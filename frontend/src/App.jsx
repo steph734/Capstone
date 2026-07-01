@@ -14,6 +14,7 @@ import SettingsPage from './pages/SettingsPage'
 import HelpPage from './pages/HelpPage'
 import UpdatePaymentPage from './pages/UpdatePaymentPage'
 import PaymentHistoryPage from './pages/PaymentHistoryPage'
+import BookAppointmentPage from './pages/BookAppointmentPage'
 
 // Temporary user data (not connected to database)
 const TEMP_USER = {
@@ -127,6 +128,17 @@ function App() {
           element={
             isAuthenticated ? (
               <AppointmentsPage user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+
+        <Route 
+          path="/appointments/book" 
+          element={
+            isAuthenticated ? (
+              <BookAppointmentPage user={currentUser} />
             ) : (
               <Navigate to="/login" replace />
             )

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import ReCaptcha from '../components/ReCaptcha'
 import './ForgotPassword.css'
@@ -13,6 +14,7 @@ function EnvelopeIcon() {
 }
 
 export default function ForgotPassword({ onLogoClick, onSignInClick }) {
+  const navigate = useNavigate()
   const [recaptchaToken, setRecaptchaToken] = useState(null)
   const [captchaError, setCaptchaError] = useState('')
 
@@ -32,7 +34,7 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
     <div className="forgot-page">
       <div className="forgot-container">
         <div className="forgot-header">
-          <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
+          <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
           <h1 className="forgot-title">Reset Password</h1>
           <p className="forgot-subtitle">
             Please enter your email address to reset your password.
@@ -67,7 +69,7 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
 
         <p className="signin-text">
           Already know your password?{' '}
-          <button type="button" className="signin-link" onClick={onSignInClick}>
+          <button type="button" className="signin-link" onClick={() => navigate('/login')}>
             Sign In
           </button>
         </p>

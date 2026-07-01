@@ -58,11 +58,14 @@ function GoogleIcon() {
   )
 }
 
-export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick }) {
+export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick, onLogin }) {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [recaptchaToken, setRecaptchaToken] = useState(null)
   const [captchaError, setCaptchaError] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -73,7 +76,14 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     }
 
     setCaptchaError('')
-    // Send recaptchaToken to your backend for verification with RECAPTCHA_SECRET_KEY
+    
+    // Call the login handler
+    if (onLogin) {
+      const result = onLogin(email, password)
+      if (!result.success) {
+        setLoginError(result.message || 'Login failed')
+      }
+    }
   }
 
   return (
@@ -95,6 +105,8 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
                 type="email"
                 placeholder="Enter your email"
                 autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
@@ -108,6 +120,8 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
               <button
                 type="button"
@@ -119,6 +133,8 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
               </button>
             </div>
           </div>
+
+          {loginError && <p className="login-error">{loginError}</p>}
 
           <div className="form-options">
             <label className="checkbox-label">

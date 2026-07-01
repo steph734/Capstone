@@ -1,7 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './ReCaptcha.css'
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY
+const MOBILE_BREAKPOINT = 768
+
+const WIDGET = {
+  normal: { width: 304, height: 78 },
+  compact: { width: 164, height: 144 },
+}
 
 let scriptLoading = false
 let scriptLoaded = false
@@ -36,50 +42,129 @@ function loadRecaptchaScript() {
   })
 }
 
+function computeLayout(hostWidth) {
+  const isMobile = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+  const size = isMobile || hostWidth < WIDGET.normal.width ? 'compact' : 'normal'
+  const { width: baseWidth, height: baseHeight } = WIDGET[size]
+  const scale = hostWidth < baseWidth ? hostWidth / baseWidth : 1
+
+  return {
+    size,
+    scale,
+    isMobile,
+    baseWidth,
+    baseHeight,
+    height: Math.ceil(baseHeight * scale),
+  }
+}
+
 export default function ReCaptcha({ onChange, onExpired }) {
-  const containerRef = useRef(null)
+  const hostRef = useRef(null)
+  const mountRef = useRef(null)
   const widgetIdRef = useRef(null)
   const onChangeRef = useRef(onChange)
   const onExpiredRef = useRef(onExpired)
+  const [layout, setLayout] = useState(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
     onExpiredRef.current = onExpired
   })
 
-  useEffect(() => {
-    if (!SITE_KEY) {
-      console.error('Missing VITE_RECAPTCHA_SITE_KEY in environment variables')
-      return
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    const updateLayout = () => {
+      const next = computeLayout(host.offsetWidth)
+      setLayout((prev) => {
+        if (
+          prev &&
+          prev.size === next.size &&
+          prev.scale === next.scale &&
+          prev.isMobile === next.isMobile
+        ) {
+          return prev
+        }
+        return next
+      })
     }
 
-    let cancelled = false
+    updateLayout()
 
-    loadRecaptchaScript().then(() => {
-      if (cancelled || !containerRef.current || widgetIdRef.current !== null) return
-
-      window.grecaptcha.ready(() => {
-        if (cancelled || !containerRef.current || widgetIdRef.current !== null) return
-
-        widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
-          sitekey: SITE_KEY,
-          callback: (token) => onChangeRef.current?.(token),
-          'expired-callback': () => {
-            onChangeRef.current?.(null)
-            onExpiredRef.current?.()
-          },
-        })
-      })
-    })
+    const observer = new ResizeObserver(updateLayout)
+    observer.observe(host)
+    window.addEventListener('resize', updateLayout)
 
     return () => {
-      cancelled = true
+      observer.disconnect()
+      window.removeEventListener('resize', updateLayout)
     }
   }, [])
 
+  useEffect(() => {
+    if (!SITE_KEY || !mountRef.current || !layout) return
+
+    const mountPoint = document.createElement('div')
+    mountRef.current.innerHTML = ''
+    mountRef.current.appendChild(mountPoint)
+
+    let cancelled = false
+
+    const renderWidget = () => {
+      if (cancelled) return
+
+      widgetIdRef.current = window.grecaptcha.render(mountPoint, {
+        sitekey: SITE_KEY,
+        size: layout.size,
+        callback: (token) => onChangeRef.current?.(token),
+        'expired-callback': () => {
+          onChangeRef.current?.(null)
+          onExpiredRef.current?.()
+        },
+      })
+    }
+
+    loadRecaptchaScript()
+      .then(() => {
+        if (cancelled) return
+        window.grecaptcha.ready(renderWidget)
+      })
+      .catch((err) => console.error(err))
+
+    return () => {
+      cancelled = true
+      widgetIdRef.current = null
+      if (mountRef.current) mountRef.current.innerHTML = ''
+    }
+  }, [layout?.size])
+
+  const scale = layout?.scale ?? 1
+  const scaleStyle =
+    scale < 1
+      ? {
+          transform: `scale(${scale})`,
+          width: `${layout.baseWidth}px`,
+          height: `${layout.baseHeight}px`,
+        }
+      : {
+          width: `${layout?.baseWidth ?? 304}px`,
+          height: `${layout?.baseHeight ?? 78}px`,
+        }
+
   return (
-    <div className="recaptcha-wrapper">
-      <div ref={containerRef} className="recaptcha-container" />
+    <div
+      ref={hostRef}
+      className={`recaptcha-wrapper${layout?.isMobile ? ' recaptcha-wrapper--mobile' : ' recaptcha-wrapper--desktop'}${layout?.size === 'compact' ? ' recaptcha-wrapper--compact' : ''}`}
+      style={{ height: layout ? `${layout.height}px` : '78px' }}
+    >
+      <div className="recaptcha-inner">
+        <div
+          ref={mountRef}
+          className="recaptcha-mount"
+          style={scaleStyle}
+        />
+      </div>
     </div>
   )
 }

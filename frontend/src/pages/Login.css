@@ -96,6 +96,18 @@
   box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.12);
 }
 
+/* Fix browser autofill background (Chrome/Edge blue-gray tint) */
+.input-wrapper input:-webkit-autofill,
+.input-wrapper input:-webkit-autofill:hover,
+.input-wrapper input:-webkit-autofill:focus,
+.input-wrapper input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 40px #fff inset !important;
+  -webkit-text-fill-color: #333 !important;
+  caret-color: #333;
+  border-color: #e0e8e3;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 .password-toggle {
   position: absolute;
   right: 12px;
@@ -245,6 +257,22 @@
 .signup-text a:hover,
 .signup-link:hover {
   text-decoration: underline;
+}
+
+.login-error {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin: -8px 0 0 0;
+  border: 1px solid #fcc;
+}
+
+.captcha-error {
+  color: #c33;
+  font-size: 13px;
+  margin-top: -8px;
 }
 
 @media (max-width: 768px) {

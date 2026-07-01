@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import ReCaptcha from '../components/ReCaptcha'
 import './SignUp.css'
@@ -42,6 +43,7 @@ function LockIcon() {
 }
 
 export default function SignUp({ onLogoClick, onLoginClick }) {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [recaptchaToken, setRecaptchaToken] = useState(null)
   const [captchaError, setCaptchaError] = useState('')
@@ -62,7 +64,7 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
     <div className="signup-page">
       <div className="signup-container">
         <div className="signup-header">
-          <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
+          <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
           <h1 className="signup-title">Create your account</h1>
           <p className="signup-subtitle">Let&apos;s get you started</p>
         </div>
@@ -155,7 +157,7 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
 
         <p className="login-text">
           Already have an account?{' '}
-          <button type="button" className="login-link" onClick={onLoginClick}>
+          <button type="button" className="login-link" onClick={() => navigate('/login')}>
             Login
           </button>
         </p>

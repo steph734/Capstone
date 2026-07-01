@@ -71,6 +71,14 @@ function GiftIcon() {
   )
 }
 
+function LockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+    </svg>
+  )
+}
+
 export default function SubscriptionPage({ user, onLogout }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -117,7 +125,7 @@ export default function SubscriptionPage({ user, onLogout }) {
       name: 'THERAPYPRO: GOLD',
       price: '₱499',
       period: '/month',
-      badge: 'Unlocked',
+      badge: 'Special Offer',
       color: 'gold',
       features: [
         'Voice Assisted Speech to Text',
@@ -135,13 +143,11 @@ export default function SubscriptionPage({ user, onLogout }) {
   }
 
   const handleUpdatePayment = () => {
-    console.log('Update payment method')
-    // In production: Open payment method modal
+    navigate('/subscription/update-payment')
   }
 
   const handlePaymentHistory = () => {
-    console.log('View payment history')
-    // In production: Navigate to payment history page
+    navigate('/subscription/payment-history')
   }
 
   const handleManageProfiles = () => {
@@ -196,6 +202,12 @@ export default function SubscriptionPage({ user, onLogout }) {
                 >
                   {tier.badge && (
                     <div className="tier-badge">{tier.badge}</div>
+                  )}
+                  {!tier.current && (
+                    <div className="tier-lock-badge">
+                      <LockIcon />
+                      <span>Locked</span>
+                    </div>
                   )}
                   
                   <div className="tier-header">

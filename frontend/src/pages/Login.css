@@ -67,7 +67,7 @@
 
 .input-icon {
   position: absolute;
-  left: 14px;
+  left: 18px;
   color: #9aab9f;
   display: flex;
   align-items: center;
@@ -76,7 +76,7 @@
 
 .input-wrapper input {
   width: 100%;
-  padding: 14px 44px 14px 42px;
+  padding: 14px 44px 14px 72px;
   border: 1px solid #e0e8e3;
   border-radius: 12px;
   background: #fff;
@@ -85,6 +85,7 @@
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  line-height: 1.2;
 }
 
 .input-wrapper input::placeholder {

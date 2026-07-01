@@ -2,11 +2,29 @@
 
 This is temporary authentication data for testing purposes only. Not connected to any database.
 
-## Test User Account
+## Patient Account
 
-**Email:** admin@therapypro.com  
-**Password:** admin123  
+**Email:** patient@gmail.com  
+**Password:** patient123  
 **Name:** Alvrin
+
+## Super Admin Account
+
+**Email:** superadmin@gmail.com  
+**Password:** superadmin123  
+**Name:** Super Admin
+
+## Owner Account
+
+**Email:** owner@gmail.com  
+**Password:** owner123  
+**Name:** Owner
+
+## Therapist Account
+
+**Email:** therapists@gmail.com  
+**Password:** therapist123  
+**Name:** Therapist
 
 ## How to Login
 

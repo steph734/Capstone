@@ -24,8 +24,8 @@ Use this script when presenting to your capstone panel to showcase all key featu
 > "The app uses secure authentication with reCAPTCHA protection. I'll login with our test account."
 
 **Action:**
-- Enter: `admin@therapypro.com`
-- Password: `admin123`
+- Enter: `patient@gmail.com`
+- Password: `patient123`
 - Check reCAPTCHA
 - Click Login
 - Wait for redirect to dashboard

@@ -69,8 +69,8 @@ npm run build
 
 ### Login Credentials (Demo)
 ```
-Email: admin@therapypro.com
-Password: admin123
+Patient account email: patient@gmail.com
+Patient account password: patient123
 ```
 
 ---

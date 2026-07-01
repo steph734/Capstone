@@ -69,8 +69,8 @@ Use this checklist before your capstone presentation to ensure everything is rea
 - [ ] Dev server running and accessible
 - [ ] At splash page (`localhost:5173`)
 - [ ] Login credentials ready:
-  - Email: `admin@therapypro.com`
-  - Password: `admin123`
+   - Patient account email: `patient@gmail.com`
+   - Patient account password: `patient123`
 - [ ] DEMO_SCRIPT.md open for reference
 - [ ] Water/coffee nearby
 - [ ] Phone on silent

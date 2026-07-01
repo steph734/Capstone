@@ -67,7 +67,30 @@ function LogoutIcon() {
   )
 }
 
-export default function PatientSidebar({ user, onLogout, isOpen, onClose }) {
+const DEFAULT_MENU_ITEMS = [
+  { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/dashboard' },
+  { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/appointments' },
+  { id: 'notes', label: 'Notes', icon: <NotesIcon />, path: '/notes' },
+  { id: 'messages', label: 'Messages', icon: <MessagesIcon />, path: '/messages' },
+  { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/subscription' },
+]
+
+const DEFAULT_BOTTOM_MENU_ITEMS = [
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  { id: 'help', label: 'Help & Support', icon: <HelpIcon />, path: '/help' },
+]
+
+export default function PatientSidebar({
+  user,
+  onLogout,
+  isOpen,
+  onClose,
+  menuItems = DEFAULT_MENU_ITEMS,
+  bottomMenuItems = DEFAULT_BOTTOM_MENU_ITEMS,
+  profileRoleLabel,
+  profileName,
+  profileAvatar,
+}) {
   const navigate = useNavigate()
   const location = useLocation()
   const [activeItem, setActiveItem] = useState('home')
@@ -83,18 +106,9 @@ export default function PatientSidebar({ user, onLogout, isOpen, onClose }) {
     navigate('/')
   }
 
-  const menuItems = [
-    { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/dashboard' },
-    { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/appointments' },
-    { id: 'notes', label: 'Notes', icon: <NotesIcon />, path: '/notes' },
-    { id: 'messages', label: 'Messages', icon: <MessagesIcon />, path: '/messages' },
-    { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/subscription' },
-  ]
-
-  const bottomMenuItems = [
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-    { id: 'help', label: 'Help & Support', icon: <HelpIcon />, path: '/help' },
-  ]
+  const resolvedProfileName = profileName || user?.name || 'Maria Santos'
+  const resolvedProfileRole = profileRoleLabel || user?.role || 'Parent'
+  const resolvedAvatar = profileAvatar || user?.avatar || '/therapy-pro-logo.png'
 
   return (
     <>
@@ -106,13 +120,13 @@ export default function PatientSidebar({ user, onLogout, isOpen, onClose }) {
         <div className="sidebar-profile">
           <div className="profile-avatar">
             <img 
-              src={user?.avatar || '/therapy-pro-logo.png'} 
-              alt={user?.name || 'User'} 
+              src={resolvedAvatar} 
+              alt={resolvedProfileName} 
             />
           </div>
           <div className="profile-info">
-            <h3 className="profile-name">{user?.name || 'Maria Santos'}</h3>
-            <p className="profile-role">{user?.role || 'Parent'}</p>
+            <h3 className="profile-name">{resolvedProfileName}</h3>
+            <p className="profile-role">{resolvedProfileRole}</p>
           </div>
           <button className="view-profile-btn">View Profile</button>
         </div>

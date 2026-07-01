@@ -1,9 +1,9 @@
 # 🚀 Therapy Pro - Quick Reference Card
 
-## Login Credentials
+## Patient Account
 ```
-Email: admin@therapypro.com
-Password: admin123
+Email: patient@gmail.com
+Password: patient123
 ```
 
 ## 5 Interactive Features & Where to Find Them

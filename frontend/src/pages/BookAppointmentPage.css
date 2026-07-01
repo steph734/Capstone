@@ -278,6 +278,26 @@
   padding-left: 32px;
 }
 
+.booking-dropdown-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, #7a9a8e 50%), linear-gradient(135deg, #7a9a8e 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.booking-dropdown-field select:disabled {
+  color: #9aaea5;
+}
+
+.input-icon-wrap input[type='date'] {
+  padding-right: 12px;
+  cursor: pointer;
+}
+
 /* ── Privacy Note ── */
 .privacy-note {
   display: flex;

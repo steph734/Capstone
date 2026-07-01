@@ -39,8 +39,8 @@ A complete dashboard page with temporary authentication (no database connection)
 
 ## Temporary Login Credentials
 
-**Email:** admin@therapypro.com  
-**Password:** admin123  
+**Patient account email:** patient@gmail.com
+**Patient account password:** patient123
 **User Name:** Alvrin
 
 ## How to Use
@@ -88,8 +88,8 @@ A complete dashboard page with temporary authentication (no database connection)
 ```javascript
 // User data
 {
-  email: 'admin@therapypro.com',
-  password: 'admin123',
+  email: 'patient@gmail.com',
+  password: 'patient123',
   name: 'Alvrin'
 }
 

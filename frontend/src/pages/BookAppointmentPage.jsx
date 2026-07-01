@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import './BookAppointmentPage.css'
@@ -37,10 +37,10 @@ const CHILD_CONDITIONS = [
 const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other']
 
 const THERAPISTS = [
-  { id: 1, name: 'Melanie Cruz',  role: 'OT Therapist',       initials: 'MC', color: '#f9a8d4', textColor: '#9d174d' },
-  { id: 2, name: 'Marco Reyes',   role: 'Speech Therapist',   initials: 'MR', color: '#93c5fd', textColor: '#1e3a8a' },
-  { id: 3, name: 'Jade Tan',      role: 'Physical Therapist', initials: 'JT', color: '#c4b5fd', textColor: '#4c1d95' },
-  { id: 4, name: 'Andre Lim',     role: 'Behavior Therapist', initials: 'AL', color: '#6ee7b7', textColor: '#064e3b' },
+  { id: 1, name: 'Melanie Cruz',  role: 'OT Therapist',       initials: 'MC', color: '#f9a8d4', textColor: '#9d174d', available: true },
+  { id: 2, name: 'Marco Reyes',   role: 'Speech Therapist',   initials: 'MR', color: '#93c5fd', textColor: '#1e3a8a', available: true },
+  { id: 3, name: 'Jade Tan',      role: 'Physical Therapist', initials: 'JT', color: '#c4b5fd', textColor: '#4c1d95', available: true },
+  { id: 4, name: 'Andre Lim',     role: 'Behavior Therapist', initials: 'AL', color: '#6ee7b7', textColor: '#064e3b', available: true },
 ]
 
 const SESSION_MODES = [
@@ -75,6 +75,8 @@ export default function BookAppointmentPage({ user }) {
 
   const [step, setStep]             = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const availableTherapists = THERAPISTS.filter(t => t.available)
+  const birthdateRef = useRef(null)
 
   /* ── Step 1: Personal Details ── */
   const [form1, setForm1] = useState({
@@ -225,10 +227,19 @@ export default function BookAppointmentPage({ user }) {
                 </div>
                 <div className="book-field">
                   <label>Birthdate <span className="req">*</span></label>
-                  <input type="date" value={form1.birthdate}
-                    onChange={e => setF1('birthdate', e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
-                    className={errors1.birthdate ? 'err' : ''} />
+                  <div className="input-icon-wrap">
+                    <CalIcon />
+                    <input
+                      ref={birthdateRef}
+                      type="date"
+                      value={form1.birthdate}
+                      onClick={e => e.currentTarget.showPicker?.()}
+                      onFocus={e => e.currentTarget.showPicker?.()}
+                      onChange={e => setF1('birthdate', e.target.value)}
+                      max={new Date().toISOString().split('T')[0]}
+                      className={errors1.birthdate ? 'err' : ''}
+                    />
+                  </div>
                   {errors1.birthdate && <span className="field-err">{errors1.birthdate}</span>}
                 </div>
               </div>
@@ -318,55 +329,61 @@ export default function BookAppointmentPage({ user }) {
               {/* ── Select Therapist ── */}
               <h3 className="book-section-title" style={{ marginTop: '18px' }}>Select your therapist</h3>
               {errors2.therapist && <div className="step-error">{errors2.therapist}</div>}
-              <div className="therapist-row">
-                {THERAPISTS.map(t => (
-                  <button
-                    key={t.id}
-                    className={`therapist-chip ${selectedTherapist === t.id ? 'selected' : ''}`}
-                    onClick={() => { setSelectedTherapist(t.id); setErrors2(p => ({ ...p, therapist: '' })) }}
-                  >
-                    <div className="therapist-avatar-wrap">
-                      <div className="therapist-avatar-circle" style={{ background: t.color, color: t.textColor }}>
-                        {t.initials}
-                      </div>
-                      {selectedTherapist === t.id && (
-                        <div className="therapist-check"><CheckIcon /></div>
-                      )}
-                    </div>
-                    <span className="therapist-chip-name">{t.name}</span>
-                    <span className="therapist-chip-role">{t.role}</span>
-                  </button>
-                ))}
+              <div className="book-field booking-dropdown-field">
+                <label htmlFor="therapist-select">Therapist <span className="req">*</span></label>
+                <select
+                  id="therapist-select"
+                  value={selectedTherapist ?? ''}
+                  onChange={e => {
+                    const value = e.target.value ? Number(e.target.value) : null
+                    setSelectedTherapist(value)
+                    setErrors2(p => ({ ...p, therapist: '' }))
+                  }}
+                  className={errors2.therapist ? 'err' : ''}
+                >
+                  <option value="" disabled>Select your therapist</option>
+                  {availableTherapists.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} - {t.role} (Available)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* ── Session Mode ── */}
               <h3 className="book-section-title" style={{ marginTop: '18px' }}>Session Mode</h3>
-              <div className="session-mode-row">
-                {SESSION_MODES.map(m => (
-                  <button
-                    key={m.id}
-                    className={`session-mode-chip ${sessionMode === m.id ? 'selected' : ''}`}
-                    onClick={() => setSessionMode(m.id)}
-                  >
-                    <m.Icon />
-                    {m.label}
-                  </button>
-                ))}
+              <div className="book-field booking-dropdown-field">
+                <label htmlFor="session-mode-select">Choose session mode</label>
+                <select
+                  id="session-mode-select"
+                  value={sessionMode}
+                  onChange={e => setSessionMode(e.target.value)}
+                >
+                  {SESSION_MODES.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
               </div>
 
               {/* ── Time Slots ── */}
               <h3 className="book-section-title" style={{ marginTop: '18px' }}>Select Time Slot</h3>
               {errors2.time && <div className="step-error">{errors2.time}</div>}
-              <div className="time-slots-grid">
-                {TIME_SLOTS.map(t => (
-                  <button
-                    key={t}
-                    className={`time-slot-btn ${pickedTime === t ? 'selected' : ''}`}
-                    onClick={() => { setPickedTime(t); setErrors2(p => ({ ...p, time: '' })) }}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="book-field booking-dropdown-field">
+                <label htmlFor="time-slot-select">Available time slots <span className="req">*</span></label>
+                <select
+                  id="time-slot-select"
+                  value={pickedTime ?? ''}
+                  onChange={e => {
+                    setPickedTime(e.target.value)
+                    setErrors2(p => ({ ...p, time: '' }))
+                  }}
+                  className={errors2.time ? 'err' : ''}
+                >
+                  <option value="" disabled>Select a time slot</option>
+                  {TIME_SLOTS.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Reschedule Note */}

@@ -1,0 +1,390 @@
+.admin-page-shell .admin-page-content {
+  background: #f5faf8;
+}
+
+.admin-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  color: #2c4a3e;
+  font-weight: 600;
+}
+
+.admin-header-badge img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-content-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+.admin-section-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e8f5f0, #d5ebe3);
+  color: #4a6b5d;
+  flex-shrink: 0;
+}
+
+.admin-section-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #2c4a3e;
+}
+
+.admin-section-heading p {
+  margin: 4px 0 0;
+  color: #6b7c75;
+}
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-stat-card,
+.admin-panel,
+.admin-table-card,
+.admin-list-card {
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.admin-stat-card {
+  padding: 18px;
+}
+
+.admin-stat-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7c75;
+}
+
+.admin-stat-value {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.admin-stat-meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #5a7a6d;
+}
+
+.admin-panel {
+  padding: 20px;
+}
+
+.admin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-panel-header h3,
+.admin-panel-header h4 {
+  margin: 0;
+  color: #2c4a3e;
+}
+
+.admin-panel-header p {
+  margin: 4px 0 0;
+  color: #6b7c75;
+  font-size: 13px;
+}
+
+.admin-button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-btn,
+.admin-btn-secondary,
+.admin-btn-danger {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-btn {
+  background: #4a6b5d;
+  color: #fff;
+}
+
+.admin-btn-secondary {
+  background: #e8f5f0;
+  color: #2c4a3e;
+}
+
+.admin-btn-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e8f5f0;
+  border-radius: 14px;
+  background: #f8fbf9;
+}
+
+.admin-list-item h4,
+.admin-list-item p {
+  margin: 0;
+}
+
+.admin-list-item p {
+  font-size: 13px;
+  color: #6b7c75;
+}
+
+.admin-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-pill.green {
+  background: #e8f5f0;
+  color: #2c4a3e;
+}
+
+.admin-pill.yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-pill.red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-table-card {
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #eef4f1;
+  font-size: 14px;
+}
+
+.admin-table th {
+  background: #f8fbf9;
+  color: #5a7a6d;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar input {
+  border: 1px solid #d8eae0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-width: 220px;
+  font-family: inherit;
+}
+
+.games-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.games-form input,
+.games-form select,
+.games-form textarea {
+  width: 100%;
+  border: 1px solid #d8eae0;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.games-form textarea {
+  grid-column: 1 / -1;
+  min-height: 96px;
+  resize: vertical;
+}
+
+.games-list {
+  display: grid;
+  gap: 12px;
+}
+
+.game-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #e8f5f0;
+  border-radius: 16px;
+  background: #f8fbf9;
+}
+
+.game-card h4 {
+  margin: 0 0 6px;
+  color: #2c4a3e;
+}
+
+.game-card p {
+  margin: 0;
+  color: #6b7c75;
+  font-size: 13px;
+}
+
+.game-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 74, 62, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 150;
+}
+
+.admin-modal {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.admin-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-modal-header h3 {
+  margin: 0;
+  color: #2c4a3e;
+}
+
+.admin-modal-form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-modal-form input,
+.admin-modal-form select,
+.admin-modal-form textarea {
+  width: 100%;
+  border: 1px solid #d8eae0;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: inherit;
+}
+
+@media (max-width: 768px) {
+  .admin-stats-grid,
+  .admin-grid-2,
+  .games-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-toolbar input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .game-card,
+  .admin-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

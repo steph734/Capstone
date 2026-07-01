@@ -78,8 +78,8 @@ npm run dev
 
 ### Issue: Can't Login
 **Fix:**
-- Email: `admin@therapypro.com`
-- Password: `admin123`
+- Patient account email: `patient@gmail.com`
+- Patient account password: `patient123`
 - Complete reCAPTCHA
 - Check console for errors
 

@@ -179,8 +179,8 @@ date-fns: ^4.1.0
    ```
 
 2. **Login:**
-   - Email: `admin@therapypro.com`
-   - Password: `admin123`
+   - Patient account email: `patient@gmail.com`
+   - Patient account password: `patient123`
 
 3. **Test each feature:**
    - ✅ Click "Show" in Quick-Log → Select mood, check exercise, rate pain

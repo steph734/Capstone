@@ -84,7 +84,7 @@ const UPCOMING = [
   { id: 3, date: 'July 17, 2026', time: '11:00 AM', therapist: 'Dr. Santos',  type: 'Speech Therapy',    status: 'confirmed' },
 ]
 
-export default function AppointmentsPage({ user, onLogout }) {
+export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const today = new Date()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
@@ -135,6 +135,7 @@ export default function AppointmentsPage({ user, onLogout }) {
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        betaTier={betaTier}
       />
 
       <div className="appt-main">

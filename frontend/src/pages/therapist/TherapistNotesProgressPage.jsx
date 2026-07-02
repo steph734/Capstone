@@ -1,5 +1,5 @@
 import TherapistPageShell from './TherapistPageShell'
-import { therapistMenuItems } from './therapistSidebarConfig'
+import { getTherapistMenuItems } from './therapistSidebarConfig'
 
 const entries = [
   { patient: 'Aira Lopez', note: 'Improved attention span during drills', progress: '78%' },
@@ -7,7 +7,7 @@ const entries = [
   { patient: 'Noah Cruz', note: 'Needs more repetition for sequencing tasks', progress: '52%' },
 ]
 
-export default function TherapistNotesProgressPage({ user, onLogout }) {
+export default function TherapistNotesProgressPage({ user, onLogout, betaTier }) {
   return (
     <TherapistPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function TherapistNotesProgressPage({ user, onLogout }) {
       title="Notes & Progress"
       subtitle="Document session notes and track outcomes"
       icon="📝"
-      menuItems={therapistMenuItems}
+      menuItems={getTherapistMenuItems(betaTier)}
     >
       <div className="admin-grid-2">
         {entries.map((entry) => (

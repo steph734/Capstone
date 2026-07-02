@@ -68,7 +68,7 @@ function CardBrandLogo({ brand }) {
   )
 }
 
-export default function UpdatePaymentPage({ user, onLogout }) {
+export default function UpdatePaymentPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentUser] = useState(user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' })
@@ -158,7 +158,7 @@ export default function UpdatePaymentPage({ user, onLogout }) {
 
   return (
     <div className="upm-layout">
-      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} />
 
       <div className="upm-main">
         <button className="mobile-menu-btn2" onClick={() => setSidebarOpen(true)} aria-label="Open menu">

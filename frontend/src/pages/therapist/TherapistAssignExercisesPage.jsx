@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
-import { therapistMenuItems } from './therapistSidebarConfig'
+import { getTherapistMenuItems } from './therapistSidebarConfig'
 
 const initialAssignments = [
   { id: 1, patient: 'Aira Lopez', exercise: 'Memory Match', due: 'Today', status: 'Assigned' },
   { id: 2, patient: 'Mika Santos', exercise: 'Sound Builder', due: 'Tomorrow', status: 'Assigned' },
 ]
 
-export default function TherapistAssignExercisesPage({ user, onLogout }) {
+export default function TherapistAssignExercisesPage({ user, onLogout, betaTier }) {
   const [assignments, setAssignments] = useState(initialAssignments)
   const [form, setForm] = useState({ patient: '', exercise: '', due: 'Today' })
 
@@ -31,7 +31,7 @@ export default function TherapistAssignExercisesPage({ user, onLogout }) {
       title="Assign Exercises"
       subtitle="Create and manage home exercises for patients"
       icon="🎯"
-      menuItems={therapistMenuItems}
+      menuItems={getTherapistMenuItems(betaTier)}
     >
       <section className="admin-panel">
         <div className="admin-panel-header">

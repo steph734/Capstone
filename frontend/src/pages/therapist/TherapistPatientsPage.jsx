@@ -1,5 +1,5 @@
 import TherapistPageShell from './TherapistPageShell'
-import { therapistMenuItems } from './therapistSidebarConfig'
+import { getTherapistMenuItems } from './therapistSidebarConfig'
 
 const patients = [
   { name: 'Aira Lopez', condition: 'ADHD', progress: '62%', status: 'Active' },
@@ -7,7 +7,7 @@ const patients = [
   { name: 'Noah Cruz', condition: 'Autism Spectrum Disorder', progress: '48%', status: 'Needs Review' },
 ]
 
-export default function TherapistPatientsPage({ user, onLogout }) {
+export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   return (
     <TherapistPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function TherapistPatientsPage({ user, onLogout }) {
       title="My Patients"
       subtitle="Track your assigned patients and current progress"
       icon="👨‍👩‍👧"
-      menuItems={therapistMenuItems}
+      menuItems={getTherapistMenuItems(betaTier)}
     >
       <div className="admin-list">
         {patients.map((patient) => (

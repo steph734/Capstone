@@ -1,5 +1,5 @@
 import OwnerPageShell from './OwnerPageShell'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 
 const staff = [
   { name: 'Marco Reyes', role: 'Speech Therapist', branch: 'Main', status: 'On Duty' },
@@ -7,7 +7,7 @@ const staff = [
   { name: 'Andre Lim', role: 'Behavior Therapist', branch: 'Cebu', status: 'On Duty' },
 ]
 
-export default function OwnerStaffPage({ user, onLogout }) {
+export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   return (
     <OwnerPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function OwnerStaffPage({ user, onLogout }) {
       title="Staff"
       subtitle="Manage therapist and clinic staff assignments"
       icon="👥"
-      menuItems={ownerMenuItems}
+      menuItems={getOwnerMenuItems(betaTier)}
     >
       <div className="admin-list">
         {staff.map((member) => (

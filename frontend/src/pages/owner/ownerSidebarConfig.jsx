@@ -60,7 +60,23 @@ function SubscriptionIcon() {
   )
 }
 
-export const ownerMenuItems = [
+function SpeechToTextIcon() {
+  return (
+    <Icon>
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+    </Icon>
+  )
+}
+
+function GamepadIcon() {
+  return (
+    <Icon>
+      <path d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" />
+    </Icon>
+  )
+}
+
+const BASE_OWNER_MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/owner/dashboard' },
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/owner/appointments' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/owner/subscription' },
@@ -69,3 +85,14 @@ export const ownerMenuItems = [
   { id: 'reports', label: 'Reports', icon: <ReportsIcon />, path: '/owner/reports' },
   { id: 'billing', label: 'Sales / Billing', icon: <BillingIcon />, path: '/owner/billing' },
 ]
+
+const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/owner/speech-features' }
+const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/owner/gamified-activities' }
+
+export const ownerMenuItems = BASE_OWNER_MENU_ITEMS
+
+export function getOwnerMenuItems(betaTier) {
+  if (betaTier === 'gold') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
+  if (betaTier === 'silver') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM]
+  return BASE_OWNER_MENU_ITEMS
+}

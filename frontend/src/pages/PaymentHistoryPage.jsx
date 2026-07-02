@@ -79,7 +79,7 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export default function PaymentHistoryPage({ user, onLogout }) {
+export default function PaymentHistoryPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentUser] = useState(user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' })
@@ -128,7 +128,7 @@ export default function PaymentHistoryPage({ user, onLogout }) {
 
   return (
     <div className="ph-layout">
-      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} />
 
       <div className="ph-main">
         <button className="mobile-menu-btn3" onClick={() => setSidebarOpen(true)} aria-label="Open menu">

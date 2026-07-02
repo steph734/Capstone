@@ -117,7 +117,7 @@ function XIcon() {
   )
 }
 
-export default function Dashboard({ onLogout, user }) {
+export default function Dashboard({ onLogout, user, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentUser] = useState(user || {
@@ -275,11 +275,12 @@ export default function Dashboard({ onLogout, user }) {
   return (
     <div className="dashboard-layout">
       {/* Patient Sidebar */}
-      <PatientSidebar 
-        user={currentUser} 
+      <PatientSidebar
+        user={currentUser}
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        betaTier={betaTier}
       />
 
       {/* Main Dashboard Content */}

@@ -1,5 +1,5 @@
 import OwnerPageShell from './OwnerPageShell'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 
 const billingRows = [
   { item: 'Appointments', amount: '₱48,000', status: 'Paid' },
@@ -7,7 +7,7 @@ const billingRows = [
   { item: 'Pending Invoices', amount: '₱7,400', status: 'Open' },
 ]
 
-export default function OwnerBillingPage({ user, onLogout }) {
+export default function OwnerBillingPage({ user, onLogout, betaTier }) {
   return (
     <OwnerPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function OwnerBillingPage({ user, onLogout }) {
       title="Sales / Billing"
       subtitle="Track income, invoices, and payment status"
       icon="💰"
-      menuItems={ownerMenuItems}
+      menuItems={getOwnerMenuItems(betaTier)}
     >
       <section className="admin-table-card">
         <table className="admin-table">

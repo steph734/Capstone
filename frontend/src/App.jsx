@@ -27,6 +27,18 @@ import OwnerStaffPage from './pages/owner/OwnerStaffPage'
 import OwnerReportsPage from './pages/owner/OwnerReportsPage'
 import OwnerBillingPage from './pages/owner/OwnerBillingPage'
 import OwnerSubscriptionPage from './pages/owner/OwnerSubscriptionPage'
+import OwnerSpeechToTextPage from './pages/owner/OwnerSpeechToTextPage'
+import OwnerTextToSpeechPage from './pages/owner/OwnerTextToSpeechPage'
+import OwnerSpeechFeaturesPage from './pages/owner/OwnerSpeechFeaturesPage'
+import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPage'
+import TherapistSpeechToTextPage from './pages/therapist/TherapistSpeechToTextPage'
+import TherapistTextToSpeechPage from './pages/therapist/TherapistTextToSpeechPage'
+import TherapistSpeechFeaturesPage from './pages/therapist/TherapistSpeechFeaturesPage'
+import TherapistGamifiedActivitiesPage from './pages/therapist/TherapistGamifiedActivitiesPage'
+import PatientSpeechToTextPage from './pages/PatientSpeechToTextPage'
+import PatientTextToSpeechPage from './pages/PatientTextToSpeechPage'
+import PatientSpeechFeaturesPage from './pages/PatientSpeechFeaturesPage'
+import PatientGamifiedActivitiesPage from './pages/PatientGamifiedActivitiesPage'
 import TherapistDashboard from './pages/therapist/TherapistDashboard'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
 import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPage'
@@ -96,8 +108,27 @@ function LoginWrapper({ onLogin }) {
 }
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true'
+  })
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('currentUser')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
+  const [ownerBetaTier, setOwnerBetaTier] = useState(() => localStorage.getItem('betaTier') || null)
+
+  const handleOwnerBetaActivate = (tier) => {
+    setOwnerBetaTier(tier)
+    if (tier) {
+      localStorage.setItem('betaTier', tier)
+    } else {
+      localStorage.removeItem('betaTier')
+    }
+  }
 
   const handleLogin = (email, password) => {
     const matchedUser = TEMP_USERS.find(user => user.email === email && user.password === password)
@@ -105,6 +136,8 @@ function App() {
     if (matchedUser) {
       setIsAuthenticated(true)
       setCurrentUser(matchedUser)
+      localStorage.setItem('isAuthenticated', 'true')
+      localStorage.setItem('currentUser', JSON.stringify(matchedUser))
       return { success: true, user: matchedUser }
     }
     return { success: false, message: 'Invalid email or password' }
@@ -113,6 +146,8 @@ function App() {
   const handleLogout = () => {
     setIsAuthenticated(false)
     setCurrentUser(null)
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('currentUser')
   }
 
   return (
@@ -161,7 +196,7 @@ function App() {
               ) : currentUser?.role === 'Therapist' ? (
                 <Navigate to="/therapist/dashboard" replace />
               ) : (
-                <Dashboard user={currentUser} onLogout={handleLogout} />
+                <Dashboard user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               )
             ) : (
               <Navigate to="/login" replace />
@@ -189,7 +224,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerDashboard user={currentUser} onLogout={handleLogout} />
+                <OwnerDashboard user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -204,7 +239,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerAppointmentsPage user={currentUser} onLogout={handleLogout} />
+                <OwnerAppointmentsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -219,7 +254,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerPatientsPage user={currentUser} onLogout={handleLogout} />
+                <OwnerPatientsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -234,7 +269,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerStaffPage user={currentUser} onLogout={handleLogout} />
+                <OwnerStaffPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -249,7 +284,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerReportsPage user={currentUser} onLogout={handleLogout} />
+                <OwnerReportsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -264,7 +299,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerBillingPage user={currentUser} onLogout={handleLogout} />
+                <OwnerBillingPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )
@@ -279,7 +314,37 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} />
+                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onBetaActivate={handleOwnerBetaActivate} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/speech-to-text"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerSpeechToTextPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/text-to-speech"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerTextToSpeechPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -294,7 +359,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistDashboard user={currentUser} onLogout={handleLogout} />
+                <TherapistDashboard user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -309,7 +374,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistPatientsPage user={currentUser} onLogout={handleLogout} />
+                <TherapistPatientsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -324,7 +389,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistAppointmentsPage user={currentUser} onLogout={handleLogout} />
+                <TherapistAppointmentsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -339,7 +404,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistSubscriptionPage user={currentUser} onLogout={handleLogout} />
+                <TherapistSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -354,7 +419,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistNotesProgressPage user={currentUser} onLogout={handleLogout} />
+                <TherapistNotesProgressPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -369,7 +434,157 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistAssignExercisesPage user={currentUser} onLogout={handleLogout} />
+                <TherapistAssignExercisesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/speech-to-text"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistSpeechToTextPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/text-to-speech"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistTextToSpeechPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/patient/speech-to-text"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientSpeechToTextPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/patient/text-to-speech"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientTextToSpeechPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/speech-features"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerSpeechFeaturesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/speech-features"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistSpeechFeaturesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/patient/speech-features"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientSpeechFeaturesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/gamified-activities"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/gamified-activities"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/patient/gamified-activities"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -455,7 +670,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <AppointmentsPage user={currentUser} onLogout={handleLogout} />
+                <AppointmentsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -485,7 +700,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <NotesPage user={currentUser} onLogout={handleLogout} />
+                <NotesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -500,7 +715,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <MessagesPage user={currentUser} onLogout={handleLogout} />
+                <MessagesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -515,7 +730,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <SubscriptionPage user={currentUser} onLogout={handleLogout} />
+                <SubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -530,7 +745,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <SettingsPage user={currentUser} onLogout={handleLogout} />
+                <SettingsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -545,7 +760,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <HelpPage user={currentUser} onLogout={handleLogout} />
+                <HelpPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -560,7 +775,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <UpdatePaymentPage user={currentUser} onLogout={handleLogout} />
+                <UpdatePaymentPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -575,7 +790,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <PaymentHistoryPage user={currentUser} onLogout={handleLogout} />
+                <PaymentHistoryPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

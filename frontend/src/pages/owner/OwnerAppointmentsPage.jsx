@@ -1,5 +1,5 @@
 import OwnerPageShell from './OwnerPageShell'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 
 const appointments = [
   { patient: 'Juan Dela Cruz', therapist: 'Marco Reyes', time: '9:00 AM', status: 'Confirmed' },
@@ -7,7 +7,7 @@ const appointments = [
   { patient: 'Aira Lopez', therapist: 'Andre Lim', time: '1:00 PM', status: 'Confirmed' },
 ]
 
-export default function OwnerAppointmentsPage({ user, onLogout }) {
+export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
   return (
     <OwnerPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function OwnerAppointmentsPage({ user, onLogout }) {
       title="Appointments"
       subtitle="Monitor bookings and session flow"
       icon="🗓️"
-      menuItems={ownerMenuItems}
+      menuItems={getOwnerMenuItems(betaTier)}
     >
       <section className="admin-table-card">
         <table className="admin-table">

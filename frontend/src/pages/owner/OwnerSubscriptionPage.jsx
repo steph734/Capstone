@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
+import OwnerPaymentPage from './OwnerPaymentPage'
 import '../SubscriptionPage.css'
 
 function MenuIcon() {
@@ -70,9 +71,19 @@ function GiftIcon() {
   )
 }
 
-export default function OwnerSubscriptionPage({ user, onLogout }) {
+function PlusIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  )
+}
+
+export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBetaActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png' }
+  const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
+  const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
 
   const subscriptionTiers = [
     {
@@ -81,6 +92,8 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
       price: 'FREE',
       period: '/ forever',
       color: 'blue',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
       features: [
         'Appointment Booking',
         'Online Payments',
@@ -95,6 +108,8 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
       price: '₱299',
       period: '/month',
       color: 'silver',
+      monthlyPrice: 299,
+      yearlyPrice: 3000,
       features: [
         'Voice Assisted Speech to Text',
         'Text to Speech',
@@ -110,6 +125,8 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
       period: '/month',
       badge: 'Special Offer',
       color: 'gold',
+      monthlyPrice: 499,
+      yearlyPrice: 5000,
       features: [
         'Voice Assisted Speech to Text',
         'Gamified Interactive Exercises',
@@ -120,8 +137,30 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
     }
   ]
 
+  const betaFeatures = {
+    silver: [
+      { id: 'speech-to-text', label: 'Speech to Text', icon: '🎤' },
+      { id: 'text-to-speech', label: 'Text to Speech', icon: '🔊' },
+    ],
+    gold: [
+      { id: 'speech-to-text', label: 'Speech to Text', icon: '🎤' },
+      { id: 'text-to-speech', label: 'Text to Speech', icon: '🔊' },
+    ],
+  }
+
   const handleSelectPlan = (planId) => {
-    console.log('Selected plan:', planId)
+    const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
+    if (selectedTier && !selectedTier.current) {
+      setSelectedTierForPayment(selectedTier)
+    }
+  }
+
+  const handleBackFromPayment = () => {
+    setSelectedTierForPayment(null)
+  }
+
+  const handleAddSubscription = () => {
+    console.log('Add subscription')
   }
 
   const handleUpdatePayment = () => {
@@ -140,6 +179,19 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
     console.log('Add family member')
   }
 
+  // If a tier is selected for payment, show the payment page
+  if (selectedTierForPayment) {
+    return (
+      <OwnerPaymentPage
+        user={user}
+        onLogout={onLogout}
+        selectedTier={selectedTierForPayment}
+        onBack={handleBackFromPayment}
+        betaTier={betaTier}
+      />
+    )
+  }
+
   return (
     <div className="subscription-layout">
       <PatientSidebar
@@ -147,7 +199,7 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        menuItems={ownerMenuItems}
+        menuItems={getOwnerMenuItems(betaTier)}
         bottomMenuItems={[]}
         profileRoleLabel="Owner"
       />
@@ -166,9 +218,15 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
             <h1 className="subscription-title">Subscription</h1>
             <p className="subscription-subtitle">Manage your subscription plan</p>
           </div>
-          <div className="user-badge">
-            <img src={currentUser.avatar} alt={currentUser.name} />
-            <span>{currentUser.name}</span>
+          <div className="header-actions">
+            <button className="add-subscription-btn" onClick={handleAddSubscription}>
+              <PlusIcon />
+              <span>Add Subscription</span>
+            </button>
+            <div className="user-badge">
+              <img src={currentUser.avatar} alt={currentUser.name} />
+              <span>{currentUser.name}</span>
+            </div>
           </div>
         </div>
 
@@ -184,6 +242,9 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
               >
                 {tier.badge && (
                   <div className="tier-badge">{tier.badge}</div>
+                )}
+                {betaTier === tier.id && (
+                  <div className="tier-beta-tag">BETA</div>
                 )}
                 {!tier.current && (
                   <div className="tier-lock-badge">
@@ -208,6 +269,14 @@ export default function OwnerSubscriptionPage({ user, onLogout }) {
                   ))}
                 </ul>
 
+                {!tier.current && betaFeatures[tier.id] && (
+                  <button
+                    className={`beta-button ${betaTier === tier.id ? 'beta-button-active' : ''}`}
+                    onClick={() => onBetaActivate && onBetaActivate(betaTier === tier.id ? null : tier.id)}
+                  >
+                    {betaTier === tier.id ? 'Beta Active ✓' : 'Beta Testing'}
+                  </button>
+                )}
                 {tier.current ? (
                   <button className="tier-button current-button" disabled>
                     Current Plan

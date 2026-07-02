@@ -1,7 +1,7 @@
 import TherapistPageShell from './TherapistPageShell'
-import { therapistMenuItems } from './therapistSidebarConfig'
+import { getTherapistMenuItems } from './therapistSidebarConfig'
 
-export default function TherapistDashboard({ user, onLogout }) {
+export default function TherapistDashboard({ user, onLogout, betaTier }) {
   const stats = [
     { label: 'Patients Assigned', value: '24', meta: '5 active today' },
     { label: 'Appointments Today', value: '8', meta: '2 pending' },
@@ -22,7 +22,7 @@ export default function TherapistDashboard({ user, onLogout }) {
       title="Dashboard"
       subtitle="Daily therapy workload and patient progress"
       icon="🩺"
-      menuItems={therapistMenuItems}
+      menuItems={getTherapistMenuItems(betaTier)}
     >
       <div className="admin-stats-grid">
         {stats.map((stat) => (

@@ -116,6 +116,14 @@
   margin-bottom: 16px;
 }
 
+.admin-panel-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .admin-panel-header h3,
 .admin-panel-header h4 {
   margin: 0;
@@ -216,6 +224,11 @@
   color: #b91c1c;
 }
 
+.admin-pill.beta {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .admin-table-card {
   overflow: hidden;
 }
@@ -251,6 +264,30 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.admin-subscription-toolbar {
+  padding: 18px 20px;
+  border: 1px solid #e8f5f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.admin-subscription-toolbar-title {
+  margin: 0 0 4px;
+  color: #2c4a3e;
+  font-size: 16px;
+}
+
+.admin-subscription-toolbar-text {
+  margin: 0;
+  color: #6b7c75;
+  font-size: 13px;
+}
+
+.admin-subscription-add-btn {
+  white-space: nowrap;
 }
 
 .admin-toolbar input {
@@ -348,6 +385,45 @@
 .admin-modal-header h3 {
   margin: 0;
   color: #2c4a3e;
+}
+
+.admin-beta-modal {
+  max-width: 640px;
+}
+
+.admin-beta-btn {
+  background: #e8f5f0;
+  color: #2c4a3e;
+}
+
+.admin-beta-btn:hover {
+  filter: brightness(0.98);
+}
+
+.admin-beta-user-item {
+  align-items: center;
+}
+
+.admin-beta-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-beta-toggle-btn {
+  white-space: nowrap;
+}
+
+.admin-beta-toggle-active {
+  background: #e8f5f0;
+  color: #2c4a3e;
+}
+
+.admin-beta-toggle-inactive {
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .admin-modal-form {

@@ -1,5 +1,5 @@
 import TherapistPageShell from './TherapistPageShell'
-import { therapistMenuItems } from './therapistSidebarConfig'
+import { getTherapistMenuItems } from './therapistSidebarConfig'
 
 const appointments = [
   { patient: 'Aira Lopez', date: 'July 1, 2026', time: '9:00 AM', status: 'Confirmed' },
@@ -7,7 +7,7 @@ const appointments = [
   { patient: 'Noah Cruz', date: 'July 1, 2026', time: '1:00 PM', status: 'Confirmed' },
 ]
 
-export default function TherapistAppointmentsPage({ user, onLogout }) {
+export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) {
   return (
     <TherapistPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function TherapistAppointmentsPage({ user, onLogout }) {
       title="Appointments"
       subtitle="Review your upcoming sessions"
       icon="🗓️"
-      menuItems={therapistMenuItems}
+      menuItems={getTherapistMenuItems(betaTier)}
     >
       <section className="admin-table-card">
         <table className="admin-table">

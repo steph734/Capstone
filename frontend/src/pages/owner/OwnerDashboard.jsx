@@ -1,7 +1,7 @@
 import OwnerPageShell from './OwnerPageShell'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 
-export default function OwnerDashboard({ user, onLogout }) {
+export default function OwnerDashboard({ user, onLogout, betaTier }) {
   const stats = [
     { label: 'Appointments Today', value: '34', meta: '6 pending confirmation' },
     { label: 'Active Patients', value: '218', meta: '+14 this week' },
@@ -16,7 +16,7 @@ export default function OwnerDashboard({ user, onLogout }) {
       title="Dashboard"
       subtitle="Overview of clinic operations, people, and revenue"
       icon="📈"
-      menuItems={ownerMenuItems}
+      menuItems={getOwnerMenuItems(betaTier)}
     >
       <div className="admin-stats-grid">
         {stats.map((stat) => (

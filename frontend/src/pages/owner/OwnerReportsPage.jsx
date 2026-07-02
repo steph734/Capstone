@@ -1,5 +1,5 @@
 import OwnerPageShell from './OwnerPageShell'
-import { ownerMenuItems } from './ownerSidebarConfig'
+import { getOwnerMenuItems } from './ownerSidebarConfig'
 
 const reports = [
   { title: 'Monthly Revenue', detail: '₱86,000 collected', status: 'Up 12%' },
@@ -7,7 +7,7 @@ const reports = [
   { title: 'Patient Growth', detail: '18 new patients', status: 'Up 7%' },
 ]
 
-export default function OwnerReportsPage({ user, onLogout }) {
+export default function OwnerReportsPage({ user, onLogout, betaTier }) {
   return (
     <OwnerPageShell
       user={user}
@@ -15,7 +15,7 @@ export default function OwnerReportsPage({ user, onLogout }) {
       title="Reports"
       subtitle="See performance summaries and trends"
       icon="📑"
-      menuItems={ownerMenuItems}
+      menuItems={getOwnerMenuItems(betaTier)}
     >
       <div className="admin-grid-2">
         {reports.map((report) => (

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import './PageWithSidebar.css'
 
-export default function HelpPage({ user, onLogout }) {
+export default function HelpPage({ user, onLogout, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -12,6 +12,7 @@ export default function HelpPage({ user, onLogout }) {
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        betaTier={betaTier}
       />
       
       <main className="page-content">

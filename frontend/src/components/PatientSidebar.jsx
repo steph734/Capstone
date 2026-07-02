@@ -67,6 +67,22 @@ function LogoutIcon() {
   )
 }
 
+function SpeechToTextIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+    </svg>
+  )
+}
+
+function GamepadIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" />
+    </svg>
+  )
+}
+
 const DEFAULT_MENU_ITEMS = [
   { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/dashboard' },
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/appointments' },
@@ -74,6 +90,15 @@ const DEFAULT_MENU_ITEMS = [
   { id: 'messages', label: 'Messages', icon: <MessagesIcon />, path: '/messages' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/subscription' },
 ]
+
+const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/patient/speech-features' }
+const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/patient/gamified-activities' }
+
+function getPatientMenuItems(betaTier) {
+  if (betaTier === 'gold') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
+  if (betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM]
+  return DEFAULT_MENU_ITEMS
+}
 
 const DEFAULT_BOTTOM_MENU_ITEMS = [
   { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
@@ -85,12 +110,14 @@ export default function PatientSidebar({
   onLogout,
   isOpen,
   onClose,
-  menuItems = DEFAULT_MENU_ITEMS,
+  menuItems,
   bottomMenuItems = DEFAULT_BOTTOM_MENU_ITEMS,
   profileRoleLabel,
   profileName,
   profileAvatar,
+  betaTier,
 }) {
+  const resolvedMenuItems = menuItems ?? getPatientMenuItems(betaTier)
   const navigate = useNavigate()
   const location = useLocation()
   const [activeItem, setActiveItem] = useState('home')
@@ -133,7 +160,7 @@ export default function PatientSidebar({
 
         {/* Main Navigation */}
         <nav className="sidebar-nav">
-          {menuItems.map(item => (
+          {resolvedMenuItems.map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeItem === item.id || location.pathname === item.path ? 'active' : ''}`}

@@ -8,10 +8,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'inline', // Automatically registers the service worker in index.html
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'] // Explicitly tell workbox to cache assets
+      },
+      devOptions: {
+        enabled: true // Allows you to test the service worker locally on localhost
+      },
       manifest: {
-        name: 'My Capstone Project',
-        short_name: 'Capstone',
+        name: 'Therapy Pro',
+        short_name: 'TherapyPro',
         description: 'An awesome Vite + React PWA',
         theme_color: '#ffffff',
         icons: [

@@ -746,7 +746,7 @@
 }
 
 @media (min-width: 1025px) and (max-width: 1439px) {
-  .book-page    { margin-left: 280px; }
+  .book-page    { margin-left: 260px; }
   .book-actions { left: 280px; }
 }
 

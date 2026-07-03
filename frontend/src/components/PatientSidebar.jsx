@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import './PatientSidebar.css'
 
@@ -75,6 +75,14 @@ function SpeechToTextIcon() {
   )
 }
 
+function EmailIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+    </svg>
+  )
+}
+
 function GamepadIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -88,6 +96,7 @@ const DEFAULT_MENU_ITEMS = [
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/appointments' },
   { id: 'notes', label: 'Notes', icon: <NotesIcon />, path: '/notes' },
   { id: 'messages', label: 'Messages', icon: <MessagesIcon />, path: '/messages' },
+  { id: 'email', label: 'Email', icon: <EmailIcon />, path: '/patient/email' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/subscription' },
 ]
 
@@ -121,6 +130,13 @@ export default function PatientSidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const [activeItem, setActiveItem] = useState('home')
+  const sidebarRef = useRef(null)
+
+  useEffect(() => {
+    if (isOpen && sidebarRef.current) {
+      sidebarRef.current.scrollTop = 0
+    }
+  }, [isOpen])
 
   const handleNavigation = (path, item) => {
     setActiveItem(item)
@@ -142,7 +158,7 @@ export default function PatientSidebar({
       {/* Overlay for mobile */}
       {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
       
-      <aside className={`patient-sidebar ${isOpen ? 'open' : ''}`}>
+      <aside ref={sidebarRef} className={`patient-sidebar ${isOpen ? 'open' : ''}`}>
         {/* User Profile Section */}
         <div className="sidebar-profile">
           <div className="profile-avatar">

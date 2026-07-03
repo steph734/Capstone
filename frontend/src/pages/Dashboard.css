@@ -1280,7 +1280,7 @@
 /* Large Tablet / Small Desktop */
 @media (min-width: 1025px) and (max-width: 1439px) {
   .dashboard-main {
-    margin-left: 280px;
+    margin-left: 260px;
   }
 
   .dashboard-content-area {

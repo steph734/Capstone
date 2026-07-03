@@ -69,6 +69,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  min-width: 0;
 }
 
 .admin-stat-card,
@@ -231,11 +232,18 @@
 
 .admin-table-card {
   overflow: hidden;
+  min-width: 0;
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 560px;
 }
 
 .admin-table th,
@@ -244,6 +252,7 @@
   text-align: left;
   border-bottom: 1px solid #eef4f1;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .admin-table th {
@@ -441,6 +450,28 @@
   font-family: inherit;
 }
 
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-section-heading h2 {
+    font-size: 20px;
+  }
+
+  .admin-section-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .admin-panel-header {
+    flex-wrap: wrap;
+  }
+}
+
+/* Mobile */
 @media (max-width: 768px) {
   .admin-stats-grid,
   .admin-grid-2,
@@ -451,6 +482,47 @@
   .admin-page-header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+  }
+
+  .admin-header-badge {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .admin-header-badge img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .admin-header-badge span {
+    display: none;
+  }
+
+  .admin-section-heading {
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .admin-section-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .admin-section-heading h2 {
+    font-size: 18px;
+  }
+
+  .admin-section-heading p {
+    font-size: 13px;
+  }
+
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .admin-toolbar input {
@@ -458,9 +530,68 @@
     width: 100%;
   }
 
+  .admin-panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .admin-panel-tags {
+    justify-content: flex-start;
+  }
+
+  .admin-button-row {
+    flex-direction: column;
+  }
+
+  .admin-btn,
+  .admin-btn-secondary,
+  .admin-btn-danger {
+    width: 100%;
+    text-align: center;
+    padding: 12px 14px;
+  }
+
   .game-card,
   .admin-list-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .game-actions {
+    width: 100%;
+  }
+
+  .admin-table-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-modal {
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
+
+  .admin-subscription-toolbar {
+    padding: 14px;
+  }
+
+  .admin-subscription-toolbar-title {
+    font-size: 14px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 400px) {
+  .admin-stats-grid {
+    gap: 10px;
+  }
+
+  .admin-stat-value {
+    font-size: 24px;
+  }
+
+  .admin-panel {
+    padding: 14px;
   }
 }

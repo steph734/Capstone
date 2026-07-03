@@ -464,7 +464,7 @@
 }
 
 @media (min-width: 1025px) and (max-width: 1439px) {
-  .appt-main { margin-left: 280px; }
+  .appt-main { margin-left: 260px; }
 }
 
 @media (min-width: 1440px) {

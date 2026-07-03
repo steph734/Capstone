@@ -39,6 +39,7 @@ import PatientSpeechToTextPage from './pages/PatientSpeechToTextPage'
 import PatientTextToSpeechPage from './pages/PatientTextToSpeechPage'
 import PatientSpeechFeaturesPage from './pages/PatientSpeechFeaturesPage'
 import PatientGamifiedActivitiesPage from './pages/PatientGamifiedActivitiesPage'
+import PatientEmailPage from './pages/PatientEmailPage'
 import TherapistDashboard from './pages/therapist/TherapistDashboard'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
 import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPage'
@@ -710,8 +711,8 @@ function App() {
           } 
         />
 
-        <Route 
-          path="/messages" 
+        <Route
+          path="/messages"
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
@@ -722,10 +723,25 @@ function App() {
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
 
-        <Route 
+        <Route
+          path="/patient/email"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientEmailPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
           path="/subscription" 
           element={
             isAuthenticated ? (

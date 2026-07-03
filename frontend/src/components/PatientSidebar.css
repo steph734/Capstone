@@ -10,7 +10,9 @@
   top: 0;
   z-index: 100;
   overflow-y: auto;
-  transition: transform 0.3s ease;
+  overflow-x: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 2px 0 12px rgba(0,0,0,0.04);
 }
 
 /* Sidebar Profile Section */
@@ -19,6 +21,10 @@
   text-align: center;
   background: #fff;
   border-bottom: 1px solid #e8f5f0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex-shrink: 0;
 }
 
 .profile-avatar {
@@ -53,6 +59,7 @@
   color: #6b7c75;
   margin: 0;
 }
+
 
 .view-profile-btn {
   background: #e8f5f0;
@@ -99,6 +106,7 @@
   transition: all 0.2s;
   text-align: left;
   font-family: inherit;
+  min-height: 48px;
 }
 
 .nav-item:hover {
@@ -153,26 +161,47 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.45);
   z-index: 99;
+  backdrop-filter: blur(2px);
+  animation: overlayFadeIn 0.2s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Mobile Styles */
 @media (max-width: 768px) {
   .patient-sidebar {
     transform: translateX(-100%);
+    width: 270px;
+    box-shadow: none;
   }
 
   .patient-sidebar.open {
     transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
   }
 
   .sidebar-overlay {
     display: block;
   }
 
-  .sidebar-overlay:not(.open) {
-    display: none;
+  .sidebar-profile {
+    padding: 24px 18px;
+  }
+
+  .profile-avatar {
+    width: 70px;
+    height: 70px;
+  }
+
+  .nav-item {
+    padding: 14px 18px;
+    font-size: 15px;
+    min-height: 52px;
   }
 }
 

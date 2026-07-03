@@ -790,17 +790,32 @@
 
   .mobile-menu-btn {
     display: flex;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    font-size: 22px;
   }
 
   .subscription-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
-    padding-left: 68px;
+    gap: 12px;
+    padding-left: 70px;
+    padding-right: 16px;
   }
 
-  .user-badge {
-    align-self: flex-start;
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .user-badge span {
+    display: none;
+  }
+
+  .add-subscription-btn {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 
   .tiers-grid {
@@ -809,7 +824,14 @@
 
   .plan-details-card {
     flex-direction: column;
-    text-align: center;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .plan-details-icon {
+    flex-direction: row;
+    align-self: stretch;
+    justify-content: space-between;
   }
 
   .manage-actions {
@@ -819,10 +841,35 @@
   .family-info {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
   }
 
   .manage-profiles-btn {
     width: 100%;
+  }
+
+  .beta-modal {
+    border-radius: 18px;
+  }
+
+  .beta-modal-header {
+    padding: 18px 18px 14px;
+  }
+
+  .beta-modal-body {
+    padding: 16px 18px 20px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 400px) {
+  .subscription-header {
+    padding-left: 62px;
+  }
+
+  .subscription-content {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 }
 

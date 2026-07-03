@@ -1,0 +1,323 @@
+.therapy-detail-page {
+  min-height: 100vh;
+  background: #f5faf8;
+}
+
+.therapy-header {
+  padding: 24px 20px 40px;
+  position: relative;
+}
+
+.back-btn {
+  background: #fff;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  transition: transform 0.2s;
+}
+
+.back-btn:hover {
+  transform: translateX(-2px);
+}
+
+.therapy-header-content {
+  text-align: center;
+}
+
+.therapy-icon {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.therapy-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0 0 8px 0;
+}
+
+.therapy-description {
+  font-size: 16px;
+  color: #5a7a6d;
+  margin: 0;
+}
+
+.therapy-content {
+  max-width: 600px;
+  margin: -20px auto 0;
+  padding: 0 20px 40px;
+}
+
+/* Progress Card */
+.progress-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.progress-card h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0 0 16px 0;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px;
+  background: #f5faf8;
+  border-radius: 12px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #5a7a6d;
+  text-align: center;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 12px;
+  background: #e8f5f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+/* Sections */
+.exercises-section,
+.milestones-section {
+  margin-bottom: 32px;
+}
+
+.exercises-section h2,
+.milestones-section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0 0 16px 0;
+}
+
+/* Exercise Cards */
+.exercise-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exercise-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s;
+}
+
+.exercise-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.exercise-card.completed {
+  opacity: 0.8;
+}
+
+.exercise-checkbox {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #5a7a6d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #fff;
+  background: #fff;
+}
+
+.exercise-card.completed .exercise-checkbox {
+  background: #4a6b5d;
+  border-color: #4a6b5d;
+}
+
+.exercise-info {
+  flex: 1;
+}
+
+.exercise-info h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c4a3e;
+  margin: 0 0 4px 0;
+}
+
+.exercise-info p {
+  font-size: 13px;
+  color: #6b7c75;
+  margin: 0;
+}
+
+.exercise-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.exercise-status.done {
+  background: #d5f0e3;
+  color: #2c7a4e;
+}
+
+.exercise-status.pending {
+  background: #fef3d5;
+  color: #8a6c1f;
+}
+
+/* Milestone Cards */
+.milestone-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.milestone-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.milestone-card.achieved {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-left: 4px solid #4ade80;
+}
+
+.milestone-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.milestone-content h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c4a3e;
+  margin: 0 0 4px 0;
+}
+
+.milestone-content p {
+  font-size: 13px;
+  color: #6b7c75;
+  margin: 0;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.action-btn.primary {
+  background: #4a6b5d;
+  color: #fff;
+}
+
+.action-btn.primary:hover {
+  background: #3d5a50;
+}
+
+.action-btn.secondary {
+  background: #fff;
+  color: #4a6b5d;
+  border: 2px solid #4a6b5d;
+}
+
+.action-btn.secondary:hover {
+  background: #f5faf8;
+}
+
+/* Not Found */
+.therapy-not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  text-align: center;
+}
+
+.therapy-not-found h1 {
+  color: #2c4a3e;
+  margin-bottom: 20px;
+}
+
+.therapy-not-found button {
+  background: #4a6b5d;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .progress-stats {
+    gap: 12px;
+  }
+
+  .quick-actions {
+    flex-direction: column;
+  }
+}

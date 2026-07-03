@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
-import ReCaptcha from '../components/ReCaptcha'
 import './SignUp.css'
 
 function PersonIcon() {
@@ -42,27 +42,17 @@ function LockIcon() {
 }
 
 export default function SignUp({ onLogoClick, onLoginClick }) {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
-  const [recaptchaToken, setRecaptchaToken] = useState(null)
-  const [captchaError, setCaptchaError] = useState('')
-
   const handleSubmit = (e) => {
     e.preventDefault()
-
-    if (!recaptchaToken) {
-      setCaptchaError('Please complete the reCAPTCHA verification.')
-      return
-    }
-
-    setCaptchaError('')
-    // Send recaptchaToken to your backend for verification with RECAPTCHA_SECRET_KEY
   }
 
   return (
     <div className="signup-page">
       <div className="signup-container">
         <div className="signup-header">
-          <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
+          <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
           <h1 className="signup-title">Create your account</h1>
           <p className="signup-subtitle">Let&apos;s get you started</p>
         </div>
@@ -141,21 +131,12 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
             </div>
           </div>
 
-          <ReCaptcha
-            onChange={(token) => {
-              setRecaptchaToken(token)
-              if (token) setCaptchaError('')
-            }}
-            onExpired={() => setRecaptchaToken(null)}
-          />
-          {captchaError && <p className="captcha-error">{captchaError}</p>}
-
           <button type="submit" className="signup-btn">Sign up</button>
         </form>
 
         <p className="login-text">
           Already have an account?{' '}
-          <button type="button" className="login-link" onClick={onLoginClick}>
+          <button type="button" className="login-link" onClick={() => navigate('/login')}>
             Login
           </button>
         </p>

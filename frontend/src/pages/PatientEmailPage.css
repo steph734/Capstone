@@ -1,0 +1,800 @@
+/* ══════════════════════════════════════════
+   PAGE WRAPPER
+   On desktop: fixed full-height Gmail layout
+   On mobile:  normal flow, hamburger padding
+══════════════════════════════════════════ */
+.pe-page {
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Gmail shell ── */
+.pe-gmail {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #f6f8fc;
+}
+
+/* ══════════════════════════════════════════
+   LEFT FOLDER SIDEBAR (desktop)
+══════════════════════════════════════════ */
+.pe-left {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+/* Compose button */
+.pe-compose-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 16px 16px;
+  padding: 16px 24px;
+  background: #c2e7ff;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #001d35;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  font-family: inherit;
+}
+
+.pe-compose-btn:hover {
+  background: #a8d7f5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Folder items */
+.pe-folders {
+  display: flex;
+  flex-direction: column;
+}
+
+.pe-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px 6px 26px;
+  background: none;
+  border: none;
+  border-radius: 0 20px 20px 0;
+  font-size: 14px;
+  color: #202124;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+  width: 100%;
+  min-height: 36px;
+  margin-right: 14px;
+  font-family: inherit;
+}
+
+.pe-folder-item:hover { background: #e8eaed; }
+
+.pe-folder-active {
+  background: #d3e3fd !important;
+  font-weight: 700;
+}
+
+.pe-folder-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.pe-folder-label { flex: 1; }
+
+.pe-folder-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #202124;
+}
+
+/* ══════════════════════════════════════════
+   MAIN PANEL
+══════════════════════════════════════════ */
+.pe-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 16px;
+  margin: 8px 16px 8px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Search bar */
+.pe-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #eaf1fb;
+  border-radius: 24px;
+  padding: 10px 20px;
+  margin: 16px 16px 4px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.pe-search-bar:focus-within {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.pe-search-icon { color: #444746; display: flex; flex-shrink: 0; }
+
+.pe-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: #202124;
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.pe-search-input::placeholder { color: #444746; }
+
+/* ── Email list ── */
+.pe-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pe-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px 4px;
+  border-bottom: 1px solid #e8eaed;
+  flex-shrink: 0;
+}
+
+.pe-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444746;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pe-list-count { font-size: 12px; color: #888; }
+
+/* Email row */
+.pe-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+  background: #fff;
+}
+
+.pe-row:hover {
+  background: #f5f5f5;
+  box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0;
+}
+
+.pe-row-unread { background: #f2f6fc; }
+
+.pe-row-unread .pe-row-from,
+.pe-row-unread .pe-row-from-mobile,
+.pe-row-unread .pe-row-subject { font-weight: 700; }
+
+.pe-row-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4a6b5d, #2c4a3e);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pe-row-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  color: #bbb;
+  flex-shrink: 0;
+}
+
+.pe-row-from {
+  width: 170px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #202124;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pe-row-body {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.pe-row-subject { color: #202124; font-size: 14px; }
+.pe-row-preview { color: #5f6368; font-weight: 400; }
+.pe-row-from-mobile { display: none; }
+
+.pe-row-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #5f6368;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ── Empty state ── */
+.pe-empty { text-align: center; padding: 80px 24px; color: #5f6368; }
+.pe-empty-icon { font-size: 64px; margin-bottom: 16px; }
+.pe-empty p { font-size: 16px; font-weight: 500; }
+
+/* ══════════════════════════════════════════
+   EMAIL DETAIL
+══════════════════════════════════════════ */
+.pe-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 32px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pe-detail-toolbar { display: flex; gap: 4px; margin-bottom: 20px; }
+
+.pe-detail-subject {
+  font-size: 22px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 16px;
+  line-height: 1.3;
+}
+
+.pe-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.pe-detail-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4a6b5d, #2c4a3e);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pe-detail-sender-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.pe-detail-sender { font-size: 14px; font-weight: 700; color: #202124; }
+.pe-detail-sender-email { font-size: 12px; color: #5f6368; }
+.pe-star-inline { color: #5f6368; }
+.pe-detail-date { font-size: 13px; color: #5f6368; white-space: nowrap; }
+.pe-detail-body { font-size: 14px; line-height: 1.8; color: #202124; }
+.pe-detail-body p { margin: 0 0 2px; }
+
+/* ══════════════════════════════════════════
+   ICON BUTTONS
+══════════════════════════════════════════ */
+.pe-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #444746;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+
+.pe-icon-btn:hover { background: #e8eaed; }
+
+/* ══════════════════════════════════════════
+   COMPOSE MODAL — Gmail style
+══════════════════════════════════════════ */
+.pe-compose-modal {
+  position: fixed;
+  bottom: 0;
+  right: 24px;
+  width: 500px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 500;
+  animation: peSlideUp 0.2s ease;
+  overflow: hidden;
+}
+
+/* Minimized: show only the header bar */
+.pe-compose-minimized {
+  height: auto;
+}
+
+@keyframes peSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Header */
+.pe-compose-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #404040;
+  color: #fff;
+  padding: 8px 8px 8px 16px;
+  border-radius: 10px 10px 0 0;
+  cursor: default;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.pe-compose-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+
+.pe-compose-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pe-compose-ctrl-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+  padding: 0;
+}
+
+.pe-compose-ctrl-btn:hover { background: rgba(255,255,255,0.18); }
+
+/* Field rows (To, Subject) */
+.pe-compose-field {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e8eaed;
+  padding: 0 16px;
+  min-height: 44px;
+}
+
+.pe-compose-field-label {
+  font-size: 13px;
+  color: #444746;
+  font-weight: 500;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.pe-compose-recipient {
+  flex: 1;
+  font-size: 13px;
+  color: #202124;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pe-compose-cc-bcc {
+  font-size: 13px;
+  color: #444746;
+  cursor: pointer;
+  white-space: nowrap;
+  padding-left: 8px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+.pe-compose-cc-bcc:hover { color: #202124; }
+
+.pe-compose-field-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  color: #202124;
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+}
+
+.pe-compose-field-input::placeholder { color: #757575; }
+
+/* Body textarea */
+.pe-compose-body {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #202124;
+  min-height: 260px;
+  line-height: 1.7;
+  background: #fff;
+}
+
+/* Footer toolbar */
+.pe-compose-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+/* Split Send button */
+.pe-compose-send-group {
+  display: flex;
+  align-items: center;
+  border-radius: 20px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.pe-send-btn {
+  background: #0b57d0;
+  color: #fff;
+  border: none;
+  border-radius: 20px 0 0 20px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.pe-send-btn:hover:not(:disabled) { background: #0842a0; }
+.pe-send-btn:disabled { opacity: 0.75; cursor: default; }
+.pe-send-btn-sent {
+  background: #34a853 !important;
+  border-radius: 20px;
+}
+
+.pe-send-arrow {
+  background: #0b57d0;
+  color: #fff;
+  border: none;
+  border-left: 1px solid rgba(255,255,255,0.25);
+  border-radius: 0 20px 20px 0;
+  padding: 9px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.pe-send-arrow:hover { background: #0842a0; }
+
+/* Toolbar icon buttons */
+.pe-compose-toolbar {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 2px;
+}
+
+.pe-tb-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #444746;
+  transition: background 0.12s;
+  padding: 0;
+}
+
+.pe-tb-btn:hover { background: #e8eaed; }
+
+.pe-compose-trash { margin-left: auto; color: #444746; }
+
+/* ══════════════════════════════════════════
+   TABLET  (769 – 1024 px)
+══════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .pe-left { width: 180px; }
+
+  .pe-compose-btn { padding: 14px 16px; font-size: 13px; }
+
+  .pe-folder-item { font-size: 13px; padding: 6px 10px 6px 18px; }
+
+  .pe-row-from { width: 130px; }
+}
+
+/* ══════════════════════════════════════════
+   MOBILE  (≤ 768 px)
+   Strategy:
+   - pe-page becomes a normal-flow column
+     with padding-top for the fixed hamburger
+   - pe-gmail stacks vertically
+   - pe-left → horizontal scrollable chip bar
+   - pe-main → flex column, fills rest
+   - email rows become 2-line cards
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Override fixed-height so page scrolls naturally */
+  .pe-page {
+    height: auto !important;
+    overflow: visible !important;
+    padding-top: 64px !important;   /* space for fixed ☰ button */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: 100vh;
+  }
+
+  .pe-gmail {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    min-height: calc(100vh - 64px);
+  }
+
+  /* ── Folder bar ── */
+  .pe-left {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 8px;
+    background: #f6f8fc;
+    border-bottom: 1px solid #e8eaed;
+    overflow-x: auto;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .pe-left::-webkit-scrollbar { display: none; }
+
+  .pe-compose-btn {
+    margin: 0;
+    padding: 9px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .pe-folders {
+    flex-direction: row;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .pe-folder-item {
+    flex-direction: row;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #dadce0;
+    gap: 6px;
+    font-size: 13px;
+    margin-right: 0;
+    min-height: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: auto;
+  }
+
+  .pe-folder-item:hover { background: #e8eaed; }
+
+  .pe-folder-active {
+    background: #d3e3fd !important;
+    border-color: #a8c7fa !important;
+    font-weight: 700;
+  }
+
+  .pe-folder-icon { font-size: 14px; width: auto; }
+
+  .pe-folder-count {
+    font-size: 11px;
+    font-weight: 800;
+    color: #0b57d0;
+  }
+
+  /* ── Main panel ── */
+  .pe-main {
+    flex: 1;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pe-search-bar {
+    margin: 10px 10px 4px;
+    padding: 9px 14px;
+    border-radius: 20px;
+  }
+
+  .pe-search-input { font-size: 14px; }
+
+  .pe-list { overflow-y: visible; }
+
+  .pe-list-header { padding: 8px 14px 4px; }
+
+  /* ── 2-line email rows on mobile ── */
+  .pe-row {
+    padding: 10px 12px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .pe-row-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+    margin-top: 2px;
+  }
+
+  .pe-row-star { display: none; }
+
+  /* The middle section becomes a 2-line stack */
+  .pe-row-from {
+    display: none;     /* hide from its own cell; shown inside pe-row-body */
+  }
+
+  .pe-row-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    white-space: normal;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* Sender name shown inline above subject on mobile */
+  .pe-row-from-mobile {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #202124;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pe-row-subject {
+    font-size: 13px;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pe-row-preview { display: none; }
+
+  .pe-row-time {
+    font-size: 11px;
+    min-width: 38px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── Email detail ── */
+  .pe-detail {
+    padding: 14px 14px 28px;
+    overflow-y: visible;
+  }
+
+  .pe-detail-subject { font-size: 18px; }
+
+  .pe-detail-meta { flex-wrap: wrap; }
+
+  .pe-detail-sender-email { display: none; }
+
+  /* ── Compose modal → full-width bottom sheet ── */
+  .pe-compose-modal {
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 88vh;
+  }
+
+  .pe-compose-body { min-height: 160px; }
+
+  .pe-compose-toolbar .pe-tb-btn:nth-child(n+4) { display: none; }
+}
+
+/* ══════════════════════════════════════════
+   SMALL MOBILE  (≤ 400 px)
+══════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .pe-page { padding-top: 58px !important; }
+
+  .pe-compose-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .pe-folder-item { padding: 6px 10px; font-size: 12px; }
+
+  .pe-row { padding: 8px 10px; gap: 8px; }
+
+  .pe-row-avatar { width: 34px; height: 34px; font-size: 13px; }
+
+  .pe-row-time { min-width: 32px; font-size: 10px; }
+}

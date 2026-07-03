@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
-import ReCaptcha from '../components/ReCaptcha'
 import './ForgotPassword.css'
 
 function EnvelopeIcon() {
@@ -13,26 +13,16 @@ function EnvelopeIcon() {
 }
 
 export default function ForgotPassword({ onLogoClick, onSignInClick }) {
-  const [recaptchaToken, setRecaptchaToken] = useState(null)
-  const [captchaError, setCaptchaError] = useState('')
-
+  const navigate = useNavigate()
   const handleSubmit = (e) => {
     e.preventDefault()
-
-    if (!recaptchaToken) {
-      setCaptchaError('Please complete the reCAPTCHA verification.')
-      return
-    }
-
-    setCaptchaError('')
-    // Send reset request to backend with email and recaptchaToken
   }
 
   return (
     <div className="forgot-page">
       <div className="forgot-container">
         <div className="forgot-header">
-          <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
+          <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
           <h1 className="forgot-title">Reset Password</h1>
           <p className="forgot-subtitle">
             Please enter your email address to reset your password.
@@ -53,21 +43,12 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
             </div>
           </div>
 
-          <ReCaptcha
-            onChange={(token) => {
-              setRecaptchaToken(token)
-              if (token) setCaptchaError('')
-            }}
-            onExpired={() => setRecaptchaToken(null)}
-          />
-          {captchaError && <p className="captcha-error">{captchaError}</p>}
-
           <button type="submit" className="forgot-btn">Reset Password</button>
         </form>
 
         <p className="signin-text">
           Already know your password?{' '}
-          <button type="button" className="signin-link" onClick={onSignInClick}>
+          <button type="button" className="signin-link" onClick={() => navigate('/login')}>
             Sign In
           </button>
         </p>

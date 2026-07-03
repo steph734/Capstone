@@ -1,0 +1,744 @@
+/* ══════════════════════════════════════════
+   PAGE SHELL
+══════════════════════════════════════════ */
+.notes-page {
+  padding: 0 !important;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.notes-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════
+   LEFT PANEL — Notes List
+══════════════════════════════════════════ */
+.notes-list-panel {
+  width: 370px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fffbf2;
+  border-right: 2px solid #fde9c4;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.nl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 16px 8px;
+  background: #fffbf2;
+  flex-shrink: 0;
+}
+
+.nl-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #e07b00;
+  margin: 0;
+}
+
+.nl-header-btns { display: flex; gap: 2px; }
+
+.nl-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e07b00;
+  transition: background 0.12s;
+  padding: 0;
+}
+.nl-icon-btn:hover { background: rgba(224,123,0,0.1); }
+
+/* ── Search ── */
+.nl-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(224,123,0,0.07);
+  border: 1.5px solid #fde9c4;
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin: 2px 12px 10px;
+  flex-shrink: 0;
+}
+.nl-search-icon { color: #e07b00; display: flex; flex-shrink: 0; }
+.nl-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: #333;
+  font-family: inherit;
+  width: 100%;
+}
+.nl-search-input::placeholder { color: #c4956a; }
+
+/* ── Scrollable body ── */
+.nl-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+/* ── Section ── */
+.nl-section { margin-bottom: 10px; }
+
+.nl-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 16px 4px;
+  font-family: inherit;
+}
+
+.nl-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #333;
+}
+
+.nl-section-plain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #333;
+  padding: 4px 16px 4px;
+}
+
+.nl-chevron { color: #f5a623; display: flex; }
+
+/* ── Card — now a transparent grouping shell ── */
+.nl-card {
+  background: transparent;
+  border-radius: 0;
+  margin: 0;
+  overflow: visible;
+  box-shadow: none;
+  border: none;
+  padding-bottom: 2px;
+}
+
+/* ── Note item — mini notebook page card ── */
+.nl-item {
+  display: flex;
+  align-items: stretch;
+  /* Warm paper background with one ruled line at ~38px (below the title) */
+  background-color: #fffef8;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 37px,
+    #ddeaf8 37px,
+    #ddeaf8 38px,
+    transparent 38px
+  );
+  border-radius: 0 8px 8px 0;
+  margin: 0 10px 7px 14px;
+  border: 1px solid #ece4d0;
+  border-left: none;
+  /* Left inset "binding" strip */
+  box-shadow: inset 6px 0 0 #c2cdd8, 1px 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  position: relative;
+  transition: box-shadow 0.15s, transform 0.15s, background-color 0.12s;
+}
+.nl-item:hover {
+  background-color: #fffdf4;
+  box-shadow: inset 6px 0 0 #a8bece, 2px 4px 12px rgba(0,0,0,0.12);
+  transform: translateX(2px);
+}
+.nl-item-active {
+  background-color: #fffaee !important;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 37px,
+    #fde9c4 37px,
+    #fde9c4 38px,
+    transparent 38px
+  ) !important;
+  border-color: #fde9c4 !important;
+  box-shadow: inset 6px 0 0 #f5a623, 2px 3px 10px rgba(245,166,35,0.18) !important;
+  transform: translateX(2px);
+}
+
+/* Clickable note-open area */
+.nl-item-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 6px 13px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.nl-item-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nl-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.nl-item-date {
+  font-size: 13px;
+  color: #e07b00;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.nl-item-preview {
+  font-size: 13px;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pin button ── */
+.nl-pin-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.12s, transform 0.12s;
+  color: #ccc;
+  padding: 0;
+  opacity: 0.4;
+}
+.nl-pin-btn:hover {
+  background: rgba(245,166,35,0.15);
+  transform: scale(1.18);
+  opacity: 1;
+}
+.nl-pin-active {
+  opacity: 1;
+  color: #f5a623;
+}
+
+/* ── Footer ── */
+.nl-footer {
+  text-align: center;
+  font-size: 12px;
+  color: #c4956a;
+  font-weight: 600;
+  padding: 8px 0 10px;
+  flex-shrink: 0;
+  border-top: 1px solid #fde9c4;
+  background: #fffbf2;
+}
+
+.nl-no-results {
+  text-align: center;
+  color: #c4956a;
+  font-size: 14px;
+  padding: 40px 16px;
+}
+
+/* ══════════════════════════════════════════
+   RIGHT PANEL — SOAP Detail
+══════════════════════════════════════════ */
+.notes-detail-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #f3f0ff;
+  overflow: hidden;
+}
+
+/* ── Empty state ── */
+.nd-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9e8ecb;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.nd-empty-icon { font-size: 64px; }
+.nd-empty p { font-size: 16px; font-weight: 600; color: #7c6ab5; }
+
+/* ── Detail view ── */
+.nd-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Topbar */
+.nd-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: #f3f0ff;
+  border-bottom: 1.5px solid #ddd4f8;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+/* Back button — desktop: hidden, mobile: shown */
+.nd-back-btn {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  color: #7c6ab5;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+  margin-right: auto;
+}
+.nd-back-btn:hover { background: rgba(124,106,181,0.1); }
+
+.nd-topbar-actions { display: flex; gap: 4px; align-items: center; }
+
+.nd-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9e8ecb;
+  transition: background 0.12s;
+  padding: 0;
+}
+.nd-action-btn:hover { background: rgba(124,106,181,0.1); }
+
+/* Pin pill in detail topbar */
+.nd-pin-detail-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px !important;
+  padding: 5px 14px !important;
+  width: auto !important;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9e8ecb !important;
+  border: 1.5px solid #ddd4f8 !important;
+  transition: background 0.12s, color 0.12s, border-color 0.12s !important;
+}
+.nd-pin-detail-btn:hover { background: #ede8ff !important; color: #5c35a0 !important; border-color: #b8a8f0 !important; }
+.nd-pin-detail-active { background: #fff3dc !important; color: #c07000 !important; border-color: #f5a623 !important; }
+.nd-pin-detail-star { font-size: 15px; line-height: 1; }
+.nd-pin-detail-label { font-size: 13px; }
+
+/* Scrollable body */
+.nd-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 20px 48px;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  justify-content: center;
+}
+
+/* ══════════════════════════════════════════
+   NOTEBOOK WRAPPER  (spiral + paper side-by-side)
+══════════════════════════════════════════ */
+.nd-notebook {
+  display: flex;
+  width: 100%;
+  max-width: 680px;
+  align-self: flex-start;
+  filter: drop-shadow(0 8px 28px rgba(0,0,0,0.15));
+}
+
+/* ── Spiral binding ── */
+.nd-spiral {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 28px 0;
+  width: 32px;
+  flex-shrink: 0;
+  background: #c8c8c8;
+  border-radius: 10px 0 0 10px;
+  gap: 0;
+  position: relative;
+  z-index: 1;
+}
+.nd-spiral::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 8px;
+  transform: translateX(-50%);
+  background: #b0b0b0;
+  z-index: -1;
+}
+.nd-ring {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #999;
+  border-radius: 50%;
+  background: #f0f0f0;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.18);
+}
+
+/* ── Paper card ── */
+.nd-paper {
+  flex: 1;
+  min-width: 0;
+  background: #fffef8;
+  border-radius: 0 14px 14px 0;
+  padding: 28px 28px 36px 40px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  /* Left margin pink vertical strip */
+  border-left: 3.5px solid #ffc4c4;
+}
+/* Subtle margin tint */
+.nd-paper::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 42px;
+  background: rgba(255,180,180,0.10);
+  pointer-events: none;
+}
+
+/* Corner flower */
+.nd-deco-tr {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 22px;
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Title row ── */
+.nd-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.nd-soap-title {
+  font-family: 'Georgia', 'Palatino Linotype', Palatino, serif;
+  font-size: 26px;
+  font-weight: 700;
+  font-style: italic;
+  color: #2c2c2e;
+  margin: 0;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.nd-date-box {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* ── Field rows (Name / Diagnosis) ── */
+.nd-field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.nd-field-row-last { margin-bottom: 20px; }
+
+.nd-field-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #5c35a0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nd-field-val {
+  font-size: 14px;
+  color: #333;
+  flex: 1;
+  min-width: 80px;
+}
+
+.nd-field-line {
+  border-bottom: 1.5px solid #b0b0b0;
+  padding-bottom: 1px;
+  display: inline;
+}
+
+/* Horizontal rule between header and SOAP */
+.nd-rule {
+  border: none;
+  border-top: 2px solid #e4d4fc;
+  margin: 0 0 20px;
+}
+
+/* ── SOAP sections ── */
+.nd-section { margin-bottom: 16px; }
+
+.nd-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  padding: 5px 14px 5px 10px;
+  border-radius: 20px;
+  color: #333;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+  letter-spacing: 0.2px;
+}
+
+.nd-section-hint {
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.nd-s { background: #b2e8c0; }
+.nd-o { background: #b2c8f5; }
+.nd-a { background: #f5b2cb; }
+.nd-p { background: #ffe87a; }
+
+/* Lined-paper body: line-height matches gradient repeat */
+.nd-section-body {
+  font-size: 14px;
+  line-height: 27px;
+  color: #2c2c2e;
+  white-space: pre-wrap;
+  padding: 3px 4px 0;
+  min-height: 54px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 26px,
+    #c8def8 26px,
+    #c8def8 27px
+  );
+}
+
+/* ── Signature block ── */
+.nd-sig-block {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1.5px dashed #e4d4fc;
+  flex-wrap: wrap;
+}
+
+.nd-sig-cheer {
+  font-family: 'Georgia', Palatino, serif;
+  font-style: italic;
+  font-size: 13px;
+  color: #9e8ecb;
+}
+
+.nd-sig-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.nd-sig-line {
+  width: 160px;
+  height: 0;
+  border-bottom: 1.5px solid #444;
+}
+
+.nd-sig-text {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════
+   TABLET  (769 – 1024 px)
+══════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .notes-list-panel { width: 300px; }
+  .nl-title { font-size: 22px; }
+  .nl-section-title, .nl-section-plain { font-size: 16px; }
+  .nd-paper { padding: 22px 20px 32px 32px; }
+  .nd-soap-title { font-size: 22px; }
+  .nd-pin-detail-label { display: none; }
+  .nd-notebook { max-width: 100%; }
+}
+
+/* ══════════════════════════════════════════
+   MOBILE  (≤ 768 px)
+   — full-height panels that slide
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Page wrapper: flow normally, pad for hamburger */
+  .notes-page {
+    padding-top: 64px !important;
+    height: auto !important;
+    overflow: visible !important;
+    min-height: 100vh;
+  }
+
+  /* Shell: fixed height, relative so panels can be absolute */
+  .notes-shell {
+    height: calc(100vh - 64px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* List panel: full-width, slides left when detail is open */
+  .notes-list-panel {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-right: none;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .nl-hidden {
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+
+  /* Detail panel: full-width, slides in from right */
+  .notes-detail-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .nd-hidden {
+    transform: translateX(100%);
+    pointer-events: none;
+  }
+
+  /* Show back button only on mobile */
+  .nd-back-btn { display: flex; }
+  .nd-topbar { justify-content: space-between; }
+
+  /* Slightly compact note list */
+  .nl-title { font-size: 22px; }
+  .nl-section-title, .nl-section-plain { font-size: 17px; }
+  .nl-card { margin: 4px 8px 0; }
+  .nl-item-btn { padding: 11px 4px 11px 12px; }
+  .nl-pin-btn { width: 32px; height: 32px; font-size: 16px; margin-right: 6px; opacity: 1; }
+
+  /* SOAP detail body */
+  .nd-body { padding: 12px 8px 48px; }
+
+  /* Notebook: full-width, spiral narrows */
+  .nd-notebook { max-width: 100%; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.13)); }
+  .nd-spiral { width: 24px; padding: 20px 0; }
+  .nd-ring { width: 18px; height: 18px; border-width: 2.5px; }
+
+  .nd-paper {
+    padding: 18px 14px 36px 28px;
+    border-radius: 0 12px 12px 0;
+  }
+
+  .nd-soap-title { font-size: 18px; }
+  .nd-title-row { flex-direction: column; gap: 6px; }
+
+  .nd-section-label { font-size: 12px; padding: 4px 12px 4px 8px; }
+  .nd-section-hint { display: none; }
+  .nd-section-body { font-size: 13.5px; }
+
+  .nd-sig-block { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .nd-sig-right { align-self: flex-end; }
+
+  /* Pin pill — hide label on mobile */
+  .nd-pin-detail-label { display: none; }
+  .nd-pin-detail-btn { padding: 5px 10px !important; }
+}
+
+/* ══════════════════════════════════════════
+   SMALL MOBILE  (≤ 400 px)
+══════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .notes-page { padding-top: 58px !important; }
+  .notes-shell { height: calc(100vh - 58px); }
+  .nl-title { font-size: 20px; }
+  .nd-soap-title { font-size: 16px; }
+  .nd-paper { padding: 14px 10px 32px 22px; }
+  .nd-section-body { font-size: 13px; }
+}

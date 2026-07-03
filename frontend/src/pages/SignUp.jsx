@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
-import ReCaptcha from '../components/ReCaptcha'
 import './SignUp.css'
 
 function PersonIcon() {
@@ -45,19 +44,8 @@ function LockIcon() {
 export default function SignUp({ onLogoClick, onLoginClick }) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
-  const [recaptchaToken, setRecaptchaToken] = useState(null)
-  const [captchaError, setCaptchaError] = useState('')
-
   const handleSubmit = (e) => {
     e.preventDefault()
-
-    if (!recaptchaToken) {
-      setCaptchaError('Please complete the reCAPTCHA verification.')
-      return
-    }
-
-    setCaptchaError('')
-    // Send recaptchaToken to your backend for verification with RECAPTCHA_SECRET_KEY
   }
 
   return (
@@ -142,15 +130,6 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
               </button>
             </div>
           </div>
-
-          <ReCaptcha
-            onChange={(token) => {
-              setRecaptchaToken(token)
-              if (token) setCaptchaError('')
-            }}
-            onExpired={() => setRecaptchaToken(null)}
-          />
-          {captchaError && <p className="captcha-error">{captchaError}</p>}
 
           <button type="submit" className="signup-btn">Sign up</button>
         </form>

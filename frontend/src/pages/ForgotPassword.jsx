@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
-import ReCaptcha from '../components/ReCaptcha'
 import './ForgotPassword.css'
 
 function EnvelopeIcon() {
@@ -15,19 +14,8 @@ function EnvelopeIcon() {
 
 export default function ForgotPassword({ onLogoClick, onSignInClick }) {
   const navigate = useNavigate()
-  const [recaptchaToken, setRecaptchaToken] = useState(null)
-  const [captchaError, setCaptchaError] = useState('')
-
   const handleSubmit = (e) => {
     e.preventDefault()
-
-    if (!recaptchaToken) {
-      setCaptchaError('Please complete the reCAPTCHA verification.')
-      return
-    }
-
-    setCaptchaError('')
-    // Send reset request to backend with email and recaptchaToken
   }
 
   return (
@@ -54,15 +42,6 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
               />
             </div>
           </div>
-
-          <ReCaptcha
-            onChange={(token) => {
-              setRecaptchaToken(token)
-              if (token) setCaptchaError('')
-            }}
-            onExpired={() => setRecaptchaToken(null)}
-          />
-          {captchaError && <p className="captcha-error">{captchaError}</p>}
 
           <button type="submit" className="forgot-btn">Reset Password</button>
         </form>

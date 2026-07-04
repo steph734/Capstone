@@ -1,0 +1,407 @@
+/* ── Header bar ───────────────────────────────────────────── */
+.trp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.trp-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.trp-header-actions { display: flex; gap: 10px; }
+
+.trp-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #4a6b5d;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.trp-edit-btn:hover { background: #3d5a50; }
+
+.trp-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #22a05a;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.trp-save-btn:hover { background: #1a8a4a; }
+
+.trp-cancel-btn {
+  padding: 10px 18px;
+  border: 1px solid #e0e8e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #6b7c75;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.trp-cancel-btn:hover { background: #f8fbf9; }
+
+/* ── Hero card ────────────────────────────────────────────── */
+.trp-hero {
+  background: linear-gradient(135deg, #e8f5f0 0%, #d0e8dd 100%);
+  border: 1px solid #c8e2d5;
+  border-radius: 22px;
+  padding: 32px 36px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+.trp-hero::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: rgba(74, 107, 93, 0.06);
+}
+
+.trp-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.trp-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  display: block;
+}
+
+.trp-avatar-edit-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #4a6b5d;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.trp-hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1;
+}
+
+.trp-hero-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #2c4a3e;
+  line-height: 1.1;
+}
+
+.trp-name-field {
+  padding: 7px 12px;
+  border: 2px solid #b0cfc2;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  color: #2c4a3e;
+  background: rgba(255,255,255,0.85);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.trp-name-field:focus { border-color: #4a6b5d; }
+
+.trp-hero-title {
+  margin: 0;
+  font-size: 15px;
+  color: #5a7a6d;
+  font-weight: 500;
+}
+
+.trp-hero-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.trp-badge {
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trp-badge-teal   { background: rgba(74,107,93,0.13); color: #3d5a50; }
+.trp-badge-gold   { background: #fef3c7; color: #92400e; }
+.trp-badge-green  { background: #dcfce7; color: #166534; }
+
+.trp-hero-stats {
+  display: flex;
+  gap: 28px;
+  margin-top: 4px;
+}
+
+.trp-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trp-hero-stat-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2c4a3e;
+  line-height: 1;
+}
+
+.trp-hero-stat-lbl {
+  font-size: 11px;
+  color: #6b7c75;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Main grid ────────────────────────────────────────────── */
+.trp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+.trp-card {
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.trp-card-title {
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9aab9f;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+/* ── Field rows ───────────────────────────────────────────── */
+.trp-field-list { display: flex; flex-direction: column; }
+
+.trp-field-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f0f7f4;
+}
+.trp-field-row:last-child { border-bottom: none; }
+
+.trp-field-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #f0f7f4;
+  color: #4a6b5d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.trp-field-body { flex: 1; min-width: 0; }
+
+.trp-field-lbl {
+  font-size: 11px;
+  color: #9aab9f;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.trp-field-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c4a3e;
+}
+
+.trp-field-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #d8eae0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c4a3e;
+  background: #f8fbf9;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.trp-field-input:focus {
+  border-color: #5a7a6d;
+  box-shadow: 0 0 0 3px rgba(90,122,109,0.1);
+}
+
+/* ── Bio card ─────────────────────────────────────────────── */
+.trp-bio-text {
+  margin: 0;
+  font-size: 14px;
+  color: #4a5a52;
+  line-height: 1.75;
+}
+
+.trp-bio-field {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d8eae0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #2c4a3e;
+  background: #f8fbf9;
+  resize: vertical;
+  outline: none;
+  min-height: 130px;
+  box-sizing: border-box;
+  line-height: 1.65;
+  transition: border-color 0.2s;
+}
+.trp-bio-field:focus {
+  border-color: #5a7a6d;
+  box-shadow: 0 0 0 3px rgba(90,122,109,0.1);
+}
+
+/* ── Stats strip ──────────────────────────────────────────── */
+.trp-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.trp-stat-card {
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 14px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  text-align: center;
+}
+
+.trp-stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.trp-stat-teal   { background: #e8f5f0; color: #4a6b5d; }
+.trp-stat-blue   { background: #e0f0ff; color: #1565c0; }
+.trp-stat-purple { background: #f3e8ff; color: #7b1fa2; }
+.trp-stat-amber  { background: #fef3c7; color: #d97706; }
+
+.trp-stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #2c4a3e;
+  line-height: 1;
+}
+
+.trp-stat-lbl {
+  font-size: 11px;
+  color: #9aab9f;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Toast ────────────────────────────────────────────────── */
+.trp-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c4a3e;
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  z-index: 500;
+  animation: trp-toast-in 0.25s ease;
+  white-space: nowrap;
+}
+
+@keyframes trp-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0);    }
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .trp-grid { grid-template-columns: 1fr; }
+  .trp-stats-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .trp-hero { flex-direction: column; align-items: center; text-align: center; padding: 24px 20px; }
+  .trp-hero-stats { justify-content: center; }
+  .trp-hero-badges { justify-content: center; }
+  .trp-avatar { width: 96px; height: 96px; }
+  .trp-hero-name { font-size: 22px; }
+  .trp-stats-strip { grid-template-columns: repeat(2, 1fr); }
+  .trp-header { flex-direction: column; align-items: flex-start; }
+}

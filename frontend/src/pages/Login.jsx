@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
+import SocialAuthModal from '../components/SocialAuthModal'
 import './Login.css'
 
 function EnvelopeIcon() {
@@ -58,11 +60,13 @@ function GoogleIcon() {
 }
 
 export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick, onLogin }) {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [socialProvider, setSocialProvider] = useState(null)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -72,6 +76,15 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
         setLoginError(result.message || 'Login failed')
       }
     }
+  }
+
+  const handleSocialSuccess = () => {
+    setSocialProvider(null)
+    if (onLogin) {
+      const result = onLogin('patient@demo.com', 'demo1234')
+      if (result && result.success) return
+    }
+    navigate('/')
   }
 
   return (
@@ -145,13 +158,31 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
         <p className="divider-text">or continue with</p>
 
         <div className="social-buttons">
-          <button type="button" className="social-btn" aria-label="Continue with Facebook">
+          <button
+            type="button"
+            className="social-btn"
+            aria-label="Continue with Facebook"
+            onClick={() => setSocialProvider('facebook')}
+          >
             <FacebookIcon />
           </button>
-          <button type="button" className="social-btn" aria-label="Continue with Google">
+          <button
+            type="button"
+            className="social-btn"
+            aria-label="Continue with Google"
+            onClick={() => setSocialProvider('google')}
+          >
             <GoogleIcon />
           </button>
         </div>
+
+        {socialProvider && (
+          <SocialAuthModal
+            provider={socialProvider}
+            onSuccess={handleSocialSuccess}
+            onClose={() => setSocialProvider(null)}
+          />
+        )}
 
         <p className="signup-text">
           Don&apos;t have an account?{' '}

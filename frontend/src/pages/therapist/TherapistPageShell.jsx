@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../../components/PatientSidebar'
 import '../PageWithSidebar.css'
 import '../admin/AdminPages.css'
 
 export default function TherapistPageShell({ user, onLogout, title, subtitle, icon, children, menuItems }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const navigate = useNavigate()
 
   return (
     <div className="page-with-sidebar admin-page-shell">
@@ -16,6 +18,7 @@ export default function TherapistPageShell({ user, onLogout, title, subtitle, ic
         menuItems={menuItems}
         bottomMenuItems={[]}
         profileRoleLabel="Therapist"
+        profilePath="/therapist/profile"
       />
 
       <main className="page-content admin-page-content">

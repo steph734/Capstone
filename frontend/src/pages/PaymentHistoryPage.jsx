@@ -128,7 +128,7 @@ export default function PaymentHistoryPage({ user, onLogout, betaTier }) {
 
   return (
     <div className="ph-layout">
-      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} />
+      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} profilePath="/patient/profile" />
 
       <div className="ph-main">
         <button className="mobile-menu-btn3" onClick={() => setSidebarOpen(true)} aria-label="Open menu">

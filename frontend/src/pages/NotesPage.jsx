@@ -343,6 +343,7 @@ export default function NotesPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <main className="page-content notes-page">

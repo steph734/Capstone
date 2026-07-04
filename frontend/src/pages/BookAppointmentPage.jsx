@@ -148,6 +148,7 @@ export default function BookAppointmentPage({ user }) {
         onLogout={() => {}}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        profilePath="/patient/profile"
       />
       <div className="book-page">
 

@@ -15,6 +15,7 @@ export default function PatientSpeechFeaturesPage({ user, onLogout, betaTier }) 
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <div className="dashboard-main" style={{ padding: '32px' }}>

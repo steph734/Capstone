@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
+import { useSharedMessages } from '../context/MessagesContext'
 import './PageWithSidebar.css'
 import './MessagesPage.css'
 
@@ -220,9 +221,39 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
   const [search, setSearch] = useState('')
   const bodyRef = useRef(null)
+  const activeIdRef = useRef(activeId)
+  const prevThreadLenRef = useRef(0)
+
+  const { thread, sendAsPatient } = useSharedMessages()
+
+  // Keep activeIdRef in sync so the thread effect can read it without being a dependency
+  useEffect(() => { activeIdRef.current = activeId }, [activeId])
+
+  // Sync conversation-1 preview and unread badge when therapist sends a new message
+  useEffect(() => {
+    if (thread.length <= prevThreadLenRef.current) return
+    const last = thread[thread.length - 1]
+    prevThreadLenRef.current = thread.length
+    if (last.from !== 'therapist') return
+    setConversations(prev => prev.map(c =>
+      c.id === 1
+        ? { ...c, lastMessage: last.text, time: last.time, unread: activeIdRef.current !== 1 ? c.unread + 1 : 0 }
+        : c
+    ))
+  }, [thread])
 
   const activeConv = conversations.find(c => c.id === activeId)
-  const messages = messageMap[activeId] || []
+
+  // Conv 1 uses the shared thread; all others use local messageMap
+  const messages = activeId === 1
+    ? thread.map(m => ({
+        id: m.id,
+        fromMe: m.from === 'patient',
+        sender: m.from === 'therapist' ? 'Dr. Sarah Reyes' : undefined,
+        text: m.text,
+        time: m.time,
+      }))
+    : (messageMap[activeId] || [])
 
   const pinned = conversations.filter(c => c.pinned && matchSearch(c, search))
   const others = conversations.filter(c => !c.pinned && matchSearch(c, search))
@@ -249,19 +280,27 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   const sendMessage = () => {
     const text = input.trim()
     if (!text) return
-    const newMsg = {
-      id: Date.now(),
-      fromMe: true,
-      text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    if (activeId === 1) {
+      // Route through shared context so therapist sees the reply
+      sendAsPatient(text)
+      setConversations(prev => prev.map(c =>
+        c.id === 1 ? { ...c, lastMessage: text, time: 'now' } : c
+      ))
+    } else {
+      const newMsg = {
+        id: Date.now(),
+        fromMe: true,
+        text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+      setMessageMap(prev => ({
+        ...prev,
+        [activeId]: [...(prev[activeId] || []), newMsg],
+      }))
+      setConversations(prev => prev.map(c =>
+        c.id === activeId ? { ...c, lastMessage: text, time: 'now' } : c
+      ))
     }
-    setMessageMap(prev => ({
-      ...prev,
-      [activeId]: [...(prev[activeId] || []), newMsg],
-    }))
-    setConversations(prev => prev.map(c =>
-      c.id === activeId ? { ...c, lastMessage: text, time: 'now' } : c
-    ))
     setInput('')
   }
 
@@ -280,6 +319,7 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <main className="page-content msg-page">

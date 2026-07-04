@@ -305,6 +305,7 @@ export default function PatientEmailPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <main className="page-content pe-page">

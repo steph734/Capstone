@@ -281,6 +281,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       {/* Main Dashboard Content */}

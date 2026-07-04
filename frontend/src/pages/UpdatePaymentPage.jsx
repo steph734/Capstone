@@ -158,7 +158,7 @@ export default function UpdatePaymentPage({ user, onLogout, betaTier }) {
 
   return (
     <div className="upm-layout">
-      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} />
+      <PatientSidebar user={currentUser} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} profilePath="/patient/profile" />
 
       <div className="upm-main">
         <button className="mobile-menu-btn2" onClick={() => setSidebarOpen(true)} aria-label="Open menu">

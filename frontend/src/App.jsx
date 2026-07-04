@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
+import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -48,6 +49,7 @@ import TherapistNotesProgressPage from './pages/therapist/TherapistNotesProgress
 import TherapistAssignExercisesPage from './pages/therapist/TherapistAssignExercisesPage'
 import TherapistSubscriptionPage from './pages/therapist/TherapistSubscriptionPage'
 import TherapistProfilePage from './pages/therapist/TherapistProfilePage'
+import TherapistReportPage from './pages/therapist/TherapistReportPage'
 import AdminProfilePage from './pages/admin/AdminProfilePage'
 import OwnerProfilePage from './pages/owner/OwnerProfilePage'
 import PatientProfilePage from './pages/PatientProfilePage'
@@ -126,6 +128,10 @@ function App() {
     }
   })
   const [ownerBetaTier, setOwnerBetaTier] = useState(() => localStorage.getItem('betaTier') || null)
+
+  useEffect(() => {
+    applyAccessibilityPrefs(loadAccessibilityPrefs())
+  }, [])
 
   const handleOwnerBetaActivate = (tier) => {
     setOwnerBetaTier(tier)
@@ -593,6 +599,21 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
                 <TherapistProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/reports"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistReportPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

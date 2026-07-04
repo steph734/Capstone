@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import './TherapistDashboard.css'
@@ -62,6 +63,7 @@ const KPI_DATA = [
     trendUp: true,
     color: 'teal',
     Icon: PatientIcon,
+    path: '/therapist/patients',
   },
   {
     label: 'Appointments Today',
@@ -71,6 +73,7 @@ const KPI_DATA = [
     trendUp: true,
     color: 'blue',
     Icon: CalendarIcon,
+    path: '/therapist/appointments',
   },
   {
     label: 'Notes Completed',
@@ -80,6 +83,7 @@ const KPI_DATA = [
     trendUp: true,
     color: 'purple',
     Icon: NoteIcon,
+    path: '/therapist/notes-progress',
   },
   {
     label: 'Avg. Completion',
@@ -89,6 +93,7 @@ const KPI_DATA = [
     trendUp: false,
     color: 'amber',
     Icon: ExerciseIcon,
+    path: '/therapist/gamified-activities',
   },
 ]
 
@@ -133,12 +138,14 @@ const DISTRIBUTION = [
 ]
 const TOTAL_PATIENTS = DISTRIBUTION.reduce((s, d) => s + d.count, 0)
 
-const THERAPY_COMPLETION = [
-  { type: 'Speech Therapy',      pct: 92, color: '#4a6b5d' },
-  { type: 'Physical Therapy',    pct: 87, color: '#3b82f6' },
-  { type: 'Occupational Therapy',pct: 78, color: '#8b5cf6' },
-  { type: 'Developmental',       pct: 85, color: '#f59e0b' },
+const THERAPY_TYPE_COUNTS = [
+  { type: 'Speech Therapy',       count: 14, color: '#2a9d8f' },
+  { type: 'Occupational Therapy', count: 9,  color: '#3b82f6' },
+  { type: 'Physical Therapy',     count: 7,  color: '#8b5cf6' },
+  { type: 'Developmental',        count: 11, color: '#f59e0b' },
+  { type: 'Articulation',         count: 5,  color: '#e46a4b' },
 ]
+const THERAPY_MAX = Math.max(...THERAPY_TYPE_COUNTS.map(t => t.count))
 
 const APPOINTMENTS = [
   { time: '9:00 AM',  patient: 'Aira Lopez',    type: 'Speech Therapy',    status: 'confirmed', emoji: '👧' },
@@ -316,6 +323,8 @@ function DonutChart({ data, total }) {
 
 // ── Main Component ─────────────────────────────────────
 export default function TherapistDashboard({ user, onLogout, betaTier }) {
+  const navigate = useNavigate()
+
   return (
     <TherapistPageShell
       user={user}
@@ -327,8 +336,15 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
     >
       {/* ── KPI Cards ── */}
       <div className="th-kpi-grid">
-        {KPI_DATA.map(({ label, value, meta, trend, trendUp, color, Icon }) => (
-          <div key={label} className={`th-kpi-card ${color}`}>
+        {KPI_DATA.map(({ label, value, meta, trend, trendUp, color, Icon, path }) => (
+          <div
+            key={label}
+            className={`th-kpi-card ${color} th-kpi-clickable`}
+            onClick={() => navigate(path)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && navigate(path)}
+          >
             <div className="th-kpi-top">
               <div className="th-kpi-icon"><Icon /></div>
               <span className={`th-kpi-trend ${trendUp ? 'up' : 'down'}`}>
@@ -345,71 +361,74 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
 
       {/* ── Charts Row ── */}
       <div className="th-charts-row">
-        {/* Calendar */}
-        <CalendarPanel />
+        {/* Left column: Calendar + Bar Chart */}
+        <div className="th-left-col">
+          <CalendarPanel />
 
-        {/* Donut Chart */}
-        <div className="th-panel">
-          <div className="th-panel-head">
-            <div>
-              <h3>Patient Status</h3>
-              <p>Progress distribution</p>
-            </div>
-          </div>
-          <DonutChart data={DISTRIBUTION} total={TOTAL_PATIENTS} />
-        </div>
-      </div>
-
-      {/* ── Middle Row ── */}
-      <div className="th-mid-row">
-        {/* Therapy Completion Progress Bars */}
-        <div className="th-panel">
-          <div className="th-panel-head">
-            <div>
-              <h3>Session Completion Rates</h3>
-              <p>By therapy type this week</p>
-            </div>
-          </div>
-          <div className="th-progress-list">
-            {THERAPY_COMPLETION.map(({ type, pct, color }) => (
-              <div key={type} className="th-progress-item">
-                <div className="th-progress-header">
-                  <span className="th-progress-name">{type}</span>
-                  <span className="th-progress-pct">{pct}%</span>
-                </div>
-                <div className="th-progress-track">
-                  <div
-                    className="th-progress-fill"
-                    style={{ width: `${pct}%`, background: color }}
-                  />
-                </div>
+          <div className="th-panel th-bar-panel">
+            <div className="th-panel-head">
+              <div>
+                <h3>Sessions by Therapy Type</h3>
+                <p>Total patients per therapy category</p>
               </div>
-            ))}
+            </div>
+            <div className="th-bar-chart">
+              <div className="th-bar-grid">
+                {[...Array(4)].map((_, i) => <div key={i} className="th-bar-gridline" />)}
+              </div>
+              <div className="th-bar-bars">
+                {THERAPY_TYPE_COUNTS.map(({ type, count, color }) => {
+                  const pct = Math.round((count / THERAPY_MAX) * 100)
+                  return (
+                    <div key={type} className="th-bar-group">
+                      <span className="th-bar-count">{count}</span>
+                      <div className="th-bar-wrap">
+                        <div className="th-bar-fill" style={{ height: `${pct}%`, background: color }} />
+                      </div>
+                      <span className="th-bar-label">{type}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="th-bar-baseline" />
+            </div>
           </div>
         </div>
 
-        {/* Upcoming Appointments */}
-        <div className="th-panel">
-          <div className="th-panel-head">
-            <div>
-              <h3>Today's Appointments</h3>
-              <p>{APPOINTMENTS.length} sessions scheduled</p>
-            </div>
-          </div>
-          <div className="th-appt-list">
-            {APPOINTMENTS.map((a) => (
-              <div key={a.time + a.patient} className="th-appt-row">
-                <span className="th-appt-time">{a.time}</span>
-                <div className="th-appt-avatar">{a.emoji}</div>
-                <div className="th-appt-info">
-                  <div className="th-appt-name">{a.patient}</div>
-                  <div className="th-appt-type">{a.type}</div>
-                </div>
-                <span className={`th-appt-badge ${a.status}`}>
-                  {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-                </span>
+        {/* Right column: Patient Status + Today's Appointments */}
+        <div className="th-right-col">
+          <div className="th-panel">
+            <div className="th-panel-head">
+              <div>
+                <h3>Patient Status</h3>
+                <p>Progress distribution</p>
               </div>
-            ))}
+            </div>
+            <DonutChart data={DISTRIBUTION} total={TOTAL_PATIENTS} />
+          </div>
+
+          <div className="th-panel">
+            <div className="th-panel-head">
+              <div>
+                <h3>Today's Appointments</h3>
+                <p>{APPOINTMENTS.length} sessions scheduled</p>
+              </div>
+            </div>
+            <div className="th-appt-list">
+              {APPOINTMENTS.map((a) => (
+                <div key={a.time + a.patient} className="th-appt-row">
+                  <span className="th-appt-time">{a.time}</span>
+                  <div className="th-appt-avatar">{a.emoji}</div>
+                  <div className="th-appt-info">
+                    <div className="th-appt-name">{a.patient}</div>
+                    <div className="th-appt-type">{a.type}</div>
+                  </div>
+                  <span className={`th-appt-badge ${a.status}`}>
+                    {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

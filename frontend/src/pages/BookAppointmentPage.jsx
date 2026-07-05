@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import './BookAppointmentPage.css'
+
+const StripePaymentModal = lazy(() => import('../components/StripePaymentModal'))
 
 /* ─── Icons ─── */
 const MenuIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -15,12 +17,6 @@ const InfoIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="
 const ArrowRight  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
 const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
 const CheckLgIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-
-/* ─── Session mode icons ─── */
-const InPersonIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-const CognitiveIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.14z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-1.14z"/></svg>
-const SpeechIcon    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-const BehaviorIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
 
 /* ─── Constants ─── */
 const STEPS = [
@@ -47,10 +43,10 @@ const THERAPISTS = [
 ]
 
 const SESSION_MODES = [
-  { id: 'in-person',  label: 'In-Person',  Icon: InPersonIcon  },
-  { id: 'cognitive',  label: 'Cognitive',  Icon: CognitiveIcon },
-  { id: 'speech',     label: 'Speech',     Icon: SpeechIcon    },
-  { id: 'behavioral', label: 'Behavioral', Icon: BehaviorIcon  },
+  { id: 'occupational', label: 'Occupational Therapy' },
+  { id: 'speech',        label: 'Speech Therapy' },
+  { id: 'physical',      label: 'Physical Therapy' },
+  { id: 'cognitive',     label: 'Cognitive Therapy' },
 ]
 
 const TIME_SLOTS = [
@@ -59,13 +55,30 @@ const TIME_SLOTS = [
 ]
 
 const PAYMENT_METHODS = [
-  { id: 'gcash', label: 'GCash',             icon: '📱' },
-  { id: 'maya',  label: 'Maya',              icon: '💚' },
-  { id: 'card',  label: 'Credit/Debit Card', icon: '💳' },
-  { id: 'cash',  label: 'Cash on Clinic',    icon: '💵' },
+  { id: 'cash',   label: 'Cash',           icon: '💵', desc: 'Pay via a cash payment center and enter your reference number' },
+  { id: 'online', label: 'Online Payment', icon: '📱', desc: 'Pay securely via GCash, Maya, or bank transfer' },
+  { id: 'card',   label: 'Credit Card',    icon: '💳', desc: 'Pay securely with your credit or debit card' },
 ]
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+/* ─── Pricing ─── */
+const SESSION_RATE      = 1000
+const DOWNPAYMENT_RATE  = 0.5
+const DOWNPAYMENT       = SESSION_RATE * DOWNPAYMENT_RATE
+const SERVICE_CHARGE    = 50
+const REMAINING_BALANCE = SESSION_RATE - DOWNPAYMENT
+const TOTAL_DUE_NOW     = DOWNPAYMENT + SERVICE_CHARGE
+const fmtPeso = (n) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const AGREEMENT_TERMS = [
+  'All patient information shared during registration and therapy sessions is kept strictly confidential in accordance with our clinic’s privacy policy and applicable data privacy laws.',
+  `A downpayment of ${fmtPeso(DOWNPAYMENT)} is required to confirm and secure this appointment slot. This downpayment is non-refundable if the appointment is cancelled less than 24 hours before the scheduled session.`,
+  'Appointments may be rescheduled up to 24 hours before the scheduled session at no additional cost.',
+  'Please arrive at least 10 minutes before the scheduled session. Late arrivals may result in a shortened session.',
+  `The remaining balance of ${fmtPeso(REMAINING_BALANCE)} must be settled on the day of the session with clinic staff.`,
+  'You confirm that the information provided during booking is accurate to the best of your knowledge, to help ensure proper care for the patient.',
+]
 
 /* ─── Component ─── */
 export default function BookAppointmentPage({ user }) {
@@ -94,13 +107,21 @@ export default function BookAppointmentPage({ user }) {
 
   /* ── Step 2: Booking Details ── */
   const [selectedTherapist, setSelectedTherapist] = useState(null)
-  const [sessionMode, setSessionMode]             = useState('in-person')
+  const [sessionMode, setSessionMode]             = useState('occupational')
   const [pickedTime, setPickedTime]               = useState(null)
   const [errors2, setErrors2]                     = useState({})
+
+  /* ── Booking Agreement modal (gates Step 2 -> Step 3) ── */
+  const [showAgreement, setShowAgreement] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   /* ── Step 4: Payment ── */
   const [payMethod, setPayMethod] = useState(null)
   const [errors4, setErrors4]     = useState({})
+  const [cashDetails, setCashDetails] = useState({ amountPaid: '', referenceNumber: '' })
+  const setCashField = (k, v) => { setCashDetails(p => ({ ...p, [k]: v })); setErrors4(p => ({ ...p, [k]: '' })) }
+  const [showStripeModal, setShowStripeModal] = useState(false)
+  const [onlinePaymentRef, setOnlinePaymentRef] = useState('')
 
   /* ── Validation ── */
   const validate1 = () => {
@@ -125,19 +146,46 @@ export default function BookAppointmentPage({ user }) {
   const validate4 = () => {
     const e = {}
     if (!payMethod) e.method = 'Please select a payment method'
+    if (payMethod === 'cash') {
+      if (!cashDetails.amountPaid || Number(cashDetails.amountPaid) <= 0) e.amountPaid = 'Enter the amount paid'
+      if (!cashDetails.referenceNumber.trim()) e.referenceNumber = 'Enter your reference number'
+    }
     return e
   }
 
   const handleNext = () => {
     if (step === 1) { const e = validate1(); if (Object.keys(e).length) { setErrors1(e); return } }
-    if (step === 2) { const e = validate2(); if (Object.keys(e).length) { setErrors2(e); return } }
-    if (step === 4) { const e = validate4(); if (Object.keys(e).length) { setErrors4(e); return } }
+    if (step === 2) {
+      const e = validate2()
+      if (Object.keys(e).length) { setErrors2(e); return }
+      // Show the booking agreement instead of advancing straight to the summary.
+      setAgreedToTerms(false)
+      setShowAgreement(true)
+      return
+    }
+    if (step === 4) {
+      const e = validate4()
+      if (Object.keys(e).length) { setErrors4(e); return }
+      if (payMethod === 'online') { setShowStripeModal(true); return }
+    }
     setStep(s => Math.min(s + 1, 5))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const handleStripeSuccess = (paymentIntentId) => {
+    setOnlinePaymentRef(paymentIntentId)
+    setShowStripeModal(false)
+    setStep(5)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const handleBack = () => {
     if (step === 1) { navigate('/appointments'); return }
     setStep(s => s - 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const handleAgreeAndProceed = () => {
+    if (!agreedToTerms) return
+    setShowAgreement(false)
+    setStep(3)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -336,10 +384,13 @@ export default function BookAppointmentPage({ user }) {
                   <span className="bii-label">Booking Rate</span>
                   <div className="bii-value">
                     <span className="peso-sign">₱</span>
-                    <span>300.00 / Session</span>
+                    <span>{SESSION_RATE.toLocaleString('en-US', { minimumFractionDigits: 2 })} / Session</span>
                   </div>
                 </div>
               </div>
+              <p className="downpayment-hint">
+                A {fmtPeso(DOWNPAYMENT)} downpayment is required to confirm your booking. Details in the agreement before the summary step.
+              </p>
 
               {/* ── Select Therapist ── */}
               <h3 className="book-section-title" style={{ marginTop: '18px' }}>Select your therapist</h3>
@@ -439,7 +490,8 @@ export default function BookAppointmentPage({ user }) {
                 <div className="summary-row"><span>Therapist</span><strong>{therapistObj?.name || '—'}</strong></div>
                 <div className="summary-row"><span>Role</span><strong>{therapistObj?.role || '—'}</strong></div>
                 <div className="summary-row"><span>Session Mode</span><strong>{sessionModeObj?.label || '—'}</strong></div>
-                <div className="summary-row total-row"><span>Rate</span><strong>₱300.00 / Session</strong></div>
+                <div className="summary-row"><span>Session Rate</span><strong>{fmtPeso(SESSION_RATE)} / Session</strong></div>
+                <div className="summary-row total-row"><span>Downpayment Due</span><strong>{fmtPeso(DOWNPAYMENT)}</strong></div>
               </div>
             </>
           )}
@@ -448,25 +500,83 @@ export default function BookAppointmentPage({ user }) {
           {step === 4 && (
             <>
               <h2 className="book-heading">Payment Method</h2>
-              <h3 className="book-section-title">Choose how you'll pay</h3>
+              <h3 className="book-section-title">Appointment Summary</h3>
+
+              <div className="summary-block">
+                <div className="summary-row"><span>Therapist</span><strong>{therapistObj?.name || '—'}</strong></div>
+                <div className="summary-row"><span>Service</span><strong>{sessionModeObj?.label || '—'}</strong></div>
+                <div className="summary-row"><span>Date &amp; Time</span><strong>{bookingDateLabel} • {pickedTime || '—'}</strong></div>
+                <div className="summary-row"><span>Rate</span><strong>{fmtPeso(SESSION_RATE)} / session</strong></div>
+              </div>
+
+              <div className="payment-total-box">
+                <div className="payment-total-row">
+                  <span>Total Amount</span>
+                  <strong>{fmtPeso(SESSION_RATE)}</strong>
+                </div>
+                <div className="payment-due-row">
+                  <span>Due Today</span>
+                  <span className="due-today-pill">{fmtPeso(TOTAL_DUE_NOW)}</span>
+                </div>
+                <p className="pricing-note">
+                  This secures your booking. The remaining {fmtPeso(REMAINING_BALANCE)} balance is payable on your session day.
+                </p>
+              </div>
+
+              <h3 className="book-section-title" style={{ marginTop: '20px' }}>Choose Payment Method</h3>
               {errors4.method && <div className="step-error">{errors4.method}</div>}
-              <div className="payment-methods">
+              <div className="payment-methods-grid">
                 {PAYMENT_METHODS.map(pm => (
                   <button key={pm.id}
-                    className={`pay-option ${payMethod === pm.id ? 'selected' : ''}`}
+                    className={`payment-method-card ${payMethod === pm.id ? 'selected' : ''}`}
                     onClick={() => { setPayMethod(pm.id); setErrors4({}) }}
                   >
-                    <span className="pay-icon">{pm.icon}</span>
-                    <span className="pay-label">{pm.label}</span>
-                    <span className={`pay-check ${payMethod === pm.id ? 'visible' : ''}`}><CheckIcon /></span>
+                    <span className="pmc-icon">{pm.icon}</span>
+                    <span className="pmc-label">{pm.label}</span>
+                    <span className="pmc-desc">{pm.desc}</span>
                   </button>
                 ))}
               </div>
-              <div className="pricing-box">
-                <div className="pricing-row"><span>Session Fee</span><span>₱300.00</span></div>
-                <div className="pricing-row"><span>Service Charge</span><span>₱50.00</span></div>
-                <div className="pricing-divider" />
-                <div className="pricing-row total"><span>Total</span><span>₱350.00</span></div>
+
+              {payMethod === 'cash' && (
+                <div className="cash-details-card">
+                  <h4>Cash Payment Details</h4>
+                  <div className="book-field">
+                    <label>Payment Paid <span className="req">*</span></label>
+                    <div className="amount-input-wrap">
+                      <span className="amount-prefix">₱</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={cashDetails.amountPaid}
+                        onChange={e => setCashField('amountPaid', e.target.value)}
+                        placeholder={TOTAL_DUE_NOW.toFixed(2)}
+                        className={errors4.amountPaid ? 'err' : ''}
+                      />
+                    </div>
+                    {errors4.amountPaid && <span className="field-err">{errors4.amountPaid}</span>}
+                  </div>
+                  <div className="book-field">
+                    <label>Total Amount of Therapy Session</label>
+                    <div className="cash-readonly-value">{fmtPeso(SESSION_RATE)}</div>
+                  </div>
+                  <div className="book-field">
+                    <label>Reference Number <span className="req">*</span></label>
+                    <input
+                      value={cashDetails.referenceNumber}
+                      onChange={e => setCashField('referenceNumber', e.target.value)}
+                      placeholder="e.g. 123456789012"
+                      className={errors4.referenceNumber ? 'err' : ''}
+                    />
+                    {errors4.referenceNumber && <span className="field-err">{errors4.referenceNumber}</span>}
+                  </div>
+                </div>
+              )}
+
+              <div className="privacy-note">
+                <ShieldIcon />
+                <p>Your payment information is secure and encrypted.<br />We do not store your card details.</p>
               </div>
             </>
           )}
@@ -489,7 +599,14 @@ export default function BookAppointmentPage({ user }) {
                 <div className="summary-row"><span>Date</span><strong>{bookingDateLabel}</strong></div>
                 <div className="summary-row"><span>Time</span><strong>{pickedTime || '—'}</strong></div>
                 <div className="summary-row"><span>Payment</span><strong>{PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '—'}</strong></div>
-                <div className="summary-row total-row"><span>Total</span><strong>₱350.00</strong></div>
+                {payMethod === 'cash' && (
+                  <div className="summary-row"><span>Reference Number</span><strong>{cashDetails.referenceNumber || '—'}</strong></div>
+                )}
+                {payMethod === 'online' && (
+                  <div className="summary-row"><span>Payment Reference</span><strong>{onlinePaymentRef || '—'}</strong></div>
+                )}
+                <div className="summary-row"><span>Downpayment Paid</span><strong>{fmtPeso(TOTAL_DUE_NOW)}</strong></div>
+                <div className="summary-row total-row"><span>Remaining Balance</span><strong>{fmtPeso(REMAINING_BALANCE)} (due on session day)</strong></div>
               </div>
 
               <button className="book-done-btn" onClick={() => navigate('/appointments')}>
@@ -512,6 +629,66 @@ export default function BookAppointmentPage({ user }) {
           </div>
         )}
       </div>
+
+      {/* ── Booking Agreement Modal ── */}
+      {showAgreement && (
+        <div className="book-modal-backdrop" onClick={() => setShowAgreement(false)}>
+          <div className="book-modal" onClick={e => e.stopPropagation()}>
+            <div className="book-modal-header">
+              <ShieldIcon />
+              <div>
+                <h3>Booking Agreement</h3>
+                <p>Please review our clinic policy before proceeding</p>
+              </div>
+            </div>
+
+            <div className="book-modal-body">
+              <ol className="agreement-list">
+                {AGREEMENT_TERMS.map((term, i) => (
+                  <li key={i}>{term}</li>
+                ))}
+              </ol>
+            </div>
+
+            <label className="agreement-checkbox">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={e => setAgreedToTerms(e.target.checked)}
+              />
+              <span className={`agreement-checkmark ${agreedToTerms ? 'checked' : ''}`}>
+                {agreedToTerms && <CheckIcon />}
+              </span>
+              <span className="agreement-checkbox-text">I have read and agree to the terms above</span>
+            </label>
+
+            <div className="book-modal-actions">
+              <button className="book-cancel-btn" onClick={() => setShowAgreement(false)}>
+                CANCEL
+              </button>
+              <button
+                className="book-continue-btn"
+                onClick={handleAgreeAndProceed}
+                disabled={!agreedToTerms}
+              >
+                AGREE &amp; PROCEED
+                <ArrowRight />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stripe Online Payment Modal ── */}
+      {showStripeModal && (
+        <Suspense fallback={null}>
+          <StripePaymentModal
+            amountLabel={fmtPeso(TOTAL_DUE_NOW)}
+            onSuccess={handleStripeSuccess}
+            onClose={() => setShowStripeModal(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -317,6 +317,13 @@
   line-height: 1.5;
 }
 
+.downpayment-hint {
+  font-size: 12px;
+  color: #7a9a8e;
+  margin: 8px 2px 0;
+  line-height: 1.5;
+}
+
 /* ── Booking Info Card ── */
 .booking-info-card {
   display: flex;
@@ -555,64 +562,130 @@
   margin-bottom: 10px;
 }
 
-/* ── Payment Options ── */
-.payment-methods {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
+/* ── Total Amount / Due Today box ── */
+.payment-total-box {
+  background: #eef6f1;
+  border: 1.5px solid #d8eae0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
 }
 
-.pay-option {
+.payment-total-row {
   display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  color: #3d5a50;
+}
+
+.payment-total-row strong { font-size: 22px; color: #2c4a3e; }
+
+.payment-due-row {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #7a9a8e;
+}
+
+.due-today-pill {
+  background: #fff;
+  border: 1.5px solid #4a9e6b;
+  color: #2c4a3e;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+/* ── Payment Method Cards ── */
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payment-method-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
   border-radius: 13px;
   border: 2px solid #e4eee8;
   background: #fafdfb;
   cursor: pointer;
   transition: all 0.2s;
+  text-align: left;
 }
 
-.pay-option:hover   { border-color: #4a9e6b; background: #f0fbf5; }
-.pay-option.selected { border-color: #2c4a3e; background: linear-gradient(135deg, #f0fbf5, #e6f5ec); }
-
-.pay-icon  { font-size: 22px; }
-.pay-label { font-size: 14px; font-weight: 600; color: #2c4a3e; flex: 1; text-align: left; }
-
-.pay-check {
-  width: 24px; height: 24px;
-  border-radius: 50%;
-  border: 2px solid #d8eae0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: transparent;
-  transition: all 0.2s;
-  flex-shrink: 0;
+.payment-method-card:hover   { border-color: #4a9e6b; background: #f0fbf5; }
+.payment-method-card.selected {
+  border-color: #4a9e6b;
+  background: #f0fbf5;
+  box-shadow: 0 0 0 1px #4a9e6b;
 }
 
-.pay-check.visible { background: #2c4a3e; border-color: #2c4a3e; color: #fff; }
+.pmc-icon  { font-size: 22px; }
+.pmc-label { font-size: 14px; font-weight: 700; color: #2c4a3e; }
+.pmc-desc  { font-size: 11.5px; color: #7a9a8e; line-height: 1.4; }
 
-/* Pricing */
-.pricing-box {
+/* ── Cash Payment Details ── */
+.cash-details-card {
   background: #f5faf8;
   border: 1.5px solid #d8eae0;
   border-radius: 14px;
   padding: 16px;
-}
-
-.pricing-row {
   display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  color: #4a7a62;
-  padding: 4px 0;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.pricing-row.total { font-weight: 800; color: #2c4a3e; font-size: 16px; }
-.pricing-divider   { border-top: 1.5px dashed #c8eeda; margin: 8px 0; }
+.cash-details-card h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.amount-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.amount-prefix {
+  position: absolute;
+  left: 12px;
+  font-weight: 700;
+  color: #7a9a8e;
+  pointer-events: none;
+}
+
+.amount-input-wrap input { padding-left: 28px; }
+
+.cash-readonly-value {
+  padding: 10px 12px;
+  border: 1.5px solid #e4eee8;
+  border-radius: 10px;
+  background: #eef6f1;
+  color: #2c4a3e;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.pricing-note {
+  font-size: 12px;
+  color: #7a9a8e;
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
 
 /* ── Confirmation ── */
 .confirm-check-wrap {
@@ -738,6 +811,134 @@
 }
 
 .book-continue-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.book-continue-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Booking Agreement Modal ── */
+.book-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 40, 32, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
+}
+
+.book-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 86vh;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  animation: popIn 0.25s ease;
+}
+
+.book-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.book-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #2c4a3e;
+}
+
+.book-modal-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #7a9a8e;
+}
+
+.book-modal-body {
+  overflow-y: auto;
+  background: #f5faf8;
+  border: 1.5px solid #d8eae0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.agreement-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agreement-list li {
+  font-size: 13px;
+  color: #3d5a50;
+  line-height: 1.6;
+}
+
+.agreement-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f0fbf5;
+  border: 1.5px solid #c8eeda;
+  border-radius: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.agreement-checkbox:hover { border-color: #4a9e6b; }
+
+.agreement-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.agreement-checkmark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #9ec9b6;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.agreement-checkmark.checked {
+  background: #2c4a3e;
+  border-color: #2c4a3e;
+}
+
+.agreement-checkbox-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c4a3e;
+}
+
+.book-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  flex-shrink: 0;
+}
 
 /* ── Responsive (match sidebar breakpoints) ── */
 @media (min-width: 769px) and (max-width: 1024px) {
@@ -764,4 +965,9 @@
   .time-slots-grid   { grid-template-columns: repeat(2, 1fr); }
   .session-mode-row  { gap: 6px; }
   .step-label-text   { font-size: 9px; }
+  .book-modal        { padding: 18px; }
+  .book-modal-actions { flex-direction: column-reverse; }
+  .book-modal-actions .book-continue-btn,
+  .book-modal-actions .book-cancel-btn { width: 100%; }
+  .payment-methods-grid { grid-template-columns: 1fr; }
 }

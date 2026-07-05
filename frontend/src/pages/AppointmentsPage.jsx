@@ -77,13 +77,6 @@ function buildAvailability(year, month) {
   return map
 }
 
-/* Mock upcoming appointments */
-const UPCOMING = [
-  { id: 1, date: 'July 3, 2026',  time: '10:00 AM', therapist: 'Dr. Santos',  type: 'Speech Therapy',    status: 'confirmed' },
-  { id: 2, date: 'July 10, 2026', time: '2:00 PM',  therapist: 'Dr. Reyes',   type: 'Occupational Therapy', status: 'pending' },
-  { id: 3, date: 'July 17, 2026', time: '11:00 AM', therapist: 'Dr. Santos',  type: 'Speech Therapy',    status: 'confirmed' },
-]
-
 export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const today = new Date()
@@ -93,7 +86,6 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())
   const [availability]                  = useState(() => buildAvailability(today.getFullYear(), today.getMonth()))
-  const [activeTab, setActiveTab]       = useState('calendar') // 'calendar' | 'upcoming'
   const [showConfirm, setShowConfirm]   = useState(false)
 
   /* ── Calendar navigation ── */
@@ -158,24 +150,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
             <img src="/therapy-hero.png" alt="Therapy session illustration" className="hero-img" />
           </div>
 
-          {/* ── Tabs ── */}
-          <div className="appt-tabs">
-            <button
-              className={`appt-tab ${activeTab === 'calendar' ? 'active' : ''}`}
-              onClick={() => setActiveTab('calendar')}
-            >
-              📅 Calendar
-            </button>
-            <button
-              className={`appt-tab ${activeTab === 'upcoming' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upcoming')}
-            >
-              🕐 Upcoming
-            </button>
-          </div>
-
-          {activeTab === 'calendar' && (
-            <div className="appt-card">
+          <div className="appt-card">
               {/* ── Session Overview Legend ── */}
               <div className="session-overview">
                 <span className="overview-title">Session Overview</span>
@@ -249,36 +224,9 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                 </div>
               )}
             </div>
-          )}
-
-          {activeTab === 'upcoming' && (
-            <div className="appt-card">
-              <h2 className="upcoming-title">Upcoming Appointments</h2>
-              {UPCOMING.length === 0 ? (
-                <div className="no-appt">No upcoming appointments scheduled.</div>
-              ) : (
-                <div className="upcoming-list">
-                  {UPCOMING.map(a => (
-                    <div key={a.id} className="upcoming-item">
-                      <div className="upcoming-left">
-                        <div className={`upcoming-status-dot status-${a.status}`} />
-                        <div className="upcoming-info">
-                          <span className="upcoming-type">{a.type}</span>
-                          <span className="upcoming-therapist">with {a.therapist}</span>
-                          <span className="upcoming-datetime">📅 {a.date} &nbsp; 🕐 {a.time}</span>
-                        </div>
-                      </div>
-                      <span className={`upcoming-badge badge-${a.status}`}>
-                        {a.status === 'confirmed' ? '✓ Confirmed' : '⏳ Pending'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
       </div>
     </div>
   )
 }
+

@@ -2,13 +2,12 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import { useSharedMessages } from '../context/MessagesContext'
 import CallOverlay from '../components/CallOverlay'
-import { STREAM_PATIENT_USER } from '../utils/streamConfig'
 import './PageWithSidebar.css'
 import './MessagesPage.css'
 
-// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
-// actually opens a real video/voice call.
-const StreamCallOverlay = lazy(() => import('../components/StreamCallOverlay'))
+// Lazy-loaded: the Daily.co video SDK is only needed once someone actually
+// opens a real video/voice call.
+const DailyCallOverlay = lazy(() => import('../components/DailyCallOverlay'))
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 const CONVERSATIONS = [
@@ -469,9 +468,9 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
         activeConv.id === 1 ? (
           activeCall && (
             <Suspense fallback={null}>
-              <StreamCallOverlay
+              <DailyCallOverlay
                 open={!!activeCall}
-                localUser={STREAM_PATIENT_USER}
+                userName="Alvrin"
                 onClose={() => setActiveCall(null)}
               />
             </Suspense>

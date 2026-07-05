@@ -3,12 +3,11 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
 import CallOverlay from '../../components/CallOverlay'
-import { STREAM_THERAPIST_USER } from '../../utils/streamConfig'
-
-// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
-// actually opens a real video/voice call.
-const StreamCallOverlay = lazy(() => import('../../components/StreamCallOverlay'))
 import './TherapistPatientsPage.css'
+
+// Lazy-loaded: the Daily.co video SDK is only needed once someone actually
+// opens a real video/voice call.
+const DailyCallOverlay = lazy(() => import('../../components/DailyCallOverlay'))
 
 function VideoIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" /></svg>
@@ -409,9 +408,9 @@ function MessageModal({ patient, messages, onSend, onClose }) {
       {patient.id === 0 ? (
         activeCall && (
           <Suspense fallback={null}>
-            <StreamCallOverlay
+            <DailyCallOverlay
               open={!!activeCall}
-              localUser={STREAM_THERAPIST_USER}
+              userName="Dr. Sarah Reyes"
               onClose={() => setActiveCall(null)}
             />
           </Suspense>

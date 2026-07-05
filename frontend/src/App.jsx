@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { MessagesProvider } from './context/MessagesContext'
+import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -46,6 +48,11 @@ import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPa
 import TherapistNotesProgressPage from './pages/therapist/TherapistNotesProgressPage'
 import TherapistAssignExercisesPage from './pages/therapist/TherapistAssignExercisesPage'
 import TherapistSubscriptionPage from './pages/therapist/TherapistSubscriptionPage'
+import TherapistProfilePage from './pages/therapist/TherapistProfilePage'
+import TherapistReportPage from './pages/therapist/TherapistReportPage'
+import AdminProfilePage from './pages/admin/AdminProfilePage'
+import OwnerProfilePage from './pages/owner/OwnerProfilePage'
+import PatientProfilePage from './pages/PatientProfilePage'
 
 // Temporary accounts (not connected to database)
 const TEMP_USERS = [
@@ -122,6 +129,10 @@ function App() {
   })
   const [ownerBetaTier, setOwnerBetaTier] = useState(() => localStorage.getItem('betaTier') || null)
 
+  useEffect(() => {
+    applyAccessibilityPrefs(loadAccessibilityPrefs())
+  }, [])
+
   const handleOwnerBetaActivate = (tier) => {
     setOwnerBetaTier(tier)
     if (tier) {
@@ -152,6 +163,7 @@ function App() {
   }
 
   return (
+    <MessagesProvider>
     <Router>
       <Routes>
         <Route 
@@ -385,6 +397,7 @@ function App() {
           }
         />
 
+
         <Route
           path="/therapist/appointments"
           element={
@@ -571,6 +584,81 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
                 <TherapistGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/profile"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/reports"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistReportPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/profile"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <AdminProfilePage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/profile"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/patient/profile"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <PatientProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -817,6 +905,7 @@ function App() {
         />
       </Routes>
     </Router>
+    </MessagesProvider>
   )
 }
 

@@ -65,18 +65,18 @@
   align-items: center;
 }
 
-.input-icon {
+.login-form .input-icon {
   position: absolute;
-  left: 18px;
+  left: 14px;
   color: #9aab9f;
   display: flex;
   align-items: center;
   pointer-events: none;
 }
 
-.input-wrapper input {
+.login-form .input-wrapper input {
   width: 100%;
-  padding: 14px 44px 14px 72px;
+  padding: 14px 44px 14px 42px;
   border: 1px solid #e0e8e3;
   border-radius: 12px;
   background: #fff;
@@ -88,20 +88,20 @@
   line-height: 1.2;
 }
 
-.input-wrapper input::placeholder {
+.login-form .input-wrapper input::placeholder {
   color: #b0bdb5;
 }
 
-.input-wrapper input:focus {
+.login-form .input-wrapper input:focus {
   border-color: #5a7a6d;
   box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.12);
 }
 
 /* Fix browser autofill background (Chrome/Edge blue-gray tint) */
-.input-wrapper input:-webkit-autofill,
-.input-wrapper input:-webkit-autofill:hover,
-.input-wrapper input:-webkit-autofill:focus,
-.input-wrapper input:-webkit-autofill:active {
+.login-form .input-wrapper input:-webkit-autofill,
+.login-form .input-wrapper input:-webkit-autofill:hover,
+.login-form .input-wrapper input:-webkit-autofill:focus,
+.login-form .input-wrapper input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 40px #fff inset !important;
   -webkit-text-fill-color: #333 !important;
   caret-color: #333;
@@ -278,10 +278,61 @@
 
 @media (max-width: 768px) {
   .login-page {
-    padding: 28px 20px 36px;
+    padding: 24px 20px 32px;
+  }
+
+  .login-container {
+    max-width: 100%;
+  }
+
+  .login-header {
+    margin-bottom: 22px;
   }
 
   .login-title {
-    font-size: 26px;
+    font-size: 24px;
+    margin: 16px 0 4px;
+  }
+
+  .login-subtitle {
+    font-size: 14px;
+  }
+
+  .login-form {
+    gap: 16px;
+  }
+
+  .login-form .input-wrapper input {
+    font-size: 16px;
+    padding: 13px 44px 13px 42px;
+  }
+
+  .login-btn {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .form-options {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .signup-text {
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 400px) {
+  .login-page {
+    padding: 16px 14px 28px;
+  }
+
+  .login-title {
+    font-size: 22px;
+  }
+
+  .social-btn {
+    width: 52px;
+    height: 52px;
   }
 }

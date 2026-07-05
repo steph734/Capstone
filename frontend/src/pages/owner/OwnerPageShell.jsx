@@ -16,6 +16,7 @@ export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, 
         menuItems={menuItems}
         bottomMenuItems={[]}
         profileRoleLabel="Owner"
+        profilePath="/owner/profile"
       />
 
       <main className="page-content admin-page-content">

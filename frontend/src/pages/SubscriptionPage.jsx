@@ -134,6 +134,7 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
       
       <div className="subscription-main">

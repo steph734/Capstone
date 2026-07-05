@@ -125,6 +125,7 @@ export default function PatientSidebar({
   profileName,
   profileAvatar,
   betaTier,
+  profilePath,
 }) {
   const resolvedMenuItems = menuItems ?? getPatientMenuItems(betaTier)
   const navigate = useNavigate()
@@ -171,7 +172,12 @@ export default function PatientSidebar({
             <h3 className="profile-name">{resolvedProfileName}</h3>
             <p className="profile-role">{resolvedProfileRole}</p>
           </div>
-          <button className="view-profile-btn">View Profile</button>
+          <button
+            className="view-profile-btn"
+            onClick={() => profilePath && navigate(profilePath)}
+          >
+            View Profile
+          </button>
         </div>
 
         {/* Main Navigation */}

@@ -117,6 +117,39 @@ function XIcon() {
   )
 }
 
+function MapPinIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  )
+}
+
+function DirectionsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polygon points="3 11 22 2 13 21 11 13 3 11" />
+    </svg>
+  )
+}
+
+// Pain scale: fewer, larger, color-coded options instead of an 11-button 0-10 grid —
+// easier to scan and tap for users who find plain numbers abstract.
+const PAIN_LEVELS = [
+  { level: 0, emoji: '😄', label: 'No Pain', color: '#22c55e' },
+  { level: 3, emoji: '🙂', label: 'Mild Pain', color: '#84cc16' },
+  { level: 5, emoji: '😐', label: 'Some Pain', color: '#eab308' },
+  { level: 7, emoji: '🙁', label: 'A Lot of Pain', color: '#f97316' },
+  { level: 10, emoji: '😣', label: 'Severe Pain', color: '#ef4444' },
+]
+
+const CLINIC = {
+  name: 'TherapyPro — Main Branch',
+  address: 'BGC, Taguig City, Metro Manila',
+  mapsQuery: 'TherapyPro Main Branch BGC Taguig',
+}
+
 export default function Dashboard({ onLogout, user, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -131,6 +164,8 @@ export default function Dashboard({ onLogout, user, betaTier }) {
   const [exerciseCompleted, setExerciseCompleted] = useState(false)
   const [painLevel, setPainLevel] = useState(null)
   const [showQuickLog, setShowQuickLog] = useState(false)
+  const [showXpBadge, setShowXpBadge] = useState(false)
+  const [showAppointmentDetails, setShowAppointmentDetails] = useState(false)
 
   // Calendar State
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -227,13 +262,16 @@ export default function Dashboard({ onLogout, user, betaTier }) {
   }
 
   const handleExerciseToggle = () => {
-    setExerciseCompleted(!exerciseCompleted)
+    const next = !exerciseCompleted
+    setExerciseCompleted(next)
     // In production: POST /api/logs/exercise
-    console.log('Exercise completed:', !exerciseCompleted)
-    
-    // Update weekly progress
-    if (!exerciseCompleted) {
+    console.log('Exercise completed:', next)
+
+    // Update weekly progress + celebrate with a quick XP reward
+    if (next) {
       setWeeklyProgress(Math.min(100, weeklyProgress + 5))
+      setShowXpBadge(true)
+      setTimeout(() => setShowXpBadge(false), 1600)
     }
   }
 
@@ -281,6 +319,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       {/* Main Dashboard Content */}
@@ -414,8 +453,10 @@ export default function Dashboard({ onLogout, user, betaTier }) {
                   {['😢', '😟', '😐', '😊', '😄'].map((emoji, index) => (
                     <button
                       key={index}
-                      className={`mood-emoji ${dailyMood === index ? 'selected' : ''}`}
+                      className={`mood-emoji ${dailyMood === index ? 'selected' : ''} ${dailyMood !== null && dailyMood !== index ? 'dimmed' : ''}`}
                       onClick={() => handleMoodSelect(index)}
+                      aria-label={`Feeling ${index + 1} out of 5`}
+                      aria-pressed={dailyMood === index}
                     >
                       {emoji}
                     </button>
@@ -431,24 +472,29 @@ export default function Dashboard({ onLogout, user, betaTier }) {
                     checked={exerciseCompleted}
                     onChange={handleExerciseToggle}
                   />
-                  <span className="checkmark">
+                  <span className={`checkmark ${exerciseCompleted ? 'checked-pop' : ''}`}>
                     {exerciseCompleted && <CheckIcon />}
                   </span>
-                  <span className="checkbox-label-text">Completed Daily Speech Exercises</span>
+                  <span className="checkbox-label-text">I did my speech exercises today</span>
+                  {showXpBadge && <span className="xp-badge">+10 XP ⭐</span>}
                 </label>
               </div>
 
               {/* Pain Level */}
               <div className="log-section">
-                <label className="log-label">Pain Level (0-10)</label>
+                <label className="log-label">How much does it hurt?</label>
                 <div className="pain-scale">
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(level => (
+                  {PAIN_LEVELS.map((p) => (
                     <button
-                      key={level}
-                      className={`pain-level ${painLevel === level ? 'selected' : ''}`}
-                      onClick={() => handlePainLevel(level)}
+                      key={p.level}
+                      className={`pain-option ${painLevel === p.level ? 'selected' : ''}`}
+                      style={{ '--pain-color': p.color }}
+                      onClick={() => handlePainLevel(p.level)}
+                      aria-label={p.label}
+                      aria-pressed={painLevel === p.level}
                     >
-                      {level}
+                      <span className="pain-emoji">{p.emoji}</span>
+                      <span className="pain-option-label">{p.label}</span>
                     </button>
                   ))}
                 </div>
@@ -504,16 +550,45 @@ export default function Dashboard({ onLogout, user, betaTier }) {
                 </div>
               </div>
 
-              <button className="view-details-btn">View Details</button>
+              <button className="view-details-btn" onClick={() => setShowAppointmentDetails(true)}>View Details</button>
             </div>
           )}
         </div>
 
-        {/* Book Appointment Button */}
-        <button className="book-appointment-btn">
-          <CalendarIcon />
-          Book an Appointment
-        </button>
+        {/* My Clinic Card */}
+        <div className="clinic-card">
+          <div className="clinic-header">
+            <div className="clinic-icon">
+              <MapPinIcon />
+            </div>
+            <h2 className="clinic-heading">Our Clinic</h2>
+          </div>
+          <div className="clinic-body">
+            <h3 className="clinic-name">{CLINIC.name}</h3>
+            <p className="clinic-address">{CLINIC.address}</p>
+            <a
+              className="clinic-map-thumb"
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CLINIC.mapsQuery)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open clinic location in Google Maps"
+            >
+              <div className="clinic-map-art">
+                <span className="clinic-map-pin"><MapPinIcon /></span>
+              </div>
+              <span className="clinic-map-caption">Tap to view map</span>
+            </a>
+            <a
+              className="get-directions-btn"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(CLINIC.mapsQuery)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <DirectionsIcon />
+              Get Directions
+            </a>
+          </div>
+        </div>
 
         {/* Therapy Services Grid - Now Interactive */}
         <div className="services-grid">
@@ -598,6 +673,47 @@ export default function Dashboard({ onLogout, user, betaTier }) {
           </button>
         </main>
       </div>
+
+      {/* Appointment Details Modal */}
+      {showAppointmentDetails && (
+        <div className="modal-overlay" onClick={() => setShowAppointmentDetails(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{appointment.type}</h2>
+              <button
+                className="modal-close"
+                onClick={() => setShowAppointmentDetails(false)}
+                aria-label="Close"
+              >
+                <XIcon />
+              </button>
+            </div>
+            <div className="modal-body">
+              <section className="modal-section">
+                <h3>When &amp; Where</h3>
+                <ul className="exercise-list">
+                  <li className="exercise-item"><span className="exercise-bullet">•</span>{appointment.date} at {appointment.time}</li>
+                  <li className="exercise-item"><span className="exercise-bullet">•</span>with {appointment.therapist}</li>
+                  <li className="exercise-item"><span className="exercise-bullet">•</span>at {CLINIC.name}</li>
+                </ul>
+              </section>
+              <section className="modal-section">
+                <h3>Good to Know</h3>
+                <ul className="milestone-list">
+                  <li className="milestone-item"><span className="milestone-check">✓</span>Please arrive 10 minutes early</li>
+                  <li className="milestone-item"><span className="milestone-check">✓</span>Bring your therapy notebook</li>
+                </ul>
+              </section>
+              <button
+                className="modal-action-btn"
+                onClick={() => setShowAppointmentDetails(false)}
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Therapy Modal */}
       {selectedTherapy && (

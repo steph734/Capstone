@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, useRef } from 'react'
 import PictureWordGame from './games/PictureWordGame'
-import PandaMascot from './games/PandaMascot'
 import PaoCustomizePage from './games/PaoCustomizePage'
 
 // ─── Intro stages ──────────────────────────────────────────────────────────────
@@ -26,7 +25,15 @@ const INTRO_STAGES = [
 ]
 
 const PAO_GAMES_SCRIPT = `Hehe! Ta da! Look at all these amazing games! All just for you! The Picture Word Matching game is unlocked and ready! Click it to start! I know you are going to be amazing!`
-const PAO_TICKLE_SCRIPT = `Hehe! Heehee! Oh oh oh! That tickles so much! Hahaha! Stop it, that is so tickly! Teehee! Hehe!`
+
+const PAO_CLICK_SCRIPTS = [
+  { pitch: 1.7,  text: `Hehe! Heehee! That was fun! Teehee! Hehe!` },
+  { pitch: 1.68, text: `Yay! You found me! I am so happy you are here with me today!` },
+  { pitch: 1.65, text: `Oh, hi there! You are doing such a great job!` },
+  { pitch: 1.72, text: `Teehee! I like it when you visit me! Let us keep playing!` },
+  { pitch: 1.66, text: `Hello hello! High five! We are best friends, you and me!` },
+  { pitch: 1.7,  text: `Hehe! I am here with you! You can do it!` },
+]
 
 // ─── Game list ────────────────────────────────────────────────────────────────
 
@@ -122,6 +129,146 @@ function CategoryModal({ onSelect, onClose }) {
   )
 }
 
+// ─── Pao helper (layered PNG rig, gentle & interactive) ───────────────────────
+// A calm, predictable companion for kids with Down syndrome, assembled from
+// separate part images (arms/body/feet + three full-head expressions) so each
+// part can move independently — always soft and slow, never fast or flashing.
+
+const PAO_REACTIONS = ['pao-r-wave', 'pao-r-bounce', 'pao-r-wiggle', 'pao-r-nod', 'pao-r-clap']
+
+function PaoHelper({ size = 220, talking = false, onClick, extraClassName = '' }) {
+  const [reaction, setReaction] = useState('')
+  const [blinking, setBlinking] = useState(false)
+  const [bobPulse, setBobPulse] = useState(false)
+  const [gestureArm, setGestureArm] = useState('')
+  const [mouthFrame, setMouthFrame] = useState('closed')
+  const reactionTimer = useRef(null)
+  const blinkTimer = useRef(null)
+  const bobTimer = useRef(null)
+  const gestureTimer = useRef(null)
+  const mouthTimer = useRef(null)
+  const gestureSideRef = useRef('l')
+  const reduceMotionRef = useRef(false)
+
+  useEffect(() => {
+    reduceMotionRef.current = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  }, [])
+
+  // Gentle, randomly-spaced blink — subtle, never sudden
+  useEffect(() => {
+    let cancelled = false
+    const schedule = () => {
+      blinkTimer.current = setTimeout(() => {
+        if (cancelled) return
+        setBlinking(true)
+        setTimeout(() => { if (!cancelled) setBlinking(false) }, 220)
+        schedule()
+      }, 3800 + Math.random() * 2600)
+    }
+    schedule()
+    return () => { cancelled = true; clearTimeout(blinkTimer.current) }
+  }, [])
+
+  // Irregular head bob/tilt while talking — randomized gaps, never a metronome
+  useEffect(() => {
+    if (!talking || reduceMotionRef.current) { setBobPulse(false); return }
+    let cancelled = false
+    const schedule = () => {
+      bobTimer.current = setTimeout(() => {
+        if (cancelled) return
+        setBobPulse(true)
+        setTimeout(() => { if (!cancelled) setBobPulse(false) }, 500)
+        schedule()
+      }, 600 + Math.random() * 450)
+    }
+    schedule()
+    return () => { cancelled = true; clearTimeout(bobTimer.current); setBobPulse(false) }
+  }, [talking])
+
+  // Gentle gesture pulses while talking — one arm at a time, alternating sides
+  useEffect(() => {
+    if (!talking || reduceMotionRef.current) { setGestureArm(''); return }
+    let cancelled = false
+    const schedule = () => {
+      gestureTimer.current = setTimeout(() => {
+        if (cancelled) return
+        gestureSideRef.current = gestureSideRef.current === 'l' ? 'r' : 'l'
+        setGestureArm(gestureSideRef.current)
+        setTimeout(() => { if (!cancelled) setGestureArm('') }, 600)
+        schedule()
+      }, 900 + Math.random() * 700)
+    }
+    schedule()
+    return () => { cancelled = true; clearTimeout(gestureTimer.current); setGestureArm('') }
+  }, [talking])
+
+  // Mouth while talking: closed ↔ open, each frame held 240–380 ms (randomized)
+  // — unhurried and irregular, so it never reads as a mechanical flutter
+  useEffect(() => {
+    if (!talking || reduceMotionRef.current) { setMouthFrame('closed'); return }
+    let cancelled = false
+    const swap = (frame) => {
+      mouthTimer.current = setTimeout(() => {
+        if (cancelled) return
+        setMouthFrame(frame)
+        swap(frame === 'open' ? 'closed' : 'open')
+      }, 240 + Math.random() * 140)
+    }
+    swap('open')
+    return () => { cancelled = true; clearTimeout(mouthTimer.current) }
+  }, [talking])
+
+  useEffect(() => () => clearTimeout(reactionTimer.current), [])
+
+  const activate = () => {
+    const pick = PAO_REACTIONS[Math.floor(Math.random() * PAO_REACTIONS.length)]
+    setReaction(pick)
+    clearTimeout(reactionTimer.current)
+    reactionTimer.current = setTimeout(() => setReaction(''), 1400)
+    onClick?.()
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      activate()
+    }
+  }
+
+  // Which head expression shows: smile when idle; alternating while talking.
+  // Under reduced motion, a static open mouth still communicates "talking".
+  const headFrame = talking ? (reduceMotionRef.current ? 'open' : mouthFrame) : 'smile'
+
+  return (
+    <div
+      className={`pao-helper ${extraClassName}`}
+      style={{ width: size, height: size }}
+      onClick={activate}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Friendly panda helper"
+    >
+      <div className={`pao-rig ${talking ? 'pao-talking' : ''} ${reaction}`}>
+        {/* Arm files are named from Pao's own perspective, so his right arm
+            renders on the SCREEN-LEFT side (paw flares outward) and vice versa */}
+        <img src="/pao-right-arm.png" alt="" className={`pao-part pao-arm-l ${gestureArm === 'l' ? 'pao-arm-gesture' : ''}`} draggable={false} />
+        <img src="/pao-left-arm.png" alt="" className={`pao-part pao-arm-r ${gestureArm === 'r' ? 'pao-arm-gesture' : ''}`} draggable={false} />
+        <img src="/pao-body.png" alt="" className="pao-part pao-body" draggable={false} />
+        <img src="/pao-left-foot.png" alt="" className="pao-part pao-foot-l" draggable={false} />
+        <img src="/pao-right-foot.png" alt="" className="pao-part pao-foot-r" draggable={false} />
+        <div className={`pao-head ${bobPulse ? 'pao-head-bob' : ''} ${blinking ? 'pao-blinking' : ''}`}>
+          <img src="/pao-mouth-smile.png" alt="" className={`pao-head-img ${headFrame === 'smile' ? 'pao-visible' : ''}`} draggable={false} />
+          <img src="/pao-mouth-closed.png" alt="" className={`pao-head-img ${headFrame === 'closed' ? 'pao-visible' : ''}`} draggable={false} />
+          <img src="/pao-mouth-open.png" alt="" className={`pao-head-img ${headFrame === 'open' ? 'pao-visible' : ''}`} draggable={false} />
+          <div className="pao-blink-lid pao-blink-lid-l" />
+          <div className="pao-blink-lid pao-blink-lid-r" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function GamifiedFullPage({ backPath = '/dashboard' }) {
@@ -132,10 +279,8 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
   const [entered,      setEntered]      = useState(false)
   const [showUI,       setShowUI]       = useState(false)
   const [talking,      setTalking]      = useState(false)
-  const [mouthOpen,    setMouthOpen]    = useState(false)
   const [displayText,  setDisplayText]  = useState('')
   const [gamesIn,      setGamesIn]      = useState(false)
-  const [pandaState,   setPandaState]   = useState('normal')
   const [showCatModal, setShowCatModal] = useState(false)
   const [selCategory,  setSelCategory]  = useState('fruits')
   const [showStats,    setShowStats]    = useState(false)
@@ -143,26 +288,11 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
   // Placeholder character (would come from backend)
   const character = { level: 1, xp: 0, xpNeeded: 100 }
 
-  const mouthRef = useRef(null)
-  const shyTimer = useRef(null)
   const advTimer = useRef(null)
   const stageRef = useRef(0)
 
-  // ── Mouth toggle ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (talking) {
-      mouthRef.current = setInterval(() => setMouthOpen(p => !p), 155)
-    } else {
-      clearInterval(mouthRef.current)
-      setMouthOpen(false)
-    }
-    return () => clearInterval(mouthRef.current)
-  }, [talking])
-
   // ── Cleanup ──────────────────────────────────────────────────────────────────
   useEffect(() => () => {
-    clearInterval(mouthRef.current)
-    clearTimeout(shyTimer.current)
     window.speechSynthesis?.cancel()
   }, [])
 
@@ -173,7 +303,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
     const utt = new SpeechSynthesisUtterance(script)
     utt.rate = 1.12; utt.pitch = pitchOverride ?? 1.62; utt.volume = 1
     utt.onstart = () => setTalking(true)
-    utt.onend   = () => { setTalking(false); setMouthOpen(false); if (onDone) onDone() }
+    utt.onend   = () => { setTalking(false); if (onDone) onDone() }
     utt.onerror = () => { setTalking(false); if (onDone) onDone() }
     utt.onboundary = (e) => { if (e.name === 'word') setDisplayText(script.substring(0, e.charIndex + e.charLength)) }
     const go = () => {
@@ -237,13 +367,12 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, []) // eslint-disable-line
 
-  // ── Pao click → shy ──────────────────────────────────────────────────────────
+  // ── Pao click → gentle reaction + friendly line ──────────────────────────────
+  const clickCountRef = useRef(0)
   const handlePandaClick = () => {
-    if (pandaState === 'shy') return
-    clearTimeout(shyTimer.current)
-    setPandaState('shy')
-    speakScript(PAO_TICKLE_SCRIPT, 1.85)
-    shyTimer.current = setTimeout(() => setPandaState('normal'), 4000)
+    const pick = PAO_CLICK_SCRIPTS[clickCountRef.current % PAO_CLICK_SCRIPTS.length]
+    clickCountRef.current += 1
+    speakScript(pick.text, pick.pitch)
   }
 
   // ── Category + game start ─────────────────────────────────────────────────────
@@ -275,7 +404,6 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
       <style>{`
         @keyframes gfStarFloat { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-8px) scale(1.08)} }
         @keyframes pandaEnter  { 0%{opacity:0;transform:scale(.3) rotate(-15deg)} 60%{transform:scale(1.08) rotate(3deg)} 80%{transform:scale(.97) rotate(-1deg)} 100%{opacity:1;transform:scale(1) rotate(0)} }
-        @keyframes float       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
         @keyframes gfCardIn    { from{opacity:0;transform:translateY(20px) scale(.93)} to{opacity:1;transform:translateY(0) scale(1)} }
         @keyframes gfPulse     { 0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.5)} 50%{box-shadow:0 0 0 8px rgba(245,158,11,0)} }
         @keyframes gfBubbleIn  { from{opacity:0;transform:scale(.88) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
@@ -284,6 +412,138 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
         @keyframes gfFadeIn    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes gfStageIn   { from{opacity:0;transform:scale(.88) translateY(-6px)} to{opacity:1;transform:scale(1) translateY(0)} }
         @keyframes gfLevelPop  { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+
+        /* ── Pao helper: layered part rig — soft, slow, predictable ──
+           Placement knobs: each part's width/left/top below. Nudge those
+           percentages if a seam shows (head↓neck band, arms↔shoulders,
+           feet↔lower legs). All motion is intentionally slow and small. */
+        @keyframes paoBodyBreath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+        /* Arms carry a 35deg raised base pose; every arm keyframe oscillates
+           around that base because a running animation replaces the transform */
+        @keyframes paoArmSwayL     { 0%, 100% { transform: rotate(35deg); } 50% { transform: rotate(37.5deg); } }
+        @keyframes paoArmSwayR     { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(-37.5deg); } }
+        @keyframes paoArmSwayLTalk { 0%, 100% { transform: rotate(35deg); } 50% { transform: rotate(40deg); } }
+        @keyframes paoArmSwayRTalk { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(-40deg); } }
+        @keyframes paoArmGestureL  { 0%, 100% { transform: rotate(35deg); } 40% { transform: rotate(31deg); } }
+        @keyframes paoArmGestureR  { 0%, 100% { transform: rotate(-35deg); } 40% { transform: rotate(-31deg); } }
+        @keyframes paoFootIdle     { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(0.8deg); } }
+        @keyframes paoHeadBob {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          40%      { transform: translateY(-2px) rotate(-2deg); }
+          75%      { transform: translateY(0) rotate(1.2deg); }
+        }
+        @keyframes pandaBlink {
+          0%, 100% { opacity: 0; transform: scaleY(0); }
+          50%      { opacity: 1; transform: scaleY(1); }
+        }
+        @keyframes paoWave {
+          0%, 100% { transform: rotate(-35deg); }
+          30% { transform: rotate(-55deg); }
+          55% { transform: rotate(-47deg); }
+          75% { transform: rotate(-54deg); }
+        }
+        @keyframes paoClapL { 0%, 100% { transform: rotate(35deg); } 40% { transform: rotate(21deg); } 65% { transform: rotate(25deg); } }
+        @keyframes paoClapR { 0%, 100% { transform: rotate(-35deg); } 40% { transform: rotate(-21deg); } 65% { transform: rotate(-25deg); } }
+        @keyframes paoBounceRig {
+          0%, 100% { transform: translateY(0); }
+          35% { transform: translateY(-6px); }
+          70% { transform: translateY(0); }
+          85% { transform: translateY(-2px); }
+        }
+        @keyframes paoWiggleRig {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-3deg); }
+          55% { transform: rotate(3deg); }
+          80% { transform: rotate(-1.5deg); }
+        }
+        @keyframes paoNodHead {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          35% { transform: translateY(2px) rotate(3deg); }
+          65% { transform: translateY(0) rotate(-1.5deg); }
+        }
+
+        .pao-helper {
+          position: relative;
+          display: inline-block;
+          cursor: pointer;
+          outline: none;
+          border-radius: 28px;
+        }
+        .pao-helper:focus-visible {
+          box-shadow: 0 0 0 4px rgba(176,132,255,.55);
+        }
+        .pao-rig {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          filter: drop-shadow(0 10px 22px rgba(0,0,0,.45));
+        }
+        .pao-part {
+          position: absolute;
+          user-select: none;
+          -webkit-user-drag: none;
+        }
+        .pao-arm-l  { width: 40%; left: 22%; top: 33%; transform: rotate(35deg);  transform-origin: 55% 16%; z-index: 1; animation: paoArmSwayL 4.2s ease-in-out infinite; }
+        .pao-arm-r  { width: 40%; left: 38%; top: 33%; transform: rotate(-35deg); transform-origin: 45% 16%; z-index: 1; animation: paoArmSwayR 4.2s ease-in-out 2.1s infinite; }
+        .pao-body   { width: 54%; left: 23%; top: 40%; z-index: 2; transform-origin: 50% 100%; animation: paoBodyBreath 3.8s ease-in-out infinite; }
+        .pao-foot-l { width: 36%; left: 16%;  bottom: -3%; z-index: 3; animation: paoFootIdle 5.5s ease-in-out infinite; }
+        .pao-foot-r { width: 36%; right: 16%; bottom: -3%; z-index: 3; animation: paoFootIdle 5.5s ease-in-out 2.7s infinite; }
+        .pao-head {
+          position: absolute;
+          width: 68%;
+          left: 16%;
+          top: 0;
+          aspect-ratio: 1 / 1;
+          z-index: 4;
+          transform-origin: 50% 85%;
+        }
+        .pao-head.pao-head-bob { animation: paoHeadBob 0.5s ease-out; }
+        .pao-head-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          user-select: none;
+          -webkit-user-drag: none;
+        }
+        .pao-head-img.pao-visible { opacity: 1; }
+        .pao-blink-lid {
+          position: absolute;
+          width: 22%;
+          height: 18%;
+          border-radius: 50%;
+          background: #1b1a1e;
+          opacity: 0;
+          pointer-events: none;
+        }
+        .pao-blink-lid-l { left: 23%;  top: 42%; }
+        .pao-blink-lid-r { right: 23%; top: 42%; }
+        .pao-head.pao-blinking .pao-blink-lid { animation: pandaBlink 0.22s ease-in-out; }
+
+        /* Livelier (not faster) arm sway while talking */
+        .pao-rig.pao-talking .pao-arm-l { animation: paoArmSwayLTalk 4.2s ease-in-out infinite; }
+        .pao-rig.pao-talking .pao-arm-r { animation: paoArmSwayRTalk 4.2s ease-in-out 2.1s infinite; }
+        /* One-arm gesture pulse — declared after the talking rules so it wins while active */
+        .pao-rig .pao-arm-l.pao-arm-gesture { animation: paoArmGestureL 0.6s ease-out; }
+        .pao-rig .pao-arm-r.pao-arm-gesture { animation: paoArmGestureR 0.6s ease-out; }
+        /* Click reactions — declared last so they win over sway/gesture */
+        .pao-rig.pao-r-bounce { animation: paoBounceRig 1.2s ease-out; }
+        .pao-rig.pao-r-wiggle { animation: paoWiggleRig 1.3s ease-in-out; }
+        .pao-rig.pao-r-wave .pao-arm-r { animation: paoWave 1.2s ease-in-out; }
+        .pao-rig.pao-r-nod .pao-head   { animation: paoNodHead 1.2s ease-in-out; }
+        .pao-rig.pao-r-clap .pao-arm-l { animation: paoClapL 1.3s ease-in-out; }
+        .pao-rig.pao-r-clap .pao-arm-r { animation: paoClapR 1.3s ease-in-out; }
+
+        @media (max-width: 480px) {
+          .pao-helper-intro { width: 190px !important; height: 190px !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .pao-rig, .pao-rig * {
+            animation: none !important;
+            transition: none !important;
+          }
+        }
       `}</style>
 
       {STARS.map((s,i) => <Star key={i} {...s}/>)}
@@ -314,8 +574,8 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
           )}
 
           {/* Pao mascot */}
-          <div style={{ animation: entered ? 'pandaEnter .9s cubic-bezier(.34,1.56,.64,1) both, float 3.2s ease-in-out 1s infinite' : 'none', cursor:'pointer', flexShrink:0 }}>
-            <PandaMascot entered={entered} mouthOpen={mouthOpen} pxWidth={220} onClick={handlePandaClick} pandaState={pandaState}/>
+          <div style={{ animation: entered ? 'pandaEnter .9s cubic-bezier(.34,1.56,.64,1) both' : 'none', flexShrink:0 }}>
+            <PaoHelper size={250} talking={talking} onClick={handlePandaClick} extraClassName="pao-helper-intro"/>
           </div>
 
           {/* Speech bubble */}
@@ -364,8 +624,8 @@ export default function GamifiedFullPage({ backPath = '/dashboard' }) {
 
           {/* Pao + speech bubble row */}
           <div style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
-            <div style={{ animation:'float 3.2s ease-in-out infinite', cursor:'pointer', flexShrink:0 }}>
-              <PandaMascot entered={true} mouthOpen={mouthOpen} pxWidth={140} onClick={handlePandaClick} pandaState={pandaState}/>
+            <div style={{ flexShrink:0 }}>
+              <PaoHelper size={150} talking={talking} onClick={handlePandaClick}/>
             </div>
             <div style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Level badge + stats toggle */}

@@ -136,6 +136,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <div className="appt-main">

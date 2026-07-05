@@ -1,7 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
+import { useSharedMessages } from '../context/MessagesContext'
+import CallOverlay from '../components/CallOverlay'
+import { STREAM_PATIENT_USER } from '../utils/streamConfig'
 import './PageWithSidebar.css'
 import './MessagesPage.css'
+
+// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
+// actually opens a real video/voice call.
+const StreamCallOverlay = lazy(() => import('../components/StreamCallOverlay'))
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 const CONVERSATIONS = [
@@ -219,10 +226,41 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   const [showInfo, setShowInfo] = useState(false)
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
   const [search, setSearch] = useState('')
+  const [activeCall, setActiveCall] = useState(null) // null | 'video' | 'voice'
   const bodyRef = useRef(null)
+  const activeIdRef = useRef(activeId)
+  const prevThreadLenRef = useRef(0)
+
+  const { thread, sendAsPatient } = useSharedMessages()
+
+  // Keep activeIdRef in sync so the thread effect can read it without being a dependency
+  useEffect(() => { activeIdRef.current = activeId }, [activeId])
+
+  // Sync conversation-1 preview and unread badge when therapist sends a new message
+  useEffect(() => {
+    if (thread.length <= prevThreadLenRef.current) return
+    const last = thread[thread.length - 1]
+    prevThreadLenRef.current = thread.length
+    if (last.from !== 'therapist') return
+    setConversations(prev => prev.map(c =>
+      c.id === 1
+        ? { ...c, lastMessage: last.text, time: last.time, unread: activeIdRef.current !== 1 ? c.unread + 1 : 0 }
+        : c
+    ))
+  }, [thread])
 
   const activeConv = conversations.find(c => c.id === activeId)
-  const messages = messageMap[activeId] || []
+
+  // Conv 1 uses the shared thread; all others use local messageMap
+  const messages = activeId === 1
+    ? thread.map(m => ({
+        id: m.id,
+        fromMe: m.from === 'patient',
+        sender: m.from === 'therapist' ? 'Dr. Sarah Reyes' : undefined,
+        text: m.text,
+        time: m.time,
+      }))
+    : (messageMap[activeId] || [])
 
   const pinned = conversations.filter(c => c.pinned && matchSearch(c, search))
   const others = conversations.filter(c => !c.pinned && matchSearch(c, search))
@@ -249,19 +287,27 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   const sendMessage = () => {
     const text = input.trim()
     if (!text) return
-    const newMsg = {
-      id: Date.now(),
-      fromMe: true,
-      text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    if (activeId === 1) {
+      // Route through shared context so therapist sees the reply
+      sendAsPatient(text)
+      setConversations(prev => prev.map(c =>
+        c.id === 1 ? { ...c, lastMessage: text, time: 'now' } : c
+      ))
+    } else {
+      const newMsg = {
+        id: Date.now(),
+        fromMe: true,
+        text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+      setMessageMap(prev => ({
+        ...prev,
+        [activeId]: [...(prev[activeId] || []), newMsg],
+      }))
+      setConversations(prev => prev.map(c =>
+        c.id === activeId ? { ...c, lastMessage: text, time: 'now' } : c
+      ))
     }
-    setMessageMap(prev => ({
-      ...prev,
-      [activeId]: [...(prev[activeId] || []), newMsg],
-    }))
-    setConversations(prev => prev.map(c =>
-      c.id === activeId ? { ...c, lastMessage: text, time: 'now' } : c
-    ))
     setInput('')
   }
 
@@ -280,6 +326,7 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
+        profilePath="/patient/profile"
       />
 
       <main className="page-content msg-page">
@@ -360,8 +407,8 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
                     </span>
                   </div>
                   <div className="msg-chat-header-actions">
-                    <button className="msg-icon-btn" aria-label="Video call"><VideoIcon /></button>
-                    <button className="msg-icon-btn" aria-label="Voice call"><PhoneIcon /></button>
+                    <button className="msg-icon-btn" onClick={() => setActiveCall('video')} aria-label="Video call"><VideoIcon /></button>
+                    <button className="msg-icon-btn" onClick={() => setActiveCall('voice')} aria-label="Voice call"><PhoneIcon /></button>
                     <button
                       className={`msg-icon-btn${showInfo ? ' msg-icon-btn-active' : ''}`}
                       onClick={() => setShowInfo(v => !v)}
@@ -417,6 +464,29 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
           )}
         </div>
       </main>
+
+      {activeConv && (
+        activeConv.id === 1 ? (
+          activeCall && (
+            <Suspense fallback={null}>
+              <StreamCallOverlay
+                open={!!activeCall}
+                localUser={STREAM_PATIENT_USER}
+                onClose={() => setActiveCall(null)}
+              />
+            </Suspense>
+          )
+        ) : (
+          <CallOverlay
+            open={!!activeCall}
+            type={activeCall || 'voice'}
+            contactName={activeConv.name}
+            initials={activeConv.initials}
+            color={activeConv.color}
+            onClose={() => setActiveCall(null)}
+          />
+        )
+      )}
     </div>
   )
 }

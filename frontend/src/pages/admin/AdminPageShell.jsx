@@ -16,6 +16,7 @@ export default function AdminPageShell({ user, onLogout, title, subtitle, icon, 
         menuItems={menuItems}
         bottomMenuItems={[]}
         profileRoleLabel="Super Admin"
+        profilePath="/admin/profile"
       />
 
       <main className="page-content admin-page-content">

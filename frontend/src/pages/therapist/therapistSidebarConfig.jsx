@@ -68,6 +68,14 @@ function GamepadIcon() {
   )
 }
 
+function ReportIcon() {
+  return (
+    <Icon>
+      <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+    </Icon>
+  )
+}
+
 const BASE_THERAPIST_MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/therapist/dashboard' },
   { id: 'patients', label: 'My Patients', icon: <PatientsIcon />, path: '/therapist/patients' },
@@ -75,6 +83,7 @@ const BASE_THERAPIST_MENU_ITEMS = [
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/therapist/subscription' },
   { id: 'notes-progress', label: 'Notes & Progress', icon: <NotesIcon />, path: '/therapist/notes-progress' },
   { id: 'assign-exercises', label: 'Assign Exercises', icon: <ExercisesIcon />, path: '/therapist/assign-exercises' },
+  { id: 'reports', label: 'Reports', icon: <ReportIcon />, path: '/therapist/reports' },
 ]
 
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/therapist/speech-features' }

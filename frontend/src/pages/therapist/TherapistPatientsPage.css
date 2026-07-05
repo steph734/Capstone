@@ -503,6 +503,32 @@
   color: #9aab9f;
 }
 
+.tp-msg-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tp-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #e8f5f0;
+  color: #4a6b5d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.tp-icon-btn:hover {
+  background: #ddeee7;
+  transform: translateY(-1px);
+}
+
 .tp-msg-body {
   flex: 1;
   overflow-y: auto;

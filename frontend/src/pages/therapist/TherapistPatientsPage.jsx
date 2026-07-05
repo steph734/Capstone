@@ -1,8 +1,21 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
+import CallOverlay from '../../components/CallOverlay'
+import { STREAM_THERAPIST_USER } from '../../utils/streamConfig'
+
+// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
+// actually opens a real video/voice call.
+const StreamCallOverlay = lazy(() => import('../../components/StreamCallOverlay'))
 import './TherapistPatientsPage.css'
+
+function VideoIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" /></svg>
+}
+function PhoneIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" /></svg>
+}
 
 const PATIENTS = [
   {
@@ -320,6 +333,7 @@ function ProfileModal({ patient, onClose, onMessage }) {
 /* ── Message Modal ──────────────────────────────────────── */
 function MessageModal({ patient, messages, onSend, onClose }) {
   const [text, setText] = useState('')
+  const [activeCall, setActiveCall] = useState(null) // null | 'video' | 'voice'
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -350,7 +364,11 @@ function MessageModal({ patient, messages, onSend, onClose }) {
             <span className="tp-msg-header-name">{patient.name}</span>
             <span className="tp-msg-header-sub">Messaging · {patient.guardian} (Guardian)</span>
           </div>
-          <button className="tp-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <div className="tp-msg-header-actions">
+            <button className="tp-icon-btn" onClick={() => setActiveCall('video')} aria-label="Video call"><VideoIcon /></button>
+            <button className="tp-icon-btn" onClick={() => setActiveCall('voice')} aria-label="Voice call"><PhoneIcon /></button>
+            <button className="tp-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -387,6 +405,26 @@ function MessageModal({ patient, messages, onSend, onClose }) {
           </button>
         </div>
       </div>
+
+      {patient.id === 0 ? (
+        activeCall && (
+          <Suspense fallback={null}>
+            <StreamCallOverlay
+              open={!!activeCall}
+              localUser={STREAM_THERAPIST_USER}
+              onClose={() => setActiveCall(null)}
+            />
+          </Suspense>
+        )
+      ) : (
+        <CallOverlay
+          open={!!activeCall}
+          type={activeCall || 'voice'}
+          contactName={patient.name}
+          avatarUrl={patient.avatar}
+          onClose={() => setActiveCall(null)}
+        />
+      )}
     </div>
   )
 }

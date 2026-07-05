@@ -1,8 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import { useSharedMessages } from '../context/MessagesContext'
+import CallOverlay from '../components/CallOverlay'
+import { STREAM_PATIENT_USER } from '../utils/streamConfig'
 import './PageWithSidebar.css'
 import './MessagesPage.css'
+
+// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
+// actually opens a real video/voice call.
+const StreamCallOverlay = lazy(() => import('../components/StreamCallOverlay'))
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 const CONVERSATIONS = [
@@ -220,6 +226,7 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   const [showInfo, setShowInfo] = useState(false)
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
   const [search, setSearch] = useState('')
+  const [activeCall, setActiveCall] = useState(null) // null | 'video' | 'voice'
   const bodyRef = useRef(null)
   const activeIdRef = useRef(activeId)
   const prevThreadLenRef = useRef(0)
@@ -400,8 +407,8 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
                     </span>
                   </div>
                   <div className="msg-chat-header-actions">
-                    <button className="msg-icon-btn" aria-label="Video call"><VideoIcon /></button>
-                    <button className="msg-icon-btn" aria-label="Voice call"><PhoneIcon /></button>
+                    <button className="msg-icon-btn" onClick={() => setActiveCall('video')} aria-label="Video call"><VideoIcon /></button>
+                    <button className="msg-icon-btn" onClick={() => setActiveCall('voice')} aria-label="Voice call"><PhoneIcon /></button>
                     <button
                       className={`msg-icon-btn${showInfo ? ' msg-icon-btn-active' : ''}`}
                       onClick={() => setShowInfo(v => !v)}
@@ -457,6 +464,29 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
           )}
         </div>
       </main>
+
+      {activeConv && (
+        activeConv.id === 1 ? (
+          activeCall && (
+            <Suspense fallback={null}>
+              <StreamCallOverlay
+                open={!!activeCall}
+                localUser={STREAM_PATIENT_USER}
+                onClose={() => setActiveCall(null)}
+              />
+            </Suspense>
+          )
+        ) : (
+          <CallOverlay
+            open={!!activeCall}
+            type={activeCall || 'voice'}
+            contactName={activeConv.name}
+            initials={activeConv.initials}
+            color={activeConv.color}
+            onClose={() => setActiveCall(null)}
+          />
+        )
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ const MenuIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="
 const BellIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
 const UserIcon    = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 const PinIcon     = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+const MailIcon    = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></svg>
 const CalIcon     = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 const ShieldIcon  = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4a9e6b" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
 const InfoIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4a9e6b" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -37,10 +38,12 @@ const CHILD_CONDITIONS = [
 const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other']
 
 const THERAPISTS = [
-  { id: 1, name: 'Melanie Cruz',  role: 'OT Therapist',       initials: 'MC', color: '#f9a8d4', textColor: '#9d174d', available: true },
-  { id: 2, name: 'Marco Reyes',   role: 'Speech Therapist',   initials: 'MR', color: '#93c5fd', textColor: '#1e3a8a', available: true },
-  { id: 3, name: 'Jade Tan',      role: 'Physical Therapist', initials: 'JT', color: '#c4b5fd', textColor: '#4c1d95', available: true },
-  { id: 4, name: 'Andre Lim',     role: 'Behavior Therapist', initials: 'AL', color: '#6ee7b7', textColor: '#064e3b', available: true },
+  { id: 1, name: 'Marco Reyes',   role: 'Speech Therapist',        initials: 'MR', color: '#93c5fd', textColor: '#1e3a8a', available: true },
+  { id: 2, name: 'Jade Tan',      role: 'Physical Therapist',      initials: 'JT', color: '#c4b5fd', textColor: '#4c1d95', available: false },
+  { id: 3, name: 'Andre Lim',     role: 'Behavior Therapist',      initials: 'AL', color: '#6ee7b7', textColor: '#064e3b', available: true },
+  { id: 4, name: 'Carmen Dizon',  role: 'Occupational Therapist',  initials: 'CD', color: '#f9a8d4', textColor: '#9d174d', available: true },
+  { id: 5, name: 'Paolo Ramos',   role: 'Developmental Therapist', initials: 'PR', color: '#fde68a', textColor: '#92400e', available: true },
+  { id: 6, name: 'Grace Uy',      role: 'Psychologist',            initials: 'GU', color: '#fecdd3', textColor: '#9f1239', available: true },
 ]
 
 const SESSION_MODES = [
@@ -84,7 +87,7 @@ export default function BookAppointmentPage({ user }) {
     gender: 'Male', birthdate: '',
     address: '', condition: 'Speech Delay',
     guardianFirst: '', guardianLast: '',
-    relationship: 'Mother', contactNumber: '',
+    relationship: 'Mother', contactNumber: '', email: '',
   })
   const [errors1, setErrors1] = useState({})
   const setF1 = (k, v) => { setForm1(p => ({ ...p, [k]: v })); setErrors1(p => ({ ...p, [k]: '' })) }
@@ -109,6 +112,8 @@ export default function BookAppointmentPage({ user }) {
     if (!form1.guardianFirst.trim()) e.guardianFirst = 'Required'
     if (!form1.guardianLast.trim())  e.guardianLast  = 'Required'
     if (!form1.contactNumber.trim()) e.contactNumber = 'Required'
+    if (!form1.email.trim())              e.email = 'Required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form1.email.trim())) e.email = 'Invalid email'
     return e
   }
   const validate2 = () => {
@@ -280,7 +285,7 @@ export default function BookAppointmentPage({ user }) {
                 </div>
               </div>
 
-              <div className="book-row">
+              <div className="book-row three-col">
                 <div className="book-field">
                   <label>Relationship with the Child <span className="req">*</span></label>
                   <select value={form1.relationship} onChange={e => setF1('relationship', e.target.value)}>
@@ -292,6 +297,15 @@ export default function BookAppointmentPage({ user }) {
                   <input value={form1.contactNumber} onChange={e => setF1('contactNumber', e.target.value)}
                     placeholder="0921 059 9762" className={errors1.contactNumber ? 'err' : ''} />
                   {errors1.contactNumber && <span className="field-err">{errors1.contactNumber}</span>}
+                </div>
+                <div className="book-field">
+                  <label>Email Address <span className="req">*</span></label>
+                  <div className="input-icon-wrap">
+                    <MailIcon />
+                    <input type="email" value={form1.email} onChange={e => setF1('email', e.target.value)}
+                      placeholder="maria@email.com" className={errors1.email ? 'err' : ''} />
+                  </div>
+                  {errors1.email && <span className="field-err">{errors1.email}</span>}
                 </div>
               </div>
 
@@ -415,6 +429,7 @@ export default function BookAppointmentPage({ user }) {
                 <div className="summary-row"><span>Guardian</span><strong>{`${form1.guardianFirst} ${form1.guardianLast}`.trim() || '—'}</strong></div>
                 <div className="summary-row"><span>Relationship</span><strong>{form1.relationship}</strong></div>
                 <div className="summary-row"><span>Contact</span><strong>{form1.contactNumber || '—'}</strong></div>
+                <div className="summary-row"><span>Email</span><strong>{form1.email || '—'}</strong></div>
               </div>
 
               <div className="summary-block">

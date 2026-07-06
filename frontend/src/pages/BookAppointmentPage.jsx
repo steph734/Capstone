@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { lazy, Suspense, useRef, useState } from 'react'
-=======
 import { useEffect, useRef, useState } from 'react'
->>>>>>> frontend
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import { logActivity } from '../utils/auditLog'

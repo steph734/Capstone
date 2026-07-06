@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import { lazy, Suspense, useRef, useState } from 'react'
+=======
+import { useEffect, useRef, useState } from 'react'
+>>>>>>> frontend
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
+import { logActivity } from '../utils/auditLog'
 import './BookAppointmentPage.css'
 
 const StripePaymentModal = lazy(() => import('../components/StripePaymentModal'))
@@ -193,6 +198,23 @@ export default function BookAppointmentPage({ user }) {
   const therapistObj = THERAPISTS.find(t => t.id === selectedTherapist)
   const sessionModeObj = SESSION_MODES.find(m => m.id === sessionMode)
   const fullName = `${form1.firstName} ${form1.lastName}`.trim() || '—'
+
+  /* Record the booking in the audit log once the confirmation step is reached */
+  const loggedBookingRef = useRef(false)
+  useEffect(() => {
+    if (step !== 5 || loggedBookingRef.current) return
+    loggedBookingRef.current = true
+    logActivity({
+      role: 'Patient',
+      user: user?.name || 'Patient',
+      email: user?.email || '—',
+      actionIcon: '📅',
+      action: 'Appointment',
+      description: `Booked ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`,
+      entity: `Appointment · ${bookingDateLabel}`,
+      status: 'Success',
+    })
+  }, [step]) // eslint-disable-line
 
   return (
     <div className="book-layout">

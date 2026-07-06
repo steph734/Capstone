@@ -137,35 +137,80 @@
   transform: translateY(-1px);
 }
 
-/* ── Patient Grid ─────────────────────────────────────────── */
-.tp-patients-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-/* ── Patient Card ─────────────────────────────────────────── */
-.tp-patient-card {
+/* ── Patient Table ────────────────────────────────────────── */
+.tp-table-card {
   background: #fff;
   border: 1px solid #e8f5f0;
-  border-radius: 20px;
-  padding: 20px;
+  border-radius: 18px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  transition: box-shadow 0.2s, transform 0.2s;
+  overflow: hidden;
 }
 
-.tp-patient-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+.tp-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.tp-card-top {
+.tp-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.tp-table th,
+.tp-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid #eef4f1;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.tp-table th {
+  background: #f8fbf9;
+  color: #5a7a6d;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.tp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tp-table tbody tr:hover {
+  background: #f8fbf9;
+}
+
+.tp-table-patient {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
+  min-width: 160px;
+}
+
+.tp-avatar-sm {
+  width: 40px;
+  height: 40px;
+}
+
+.tp-table-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.tp-table-actions .tp-action-btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.tp-table-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: #9aab9f;
+  font-size: 14px;
 }
 
 .tp-avatar-wrap {
@@ -270,46 +315,6 @@
   transition: width 0.4s ease;
 }
 
-/* ── Session Info ─────────────────────────────────────────── */
-.tp-session-info {
-  display: flex;
-  padding: 10px 0;
-  border-top: 1px solid #f0f7f4;
-  border-bottom: 1px solid #f0f7f4;
-}
-
-.tp-session-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: center;
-  text-align: center;
-}
-
-.tp-session-item:not(:last-child) {
-  border-right: 1px solid #f0f7f4;
-}
-
-.tp-session-lbl {
-  font-size: 10px;
-  color: #9aab9f;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.tp-session-val {
-  font-size: 12px;
-  font-weight: 600;
-  color: #2c4a3e;
-}
-
-/* ── Card Actions ─────────────────────────────────────────── */
-.tp-card-actions {
-  display: flex;
-  gap: 8px;
-}
-
 .tp-action-btn {
   flex: 1;
   padding: 8px 10px;
@@ -339,15 +344,6 @@
 }
 
 .tp-action-msg:hover { background: #ddeee7; }
-
-/* ── Empty State ──────────────────────────────────────────── */
-.tp-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 60px 20px;
-  color: #9aab9f;
-  font-size: 15px;
-}
 
 /* ── Profile Modal ────────────────────────────────────────── */
 .tp-profile-modal {
@@ -789,17 +785,7 @@
 .tp-btn-add:hover { background: #3d5a50; }
 
 /* ── Responsive ───────────────────────────────────────────── */
-@media (max-width: 1100px) {
-  .tp-patients-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 768px) {
-  .tp-patients-grid {
-    grid-template-columns: 1fr;
-  }
-
   .tp-stats-strip {
     padding: 14px 16px;
     flex-wrap: wrap;

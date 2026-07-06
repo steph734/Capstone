@@ -1,0 +1,589 @@
+/* My Progress — warm, jargon-free "progress storybook" for parents */
+
+.pp-layout {
+  background: linear-gradient(180deg, #fff9f0 0%, #f5faf8 100%);
+}
+
+.pp-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pp-header {
+  margin-bottom: 4px;
+}
+
+.pp-title {
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 800;
+  color: #2c4a3e;
+  margin: 0 0 6px 0;
+}
+
+.pp-subtitle {
+  font-size: 15px;
+  color: #7a8a83;
+  margin: 0;
+}
+
+.pp-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(44, 74, 62, 0.06);
+  border: 1px solid #f0ede3;
+}
+
+/* ── Snapshot ── */
+.pp-snapshot-card {
+  background: linear-gradient(135deg, #fff6e5 0%, #ffeef5 100%);
+  border: 1px solid #ffe3c2;
+}
+
+.pp-snapshot-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pp-level-badge {
+  background: #ffd166;
+  color: #7a4b00;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.pp-xp-wrap {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-xp-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a7256;
+}
+
+.pp-xp-bar {
+  height: 10px;
+  background: #fff0da;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pp-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff9f68, #ffd166);
+  border-radius: 6px;
+}
+
+.pp-badges-count {
+  font-weight: 800;
+  color: #b8460e;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.pp-snapshot-summary {
+  font-size: 17px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0;
+}
+
+/* ── Section header / recap ── */
+.pp-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pp-section-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #2c4a3e;
+  margin: 0 0 16px 0;
+}
+
+.pp-section-header .pp-section-title {
+  margin-bottom: 0;
+}
+
+.pp-period-toggle {
+  display: flex;
+  background: #f5faf8;
+  border-radius: 12px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.pp-period-btn {
+  border: none;
+  background: transparent;
+  color: #6b7c75;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.pp-period-btn.active {
+  background: #4a6b5d;
+  color: #fff;
+}
+
+.pp-recap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pp-recap-item {
+  background: #f8faf9;
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-recap-num {
+  font-size: 26px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.pp-recap-lbl {
+  font-size: 12px;
+  color: #6b7c75;
+  font-weight: 600;
+}
+
+.pp-domain-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pp-domain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pp-trend-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c4a3e;
+  background: #f5faf8;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+/* ── Streak ── */
+.pp-streak-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, #fff1f0 0%, #fff7e6 100%);
+  border: 1px solid #ffd9cc;
+}
+
+.pp-streak-flame {
+  font-size: 44px;
+  flex-shrink: 0;
+}
+
+.pp-streak-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: #b8460e;
+  margin-bottom: 6px;
+}
+
+.pp-streak-days {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pp-streak-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffe0d1;
+  display: inline-block;
+}
+
+.pp-streak-dot-on {
+  background: #ff7a45;
+}
+
+.pp-streak-sub {
+  margin: 0;
+  font-size: 12.5px;
+  color: #8a7256;
+  font-weight: 600;
+}
+
+/* ── Domain engagement pie ── */
+.pp-pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pp-pie-chart {
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+}
+
+.pp-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.pp-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.pp-pie-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pp-pie-legend-label {
+  color: #2c4a3e;
+  font-weight: 700;
+  flex: 1;
+}
+
+.pp-pie-legend-pct {
+  color: #6b7c75;
+  font-weight: 700;
+}
+
+.pp-domain-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: #9aab9f;
+  font-style: italic;
+}
+
+/* ── Personal best ── */
+.pp-personal-best-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f5faf8 100%);
+  border: 1px solid #d5ebe3;
+}
+
+.pp-personal-best-icon {
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.pp-personal-best-title {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.pp-personal-best-note {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c6e4f;
+}
+
+.pp-personal-best-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: #7a8a83;
+}
+
+/* ── Goals ── */
+.pp-goals-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pp-goal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8faf9;
+  border-radius: 12px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.pp-goal-text {
+  font-size: 14px;
+  color: #2c4a3e;
+  font-weight: 600;
+}
+
+/* ── Notes from therapist ── */
+.pp-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-note-card {
+  background: #f8faf9;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid #eef4f1;
+}
+
+.pp-note-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pp-note-date {
+  font-size: 12px;
+  color: #9aab9f;
+  font-weight: 600;
+}
+
+.pp-note-summary {
+  margin: 0;
+  font-size: 14.5px;
+  color: #2c4a3e;
+  line-height: 1.5;
+}
+
+.pp-empty-note {
+  margin: 0;
+  font-size: 14px;
+  color: #9aab9f;
+  font-style: italic;
+}
+
+/* ── Home activities ── */
+.pp-activities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pp-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f8faf9;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid #eef4f1;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pp-activity-item:hover {
+  background: #f0f8f4;
+}
+
+.pp-activity-done {
+  opacity: 0.6;
+}
+
+.pp-activity-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: #4a6b5d;
+}
+
+.pp-activity-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-activity-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pp-activity-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.pp-activity-done .pp-activity-title {
+  text-decoration: line-through;
+}
+
+.pp-activity-instructions {
+  margin: 0;
+  font-size: 13.5px;
+  color: #6b7c75;
+}
+
+.pp-activity-due {
+  font-size: 12px;
+  color: #9aab9f;
+  font-weight: 600;
+}
+
+/* ── Milestone celebration modal ── */
+.pp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 74, 62, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+  overflow: hidden;
+}
+
+.pp-milestone-modal {
+  position: relative;
+  z-index: 2;
+  background: #fff;
+  border-radius: 28px;
+  padding: 36px 32px;
+  text-align: center;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  animation: ppMilestonePop 0.5s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes ppMilestonePop {
+  from { opacity: 0; transform: scale(.8) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pp-milestone-icon {
+  font-size: 64px;
+  margin-bottom: 8px;
+}
+
+.pp-milestone-eyebrow {
+  margin: 0 0 4px 0;
+  color: #ff7a45;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.pp-milestone-name {
+  margin: 0 0 8px 0;
+  color: #2c4a3e;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.pp-milestone-sub {
+  margin: 0 0 20px 0;
+  color: #6b7c75;
+  font-size: 14px;
+}
+
+.pp-milestone-btn {
+  background: linear-gradient(135deg, #ffd166, #ff9f68);
+  border: none;
+  color: #7a4b00;
+  font-weight: 800;
+  font-size: 15px;
+  border-radius: 14px;
+  padding: 12px 28px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(255, 159, 104, 0.4);
+}
+
+/* ── Confetti ── */
+.pp-confetti-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pp-confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 14px;
+  opacity: 0.9;
+  animation-name: ppConfettiFall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes ppConfettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(360deg); opacity: 0.4; }
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .pp-card { padding: 18px; border-radius: 16px; }
+  .pp-recap-grid { grid-template-columns: 1fr 1fr; }
+  .pp-recap-item:last-child { grid-column: 1 / -1; }
+  .pp-streak-card { flex-direction: column; text-align: center; align-items: center; }
+  .pp-personal-best-card { flex-direction: column; align-items: center; text-align: center; }
+  .pp-pie-wrap { justify-content: center; }
+}

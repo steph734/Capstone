@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { Sparkline, TrendChart, BreakdownChart } from './ReportCharts'
+import { logActivity } from '../../utils/auditLog'
 import './OwnerReportsPage.css'
 
 const fmtPeso = (n) => `₱${n.toLocaleString()}`
@@ -554,25 +555,42 @@ export default function OwnerReportsPage({ user, onLogout, betaTier }) {
     setTimeout(() => setToast(''), 2800)
   }
 
+  const logExport = (title, format) => {
+    logActivity({
+      role: 'Owner',
+      user: user?.name || 'Owner',
+      email: user?.email || '—',
+      actionIcon: '📤',
+      action: 'Report',
+      description: `Exported ${title} as ${format}`,
+      entity: `Report · ${title}`,
+      status: 'Success',
+    })
+  }
+
   const handleCardCSV = (report) => {
     const csv = csvStringFor(report.cols, report.rows.map(report.toRow))
     downloadAndRecord(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${report.id}-report.csv`, report.title, 'CSV', setDownloads)
     showToast(`${report.title} exported as CSV`)
+    logExport(report.title, 'CSV')
   }
   const handleCardPDF = (report) => {
     const doc = buildPDFDoc(report.title, report.cols, report.rows.map(report.toRow))
     downloadAndRecord(doc.output('blob'), `${report.id}-report.pdf`, report.title, 'PDF', setDownloads)
     showToast(`${report.title} exported as PDF`)
+    logExport(report.title, 'PDF')
   }
   const handleFullCSV = () => {
     const sections = REPORTS.map((r) => `${r.title}\n${csvStringFor(r.cols, r.rows.map(r.toRow))}`)
     downloadAndRecord(new Blob([sections.join('\n\n')], { type: 'text/csv;charset=utf-8;' }), 'therapypro-full-report.csv', 'Full Report', 'CSV', setDownloads)
     showToast('Full report exported as CSV')
+    logExport('Full Report', 'CSV')
   }
   const handleFullPDF = () => {
     const doc = buildCombinedPDFDoc(REPORTS)
     downloadAndRecord(doc.output('blob'), 'therapypro-full-report.pdf', 'Full Report', 'PDF', setDownloads)
     showToast('Full report exported as PDF')
+    logExport('Full Report', 'PDF')
   }
 
   return (

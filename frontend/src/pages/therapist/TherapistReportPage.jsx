@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
+import { logActivity } from '../../utils/auditLog'
 import './TherapistReportPage.css'
 
 // ── Static demo data ────────────────────────────────────────────────────────
@@ -125,17 +126,32 @@ export default function TherapistReportPage({ user, onLogout, betaTier }) {
     setTimeout(() => setToast(''), 2800)
   }
 
+  const selected = REPORT_TYPES.find(r => r.id === reportType)
+
+  const logExport = (format) => {
+    logActivity({
+      role: 'Therapist',
+      user: user?.name || 'Therapist',
+      email: user?.email || '—',
+      actionIcon: '📤',
+      action: 'Report',
+      description: `Exported ${selected?.label || 'report'} as ${format} (${dateRange.from} to ${dateRange.to})`,
+      entity: `Report · ${reportType}`,
+      status: 'Success',
+    })
+  }
+
   const handlePDF = () => {
     exportPDF(reportType, rows, cols, dateRange)
     showToast('PDF exported successfully!')
+    logExport('PDF')
   }
 
   const handleExcel = () => {
     exportExcel(reportType, rows, cols, dateRange)
     showToast('Excel file exported successfully!')
+    logExport('Excel')
   }
-
-  const selected = REPORT_TYPES.find(r => r.id === reportType)
 
   return (
     <TherapistPageShell

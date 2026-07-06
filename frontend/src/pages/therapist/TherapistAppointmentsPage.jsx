@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
+import { logActivity } from '../../utils/auditLog'
 import './TherapistAppointmentsPage.css'
 
 /* ── Data ─────────────────────────────────────────────────── */
@@ -486,10 +487,41 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800) }
   const patient   = (a)   => PATIENTS.find(p => p.id === a.patientId) || { name: a.patientName || 'Unknown', avatar: `https://i.pravatar.cc/150?img=${(a.id % 70) + 1}`, condition: '' }
 
-  const handleAdd       = (appt) => { setAppointments(p => [...p, appt]); setShowAdd(false); showToast('Appointment added!') }
-  const handleSaveEdit  = (appt) => { setAppointments(p => p.map(a => a.id===appt.id?appt:a)); setEditAppt(null); showToast('Appointment updated!') }
-  const handleArchive   = (id)   => { setAppointments(p => p.map(a => a.id===id?{...a,status:'Archived',archivedAt:new Date().toISOString()}:a)); showToast('Appointment archived.') }
-  const handleUnarchive = (id)   => { setAppointments(p => p.map(a => a.id===id?{...a,status:'Confirmed',archivedAt:null}:a)); showToast('Appointment restored.') }
+  const logAppt = (actionIcon, description, appt, status = 'Success') => {
+    logActivity({
+      role: 'Therapist',
+      user: user?.name || 'Therapist',
+      email: user?.email || '—',
+      actionIcon,
+      action: 'Appointment',
+      description,
+      entity: `Appointment #${appt.id}`,
+      status,
+    })
+  }
+
+  const handleAdd       = (appt) => {
+    setAppointments(p => [...p, appt]); setShowAdd(false); showToast('Appointment added!')
+    logAppt('📅', `Scheduled appointment for ${patient(appt).name} on ${appt.date}`, appt)
+  }
+  const handleSaveEdit  = (appt) => {
+    const prev = appointments.find(a => a.id === appt.id)
+    setAppointments(p => p.map(a => a.id===appt.id?appt:a)); setEditAppt(null); showToast('Appointment updated!')
+    const statusChanged = prev && prev.status !== appt.status
+    logAppt('✏️', statusChanged
+      ? `${appt.status} appointment for ${patient(appt).name}`
+      : `Updated appointment details for ${patient(appt).name}`, appt)
+  }
+  const handleArchive   = (id)   => {
+    const appt = appointments.find(a => a.id === id)
+    setAppointments(p => p.map(a => a.id===id?{...a,status:'Archived',archivedAt:new Date().toISOString()}:a)); showToast('Appointment archived.')
+    if (appt) logAppt('🗃️', `Archived appointment for ${patient(appt).name}`, appt, 'Review')
+  }
+  const handleUnarchive = (id)   => {
+    const appt = appointments.find(a => a.id === id)
+    setAppointments(p => p.map(a => a.id===id?{...a,status:'Confirmed',archivedAt:null}:a)); showToast('Appointment restored.')
+    if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
+  }
 
   return (
     <TherapistPageShell

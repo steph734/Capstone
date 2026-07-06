@@ -31,6 +31,7 @@ function LockIcon() {
 
 export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [contactOwnerModalOpen, setContactOwnerModalOpen] = useState(false)
   const currentUser = user || { name: 'Therapist', role: 'Therapist', avatar: '/therapy-pro-logo.png', email: 'therapists@gmail.com' }
 
   const subscriptionTiers = [
@@ -79,8 +80,8 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
     }
   ]
 
-  const handleSelectPlan = (planId) => {
-    console.log('Selected plan:', planId)
+  const handleSelectPlan = () => {
+    setContactOwnerModalOpen(true)
   }
 
   const betaFeatures = {
@@ -185,6 +186,34 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
           </section>
         </div>
       </div>
+
+      {contactOwnerModalOpen && (
+        <div className="beta-modal-overlay" onClick={() => setContactOwnerModalOpen(false)}>
+          <div className="beta-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="beta-modal-header">
+              <div>
+                <p className="beta-modal-eyebrow">Upgrade Restricted</p>
+                <h3 className="beta-modal-title">Contact the Clinic Owner</h3>
+                <p className="beta-modal-subtitle">
+                  Only the clinic owner can enable beta testing and purchase a subscription tier for this account.
+                </p>
+              </div>
+              <button
+                className="beta-modal-close"
+                onClick={() => setContactOwnerModalOpen(false)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="beta-modal-body">
+              <p style={{ margin: 0, color: '#2c4a3e', fontSize: '14px', lineHeight: 1.6 }}>
+                Please reach out to your clinic owner to request an upgrade to this plan.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,6 +11,7 @@ export default function OwnerSpeechFeaturesPage({ user, onLogout, betaTier }) {
       subtitle="Voice recorder and text-to-speech tools"
       icon="🎙️"
       menuItems={getOwnerMenuItems(betaTier)}
+      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <SpeechFeaturesUI />
     </OwnerPageShell>

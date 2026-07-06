@@ -39,6 +39,7 @@ export default function TherapistSpeechToTextPage({ user, onLogout, betaTier }) 
       subtitle="Convert voice input into text using your microphone"
       icon="🎤"
       menuItems={getTherapistMenuItems(betaTier)}
+      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <div className="stt-card" style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>

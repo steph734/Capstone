@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
-import BetaTag from '../components/BetaTag'
 import SpeechFeaturesUI from './SpeechFeaturesUI'
 import './Dashboard.css'
 
@@ -23,10 +22,7 @@ export default function PatientSpeechFeaturesPage({ user, onLogout, betaTier }) 
         <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
 
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#2c4a3e', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            🎙️ Speech Features
-            {(betaTier === 'silver' || betaTier === 'gold') && <BetaTag />}
-          </h1>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#2c4a3e', margin: 0 }}>🎙️ Speech Features</h1>
           <p style={{ color: '#8a9e96', margin: '6px 0 0', fontSize: 14, fontWeight: 500 }}>Voice recorder and text-to-speech tools</p>
         </div>
 

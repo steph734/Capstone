@@ -109,6 +109,34 @@
   display: block;
 }
 
+/* ── Tabs ── */
+.appt-tabs {
+  display: flex;
+  gap: 0;
+  padding: 16px 24px 0;
+}
+
+.appt-tab {
+  flex: 1;
+  padding: 11px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #7a9a8e;
+  background: #fff;
+  border: 1.5px solid #d8eae0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.appt-tab:first-child { border-radius: 12px 0 0 12px; border-right: none; }
+.appt-tab:last-child  { border-radius: 0 12px 12px 0; }
+
+.appt-tab.active {
+  background: linear-gradient(135deg, #2c4a3e 0%, #4a7a62 100%);
+  color: #fff;
+  border-color: #2c4a3e;
+}
+
 /* ── Card ── */
 .appt-card {
   margin: 16px 24px 0;
@@ -338,6 +366,98 @@
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* ── Upcoming List ── */
+.upcoming-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0 0 16px;
+}
+
+.no-appt {
+  text-align: center;
+  color: #9aada6;
+  font-size: 14px;
+  padding: 32px 0;
+}
+
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upcoming-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 13px;
+  border: 1.5px solid #e4eee8;
+  background: #fafdfb;
+  gap: 12px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.upcoming-item:hover {
+  border-color: #4a9e6b;
+  box-shadow: 0 3px 12px rgba(74,158,107,.1);
+}
+
+.upcoming-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.upcoming-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.status-confirmed { background: #22c55e; }
+.status-pending   { background: #eab308; }
+
+.upcoming-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upcoming-type {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.upcoming-therapist {
+  font-size: 12px;
+  color: #7a9a8e;
+}
+
+.upcoming-datetime {
+  font-size: 12px;
+  color: #5a7a6e;
+  margin-top: 3px;
+}
+
+.upcoming-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge-confirmed { background: #dcfce7; color: #16a34a; }
+.badge-pending   { background: #fef9c3; color: #854d0e; }
+
 /* ── Responsive Breakpoints (matching sidebar) ── */
 @media (min-width: 769px) and (max-width: 1024px) {
   .appt-main { margin-left: 240px; }
@@ -356,6 +476,7 @@
   .appt-menu-btn { display: flex; }
   .appt-topbar  { padding: 14px 16px; }
   .appt-card    { margin: 12px 12px 0; padding: 16px; }
+  .appt-tabs    { padding: 12px 12px 0; }
   .schedule-bar { flex-direction: column; align-items: stretch; }
   .schedule-btn { width: 100%; text-align: center; }
 }

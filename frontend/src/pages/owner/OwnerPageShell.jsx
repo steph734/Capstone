@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import PatientSidebar from '../../components/PatientSidebar'
-import BetaTag from '../../components/BetaTag'
 import '../PageWithSidebar.css'
 import '../admin/AdminPages.css'
 
-export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, beta }) {
+export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, children, menuItems }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -27,10 +26,7 @@ export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, 
 
         <div className="page-header admin-page-header">
           <div>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {title}
-              {beta && <BetaTag />}
-            </h1>
+            <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
           <div className="admin-header-badge">
@@ -40,6 +36,13 @@ export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, 
         </div>
 
         <div className="content-container admin-content-container">
+          <div className="admin-section-heading">
+            <span className="admin-section-icon">{icon}</span>
+            <div>
+              <h2>{title}</h2>
+              <p>{subtitle}</p>
+            </div>
+          </div>
           {children}
         </div>
       </main>

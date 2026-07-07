@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
-import BetaTag from '../components/BetaTag'
 import './PageWithSidebar.css'
 
 export default function PatientSpeechToTextPage({ user, onLogout, betaTier }) {
@@ -43,10 +42,7 @@ export default function PatientSpeechToTextPage({ user, onLogout, betaTier }) {
       <main className="page-content">
         <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
         <div style={{ padding: '32px 24px' }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#2c4a3e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-            Speech to Text
-            {(betaTier === 'silver' || betaTier === 'gold') && <BetaTag />}
-          </h1>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#2c4a3e', marginBottom: 6 }}>Speech to Text</h1>
           <p style={{ color: '#6b7c75', marginBottom: 24 }}>Convert voice input into text using your microphone</p>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', maxWidth: 700 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>

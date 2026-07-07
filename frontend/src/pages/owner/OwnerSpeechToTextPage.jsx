@@ -55,7 +55,6 @@ export default function OwnerSpeechToTextPage({ user, onLogout, betaTier }) {
       subtitle="Convert voice input into text using your microphone"
       icon="🎙️"
       menuItems={getOwnerMenuItems(betaTier)}
-      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <div className="stt-container">
         <div className="stt-card">

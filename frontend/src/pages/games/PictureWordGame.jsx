@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import PandaMascot from './PandaMascot'
-import { useAnalytics } from '../../context/AnalyticsContext'
-import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
-import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 
 // ─── Questions by category ────────────────────────────────────────────────────
 
@@ -147,7 +144,7 @@ function FinishScreen({ score, total, onReplay, onExit }) {
   }, [talking])
 
   useEffect(() => {
-    return () => stopPaoVoice()
+    return () => window.speechSynthesis?.cancel()
   }, [])
 
   const speakWithDisplay = (text, onDone) => {
@@ -258,12 +255,30 @@ function FinishScreen({ score, total, onReplay, onExit }) {
 // ─── Shared speak helper ──────────────────────────────────────────────────────
 
 function pgSpeak(text, { onStart, onEnd, onWord } = {}) {
-  speakPao(text, { pitch: 1.62, rate: 1.08, onStart, onEnd, onWord })
+  if (!window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const utt = new SpeechSynthesisUtterance(text)
+  utt.rate = 1.08; utt.pitch = 1.62; utt.volume = 1
+  if (onStart)    utt.onstart    = onStart
+  if (onEnd)      utt.onend      = onEnd
+  if (onWord)     utt.onboundary = (e) => { if (e.name === 'word') onWord(text.substring(0, e.charIndex + e.charLength)) }
+  const go = () => {
+    const voices = window.speechSynthesis.getVoices()
+    const v = voices.find(v => v.lang.startsWith('en') && /zira/i.test(v.name))    ||
+              voices.find(v => v.lang.startsWith('en') && /samantha/i.test(v.name)) ||
+              voices.find(v => v.lang === 'en-US')                                  ||
+              voices.find(v => v.lang.startsWith('en'))                             ||
+              voices[0]
+    if (v) utt.voice = v
+    window.speechSynthesis.speak(utt)
+  }
+  if (window.speechSynthesis.getVoices().length > 0) go()
+  else window.speechSynthesis.onvoiceschanged = go
 }
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function PictureWordGame({ onExit, category = 'fruits', patientId = 'alvrin', exerciseId = 'picture-word', domain = 'Cognitive' }) {
+export default function PictureWordGame({ onExit, category = 'fruits' }) {
   const pool = QUESTIONS_BY_CATEGORY[category] || QUESTIONS_BY_CATEGORY.fruits
 
   const [questions]    = useState(() => shuffle(pool).slice(0, 6))
@@ -283,19 +298,6 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
   const mouthRef = useRef(null)
   const timerRef = useRef(null)
 
-  // ── Layer 1: gameplay event instrumentation ──────────────────────────────
-  const { submitEventBatch } = useAnalytics()
-  const sessionIdRef      = useRef(createSessionId())
-  const loggerRef         = useRef(createEventLogger({ patientId, exerciseId, sessionId: sessionIdRef.current, domain, onFlush: submitEventBatch }))
-  const promptShownAtRef  = useRef(null)
-  const sessionEndedRef   = useRef(false)
-
-  const logExitOnce = () => {
-    if (sessionEndedRef.current) return
-    sessionEndedRef.current = true
-    loggerRef.current.log('exit', {})
-  }
-
   /* mouth toggle while talking */
   useEffect(() => {
     if (talking) {
@@ -311,9 +313,8 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
   useEffect(() => () => {
     clearTimeout(timerRef.current)
     clearInterval(mouthRef.current)
-    stopPaoVoice()
-    logExitOnce()
-  }, []) // eslint-disable-line
+    window.speechSynthesis?.cancel()
+  }, [])
 
   const speak = (text) => {
     setDisplayText('')
@@ -331,50 +332,33 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
     setOptions(shuffle(q.options))
     setSelected(null); setResult(null); setPicAnim('pgBounce')
     setTimeout(() => speak('Look at the picture! Which word matches?'), 350)
-    promptShownAtRef.current = Date.now()
-    loggerRef.current.log('prompt_shown', {})
   }, [current, questions]) // eslint-disable-line
 
-  const handleSelect = (word, touchPressure = null) => {
+  const handleSelect = (word) => {
     if (selected !== null) return
     setSelected(word)
     const isCorrect = word === questions[current].word
     setResult(isCorrect ? 'correct' : 'wrong')
-
-    const responseTimeMs = promptShownAtRef.current ? Date.now() - promptShownAtRef.current : null
-    loggerRef.current.log('response_given', { responseTimeMs, isCorrect, inputMethod: 'tap', touchPressure })
-
     if (isCorrect) {
       setScore(s => s + 1)
       setPicAnim('pgCorrectPic')
       speak(CHEERS_CORRECT[Math.floor(Math.random() * CHEERS_CORRECT.length)])
-      loggerRef.current.log('praise_shown', {})
     } else {
       speak(CHEERS_WRONG[Math.floor(Math.random() * CHEERS_WRONG.length)])
     }
     timerRef.current = setTimeout(() => {
-      if (current + 1 >= questions.length) { setDone(true); logExitOnce() }
+      if (current + 1 >= questions.length) setDone(true)
       else setCurrent(c => c + 1)
     }, 2200)
   }
 
   const handleReplay = () => {
-    stopPaoVoice()
+    window.speechSynthesis?.cancel()
     setCurrent(0); setScore(0); setDone(false)
     setDisplayText(''); setTalking(false)
-    // A replay is a fresh gameplay session — new session id + a fresh logger.
-    sessionIdRef.current = createSessionId()
-    loggerRef.current = createEventLogger({ patientId, exerciseId, sessionId: sessionIdRef.current, domain, onFlush: submitEventBatch })
-    sessionEndedRef.current = false
   }
 
-  const handleExit = () => {
-    logExitOnce()
-    stopPaoVoice()
-    onExit()
-  }
-
-  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={handleExit}/>
+  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={onExit}/>
 
   const q = questions[current]
 
@@ -394,7 +378,7 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
 
       {/* ── Top bar ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', boxSizing:'border-box', flexShrink:0 }}>
-        <button onClick={handleExit} style={topBtnStyle}>← All Games</button>
+        <button onClick={() => { window.speechSynthesis?.cancel(); onExit() }} style={topBtnStyle}>← All Games</button>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <div style={{ fontSize:12, fontWeight:700, background:'rgba(255,255,255,.1)', borderRadius:20, padding:'5px 13px', letterSpacing:.5 }}>
             {CATEGORY_LABELS[category] || '🎮 Game'}
@@ -432,7 +416,7 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
             const isWrong    = isSelected && result === 'wrong'
             const isReveal   = selected !== null && word === q.word && result === 'wrong'
             return (
-              <button key={word} onPointerUp={(e) => handleSelect(word, getPointerPressure(e))} style={{
+              <button key={word} onClick={() => handleSelect(word)} style={{
                 padding:'16px 10px', borderRadius:16, border:'2px solid',
                 fontSize:17, fontWeight:700, cursor:selected?'default':'pointer',
                 transition:'background .25s, border-color .25s',

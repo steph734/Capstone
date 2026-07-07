@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
-import { logActivity } from '../utils/auditLog'
 import './therapist/TherapistProfilePage.css'
 import './PageWithSidebar.css'
 import './admin/AdminPages.css'
@@ -76,16 +75,6 @@ export default function PatientProfilePage({ user, onLogout, betaTier }) {
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)
-    logActivity({
-      role: 'Patient',
-      user: user?.name || draft.name,
-      email: user?.email || draft.email,
-      actionIcon: '👤',
-      action: 'Profile',
-      description: `Updated profile information for ${draft.name}`,
-      entity: `Patient · ${draft.name}`,
-      status: 'Success',
-    })
   }
 
   const set = (field, val) => setDraft(prev => ({ ...prev, [field]: val }))
@@ -122,6 +111,14 @@ export default function PatientProfilePage({ user, onLogout, betaTier }) {
         </div>
 
         <div className="content-container admin-content-container">
+          <div className="admin-section-heading">
+            <span className="admin-section-icon">👤</span>
+            <div>
+              <h2>My Profile</h2>
+              <p>View and update your personal information</p>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Header */}

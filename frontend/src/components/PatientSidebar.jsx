@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import BetaTag from './BetaTag'
 import './PatientSidebar.css'
-
-const BETA_ITEM_IDS = new Set(['speech-features', 'gamified-activities'])
 
 // SVG Icons
 function HomeIcon() {
@@ -94,17 +91,8 @@ function GamepadIcon() {
   )
 }
 
-function ProgressIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M5 20h2v-8H5v8zm6 0h2V4h-2v16zm6 0h2v-12h-2v12z" />
-    </svg>
-  )
-}
-
 const DEFAULT_MENU_ITEMS = [
   { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/dashboard' },
-  { id: 'progress', label: 'My Progress', icon: <ProgressIcon />, path: '/patient/progress' },
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/appointments' },
   { id: 'notes', label: 'Notes', icon: <NotesIcon />, path: '/notes' },
   { id: 'messages', label: 'Messages', icon: <MessagesIcon />, path: '/messages' },
@@ -202,7 +190,6 @@ export default function PatientSidebar({
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
-              {BETA_ITEM_IDS.has(item.id) && <BetaTag style={{ marginLeft: 'auto' }} />}
             </button>
           ))}
         </nav>

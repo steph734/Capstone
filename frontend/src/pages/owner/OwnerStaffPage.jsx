@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
-import { logActivity } from '../../utils/auditLog'
 import './OwnerStaffPage.css'
 
 const SPECIALTY_COLORS = {
@@ -375,25 +374,11 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     coverage: new Set(activeStaff.map((s) => s.specialty).filter(Boolean)).size,
   }
 
-  const logStaff = (actionIcon, description, staffId, status = 'Success') => {
-    logActivity({
-      role: 'Owner',
-      user: user?.name || 'Owner',
-      email: user?.email || '—',
-      actionIcon,
-      action: 'Staff',
-      description,
-      entity: `Staff #${staffId}`,
-      status,
-    })
-  }
-
   const handleAdd = (form) => {
     const seed = Math.floor(Math.random() * 70) + 1
-    const newId = Date.now()
     setStaff((prev) => [
       {
-        id: newId, name: form.name, specialty: null, branch: form.branch, status: form.status,
+        id: Date.now(), name: form.name, specialty: null, branch: form.branch, status: form.status,
         caseload: 0, avatar: `https://i.pravatar.cc/150?img=${seed}`,
         joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         archived: false, attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
@@ -401,27 +386,15 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       ...prev,
     ])
     setShowAdd(false)
-    logStaff('➕', `Added new staff member ${form.name} (${form.branch} branch)`, newId)
   }
 
   const handleEditSave = (updates) => {
     setStaff((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...updates } : s)))
-    logStaff('✏️', `Updated staff details for ${updates.name || editing.name}`, editing.id)
     setEditing(null)
   }
 
   const toggleArchive = (id) => {
-    const member = staff.find((s) => s.id === id)
-    const willArchive = member && !member.archived
     setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, archived: !s.archived } : s)))
-    if (member) {
-      logStaff(
-        willArchive ? '🗃️' : '♻️',
-        `${willArchive ? 'Archived' : 'Restored'} staff member ${member.name}`,
-        id,
-        willArchive ? 'Review' : 'Success'
-      )
-    }
   }
 
   return (

@@ -36,6 +36,13 @@ export default function AdminPageShell({ user, onLogout, title, subtitle, icon, 
         </div>
 
         <div className="content-container admin-content-container">
+          <div className="admin-section-heading">
+            <span className="admin-section-icon">{icon}</span>
+            <div>
+              <h2>{title}</h2>
+              <p>{subtitle}</p>
+            </div>
+          </div>
           {children}
         </div>
       </main>

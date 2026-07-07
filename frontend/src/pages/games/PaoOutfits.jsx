@@ -106,27 +106,6 @@ export function HairBackwardsCap() {
   )
 }
 
-export function HairThinkingCap() {
-  return (
-    <g>
-      {/* Fitted cap band */}
-      <ellipse cx="150" cy="60" rx="72" ry="16" fill="#1e293b"/>
-      <ellipse cx="150" cy="56" rx="60" ry="11" fill="#334155" opacity=".7"/>
-      {/* Flat mortarboard top, angled for perspective */}
-      <polygon points="150,4 232,32 150,60 68,32" fill="#111827"/>
-      <polygon points="150,4 232,32 150,44" fill="rgba(255,255,255,.08)"/>
-      {/* Center button */}
-      <circle cx="150" cy="32" r="6" fill="#34d399"/>
-      {/* Tassel cord + tuft */}
-      <path d="M 150,32 Q 176,40 190,64 Q 194,74 190,84" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round"/>
-      {[-4, 0, 4].map((dx, i) => (
-        <line key={i} x1={190 + dx} y1={84} x2={190 + dx * 1.3} y2={96} stroke="#34d399" strokeWidth="2" strokeLinecap="round" opacity=".85"/>
-      ))}
-      <circle cx="190" cy="82" r="4" fill="#10b981"/>
-    </g>
-  )
-}
-
 // ═══ CLOTHES ══════════════════════════════════════════════════════════════════
 
 export function ClothesRainbowTee() {
@@ -239,56 +218,6 @@ export function ClothesStarOveralls() {
       <ellipse cx="58"  cy="300" rx="27" ry="19" fill="#1d4ed8" opacity=".85"/>
       <ellipse cx="232" cy="278" rx="34" ry="21" fill="#1d4ed8" opacity=".85" transform="rotate(28 232 278)"/>
       <ellipse cx="242" cy="300" rx="27" ry="19" fill="#1d4ed8" opacity=".85"/>
-    </g>
-  )
-}
-
-export function ClothesEchoScarf() {
-  return (
-    <g>
-      {/* Scarf band around neck/shoulders */}
-      <path d="M 92,196 Q 150,224 208,196 Q 210,212 208,222 Q 150,250 92,222 Q 90,212 92,196 Z" fill="#0d9488"/>
-      <path d="M 92,196 Q 150,224 208,196 Q 209,204 208,210 Q 150,236 92,210 Q 91,204 92,196 Z" fill="#14b8a6" opacity=".65"/>
-      {/* Hanging tail down the front */}
-      <path d="M 128,214 Q 116,254 112,300 Q 112,312 124,312 Q 134,312 136,300 Q 140,256 152,220 Z" fill="#14b8a6"/>
-      <path d="M 112,296 L 136,296 L 133,312 L 116,312 Z" fill="#0d9488"/>
-      {/* Sound-wave stitching motif */}
-      <path d="M 120,236 Q 127,242 120,248 Q 113,254 120,260" fill="none" stroke="#99f6e4" strokeWidth="2.2" strokeLinecap="round" opacity=".9"/>
-      <path d="M 126,268 Q 133,274 126,280 Q 119,286 126,292" fill="none" stroke="#99f6e4" strokeWidth="2.2" strokeLinecap="round" opacity=".9"/>
-      {/* Fringe at the tail end */}
-      {[116,122,128,134].map((x,i)=>(
-        <line key={i} x1={x} y1="310" x2={x} y2="320" stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round"/>
-      ))}
-    </g>
-  )
-}
-
-export function ClothesPuzzleVest() {
-  // Patches reuse the exact palette from the Puzzle Pals game (lion/elephant/
-  // giraffe/zebra/bear) so the reward visibly echoes the badge it came from.
-  const patches = [
-    [112, 208, '#f59e0b'], [150, 202, '#3b82f6'], [188, 208, '#eab308'],
-    [120, 246, '#374151'], [180, 246, '#92400e'],
-  ]
-  return (
-    <g>
-      <defs><clipPath id="cpv"><ellipse cx="150" cy="272" rx="91" ry="83"/></clipPath></defs>
-      <ellipse cx="150" cy="272" rx="91" ry="83" fill="#fef3c7" opacity=".5"/>
-      <g clipPath="url(#cpv)">
-        {patches.map(([x, y, c], i) => (
-          <g key={i}>
-            <rect x={x - 17} y={y - 17} width="34" height="34" rx="6" fill={c} opacity=".92"/>
-            <circle cx={x + 17} cy={y} r="6.5" fill={c} opacity=".92"/>
-          </g>
-        ))}
-      </g>
-      {/* Vest edge trim */}
-      <path d="M 92,198 Q 60,260 78,330" fill="none" stroke="#78350f" strokeWidth="5" strokeLinecap="round" opacity=".45"/>
-      <path d="M 208,198 Q 240,260 222,330" fill="none" stroke="#78350f" strokeWidth="5" strokeLinecap="round" opacity=".45"/>
-      {/* Center seam buttons */}
-      {[220, 246, 272].map((y, i) => (
-        <circle key={i} cx="150" cy={y} r="4" fill="#78350f" opacity=".65"/>
-      ))}
     </g>
   )
 }
@@ -492,7 +421,6 @@ export const OUTFIT_MAP = {
     flower_crown:  HairFlowerCrown,
     backwards_cap: HairBackwardsCap,
     bunny_ears:    HairBunnyEars,
-    thinking_cap:  HairThinkingCap,
   },
   clothes: {
     rainbow_tee:  ClothesRainbowTee,
@@ -500,8 +428,6 @@ export const OUTFIT_MAP = {
     hero_tee:     ClothesHeroTee,
     cozy_hoodie:  ClothesCozyHoodie,
     overalls:     ClothesStarOveralls,
-    echo_scarf:   ClothesEchoScarf,
-    puzzle_vest:  ClothesPuzzleVest,
   },
   pants: {
     polka_dots:  PantsPolkaDots,

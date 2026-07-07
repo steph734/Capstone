@@ -40,7 +40,6 @@ export default function OwnerTextToSpeechPage({ user, onLogout, betaTier }) {
       subtitle="Convert written text into spoken audio"
       icon="🔊"
       menuItems={getOwnerMenuItems(betaTier)}
-      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <div className="tts-container">
         <div className="tts-card">

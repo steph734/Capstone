@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
-import { ProgressProvider } from './context/ProgressContext'
-import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
@@ -43,7 +41,6 @@ import PatientSpeechToTextPage from './pages/PatientSpeechToTextPage'
 import PatientTextToSpeechPage from './pages/PatientTextToSpeechPage'
 import PatientSpeechFeaturesPage from './pages/PatientSpeechFeaturesPage'
 import PatientGamifiedActivitiesPage from './pages/PatientGamifiedActivitiesPage'
-import PatientProgressPage from './pages/PatientProgressPage'
 import PatientEmailPage from './pages/PatientEmailPage'
 import TherapistDashboard from './pages/therapist/TherapistDashboard'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
@@ -167,8 +164,6 @@ function App() {
 
   return (
     <MessagesProvider>
-    <ProgressProvider>
-    <AnalyticsProvider>
     <Router>
       <Routes>
         <Route 
@@ -689,21 +684,6 @@ function App() {
         />
 
         <Route
-          path="/patient/progress"
-          element={
-            isAuthenticated ? (
-              currentUser?.role === 'Patient' ? (
-                <PatientProgressPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
-              ) : (
-                <Navigate to={getHomePath(currentUser?.role)} replace />
-              )
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-
-        <Route
           path="/admin/branches"
           element={
             isAuthenticated ? (
@@ -925,8 +905,6 @@ function App() {
         />
       </Routes>
     </Router>
-    </AnalyticsProvider>
-    </ProgressProvider>
     </MessagesProvider>
   )
 }

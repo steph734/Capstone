@@ -615,66 +615,57 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
         </button>
       </div>
 
-      {/* Patient Table */}
-      <div className="tp-table-card">
-        <div className="tp-table-scroll">
-          <table className="tp-table">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Condition</th>
-                <th>Status</th>
-                <th>Last Session</th>
-                <th>Next Session</th>
-                <th>Sessions</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="tp-table-empty">No patients match your search.</td>
-                </tr>
-              ) : filtered.map(p => {
-                const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG['Active']
-                return (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="tp-table-patient">
-                        <div className="tp-avatar-wrap">
-                          <img src={p.avatar} alt={p.name} className="tp-avatar tp-avatar-sm" />
-                          <span className={`tp-status-dot ${sc.dot}`} />
-                        </div>
-                        <div className="tp-card-info">
-                          <h3 className="tp-patient-name">{p.name}</h3>
-                          <span className="tp-patient-age">Age {p.age}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td><span className="tp-condition-badge">{p.condition}</span></td>
-                    <td><span className={`tp-pill ${sc.cls}`}>{p.status}</span></td>
-                    <td>{p.lastSession}</td>
-                    <td>{p.nextSession}</td>
-                    <td>{p.sessions}</td>
-                    <td>
-                      <div className="tp-table-actions">
-                        <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
-                          View Profile
-                        </button>
-                        <button className="tp-action-btn tp-action-msg" onClick={() => setMessagePt(p)}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          Message
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Patient Cards */}
+      <div className="tp-patients-grid">
+        {filtered.length === 0 ? (
+          <p className="tp-empty">No patients match your search.</p>
+        ) : filtered.map(p => {
+          const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG['Active']
+          return (
+            <div key={p.id} className="tp-patient-card">
+              <div className="tp-card-top">
+                <div className="tp-avatar-wrap">
+                  <img src={p.avatar} alt={p.name} className="tp-avatar" />
+                  <span className={`tp-status-dot ${sc.dot}`} />
+                </div>
+                <div className="tp-card-info">
+                  <h3 className="tp-patient-name">{p.name}</h3>
+                  <span className="tp-patient-age">Age {p.age}</span>
+                </div>
+                <span className={`tp-pill ${sc.cls}`}>{p.status}</span>
+              </div>
+
+              <span className="tp-condition-badge">{p.condition}</span>
+
+              <div className="tp-session-info">
+                <div className="tp-session-item">
+                  <span className="tp-session-lbl">Last Session</span>
+                  <span className="tp-session-val">{p.lastSession}</span>
+                </div>
+                <div className="tp-session-item">
+                  <span className="tp-session-lbl">Next Session</span>
+                  <span className="tp-session-val">{p.nextSession}</span>
+                </div>
+                <div className="tp-session-item">
+                  <span className="tp-session-lbl">Sessions</span>
+                  <span className="tp-session-val">{p.sessions}</span>
+                </div>
+              </div>
+
+              <div className="tp-card-actions">
+                <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
+                  View Profile
+                </button>
+                <button className="tp-action-btn tp-action-msg" onClick={() => setMessagePt(p)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Message
+                </button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {showAdd && (

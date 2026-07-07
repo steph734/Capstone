@@ -31,6 +31,7 @@ export default function TherapistTextToSpeechPage({ user, onLogout, betaTier }) 
       subtitle="Convert written text into spoken audio"
       icon="🔊"
       menuItems={getTherapistMenuItems(betaTier)}
+      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <textarea

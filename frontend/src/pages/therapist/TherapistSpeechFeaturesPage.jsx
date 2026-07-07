@@ -11,6 +11,7 @@ export default function TherapistSpeechFeaturesPage({ user, onLogout, betaTier }
       subtitle="Voice recorder and text-to-speech tools"
       icon="🎙️"
       menuItems={getTherapistMenuItems(betaTier)}
+      beta={betaTier === 'silver' || betaTier === 'gold'}
     >
       <SpeechFeaturesUI />
     </TherapistPageShell>

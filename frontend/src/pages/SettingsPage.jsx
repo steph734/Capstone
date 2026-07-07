@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import { loadAccessibilityPrefs, saveAccessibilityPrefs, applyAccessibilityPrefs } from '../utils/accessibilityPrefs'
+import { logActivity } from '../utils/auditLog'
 import './PageWithSidebar.css'
 import './SettingsPage.css'
+
+const humanize = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
 
 const SETTINGS_KEY = 'therapypro_settings'
 
@@ -122,20 +125,43 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
     setTimeout(() => setToast(''), 2200)
   }
 
-  const persistSettings = (next) => {
+  const logSettingsChange = (actionIcon, action, description) => {
+    logActivity({
+      role: 'Patient',
+      user: user?.name || 'Patient',
+      email: user?.email || '—',
+      actionIcon,
+      action,
+      description,
+      entity: 'Settings',
+      status: 'Success',
+    })
+  }
+
+  const persistSettings = (next, changeLabel) => {
     setSettings(next)
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
     showToast('Saved')
+    if (changeLabel) logSettingsChange('🔔', 'Settings', changeLabel)
   }
 
   const updateNotification = (key, value) => {
-    persistSettings({ ...settings, notifications: { ...settings.notifications, [key]: value } })
+    persistSettings(
+      { ...settings, notifications: { ...settings.notifications, [key]: value } },
+      `${value ? 'Enabled' : 'Disabled'} ${humanize(key)} notification`
+    )
   }
   const updatePrivacy = (key, value) => {
-    persistSettings({ ...settings, privacy: { ...settings.privacy, [key]: value } })
+    persistSettings(
+      { ...settings, privacy: { ...settings.privacy, [key]: value } },
+      `${value ? 'Enabled' : 'Disabled'} ${humanize(key)} privacy setting`
+    )
   }
   const updateSecurity = (key, value) => {
-    persistSettings({ ...settings, security: { ...settings.security, [key]: value } })
+    persistSettings(
+      { ...settings, security: { ...settings.security, [key]: value } },
+      `${value ? 'Enabled' : 'Disabled'} ${humanize(key)}`
+    )
   }
 
   const updateAccessibility = (patch) => {
@@ -144,6 +170,8 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
     saveAccessibilityPrefs(next)
     applyAccessibilityPrefs(next)
     showToast('Saved')
+    const [key, value] = Object.entries(patch)[0] || []
+    if (key) logSettingsChange('♿', 'Accessibility', `Updated ${humanize(key)} to ${value}`)
   }
 
   const handlePasswordSubmit = (e) => {
@@ -163,6 +191,7 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
     }
     setPasswordForm({ current: '', next: '', confirm: '' })
     showToast('Password updated')
+    logSettingsChange('🔑', 'Security', 'Changed account password')
   }
 
   return (

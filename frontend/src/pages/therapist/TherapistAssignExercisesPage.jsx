@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
+import { logActivity } from '../../utils/auditLog'
+import { useSharedProgress } from '../../context/ProgressContext'
+
+const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
 const initialAssignments = [
-  { id: 1, patient: 'Aira Lopez', exercise: 'Memory Match', due: 'Today', status: 'Assigned' },
-  { id: 2, patient: 'Mika Santos', exercise: 'Sound Builder', due: 'Tomorrow', status: 'Assigned' },
+  { id: 1, patient: 'Aira Lopez', exercise: 'Memory Match', domain: 'Cognitive', instructions: '', due: 'Today', status: 'Assigned' },
+  { id: 2, patient: 'Mika Santos', exercise: 'Sound Builder', domain: 'Speech', instructions: '', due: 'Tomorrow', status: 'Assigned' },
 ]
 
 export default function TherapistAssignExercisesPage({ user, onLogout, betaTier }) {
   const [assignments, setAssignments] = useState(initialAssignments)
-  const [form, setForm] = useState({ patient: '', exercise: '', due: 'Today' })
+  const [form, setForm] = useState({ patient: '', exercise: '', domain: DOMAINS[0], instructions: '', due: 'Today' })
+  const { addExercise } = useSharedProgress()
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -17,11 +22,43 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
       ...currentAssignments,
       { id: Date.now(), ...form, status: 'Assigned' },
     ])
-    setForm({ patient: '', exercise: '', due: 'Today' })
+    // Alvrin is the demo patient wired to the parent-facing Progress page.
+    if (form.patient.trim().toLowerCase() === 'alvrin') {
+      addExercise({
+        title: form.exercise,
+        domain: form.domain,
+        instructions: form.instructions.trim() || `Practice ${form.exercise} together for a few minutes.`,
+        due: form.due,
+      })
+    }
+    setForm({ patient: '', exercise: '', domain: DOMAINS[0], instructions: '', due: 'Today' })
+    logActivity({
+      role: 'Therapist',
+      user: user?.name || 'Therapist',
+      email: user?.email || '—',
+      actionIcon: '🎯',
+      action: 'Exercise',
+      description: `Assigned "${form.exercise}" to ${form.patient} (due ${form.due})`,
+      entity: `Patient · ${form.patient}`,
+      status: 'Success',
+    })
   }
 
   const handleDelete = (id) => {
+    const assignment = assignments.find((a) => a.id === id)
     setAssignments((currentAssignments) => currentAssignments.filter((assignment) => assignment.id !== id))
+    if (assignment) {
+      logActivity({
+        role: 'Therapist',
+        user: user?.name || 'Therapist',
+        email: user?.email || '—',
+        actionIcon: '🗑️',
+        action: 'Exercise',
+        description: `Removed "${assignment.exercise}" assignment for ${assignment.patient}`,
+        entity: `Patient · ${assignment.patient}`,
+        status: 'Review',
+      })
+    }
   }
 
   return (
@@ -54,14 +91,22 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
             placeholder="Exercise name"
             required
           />
+          <select value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))}>
+            {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
           <select value={form.due} onChange={(event) => setForm((current) => ({ ...current, due: event.target.value }))}>
             <option>Today</option>
             <option>Tomorrow</option>
             <option>This Week</option>
           </select>
+          <input
+            value={form.instructions}
+            onChange={(event) => setForm((current) => ({ ...current, instructions: event.target.value }))}
+            placeholder="Simple instructions for parents (optional)"
+          />
           <div className="admin-button-row">
             <button className="admin-btn" type="submit">Assign Exercise</button>
-            <button className="admin-btn-secondary" type="button" onClick={() => setForm({ patient: '', exercise: '', due: 'Today' })}>Clear</button>
+            <button className="admin-btn-secondary" type="button" onClick={() => setForm({ patient: '', exercise: '', domain: DOMAINS[0], instructions: '', due: 'Today' })}>Clear</button>
           </div>
         </form>
       </section>
@@ -79,7 +124,7 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
             <div key={assignment.id} className="game-card">
               <div>
                 <h4>{assignment.patient}</h4>
-                <p>{assignment.exercise} · Due {assignment.due}</p>
+                <p>{assignment.exercise} · {assignment.domain} · Due {assignment.due}</p>
                 <div className="admin-button-row" style={{ marginTop: '10px' }}>
                   <span className="admin-pill green">{assignment.status}</span>
                 </div>

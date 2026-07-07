@@ -77,13 +77,6 @@ function buildAvailability(year, month) {
   return map
 }
 
-/* Mock upcoming appointments */
-const UPCOMING = [
-  { id: 1, date: 'July 3, 2026',  time: '10:00 AM', therapist: 'Dr. Santos',  type: 'Speech Therapy',    status: 'confirmed' },
-  { id: 2, date: 'July 10, 2026', time: '2:00 PM',  therapist: 'Dr. Reyes',   type: 'Occupational Therapy', status: 'pending' },
-  { id: 3, date: 'July 17, 2026', time: '11:00 AM', therapist: 'Dr. Santos',  type: 'Speech Therapy',    status: 'confirmed' },
-]
-
 export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const today = new Date()
@@ -93,7 +86,6 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())
   const [availability]                  = useState(() => buildAvailability(today.getFullYear(), today.getMonth()))
-  const [activeTab, setActiveTab]       = useState('calendar') // 'calendar' | 'upcoming'
   const [showConfirm, setShowConfirm]   = useState(false)
 
   /* ── Calendar navigation ── */
@@ -158,125 +150,80 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
             <img src="/therapy-hero.png" alt="Therapy session illustration" className="hero-img" />
           </div>
 
-          {/* ── Tabs ── */}
-          <div className="appt-tabs">
-            <button
-              className={`appt-tab ${activeTab === 'calendar' ? 'active' : ''}`}
-              onClick={() => setActiveTab('calendar')}
-            >
-              📅 Calendar
-            </button>
-            <button
-              className={`appt-tab ${activeTab === 'upcoming' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upcoming')}
-            >
-              🕐 Upcoming
-            </button>
+          <div className="appt-card">
+            {/* ── Session Overview Legend ── */}
+            <div className="session-overview">
+              <span className="overview-title">Session Overview</span>
+              <div className="legend-items">
+                <span className="legend-item"><span className="dot dot-available" />Available</span>
+                <span className="legend-item"><span className="dot dot-booked"    />Booked</span>
+                <span className="legend-item"><span className="dot dot-closed"    />Closed</span>
+              </div>
+            </div>
+
+            {/* ── Calendar ── */}
+            <div className="calendar-wrap">
+              {/* Month Nav */}
+              <div className="cal-nav">
+                <button className="cal-nav-btn" onClick={prevMonth}><ChevronLeft /></button>
+                <span className="cal-month-label">{MONTHS[viewMonth]} {viewYear}</span>
+                <button className="cal-nav-btn" onClick={nextMonth}><ChevronRight /></button>
+              </div>
+
+              {/* Day Headers */}
+              <div className="cal-grid">
+                {DAYS_SHORT.map(d => (
+                  <div key={d} className="cal-day-header">{d}</div>
+                ))}
+
+                {/* Day Cells */}
+                {cells.map((day, idx) => {
+                  if (!day) return <div key={`empty-${idx}`} />
+                  const status = dotStatus(day)
+                  return (
+                    <button
+                      key={day}
+                      className={`cal-day
+                        ${isToday(day) ? 'cal-today' : ''}
+                        ${isSelected(day) ? 'cal-selected' : ''}
+                        ${status === 'closed' ? 'cal-closed' : ''}
+                      `}
+                      onClick={() => setSelectedDate(day)}
+                      disabled={status === 'closed'}
+                    >
+                      <span className="cal-day-num">{day}</span>
+                      <span className={`dot dot-${status} dot-sm`} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ── Schedule Bar ── */}
+            <div className="schedule-bar">
+              <div className="selected-date-info">
+                <CalendarIcon />
+                <div>
+                  <span className="sdi-label">Selected Date</span>
+                  <span className="sdi-value">{selectedLabel}</span>
+                </div>
+              </div>
+              <button
+                className="schedule-btn"
+                onClick={handleSchedule}
+                disabled={!selectedDate || dotStatus(selectedDate) === 'closed'}
+              >
+                Schedule Appointment
+              </button>
+            </div>
+
+            {/* ── Confirm Toast ── */}
+            {showConfirm && (
+              <div className="appt-confirm-toast">
+                ✓ Appointment request sent for {selectedLabel}!
+              </div>
+            )}
           </div>
-
-          {activeTab === 'calendar' && (
-            <div className="appt-card">
-              {/* ── Session Overview Legend ── */}
-              <div className="session-overview">
-                <span className="overview-title">Session Overview</span>
-                <div className="legend-items">
-                  <span className="legend-item"><span className="dot dot-available" />Available</span>
-                  <span className="legend-item"><span className="dot dot-booked"    />Booked</span>
-                  <span className="legend-item"><span className="dot dot-closed"    />Closed</span>
-                </div>
-              </div>
-
-              {/* ── Calendar ── */}
-              <div className="calendar-wrap">
-                {/* Month Nav */}
-                <div className="cal-nav">
-                  <button className="cal-nav-btn" onClick={prevMonth}><ChevronLeft /></button>
-                  <span className="cal-month-label">{MONTHS[viewMonth]} {viewYear}</span>
-                  <button className="cal-nav-btn" onClick={nextMonth}><ChevronRight /></button>
-                </div>
-
-                {/* Day Headers */}
-                <div className="cal-grid">
-                  {DAYS_SHORT.map(d => (
-                    <div key={d} className="cal-day-header">{d}</div>
-                  ))}
-
-                  {/* Day Cells */}
-                  {cells.map((day, idx) => {
-                    if (!day) return <div key={`empty-${idx}`} />
-                    const status = dotStatus(day)
-                    return (
-                      <button
-                        key={day}
-                        className={`cal-day
-                          ${isToday(day) ? 'cal-today' : ''}
-                          ${isSelected(day) ? 'cal-selected' : ''}
-                          ${status === 'closed' ? 'cal-closed' : ''}
-                        `}
-                        onClick={() => setSelectedDate(day)}
-                        disabled={status === 'closed'}
-                      >
-                        <span className="cal-day-num">{day}</span>
-                        <span className={`dot dot-${status} dot-sm`} />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* ── Schedule Bar ── */}
-              <div className="schedule-bar">
-                <div className="selected-date-info">
-                  <CalendarIcon />
-                  <div>
-                    <span className="sdi-label">Selected Date</span>
-                    <span className="sdi-value">{selectedLabel}</span>
-                  </div>
-                </div>
-                <button
-                  className="schedule-btn"
-                  onClick={handleSchedule}
-                  disabled={!selectedDate || dotStatus(selectedDate) === 'closed'}
-                >
-                  Schedule Appointment
-                </button>
-              </div>
-
-              {/* ── Confirm Toast ── */}
-              {showConfirm && (
-                <div className="appt-confirm-toast">
-                  ✓ Appointment request sent for {selectedLabel}!
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'upcoming' && (
-            <div className="appt-card">
-              <h2 className="upcoming-title">Upcoming Appointments</h2>
-              {UPCOMING.length === 0 ? (
-                <div className="no-appt">No upcoming appointments scheduled.</div>
-              ) : (
-                <div className="upcoming-list">
-                  {UPCOMING.map(a => (
-                    <div key={a.id} className="upcoming-item">
-                      <div className="upcoming-left">
-                        <div className={`upcoming-status-dot status-${a.status}`} />
-                        <div className="upcoming-info">
-                          <span className="upcoming-type">{a.type}</span>
-                          <span className="upcoming-therapist">with {a.therapist}</span>
-                          <span className="upcoming-datetime">📅 {a.date} &nbsp; 🕐 {a.time}</span>
-                        </div>
-                      </div>
-                      <span className={`upcoming-badge badge-${a.status}`}>
-                        {a.status === 'confirmed' ? '✓ Confirmed' : '⏳ Pending'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

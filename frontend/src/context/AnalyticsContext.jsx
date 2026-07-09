@@ -1,8 +1,11 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { useSharedProgress } from './ProgressContext'
 import { computeSessionObservation, ROLLING_BASELINE_WINDOW } from '../utils/sessionAnalytics'
+import { generateSeedObservations } from '../utils/seedAnalytics'
 
-const STORAGE_KEY = 'tp_shared_analytics'
+// Bumped to v2 so browsers with old cached analytics (pre per-patient seed
+// data) automatically pick up the fresh baseline instead of keeping stale data.
+const STORAGE_KEY = 'tp_shared_analytics_v2'
 
 // A few historical SessionObservations for the demo patient (Alvrin) so the
 // therapist's "View Stats" screen has a timeline and a rolling baseline to
@@ -60,7 +63,13 @@ const SEED_OBSERVATIONS = [
   },
 ]
 
-const INITIAL_ANALYTICS = { events: [], observations: SEED_OBSERVATIONS }
+// Alvrin (the live demo patient) keeps the hand-picked seed above; every
+// other mock patient in the therapist/owner tables gets generated sessions
+// across all four domains so "View Stats" never shows an empty state.
+const INITIAL_ANALYTICS = {
+  events: [],
+  observations: [...SEED_OBSERVATIONS, ...generateSeedObservations()].sort((a, b) => new Date(a.date) - new Date(b.date)),
+}
 
 function loadAnalytics() {
   try {

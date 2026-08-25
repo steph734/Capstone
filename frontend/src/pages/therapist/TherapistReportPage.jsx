@@ -5,10 +5,40 @@ import * as XLSX from 'xlsx'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
+import { TrendChart, BreakdownChart } from '../owner/ReportCharts'
 import './TherapistReportPage.css'
 
 // ── Static demo data ────────────────────────────────────────────────────────
+const HISTORY_PATIENTS = ['Aira Lopez', 'Noah Cruz', 'Mika Santos', 'Lily Santos', 'Jasper Reyes', 'Carlos Buen']
+const HISTORY_TYPES = ['Speech Therapy', 'Developmental', 'Articulation', 'Physical Therapy', 'Occupational Therapy']
+
+// Generates deterministic past-month appointment history (Jan 2025 – Jun 2026)
+// so the Daily/Monthly/Annual views each have real breadth to aggregate over.
+function generateAppointmentHistory() {
+  const rows = []
+  const months = []
+  for (let y = 2025; y <= 2026; y++) {
+    for (let m = 1; m <= 12; m++) {
+      if (y === 2026 && m >= 7) continue // Jul 2026 onward covered by the current-month rows below
+      months.push({ y, m })
+    }
+  }
+  months.forEach(({ y, m }, idx) => {
+    const count = 3 + (idx % 3) // 3–5 appointments per month
+    for (let i = 0; i < count; i++) {
+      const day = String(2 + ((i * 6 + idx * 3) % 26)).padStart(2, '0')
+      const monthStr = String(m).padStart(2, '0')
+      const patient = HISTORY_PATIENTS[(idx + i) % HISTORY_PATIENTS.length]
+      const type = HISTORY_TYPES[(idx + i * 2) % HISTORY_TYPES.length]
+      const status = i % 5 === 0 ? 'Cancelled' : 'Completed'
+      rows.push({ date: `${y}-${monthStr}-${day}`, patient, type, status, duration: '50 min' })
+    }
+  })
+  return rows
+}
+
 const APPOINTMENTS_DATA = [
+  ...generateAppointmentHistory(),
   { date: '2026-07-04', patient: 'Aira Lopez',   type: 'Speech Therapy',       status: 'Confirmed', duration: '50 min' },
   { date: '2026-07-04', patient: 'Noah Cruz',     type: 'Developmental',        status: 'Pending',   duration: '50 min' },
   { date: '2026-07-04', patient: 'Mika Santos',   type: 'Articulation',         status: 'Confirmed', duration: '50 min' },
@@ -104,10 +134,31 @@ function exportExcel(type, rows, cols, dateRange) {
   XLSX.writeFile(wb, `${type}-report-${dateRange.from}.xlsx`)
 }
 
+const GRANULARITIES = [
+  { id: 'daily',   label: 'Daily',   range: { from: '2026-07-01', to: '2026-07-31' } },
+  { id: 'monthly', label: 'Monthly', range: { from: '2026-01-01', to: '2026-07-31' } },
+  { id: 'annual',  label: 'Annual',  range: { from: '2025-01-01', to: '2026-07-31' } },
+]
+
+function groupKey(dateStr, granularity) {
+  if (granularity === 'monthly') return dateStr.slice(0, 7) // YYYY-MM
+  if (granularity === 'annual') return dateStr.slice(0, 4)  // YYYY
+  return dateStr
+}
+
+function groupLabel(key, granularity) {
+  if (granularity === 'monthly') {
+    const [y, m] = key.split('-')
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+  }
+  return key
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function TherapistReportPage({ user, onLogout, betaTier }) {
   const [reportType, setReportType] = useState('appointments')
   const [dateRange, setDateRange] = useState({ from: '2026-07-01', to: '2026-07-31' })
+  const [granularity, setGranularity] = useState('daily')
   const [toast, setToast] = useState('')
 
   const rawData = useMemo(() => {
@@ -120,6 +171,69 @@ export default function TherapistReportPage({ user, onLogout, betaTier }) {
 
   const cols = COLS[reportType]
   const rows = rowsFor(reportType, rawData)
+
+  const charts = useMemo(() => {
+    if (reportType === 'appointments') {
+      const byKey = {}
+      rawData.forEach(r => {
+        const k = groupKey(r.date, granularity)
+        byKey[k] = (byKey[k] || 0) + 1
+      })
+      const keys = Object.keys(byKey).sort()
+      const labels = keys.map(k => groupLabel(k, granularity))
+      const statuses = ['Confirmed', 'Completed', 'Pending', 'Cancelled']
+      return {
+        left: {
+          title: `Appointments per ${granularity === 'daily' ? 'Day' : granularity === 'monthly' ? 'Month' : 'Year'}`,
+          type: 'trend',
+          months: labels,
+          trend: keys.map(k => byKey[k]),
+          color: '#2a9d8f',
+        },
+        right: {
+          title: 'Appointments by Status',
+          type: 'breakdown',
+          labels: statuses,
+          values: statuses.map(s => rawData.filter(r => r.status === s).length),
+          color: ['#16a34a', '#0284c7', '#d97706', '#dc2626'],
+        },
+      }
+    }
+    if (reportType === 'progress') {
+      return {
+        left: {
+          title: 'Progress by Patient (%)',
+          type: 'breakdown',
+          labels: rawData.map(r => r.patient),
+          values: rawData.map(r => r.progress),
+          color: '#2a9d8f',
+        },
+        right: {
+          title: 'Sessions Completed by Patient',
+          type: 'breakdown',
+          labels: rawData.map(r => r.patient),
+          values: rawData.map(r => r.sessions),
+          color: '#0284c7',
+        },
+      }
+    }
+    return {
+      left: {
+        title: 'Total Sessions Trend',
+        type: 'trend',
+        months: rawData.map(r => r.month),
+        trend: rawData.map(r => r.total),
+        color: '#2a9d8f',
+      },
+      right: {
+        title: 'Completed Sessions by Month',
+        type: 'breakdown',
+        labels: rawData.map(r => r.month),
+        values: rawData.map(r => r.completed),
+        color: '#16a34a',
+      },
+    }
+  }, [reportType, rawData, granularity])
 
   const showToast = (msg) => {
     setToast(msg)
@@ -212,6 +326,21 @@ export default function TherapistReportPage({ user, onLogout, betaTier }) {
                 <label>To</label>
                 <input type="date" value={dateRange.to} onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))} />
               </div>
+              <div className="rpt-filter-group">
+                <label>View</label>
+                <div className="rpt-granularity">
+                  {GRANULARITIES.map(g => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={`rpt-granularity-btn ${granularity === g.id ? 'active' : ''}`}
+                      onClick={() => { setGranularity(g.id); setDateRange(g.range) }}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="rpt-filter-meta">
                 <span className="rpt-count-pill">{rawData.length} record{rawData.length !== 1 ? 's' : ''} found</span>
               </div>
@@ -239,6 +368,28 @@ export default function TherapistReportPage({ user, onLogout, betaTier }) {
               <KPITile label="Cancelled"      value={rawData.reduce((s,r)=>s+r.cancelled,0)} color="red" />
             </>}
           </div>
+
+          {/* Charts */}
+          {rawData.length > 0 && (
+            <div className="rpt-charts-row">
+              <div className="rpt-chart-card">
+                <p className="rpt-chart-title">{charts.left.title}</p>
+                {charts.left.type === 'trend' ? (
+                  <TrendChart months={charts.left.months} trend={charts.left.trend} color={charts.left.color} />
+                ) : (
+                  <BreakdownChart labels={charts.left.labels} values={charts.left.values} color={charts.left.color} />
+                )}
+              </div>
+              <div className="rpt-chart-card">
+                <p className="rpt-chart-title">{charts.right.title}</p>
+                {charts.right.type === 'trend' ? (
+                  <TrendChart months={charts.right.months} trend={charts.right.trend} color={charts.right.color} />
+                ) : (
+                  <BreakdownChart labels={charts.right.labels} values={charts.right.values} color={charts.right.color} />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Table */}
           <div className="rpt-table-wrap">

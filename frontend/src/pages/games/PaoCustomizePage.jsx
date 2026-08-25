@@ -24,6 +24,14 @@ const BADGES = {
   'Alphabet Blast': { emoji:'🚀', color:'#ef4444', how:'Finish the Alphabet Blast game' },
   'Echo Master':    { emoji:'📣', color:'#14b8a6', how:'Say every syllable clearly across all 4 Echo levels' },
   'Puzzle Pro':     { emoji:'🧩', color:'#34d399', how:'Finish Puzzle Pals' },
+  'Sound Hunter':   { emoji:'🔎', color:'#0ea5e9', how:'Finish Sound Hunt' },
+  'Rhyme Master':   { emoji:'🎵', color:'#ec4899', how:'Finish Rhyme Time' },
+  'Sentence Star':  { emoji:'✍️', color:'#6366f1', how:'Finish Sentence Builder' },
+  'Early Bird':     { emoji:'🌅', color:'#f59e0b', how:'Play before 9am' },
+  'Streak Keeper':  { emoji:'🔥', color:'#ef4444', how:'Play 3 days in a row' },
+  'Big Brain':      { emoji:'🧠', color:'#8b5cf6', how:'Reach Level 10' },
+  'Marathoner':     { emoji:'🏃', color:'#10b981', how:'Play 10 games total' },
+  'Helping Hand':   { emoji:'🤝', color:'#14b8a6', how:'Complete an assigned exercise' },
 }
 
 // ─── Outfit categories ────────────────────────────────────────────────────────
@@ -82,14 +90,21 @@ function tts(text, { onStart, onEnd, onWord } = {}) {
   speakPao(text, { pitch: 1.62, rate: 1.1, onStart, onEnd, onWord })
 }
 
-// ─── Badge Case Modal ─────────────────────────────────────────────────────────
+// ─── Badge Case Page ──────────────────────────────────────────────────────────
 
-function BadgeCaseModal({ earnedBadges, onClose }) {
+const BADGE_PAGE_SIZE = 8
+
+export function BadgeCasePage({ earnedBadges, onBack }) {
   const ALL_KEYS = Object.keys(BADGES)
+  const [page, setPage] = useState(0)
+  const pageCount = Math.ceil(ALL_KEYS.length / BADGE_PAGE_SIZE)
+  const pageKeys = ALL_KEYS.slice(page * BADGE_PAGE_SIZE, page * BADGE_PAGE_SIZE + BADGE_PAGE_SIZE)
+  const percent = Math.round((earnedBadges.size / ALL_KEYS.length) * 100)
+
+  const goPage = (p) => setPage(Math.max(0, Math.min(pageCount - 1, p)))
+
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position:'fixed', inset:0, zIndex:10010, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,.75)', backdropFilter:'blur(8px)' }}>
+    <div style={{ position:'fixed', inset:0, zIndex:9999, overflowY:'auto', background:'radial-gradient(circle, rgba(255,255,255,.05) 1.5px, transparent 2px) 0 0/28px 28px, #0b2b30', fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
       <style>{`
         @keyframes bcIn   { from{opacity:0;transform:scale(.88) translateY(18px)} to{opacity:1;transform:scale(1) translateY(0)} }
         @keyframes bcBadge{ 0%{transform:scale(0) rotate(-10deg)} 65%{transform:scale(1.12) rotate(3deg)} 100%{transform:scale(1) rotate(0)} }
@@ -97,47 +112,60 @@ function BadgeCaseModal({ earnedBadges, onClose }) {
         @keyframes bcGlow { 0%,100%{box-shadow:0 0 14px rgba(96,165,250,.3)} 50%{box-shadow:0 0 30px rgba(96,165,250,.65)} }
       `}</style>
 
-      <div style={{ width:580, maxWidth:'95vw', animation:'bcIn .45s cubic-bezier(.34,1.56,.64,1)' }}>
+      <button onClick={onBack} style={{ position:'absolute', top:20, left:20, zIndex:10, display:'flex', alignItems:'center', gap:6, background:'#fff', border:'1px solid rgba(15,23,42,.12)', color:'#1e293b', borderRadius:10, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,.18)' }}>
+        ← Back
+      </button>
+
+      <div style={{ minHeight:'100%', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'86px 20px 40px' }}>
+      <div style={{ width:520, maxWidth:'95vw', animation:'bcIn .45s cubic-bezier(.34,1.56,.64,1)' }}>
 
         {/* ── Lid ── */}
-        <div style={{ background:'linear-gradient(180deg,#1c1c2e 0%,#16213e 100%)', border:'3px solid #1e3a5f', borderBottom:'none', borderRadius:'16px 16px 0 0', padding:'14px 20px 10px', display:'flex', alignItems:'center', justifyContent:'space-between', animation:'bcGlow 2.5s ease-in-out infinite' }}>
-          <div>
-            <h2 style={{ margin:0, fontSize:18, fontWeight:900, color:'#e2e8f0' }}>🏆 Pao's Badge Case</h2>
-            <div style={{ fontSize:11, color:'rgba(96,165,250,.7)', marginTop:2, fontWeight:600 }}>
-              {earnedBadges.size} / {ALL_KEYS.length} badges collected
+        <div style={{ background:'linear-gradient(180deg,#1c1c2e 0%,#16213e 100%)', border:'3px solid #1e3a5f', borderBottom:'none', borderRadius:'16px 16px 0 0', padding:'12px 16px 8px' }}>
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+            <div>
+              <h2 style={{ margin:0, fontSize:16, fontWeight:900, color:'#e2e8f0' }}>🏆 Pao's Badge Case</h2>
+              <div style={{ fontSize:11, color:'rgba(96,165,250,.7)', marginTop:2, fontWeight:600 }}>
+                {earnedBadges.size} / {ALL_KEYS.length} badges collected
+              </div>
             </div>
-          </div>
-          {/* LED dots */}
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ display:'flex', gap:4 }}>
+            {/* LED dots */}
+            <div style={{ display:'flex', gap:4, marginTop:3 }}>
               {[0,0.15,0.3,0.45,0.6].map((d,i) => (
-                <div key={i} style={{ width:7, height:7, borderRadius:'50%', background:'#60a5fa', animation:`bcPulse 1.8s ease-in-out ${d}s infinite`, boxShadow:'0 0 7px #60a5fa' }}/>
+                <div key={i} style={{ width:6, height:6, borderRadius:'50%', background:'#60a5fa', animation:`bcPulse 1.8s ease-in-out ${d}s infinite`, boxShadow:'0 0 6px #60a5fa' }}/>
               ))}
             </div>
-            <button onClick={onClose} style={{ background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.14)', color:'rgba(255,255,255,.6)', borderRadius:8, width:30, height:30, cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>✕</button>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+            <div style={{ flex:1, height:5, background:'rgba(255,255,255,.08)', borderRadius:4, position:'relative' }}>
+              <div style={{ height:'100%', width:`${percent}%`, background:'linear-gradient(90deg,#38bdf8,#60a5fa)', borderRadius:4 }}/>
+              <div style={{ position:'absolute', left:`${percent}%`, top:'50%', transform:'translate(-50%,-50%)', width:11, height:11, borderRadius:'50%', background:'#60a5fa', border:'2px solid #0d1b2a', boxShadow:'0 0 8px rgba(96,165,250,.7)' }}/>
+            </div>
+            <span style={{ fontSize:11, fontWeight:700, color:'rgba(96,165,250,.85)', whiteSpace:'nowrap' }}>{percent}% Complete</span>
           </div>
         </div>
 
         {/* ── Hinge ── */}
-        <div style={{ height:7, background:'linear-gradient(90deg,#0d2b4a,#1a4a7a,#1a4a7a,#0d2b4a)', position:'relative' }}>
+        <div style={{ height:6, background:'linear-gradient(90deg,#0d2b4a,#1a4a7a,#1a4a7a,#0d2b4a)', position:'relative' }}>
           <div style={{ position:'absolute', inset:'2px 18%', background:'rgba(96,165,250,.2)', borderRadius:2 }}/>
           {[25, 75].map(p => (
-            <div key={p} style={{ position:'absolute', left:`${p}%`, top:'50%', transform:'translate(-50%,-50%)', width:11, height:11, borderRadius:'50%', background:'#1b3a5c', border:'2px solid rgba(96,165,250,.4)' }}/>
+            <div key={p} style={{ position:'absolute', left:`${p}%`, top:'50%', transform:'translate(-50%,-50%)', width:9, height:9, borderRadius:'50%', background:'#1b3a5c', border:'2px solid rgba(96,165,250,.4)' }}/>
           ))}
         </div>
 
         {/* ── Interior ── */}
-        <div style={{ background:'linear-gradient(180deg,#090912 0%,#0d0d1c 100%)', border:'3px solid #1e3a5f', borderTop:'none', borderRadius:'0 0 16px 16px', padding:'20px 20px 18px', boxShadow:'inset 0 6px 28px rgba(0,0,0,.7), 0 20px 56px rgba(0,0,0,.7)' }}>
+        <div style={{ background:'linear-gradient(180deg,#090912 0%,#0d0d1c 100%)', border:'3px solid #1e3a5f', borderTop:'none', borderRadius:'0 0 16px 16px', padding:'16px 16px 14px', boxShadow:'inset 0 6px 28px rgba(0,0,0,.7), 0 20px 56px rgba(0,0,0,.7)' }}>
 
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-            {ALL_KEYS.map((key, idx) => {
+          <div key={page} style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+            {pageKeys.map((key, idx) => {
               const b      = BADGES[key]
               const earned = earnedBadges.has(key)
               return (
-                <div key={key} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
+                <div key={key} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                   {/* Slot */}
                   <div style={{
-                    width:'100%', aspectRatio:'1', borderRadius:14,
+                    width:'100%', aspectRatio:'1', borderRadius:12,
                     background: earned ? `${b.color}18` : 'rgba(255,255,255,.025)',
                     border: `2px solid ${earned ? b.color+'50' : 'rgba(255,255,255,.06)'}`,
                     display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column',
@@ -147,7 +175,7 @@ function BadgeCaseModal({ earnedBadges, onClose }) {
                     {earned ? (
                       <>
                         <div style={{ position:'absolute', inset:0, background:`radial-gradient(circle at 40% 30%,${b.color}25 0%,transparent 68%)`, pointerEvents:'none' }}/>
-                        <div style={{ fontSize:36, animation:`bcBadge .5s ${idx*.04}s cubic-bezier(.34,1.56,.64,1) both`, position:'relative', zIndex:1 }}>
+                        <div style={{ fontSize:30, animation:`bcBadge .5s ${idx*.04}s cubic-bezier(.34,1.56,.64,1) both`, position:'relative', zIndex:1 }}>
                           {b.emoji}
                         </div>
                         {/* Top shine */}
@@ -155,16 +183,16 @@ function BadgeCaseModal({ earnedBadges, onClose }) {
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize:28, filter:'grayscale(1)', opacity:.12 }}>{b.emoji}</div>
-                        <div style={{ fontSize:13, color:'rgba(255,255,255,.1)' }}>🔒</div>
+                        <div style={{ fontSize:24, filter:'grayscale(1)', opacity:.12 }}>{b.emoji}</div>
+                        <div style={{ fontSize:11, color:'rgba(255,255,255,.1)' }}>🔒</div>
                       </>
                     )}
                   </div>
 
                   {/* Label */}
                   <div style={{ textAlign:'center' }}>
-                    <div style={{ fontSize:10, fontWeight:700, color: earned ? b.color : 'rgba(255,255,255,.18)', lineHeight:1.3 }}>{key}</div>
-                    <div style={{ fontSize:9, color: earned ? `${b.color}80` : 'rgba(255,255,255,.13)', lineHeight:1.3, marginTop:1 }}>
+                    <div style={{ fontSize:9.5, fontWeight:700, color: earned ? b.color : 'rgba(255,255,255,.18)', lineHeight:1.25 }}>{key}</div>
+                    <div style={{ fontSize:8.5, color: earned ? `${b.color}80` : 'rgba(255,255,255,.13)', lineHeight:1.25, marginTop:1 }}>
                       {earned ? 'Collected!' : b.how}
                     </div>
                   </div>
@@ -173,11 +201,35 @@ function BadgeCaseModal({ earnedBadges, onClose }) {
             })}
           </div>
 
+          {/* Pagination */}
+          {pageCount > 1 && (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:14, marginTop:16 }}>
+              <button onClick={() => goPage(page - 1)} disabled={page === 0}
+                style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', color: page===0 ? 'rgba(255,255,255,.2)' : '#bfdbfe', borderRadius:8, width:28, height:28, cursor: page===0 ? 'default' : 'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ‹
+              </button>
+              <div style={{ display:'flex', gap:6 }}>
+                {Array.from({ length: pageCount }).map((_, i) => (
+                  <button key={i} onClick={() => goPage(i)}
+                    style={{ width:24, height:24, borderRadius:7, border:'none', cursor:'pointer', background: i===page ? '#60a5fa' : 'rgba(255,255,255,.1)', color: i===page ? '#0d1b2a' : 'rgba(191,219,254,.6)', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', transition:'all .2s' }}>
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => goPage(page + 1)} disabled={page === pageCount - 1}
+                style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', color: page===pageCount-1 ? 'rgba(255,255,255,.2)' : '#bfdbfe', borderRadius:8, width:28, height:28, cursor: page===pageCount-1 ? 'default' : 'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ›
+              </button>
+              <span style={{ fontSize:11, fontWeight:700, color:'rgba(191,219,254,.7)', minWidth:52 }}>Page {page + 1} of {pageCount}</span>
+            </div>
+          )}
+
           {/* Bottom strip */}
-          <div style={{ marginTop:16, textAlign:'center', fontSize:11, color:'rgba(96,165,250,.38)', fontWeight:600, letterSpacing:.5 }}>
+          <div style={{ marginTop:14, textAlign:'center', fontSize:11, color:'rgba(96,165,250,.38)', fontWeight:600, letterSpacing:.5 }}>
             Play games to earn more badges and unlock Pao's outfits!
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -262,6 +314,10 @@ export default function PaoCustomizePage({ onDone }) {
   }
 
   const activeCategory = CATEGORIES.find(c => c.id === activeTab)
+
+  if (showBadgeCase) {
+    return <BadgeCasePage earnedBadges={earnedBadges} onBack={() => setShowBadgeCase(false)}/>
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:9999, background:'radial-gradient(circle, rgba(255,255,255,.06) 1.5px, transparent 2px) 0 0/28px 28px, linear-gradient(180deg,#182552 0%,#1f2f63 100%)', color:'#3a2e6b', fontFamily:"'Segoe UI',system-ui,sans-serif", overflow:'hidden' }}>
@@ -518,8 +574,6 @@ export default function PaoCustomizePage({ onDone }) {
       </div>
 
       </div>
-
-      {showBadgeCase && <BadgeCaseModal earnedBadges={earnedBadges} onClose={() => setShowBadgeCase(false)}/>}
     </div>
   )
 }

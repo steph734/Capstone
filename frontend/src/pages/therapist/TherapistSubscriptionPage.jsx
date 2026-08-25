@@ -56,10 +56,12 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
       period: '/month',
       color: 'silver',
       features: [
-        'Voice Assisted Speech to Text',
-        'Text to Speech',
+        'Appointment Booking',
+        'Online Payments',
         'SOAP Notes / Documentation',
-        'Note-taking Tools'
+        'Note-taking Tools',
+        'Voice Assisted Speech to Text',
+        'Text to Speech'
       ],
       current: false
     },
@@ -68,10 +70,14 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
       name: 'THERAPYPRO: GOLD',
       price: '₱499',
       period: '/month',
-      badge: 'Special Offer',
       color: 'gold',
       features: [
+        'Appointment Booking',
+        'Online Payments',
+        'SOAP Notes / Documentation',
+        'Note-taking Tools',
         'Voice Assisted Speech to Text',
+        'Text to Speech',
         'Gamified Interactive Exercises',
         'Avatar Customization',
         'Priority Goal Setting'

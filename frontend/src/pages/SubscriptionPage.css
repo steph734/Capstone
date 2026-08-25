@@ -163,6 +163,29 @@
 }
 
 /* Tier Colors */
+.tier-blue,
+.tier-silver {
+  align-self: start;
+  padding-bottom: 76px;
+}
+
+.tier-blue {
+  height: 360px;
+}
+
+.tier-silver {
+  height: 400px;
+}
+
+.tier-blue .tier-button,
+.tier-silver .tier-button {
+  position: absolute;
+  left: clamp(20px, 2.5vw, 28px);
+  right: clamp(20px, 2.5vw, 28px);
+  bottom: clamp(20px, 2.5vw, 28px);
+  width: auto;
+}
+
 .tier-blue {
   border-color: #a8d5f2;
   background: linear-gradient(135deg, #e8f4fc 0%, #d5ebf8 100%);
@@ -176,6 +199,11 @@
 .tier-gold {
   border-color: #f4c430;
   background: linear-gradient(135deg, #fff9e6 0%, #fff0c2 100%);
+  box-shadow: 0 0 0 3px rgba(244, 196, 48, 0.25), 0 8px 20px rgba(244, 196, 48, 0.25);
+}
+
+.tier-gold:hover {
+  box-shadow: 0 0 0 3px rgba(244, 196, 48, 0.3), 0 12px 28px rgba(244, 196, 48, 0.32);
 }
 
 .tier-blue.current-tier {
@@ -264,24 +292,26 @@
 .tier-features {
   list-style: none;
   padding: 0;
-  margin: 0 0 clamp(20px, 2.5vw, 24px) 0;
+  margin: 0 0 clamp(16px, 2vw, 20px) 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.2vw, 12px);
+  gap: 6px;
 }
 
 .tier-feature {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: clamp(13px, 1.1vw, 14px);
+  gap: 8px;
+  font-size: 16px;
   color: #2c4a3e;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .tier-feature svg {
   flex-shrink: 0;
   margin-top: 2px;
+  width: 15px;
+  height: 15px;
   stroke: #4a9eff;
 }
 

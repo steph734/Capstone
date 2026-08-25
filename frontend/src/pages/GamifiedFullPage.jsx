@@ -5,7 +5,7 @@ import SlowMotionEchoGame from './games/SlowMotionEchoGame'
 import PuzzlePiecesGame from './games/PuzzlePiecesGame'
 import StoryBuilderGame from './games/StoryBuilderGame'
 import LittleRedRidingHoodGame from './games/LittleRedRidingHoodGame'
-import PaoCustomizePage from './games/PaoCustomizePage'
+import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import { useSharedProgress } from '../context/ProgressContext'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
@@ -59,8 +59,6 @@ const GAME_CATEGORIES = [
   { id: 'all',          label: 'All Games',        icon: '🎮', color: '#6366f1' },
   { id: 'cognitive',    label: 'Cognitive',        icon: '🧠', color: '#8b5cf6' },
   { id: 'speech',       label: 'Speech & Language', icon: '🗣️', color: '#10b981' },
-  { id: 'physical',     label: 'Physical Therapy', icon: '🏃', color: '#3b82f6' },
-  { id: 'occupational', label: 'Occupational',     icon: '🖐️', color: '#f59e0b' },
 ]
 
 const GAME_DIFFICULTIES = [
@@ -198,6 +196,114 @@ function CategoryModal({ onSelect, onClose }) {
   )
 }
 
+// ─── In-game profile view ──────────────────────────────────────────────────────
+// A playful, kid-facing profile just for this page — separate from the real
+// account settings page at /patient/profile.
+function GamifiedProfileView({ progress, onBack, onViewAllBadges }) {
+  const { patientName, level, xp, xpNeeded, characterStats, badges, streak, weekly } = progress
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'linear-gradient(180deg,#87ceeb 0%,#b8e6f5 60%,#d4f1e8 100%)' }}>
+      {/* Background scenery — pinned to the viewport, independent of content scroll */}
+      <Sun/>
+      <Cloud x="8%" y="8%" size={90} delay={0} dur={8}/>
+      <Cloud x="70%" y="5%" size={110} delay={1.5} dur={9}/>
+      <Cloud x="85%" y="22%" size={70} delay={.6} dur={7}/>
+      <HillsScenery/>
+
+      <button onClick={onBack} style={{ position:'absolute', top:20, left:20, zIndex:10, display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.85)', border:'1.5px solid rgba(124,79,224,.25)', color:'#5b21b6', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+        ← Back
+      </button>
+
+      {/* Scrollable content layer, separate from the fixed background */}
+      <div style={{ position:'absolute', inset:0, overflowY:'auto', zIndex:2 }}>
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'90px 24px 60px', display:'flex', flexDirection:'column', gap:20 }}>
+
+        {/* Header card */}
+        <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(10px)', border:'1.5px solid rgba(124,79,224,.2)', borderRadius:24, padding:24, display:'flex', alignItems:'center', gap:18, boxShadow:'0 8px 32px rgba(80,60,20,.12)' }}>
+          <PandaMascot pxWidth={90} mouthOpen={false}/>
+          <div style={{ flex:1 }}>
+            <h2 style={{ margin:0, fontSize:22, fontWeight:900, color:'#3a2e6b' }}>{patientName}</h2>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,183,3,.14)', border:'1px solid rgba(255,183,3,.4)', borderRadius:20, padding:'4px 12px 4px 8px' }}>
+                <span style={{ fontSize:14 }}>⭐</span>
+                <span style={{ fontSize:11, fontWeight:700, color:'#92400e' }}>LVL</span>
+                <span style={{ fontSize:18, fontWeight:900, color:'#d97706' }}>{level}</span>
+              </div>
+              <div style={{ flex:1 }}>
+                <span style={{ fontSize:10, color:'rgba(58,46,107,.5)', fontWeight:600 }}>XP {xp}/{xpNeeded}</span>
+                <div style={{ height:6, background:'rgba(124,79,224,.12)', borderRadius:4, overflow:'hidden', marginTop:2 }}>
+                  <div style={{ height:'100%', width:`${(xp / xpNeeded) * 100}%`, background:'linear-gradient(90deg,#6366f1,#8b5cf6)', borderRadius:4 }}/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Streak + weekly summary */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          <div style={{ background:'rgba(255,255,255,.9)', border:'1.5px solid rgba(124,79,224,.18)', borderRadius:18, padding:'16px 18px', textAlign:'center' }}>
+            <div style={{ fontSize:28 }}>🔥</div>
+            <div style={{ fontSize:24, fontWeight:900, color:'#d97706' }}>{streak?.current ?? 0}</div>
+            <div style={{ fontSize:12, color:'rgba(58,46,107,.6)', fontWeight:600 }}>Day Streak</div>
+          </div>
+          <div style={{ background:'rgba(255,255,255,.9)', border:'1.5px solid rgba(124,79,224,.18)', borderRadius:18, padding:'16px 18px', textAlign:'center' }}>
+            <div style={{ fontSize:28 }}>🎮</div>
+            <div style={{ fontSize:24, fontWeight:900, color:'#8b5cf6' }}>{weekly?.gamesCompleted ?? 0}</div>
+            <div style={{ fontSize:12, color:'rgba(58,46,107,.6)', fontWeight:600 }}>Games This Week</div>
+          </div>
+        </div>
+
+        {/* Character stats */}
+        <div style={{ background:'rgba(255,255,255,.9)', border:'1.5px solid rgba(124,79,224,.18)', borderRadius:20, padding:20 }}>
+          <h3 style={{ margin:'0 0 14px', fontSize:16, fontWeight:800, color:'#3a2e6b' }}>Character Stats</h3>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            {STATS_META.map((meta) => {
+              const value = characterStats?.[meta.key] ?? 0
+              return (
+                <div key={meta.key}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, fontWeight:700, color:'#3a2e6b', marginBottom:4 }}>
+                    <span>{meta.icon} {meta.label}</span>
+                    <span style={{ color: meta.color }}>{value}</span>
+                  </div>
+                  <div style={{ height:6, background:'rgba(124,79,224,.1)', borderRadius:4, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${value}%`, background: meta.color, borderRadius:4 }}/>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Badges */}
+        <div style={{ background:'rgba(255,255,255,.9)', border:'1.5px solid rgba(124,79,224,.18)', borderRadius:20, padding:20 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <h3 style={{ margin:0, fontSize:16, fontWeight:800, color:'#3a2e6b' }}>Badges Earned</h3>
+            <button onClick={onViewAllBadges} style={{ background:'none', border:'none', color:'#7c3aed', fontSize:12, fontWeight:700, cursor:'pointer', padding:0 }}>
+              View All →
+            </button>
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+            {(badges || []).map((b) => (
+              <div key={b.id} style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(139,92,246,.08)', border:'1px solid rgba(139,92,246,.2)', borderRadius:14, padding:'8px 14px' }}>
+                <span style={{ fontSize:20 }}>{b.icon}</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#3a2e6b' }}>{b.label}</div>
+                  <div style={{ fontSize:10, color:'rgba(58,46,107,.5)' }}>{b.dateEarned}</div>
+                </div>
+              </div>
+            ))}
+            {(!badges || badges.length === 0) && (
+              <p style={{ margin:0, fontSize:13, color:'rgba(58,46,107,.5)' }}>No badges earned yet — keep playing!</p>
+            )}
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 'alvrin' }) {
@@ -303,6 +409,20 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
     setShowCatModal(false)
     stopPaoVoice()
     setPhase('picture-word')
+  }
+
+  if (phase === 'profile') {
+    return <GamifiedProfileView progress={progress} onViewAllBadges={() => setPhase('badges')} onBack={() => {
+      setPhase('games'); setGamesIn(true); setDisplayText('')
+      setTimeout(() => speakScript(PAO_GAMES_SCRIPT), 400)
+    }}/>
+  }
+
+  if (phase === 'badges') {
+    let earnedBadges
+    try { earnedBadges = new Set(JSON.parse(localStorage.getItem('pao_badges') || '[]')) }
+    catch { earnedBadges = new Set() }
+    return <BadgeCasePage earnedBadges={earnedBadges} onBack={() => setPhase('profile')}/>
   }
 
   if (phase === 'customize') {
@@ -445,11 +565,11 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
       {phase === 'games' && (
         <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
-          {/* Customize button — top right */}
-          <button onClick={() => { stopPaoVoice(); setPhase('customize') }} style={{ position:'absolute', top:18, right:20, zIndex:10, display:'flex', alignItems:'center', gap:7, background:'rgba(139,92,246,.14)', border:'1.5px solid rgba(139,92,246,.4)', color:'#5b21b6', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s' }}
+          {/* Profile button — top right */}
+          <button onClick={() => { stopPaoVoice(); setPhase('profile') }} style={{ position:'absolute', top:18, right:20, zIndex:10, display:'flex', alignItems:'center', gap:7, background:'rgba(139,92,246,.14)', border:'1.5px solid rgba(139,92,246,.4)', color:'#5b21b6', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s' }}
             onMouseEnter={e => { e.currentTarget.style.background='rgba(139,92,246,.26)'; e.currentTarget.style.borderColor='rgba(139,92,246,.6)' }}
             onMouseLeave={e => { e.currentTarget.style.background='rgba(139,92,246,.14)'; e.currentTarget.style.borderColor='rgba(139,92,246,.4)' }}>
-            ✨ Customize Pao
+            👤 Profile
           </button>
 
           {/* Pao + speech bubble row */}
@@ -458,6 +578,9 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
               <PandaMascot pxWidth={150} mouthOpen={talking} onClick={handlePandaClick}/>
             </div>
             <div style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
+              {/* Patient name */}
+              <span style={{ fontSize:15, fontWeight:800, color:'#3a2e6b' }}>{progress.patientName}</span>
+
               {/* Level badge + stats toggle */}
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,183,3,.14)', border:'1px solid rgba(255,183,3,.4)', borderRadius:20, padding:'4px 12px 4px 8px' }}>

@@ -70,72 +70,74 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
       icon="🎯"
       menuItems={getTherapistMenuItems(betaTier)}
     >
-      <section className="admin-panel">
-        <div className="admin-panel-header">
-          <div>
-            <h3>New Assignment</h3>
-            <p>Add an exercise for a patient</p>
+      <div className="admin-grid-2">
+        <section className="admin-panel">
+          <div className="admin-panel-header">
+            <div>
+              <h3>New Assignment</h3>
+              <p>Add an exercise for a patient</p>
+            </div>
           </div>
-        </div>
 
-        <form className="admin-modal-form" onSubmit={handleSubmit}>
-          <input
-            value={form.patient}
-            onChange={(event) => setForm((current) => ({ ...current, patient: event.target.value }))}
-            placeholder="Patient name"
-            required
-          />
-          <input
-            value={form.exercise}
-            onChange={(event) => setForm((current) => ({ ...current, exercise: event.target.value }))}
-            placeholder="Exercise name"
-            required
-          />
-          <select value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))}>
-            {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select value={form.due} onChange={(event) => setForm((current) => ({ ...current, due: event.target.value }))}>
-            <option>Today</option>
-            <option>Tomorrow</option>
-            <option>This Week</option>
-          </select>
-          <input
-            value={form.instructions}
-            onChange={(event) => setForm((current) => ({ ...current, instructions: event.target.value }))}
-            placeholder="Simple instructions for parents (optional)"
-          />
-          <div className="admin-button-row">
-            <button className="admin-btn" type="submit">Assign Exercise</button>
-            <button className="admin-btn-secondary" type="button" onClick={() => setForm({ patient: '', exercise: '', domain: DOMAINS[0], instructions: '', due: 'Today' })}>Clear</button>
+          <form className="admin-modal-form" onSubmit={handleSubmit}>
+            <input
+              value={form.patient}
+              onChange={(event) => setForm((current) => ({ ...current, patient: event.target.value }))}
+              placeholder="Patient name"
+              required
+            />
+            <input
+              value={form.exercise}
+              onChange={(event) => setForm((current) => ({ ...current, exercise: event.target.value }))}
+              placeholder="Exercise name"
+              required
+            />
+            <select value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))}>
+              {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select value={form.due} onChange={(event) => setForm((current) => ({ ...current, due: event.target.value }))}>
+              <option>Today</option>
+              <option>Tomorrow</option>
+              <option>This Week</option>
+            </select>
+            <input
+              value={form.instructions}
+              onChange={(event) => setForm((current) => ({ ...current, instructions: event.target.value }))}
+              placeholder="Simple instructions for parents (optional)"
+            />
+            <div className="admin-button-row">
+              <button className="admin-btn" type="submit">Assign Exercise</button>
+              <button className="admin-btn-secondary" type="button" onClick={() => setForm({ patient: '', exercise: '', domain: DOMAINS[0], instructions: '', due: 'Today' })}>Clear</button>
+            </div>
+          </form>
+        </section>
+
+        <section className="admin-panel">
+          <div className="admin-panel-header">
+            <div>
+              <h3>Current Assignments</h3>
+              <p>Live list of active home exercises</p>
+            </div>
           </div>
-        </form>
-      </section>
 
-      <section className="admin-panel">
-        <div className="admin-panel-header">
-          <div>
-            <h3>Current Assignments</h3>
-            <p>Live list of active home exercises</p>
-          </div>
-        </div>
-
-        <div className="games-list">
-          {assignments.map((assignment) => (
-            <div key={assignment.id} className="game-card">
-              <div>
-                <h4>{assignment.patient}</h4>
-                <p>{assignment.exercise} · {assignment.domain} · Due {assignment.due}</p>
-                <div className="admin-button-row" style={{ marginTop: '10px' }}>
-                  <span className="admin-pill green">{assignment.status}</span>
+          <div className="games-list">
+            {assignments.map((assignment) => (
+              <div key={assignment.id} className="game-card">
+                <div>
+                  <h4>{assignment.patient}</h4>
+                  <p>{assignment.exercise} · {assignment.domain} · Due {assignment.due}</p>
+                  <div className="admin-button-row" style={{ marginTop: '10px' }}>
+                    <span className="admin-pill green">{assignment.status}</span>
+                  </div>
+                </div>
+                <div className="game-actions">
+                  <button className="admin-btn-danger" onClick={() => handleDelete(assignment.id)}>Delete</button>
                 </div>
               </div>
-              <div className="game-actions">
-                <button className="admin-btn-danger" onClick={() => handleDelete(assignment.id)}>Delete</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      </div>
     </TherapistPageShell>
   )
 }

@@ -1,0 +1,60 @@
+.ssf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ssf-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3d5a50;
+}
+
+.ssf-card-box {
+  padding: 12px;
+  border: 1px solid #d8eae0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ssf-card-box:focus-within {
+  border-color: #7fb69f;
+  box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.15);
+}
+
+.ssf-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ssf-submit {
+  background: #2c4a3e;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ssf-submit:hover {
+  background: #3d5a50;
+}
+
+.ssf-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ssf-secure-note {
+  margin: 0;
+  font-size: 11px;
+  color: #6b7c75;
+  text-align: center;
+}

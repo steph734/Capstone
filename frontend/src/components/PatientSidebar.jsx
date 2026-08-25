@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import BetaTag from './BetaTag'
 import './PatientSidebar.css'
@@ -142,7 +142,6 @@ export default function PatientSidebar({
   const resolvedMenuItems = menuItems ?? getPatientMenuItems(betaTier)
   const navigate = useNavigate()
   const location = useLocation()
-  const [activeItem, setActiveItem] = useState('home')
   const sidebarRef = useRef(null)
 
   useEffect(() => {
@@ -151,8 +150,7 @@ export default function PatientSidebar({
     }
   }, [isOpen])
 
-  const handleNavigation = (path, item) => {
-    setActiveItem(item)
+  const handleNavigation = (path) => {
     navigate(path)
     if (onClose) onClose() // Close sidebar on mobile after navigation
   }
@@ -197,8 +195,8 @@ export default function PatientSidebar({
           {resolvedMenuItems.map(item => (
             <button
               key={item.id}
-              className={`nav-item ${activeItem === item.id || location.pathname === item.path ? 'active' : ''}`}
-              onClick={() => handleNavigation(item.path, item.id)}
+              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => handleNavigation(item.path)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
@@ -212,8 +210,8 @@ export default function PatientSidebar({
           {bottomMenuItems.map(item => (
             <button
               key={item.id}
-              className={`nav-item ${activeItem === item.id || location.pathname === item.path ? 'active' : ''}`}
-              onClick={() => handleNavigation(item.path, item.id)}
+              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => handleNavigation(item.path)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>

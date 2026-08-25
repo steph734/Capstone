@@ -71,7 +71,7 @@ function CardBrandLogo({ brand }) {
 export default function UpdatePaymentPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentUser] = useState(user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' })
+  const currentUser = user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' }
 
   const [savedCards, setSavedCards] = useState(SAVED_CARDS)
   const [showAddForm, setShowAddForm] = useState(false)

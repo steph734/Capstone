@@ -81,7 +81,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const today = new Date()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [currentUser] = useState(user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' })
+  const currentUser = user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' }
   const [viewMonth, setViewMonth]       = useState(today.getMonth())
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())

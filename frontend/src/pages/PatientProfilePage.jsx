@@ -61,7 +61,7 @@ function Field({ icon, label, value, editing, field, draft, onChange }) {
   )
 }
 
-export default function PatientProfilePage({ user, onLogout, betaTier }) {
+export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateUser }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profile, setProfile] = useState(() => loadProfile(user))
   const [editing, setEditing] = useState(false)
@@ -73,6 +73,7 @@ export default function PatientProfilePage({ user, onLogout, betaTier }) {
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    onUpdateUser?.({ name: draft.name, avatar: draft.avatar })
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)
@@ -105,6 +106,8 @@ export default function PatientProfilePage({ user, onLogout, betaTier }) {
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
         profilePath="/patient/profile"
+        profileName={profile.name}
+        profileAvatar={profile.avatar}
       />
 
       <main className="page-content admin-page-content">
@@ -114,10 +117,6 @@ export default function PatientProfilePage({ user, onLogout, betaTier }) {
           <div>
             <h1>My Profile</h1>
             <p>View and update your personal information</p>
-          </div>
-          <div className="admin-header-badge">
-            <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Patient'} />
-            <span>{user?.name || 'Patient'}</span>
           </div>
         </div>
 

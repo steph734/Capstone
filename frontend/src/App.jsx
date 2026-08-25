@@ -165,6 +165,14 @@ function App() {
     localStorage.removeItem('currentUser')
   }
 
+  const handleUpdateUser = (updates) => {
+    setCurrentUser((prev) => {
+      const next = { ...prev, ...updates }
+      localStorage.setItem('currentUser', JSON.stringify(next))
+      return next
+    })
+  }
+
   return (
     <MessagesProvider>
     <ProgressProvider>
@@ -663,7 +671,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
-                <PatientProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+                <PatientProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onUpdateUser={handleUpdateUser} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

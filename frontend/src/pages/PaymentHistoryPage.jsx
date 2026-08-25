@@ -82,7 +82,7 @@ function formatDate(d) {
 export default function PaymentHistoryPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentUser] = useState(user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' })
+  const currentUser = user || { name: 'Alvrin', role: 'Patient', avatar: '/therapy-pro-logo.png' }
 
   const [search, setSearch]         = useState('')
   const [planFilter, setPlanFilter] = useState('All')

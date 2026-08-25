@@ -32,12 +32,12 @@ function LockIcon() {
 export default function SubscriptionPage({ user, onLogout, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [contactOwnerModalOpen, setContactOwnerModalOpen] = useState(false)
-  const [currentUser] = useState(user || {
+  const currentUser = user || {
     name: 'Alvrin',
     role: 'Patient',
     avatar: '/therapy-pro-logo.png',
     email: 'patient@gmail.com'
-  })
+  }
 
   const subscriptionTiers = [
     {

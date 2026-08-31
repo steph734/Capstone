@@ -55,6 +55,14 @@ function InfoIcon() {
   )
 }
 
+function CheckIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
 export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState('monthly')
@@ -203,18 +211,7 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
               </div>
 
               {/* Payment Form */}
-              {paymentStatus === 'success' ? (
-                <div className="payment-form">
-                  <h3 className="section-title">Subscription active!</h3>
-                  <p className="field-description">
-                    Your {tier.name.split(': ')[1]} plan (₱{price}.00/{isMonthly ? 'month' : 'year'}) is now active and billed by Stripe.
-                  </p>
-                  <button type="button" className="submit-button" onClick={handleGoBack}>
-                    Back to Subscription
-                  </button>
-                </div>
-              ) : (
-                <div className="payment-form">
+              <div className="payment-form">
                   <h3 className="section-title">Payment information</h3>
 
                   <div className="form-group">
@@ -353,8 +350,7 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                       This billing period isn't set up yet — please choose Monthly or Yearly to subscribe right now.
                     </p>
                   )}
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Right Column - Order Summary */}
@@ -386,6 +382,31 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
           </div>
         </div>
       </div>
+
+      {paymentStatus === 'success' && (
+        <div
+          className="payment-success-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-success-title"
+        >
+          <div className="payment-success-modal">
+            <div className="payment-success-icon">
+              <CheckIcon />
+            </div>
+            <h2 id="payment-success-title" className="payment-success-title">
+              Payment successful
+            </h2>
+            <p className="payment-success-text">
+              Your {tier.name.split(': ')[1]} plan (₱{price}.00/{isMonthly ? 'month' : 'year'}) is
+              now active and recorded with Stripe.
+            </p>
+            <button type="button" className="submit-button" onClick={handleGoBack}>
+              Back to subscription tiers
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

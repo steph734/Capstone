@@ -450,6 +450,70 @@
   transform: translateY(0);
 }
 
+/* Payment success modal */
+.payment-success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 38, 31, 0.55);
+  backdrop-filter: blur(2px);
+  animation: payment-success-fade 0.2s ease;
+}
+
+.payment-success-modal {
+  background: #fff;
+  border-radius: clamp(16px, 2vw, 22px);
+  padding: clamp(28px, 4vw, 40px);
+  width: min(440px, 100%);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(20, 38, 31, 0.3);
+  animation: payment-success-pop 0.25s ease;
+}
+
+.payment-success-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: #e8f5f0;
+  color: #2c4a3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-success-title {
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0 0 12px;
+}
+
+.payment-success-text {
+  font-size: clamp(13px, 1.1vw, 15px);
+  color: #6b7c75;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.payment-success-modal .submit-button {
+  width: 100%;
+}
+
+@keyframes payment-success-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes payment-success-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* Responsive - Mobile */
 @media (max-width: 768px) {
   .payment-main {

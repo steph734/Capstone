@@ -312,6 +312,56 @@
   gap: 16px;
 }
 
+/* Email + inline verify control */
+.email-verify-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.email-verify-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.verify-email-btn {
+  flex-shrink: 0;
+  background: #f8faf9;
+  border: 2px solid #4a6b5d;
+  color: #2c4a3e;
+  border-radius: clamp(8px, 1vw, 10px);
+  padding: 0 clamp(14px, 1.8vw, 18px);
+  font-size: clamp(12px, 1vw, 13px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.verify-email-btn:hover:not(:disabled) {
+  background: #e8f5f0;
+}
+
+.verify-email-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.email-verified-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 clamp(12px, 1.6vw, 16px);
+  border-radius: clamp(8px, 1vw, 10px);
+  background: #e8f5f0;
+  border: 2px solid #4a6b5d;
+  color: #2c4a3e;
+  font-size: clamp(12px, 1vw, 13px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .card-input {
   position: relative;
 }

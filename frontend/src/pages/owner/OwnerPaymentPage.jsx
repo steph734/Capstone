@@ -6,6 +6,27 @@ import './OwnerPaymentPage.css'
 
 const STRIPE_BILLING_PERIODS = new Set(['monthly', 'yearly'])
 
+// Dialling code prefilled into the phone field when a country/region is picked.
+const COUNTRY_DIAL_CODES = {
+  'Philippines': '+63',
+  'United States': '+1',
+  'Canada': '+1',
+  'United Kingdom': '+44',
+}
+// Longest first so stripping an old prefix never leaves a stray digit behind.
+const ALL_DIAL_CODES = ['+63', '+44', '+1']
+
+// Providers we can offer an inline "verify" step for.
+const VERIFIABLE_EMAIL_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com',
+  'yahoo.com', 'yahoo.co.uk', 'ymail.com',
+  'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com',
+  'proton.me', 'protonmail.com',
+  'aol.com',
+])
+const EMAIL_RE = /^[^\s@]+@([^\s@]+\.[^\s@]+)$/
+
 function ArrowLeftIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -39,14 +60,17 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
   const [billingPeriod, setBillingPeriod] = useState('monthly')
   const [paymentData, setPaymentData] = useState({
     fullName: '',
+    email: '',
+    phone: `${COUNTRY_DIAL_CODES['Philippines']} `,
     countryRegion: 'Philippines',
     address: '',
     zipCode: '',
     useShippingAddress: false,
     businessTax: false,
-    phoneNumber: ''
+    taxId: ''
   })
   const [paymentStatus, setPaymentStatus] = useState(null) // null | 'success'
+  const [emailStatus, setEmailStatus] = useState('idle') // idle | verifying | verified
 
   const currentUser = user || { 
     name: 'Owner', 
@@ -73,6 +97,38 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
       ...prev,
       [field]: value
     }))
+  }
+
+  const emailMatch = paymentData.email.trim().toLowerCase().match(EMAIL_RE)
+  const emailDomain = emailMatch ? emailMatch[1] : ''
+  const canVerifyEmail = VERIFIABLE_EMAIL_DOMAINS.has(emailDomain)
+
+  const handleEmailChange = (value) => {
+    setEmailStatus('idle') // any edit invalidates a previous verification
+    handleInputChange('email', value)
+  }
+
+  const handleVerifyEmail = () => {
+    if (!canVerifyEmail || emailStatus === 'verifying') return
+    setEmailStatus('verifying')
+    // No mail server in this build — simulate the provider round-trip.
+    setTimeout(() => setEmailStatus('verified'), 1200)
+  }
+
+  // Swap the leading dial code for the picked country's, keeping any digits typed.
+  const handleCountryChange = (country) => {
+    setPaymentData(prev => {
+      const nextCode = COUNTRY_DIAL_CODES[country] || ''
+      let rest = prev.phone.trim()
+      for (const code of ALL_DIAL_CODES) {
+        if (rest.startsWith(code)) {
+          rest = rest.slice(code.length).trim()
+          break
+        }
+      }
+      const phone = nextCode ? `${nextCode} ${rest}`.trimEnd() : rest
+      return { ...prev, countryRegion: country, phone }
+    })
   }
 
   const stripeReady = STRIPE_BILLING_PERIODS.has(billingPeriod)
@@ -174,11 +230,54 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="email">Email</label>
+                    <div className="email-verify-row">
+                      <input
+                        id="email"
+                        type="email"
+                        value={paymentData.email}
+                        onChange={(e) => handleEmailChange(e.target.value)}
+                        placeholder="you@example.com"
+                        required
+                      />
+                      {emailStatus === 'verified' ? (
+                        <span className="email-verified-badge">✓ Verified</span>
+                      ) : canVerifyEmail ? (
+                        <button
+                          type="button"
+                          className="verify-email-btn"
+                          onClick={handleVerifyEmail}
+                          disabled={emailStatus === 'verifying'}
+                        >
+                          {emailStatus === 'verifying' ? 'Verifying…' : 'Verify email'}
+                        </button>
+                      ) : null}
+                    </div>
+                    {canVerifyEmail && emailStatus === 'idle' && (
+                      <p className="field-description">
+                        We can confirm this {emailDomain} address before you subscribe.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="phone">Phone number</label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      value={paymentData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      placeholder="+63 912 345 6789"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="countryRegion">Country or region</label>
                     <select
                       id="countryRegion"
                       value={paymentData.countryRegion}
-                      onChange={(e) => handleInputChange('countryRegion', e.target.value)}
+                      onChange={(e) => handleCountryChange(e.target.value)}
                     >
                       <option value="Philippines">Philippines</option>
                       <option value="United States">United States</option>
@@ -215,12 +314,12 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                       For businesses only—Display your tax ID on your monthly invoice should you need it for business claims.
                     </p>
                     <div className="form-group">
-                      <label htmlFor="phoneNumber">Philippines tax identification Number</label>
+                      <label htmlFor="taxId">Philippines tax identification Number</label>
                       <input
-                        id="phoneNumber"
+                        id="taxId"
                         type="text"
-                        value={paymentData.phoneNumber}
-                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                        value={paymentData.taxId}
+                        onChange={(e) => handleInputChange('taxId', e.target.value)}
                         placeholder="123456789012"
                       />
                     </div>
@@ -244,8 +343,9 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                       tierId={tier.id}
                       billingPeriod={billingPeriod}
                       submitLabel={`Subscribe — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
-                      billingEmail={currentUser.email}
+                      billingEmail={paymentData.email || currentUser.email}
                       billingName={paymentData.fullName || currentUser.name}
+                      billingPhone={paymentData.phone}
                       onSuccess={handleSubscribeSuccess}
                     />
                   ) : (

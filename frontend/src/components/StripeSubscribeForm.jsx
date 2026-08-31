@@ -20,7 +20,7 @@ const CARD_ELEMENT_OPTIONS = {
 // fixed server-side), then confirms the first invoice's Payment Intent with
 // the card entered here. Card details go straight to Stripe via CardElement —
 // they never touch our server.
-function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billingName, onSuccess, onError }) {
+function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billingName, billingPhone, onSuccess, onError }) {
   const stripe = useStripe()
   const elements = useElements()
   const [submitting, setSubmitting] = useState(false)
@@ -53,7 +53,11 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
       const result = await stripe.confirmCardPayment(data.clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement),
-          billing_details: { name: billingName, email: billingEmail },
+          billing_details: {
+            name: billingName,
+            email: billingEmail,
+            ...(billingPhone ? { phone: billingPhone } : {}),
+          },
         },
       })
 

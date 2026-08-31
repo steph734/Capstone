@@ -6,11 +6,15 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  const { tierId, billingPeriod, email, name } = req.body || {}
+  if (!tierId || !billingPeriod || !email) {
+    return res.status(400).json({ error: 'Missing tierId, billingPeriod, or email' })
+  }
+
   try {
-    const { tierId, billingPeriod, email, name } = req.body || {}
     const result = await createSubscription({ tierId, billingPeriod, email, name })
     return res.status(200).json(result)
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    return res.status(400).json({ error: err.message })
   }
 }

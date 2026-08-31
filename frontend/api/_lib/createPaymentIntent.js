@@ -9,7 +9,7 @@ export async function createPaymentIntent() {
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not set on the server')
   }
-  const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
   const paymentIntent = await stripe.paymentIntents.create({
     amount: AMOUNT_DUE_NOW_CENTAVOS,
     currency: CURRENCY,

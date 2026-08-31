@@ -20,7 +20,7 @@ export async function createSubscription({ tierId, billingPeriod, email, name })
     throw new Error('Missing billing email')
   }
 
-  const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
   // Reuse an existing customer for this email if one exists, otherwise create one.
   const existing = await stripe.customers.list({ email, limit: 1 })

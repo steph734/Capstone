@@ -33,11 +33,18 @@ export async function createSubscription({ tierId, billingPeriod, email, name })
     items: [{ price: priceId }],
     payment_behavior: 'default_incomplete',
     payment_settings: { save_default_payment_method: 'on_subscription' },
-    expand: ['latest_invoice.payment_intent'],
+    // Invoice.payment_intent was removed from the API — the PaymentIntent's
+    // client_secret now lives under Invoice.confirmation_secret instead.
+    expand: ['latest_invoice.confirmation_secret'],
   })
+
+  const clientSecret = subscription.latest_invoice?.confirmation_secret?.client_secret
+  if (!clientSecret) {
+    throw new Error('Stripe did not return a client secret for this subscription')
+  }
 
   return {
     subscriptionId: subscription.id,
-    clientSecret: subscription.latest_invoice.payment_intent.client_secret,
+    clientSecret,
   }
 }

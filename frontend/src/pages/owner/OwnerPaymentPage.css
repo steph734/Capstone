@@ -349,6 +349,8 @@
 }
 
 .checkbox-group input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: auto;
   width: 18px;
   height: 18px;
   margin: 0;

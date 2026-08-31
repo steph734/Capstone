@@ -164,6 +164,19 @@ button {
   appearance: none;
 }
 
+/* This app only implements a light palette (plus one manual prefers-color-scheme
+   fallback above) — it never adapted its custom-styled controls for OS/browser
+   forced-colors (Windows High Contrast) mode. Combined with appearance:none above,
+   that left checkboxes rendering with zero visual feedback and text inputs losing
+   their intended colors under forced-colors, even though they stayed interactive.
+   Opt custom-styled controls back out of forced-colors so our own colors hold. */
+input,
+textarea,
+select,
+button {
+  forced-color-adjust: none;
+}
+
 /* Better focus states for accessibility */
 button:focus-visible,
 a:focus-visible,

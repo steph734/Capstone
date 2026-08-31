@@ -4,8 +4,7 @@ import PatientSidebar from '../../components/PatientSidebar'
 import StripeSubscribeForm from '../../components/StripeSubscribeForm'
 import './OwnerPaymentPage.css'
 
-// Only monthly Stripe Prices exist so far (see api/_lib/createSubscription.js).
-const STRIPE_BILLING_PERIODS = new Set(['monthly'])
+const STRIPE_BILLING_PERIODS = new Set(['monthly', 'yearly'])
 
 function ArrowLeftIcon() {
   return (
@@ -244,14 +243,14 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                     <StripeSubscribeForm
                       tierId={tier.id}
                       billingPeriod={billingPeriod}
-                      submitLabel={`Subscribe — ₱${price}.00/month`}
+                      submitLabel={`Subscribe — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
                       billingEmail={currentUser.email}
                       billingName={paymentData.fullName || currentUser.name}
                       onSuccess={handleSubscribeSuccess}
                     />
                   ) : (
                     <p className="field-description">
-                      Yearly billing isn't set up yet — please choose Monthly to subscribe right now.
+                      This billing period isn't set up yet — please choose Monthly or Yearly to subscribe right now.
                     </p>
                   )}
                 </div>

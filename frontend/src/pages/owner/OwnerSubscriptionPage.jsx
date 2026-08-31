@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
 import OwnerPaymentPage from './OwnerPaymentPage'
+import PaymentHistoryModal from '../../components/PaymentHistoryModal'
+import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
 import '../SubscriptionPage.css'
 
 function MenuIcon() {
@@ -40,33 +42,10 @@ function ClockIcon() {
   )
 }
 
-function UsersIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  )
-}
-
 function ChevronRightIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
-}
-
-function GiftIcon() {
-  return (
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <polyline points="20 12 20 22 4 22 4 12" />
-      <rect x="2" y="7" width="20" height="5" />
-      <line x1="12" y1="22" x2="12" y2="7" />
-      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
     </svg>
   )
 }
@@ -83,7 +62,9 @@ function PlusIcon() {
 export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBetaActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
+  const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history'
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
+  const billingEmail = currentUser.email
 
   const subscriptionTiers = [
     {
@@ -170,20 +151,14 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
   }
 
   const handleUpdatePayment = () => {
-    console.log('Update payment method')
+    setActiveModal('update-payment')
   }
 
   const handlePaymentHistory = () => {
-    console.log('Payment history')
+    setActiveModal('payment-history')
   }
 
-  const handleManageProfiles = () => {
-    console.log('Manage profiles')
-  }
-
-  const handleAddFamilyMember = () => {
-    console.log('Add family member')
-  }
+  const closeModal = () => setActiveModal(null)
 
   // If a tier is selected for payment, show the payment page
   if (selectedTierForPayment) {
@@ -300,20 +275,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
           </div>
         </section>
 
-        <section className="plan-details-section">
-          <div className="plan-details-card">
-            <div className="plan-details-content">
-              <h2 className="plan-details-title">Current Plan Details</h2>
-              <p className="plan-details-text">Current usage of the Free Plan</p>
-              <p className="plan-details-amount">Amount: <strong>FREE</strong></p>
-            </div>
-            <div className="plan-details-icon">
-              <GiftIcon />
-              <button className="explore-btn">Explore Gold</button>
-            </div>
-          </div>
-        </section>
-
         <section className="manage-section">
           <h2 className="section-title">Manage Subscriptions</h2>
 
@@ -335,40 +296,20 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
             </button>
           </div>
         </section>
-
-        <section className="family-section">
-          <h2 className="section-title">Family Access</h2>
-
-          <div className="family-card">
-            <div className="family-info">
-              <div className="family-count">
-                <UsersIcon />
-                <div>
-                  <h3>3 Children Profiles</h3>
-                  <p>Manage access for your family</p>
-                </div>
-              </div>
-              <button className="manage-profiles-btn" onClick={handleManageProfiles}>
-                Manage Profiles
-              </button>
-            </div>
-
-            <button className="add-family-btn" onClick={handleAddFamilyMember}>
-              <div className="family-avatars">
-                <span className="avatar-icon">👧</span>
-                <span className="avatar-icon">👦</span>
-                <span className="avatar-icon">👶</span>
-              </div>
-              <div className="add-family-text">
-                <h4>Add Family Member</h4>
-                <p>Up to 5 profiles total</p>
-              </div>
-              <ChevronRightIcon />
-            </button>
-          </div>
-        </section>
       </div>
     </div>
+
+    {activeModal === 'update-payment' && (
+      <UpdatePaymentMethodModal
+        email={billingEmail}
+        name={currentUser.name}
+        onClose={closeModal}
+      />
+    )}
+
+    {activeModal === 'payment-history' && (
+      <PaymentHistoryModal email={billingEmail} onClose={closeModal} />
+    )}
     </div>
   )
 }

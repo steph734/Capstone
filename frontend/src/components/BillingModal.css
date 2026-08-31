@@ -1,0 +1,225 @@
+.billing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 38, 31, 0.55);
+  backdrop-filter: blur(2px);
+  animation: billing-modal-fade 0.2s ease;
+}
+
+.billing-modal {
+  background: #fff;
+  border-radius: 20px;
+  width: min(560px, 100%);
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(20, 38, 31, 0.3);
+  animation: billing-modal-pop 0.25s ease;
+}
+
+.billing-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e8f5f0;
+}
+
+.billing-modal-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin: 0;
+}
+
+.billing-modal-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7c75;
+}
+
+.billing-modal-close {
+  flex-shrink: 0;
+  background: #f8faf9;
+  border: 2px solid #e8f5f0;
+  color: #4a6b5d;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.billing-modal-close:hover {
+  background: #e8f5f0;
+  border-color: #4a6b5d;
+}
+
+.billing-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+}
+
+/* --- Payment history list --- */
+.payment-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.payment-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 2px solid #e8f5f0;
+  border-radius: 12px;
+  background: #f8faf9;
+}
+
+.payment-row-main {
+  font-weight: 600;
+  color: #2c4a3e;
+  font-size: 14px;
+}
+
+.payment-row-amount {
+  font-weight: 700;
+  color: #2c4a3e;
+  font-size: 15px;
+  text-align: right;
+}
+
+.payment-row-sub {
+  font-size: 12px;
+  color: #6b7c75;
+}
+
+.payment-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.payment-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.payment-status.succeeded { background: #e3f4ea; color: #1c7a45; }
+.payment-status.pending { background: #fff4d6; color: #8b6e00; }
+.payment-status.failed { background: #fee2e2; color: #991b1b; }
+.payment-status.refunded { background: #eef0f2; color: #4b5563; }
+
+.payment-receipt-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c4a3e;
+  text-decoration: underline;
+}
+
+.billing-modal-empty,
+.billing-modal-loading,
+.billing-modal-error {
+  text-align: center;
+  padding: 32px 16px;
+  color: #6b7c75;
+  font-size: 14px;
+}
+
+.billing-modal-error { color: #991b1b; }
+
+/* --- Update payment method form --- */
+.billing-modal-body .ssf-card-box {
+  border: 2px solid #e8f5f0;
+  background: #f8faf9;
+}
+
+.update-pm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.update-pm-btn {
+  flex: 1;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.update-pm-btn.primary {
+  background: #2c4a3e;
+  color: #fff;
+  border: none;
+}
+
+.update-pm-btn.primary:hover:not(:disabled) { background: #3d5a50; }
+.update-pm-btn.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.update-pm-btn.secondary {
+  background: #f8faf9;
+  color: #2c4a3e;
+  border: 2px solid #e8f5f0;
+}
+
+.update-pm-btn.secondary:hover { background: #e8f5f0; }
+
+.update-pm-success {
+  text-align: center;
+  padding: 16px 8px 4px;
+}
+
+.update-pm-success .success-check {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #e8f5f0;
+  color: #2c4a3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-pm-success h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #2c4a3e;
+}
+
+.update-pm-success p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7c75;
+}
+
+@keyframes billing-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes billing-modal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

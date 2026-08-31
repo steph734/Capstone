@@ -1,6 +1,6 @@
-const { createSubscription } = require('./_lib/createSubscription')
+import { createSubscription } from './_lib/createSubscription.js'
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed' })

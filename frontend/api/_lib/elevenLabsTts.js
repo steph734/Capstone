@@ -4,7 +4,7 @@ const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech'
 const DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'
 const DEFAULT_MODEL_ID = 'eleven_turbo_v2_5'
 
-async function synthesizeSpeech(text) {
+export async function synthesizeSpeech(text) {
   const apiKey = process.env.ELEVENLABS_API_KEY
   if (!apiKey) {
     throw new Error('ELEVENLABS_API_KEY is not set on the server')
@@ -39,5 +39,3 @@ async function synthesizeSpeech(text) {
 
   return Buffer.from(await response.arrayBuffer())
 }
-
-module.exports = { synthesizeSpeech }

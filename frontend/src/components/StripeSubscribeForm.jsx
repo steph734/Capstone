@@ -63,6 +63,20 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
 
       if (result.error) throw new Error(result.error.message)
       if (result.paymentIntent.status === 'succeeded') {
+        // Email the receipt to the address the user entered. Fire-and-forget:
+        // the payment already went through, so a mail hiccup must not block
+        // the success screen. The endpoint re-verifies the PaymentIntent at
+        // Stripe before it sends anything.
+        fetch('/api/send-receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: billingEmail,
+            name: billingName,
+            paymentIntentId: result.paymentIntent.id,
+          }),
+        }).catch((e) => console.warn('Receipt email could not be sent:', e))
+
         onSuccess?.({ subscriptionId: data.subscriptionId, paymentIntent: result.paymentIntent })
       } else {
         throw new Error(`Payment ${result.paymentIntent.status}. Please try a different card.`)

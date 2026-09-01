@@ -74,7 +74,8 @@
   pointer-events: none;
 }
 
-.signup-form .input-wrapper input {
+.signup-form .input-wrapper input,
+.signup-form .input-wrapper select {
   width: 100%;
   padding: 14px 44px 14px 42px;
   border: 1px solid #e0e8e3;
@@ -87,11 +88,17 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.signup-form .input-wrapper select {
+  appearance: none;
+  cursor: pointer;
+}
+
 .signup-form .input-wrapper input::placeholder {
   color: #b0bdb5;
 }
 
-.signup-form .input-wrapper input:focus {
+.signup-form .input-wrapper input:focus,
+.signup-form .input-wrapper select:focus {
   border-color: #5a7a6d;
   box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.12);
 }

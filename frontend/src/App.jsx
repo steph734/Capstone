@@ -131,6 +131,9 @@ function App() {
     }
   })
   const [ownerBetaTier, setOwnerBetaTier] = useState(() => localStorage.getItem('betaTier') || null)
+  // The paid, active subscription tier ('silver' | 'gold' | null). Set once a
+  // Stripe payment succeeds; supersedes the beta preview flag above.
+  const [ownerActivePlan, setOwnerActivePlan] = useState(() => localStorage.getItem('activePlan') || null)
 
   useEffect(() => {
     applyAccessibilityPrefs(loadAccessibilityPrefs())
@@ -142,6 +145,18 @@ function App() {
       localStorage.setItem('betaTier', tier)
     } else {
       localStorage.removeItem('betaTier')
+    }
+  }
+
+  const handleOwnerPlanActivate = (tier) => {
+    setOwnerActivePlan(tier)
+    if (tier) {
+      localStorage.setItem('activePlan', tier)
+      // A paid plan replaces the beta preview — drop the beta tags/features.
+      setOwnerBetaTier(null)
+      localStorage.removeItem('betaTier')
+    } else {
+      localStorage.removeItem('activePlan')
     }
   }
 
@@ -340,7 +355,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onBetaActivate={handleOwnerBetaActivate} />
+                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onBetaActivate={handleOwnerBetaActivate} activePlan={ownerActivePlan} onPlanActivate={handleOwnerPlanActivate} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

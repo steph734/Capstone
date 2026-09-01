@@ -61,10 +61,23 @@ function LockIcon() {
   )
 }
 
+function BadgeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <circle cx="12" cy="10" r="2.5" />
+      <path d="M8 17c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5" />
+    </svg>
+  )
+}
+
+const ROLES = ['Therapist', 'Patient']
+
 export default function SignUp({ onLogoClick, onLoginClick }) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [socialProvider, setSocialProvider] = useState(null)
+  const [role, setRole] = useState('')
 
   const handleSocialSuccess = () => {
     setSocialProvider(null)
@@ -121,6 +134,23 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
                 placeholder="Enter your email"
                 autoComplete="email"
               />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="role">Role</label>
+            <div className="input-wrapper">
+              <span className="input-icon"><BadgeIcon /></span>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+              >
+                <option value="" disabled>Select your role</option>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
             </div>
           </div>
 

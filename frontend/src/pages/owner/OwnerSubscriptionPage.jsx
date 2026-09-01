@@ -59,14 +59,17 @@ function PlusIcon() {
   )
 }
 
-export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBetaActivate }) {
+export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBetaActivate, activePlan, onPlanActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
   const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history'
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
 
-  const subscriptionTiers = [
+  // 'free' is the plan when no paid subscription is active.
+  const activeTierId = activePlan || 'free'
+
+  const subscriptionTiersRaw = [
     {
       id: 'free',
       name: 'THERAPYPRO: FREE',
@@ -124,6 +127,12 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
     }
   ]
 
+  // The active plan drives which card shows as "current" / unlocked.
+  const subscriptionTiers = subscriptionTiersRaw.map((tier) => ({
+    ...tier,
+    current: tier.id === activeTierId,
+  }))
+
   const betaFeatures = {
     silver: [
       { id: 'speech-to-text', label: 'Speech to Text', icon: '🎤' },
@@ -169,6 +178,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
         selectedTier={selectedTierForPayment}
         onBack={handleBackFromPayment}
         betaTier={betaTier}
+        activePlan={activePlan}
+        onPlanActivate={onPlanActivate}
       />
     )
   }
@@ -180,7 +191,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        menuItems={getOwnerMenuItems(betaTier)}
+        menuItems={getOwnerMenuItems(betaTier, activePlan)}
         bottomMenuItems={[]}
         profileRoleLabel="Owner"
       />
@@ -224,7 +235,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
                 {tier.badge && (
                   <div className="tier-badge">{tier.badge}</div>
                 )}
-                {betaTier === tier.id && (
+                {!activePlan && betaTier === tier.id && (
                   <div className="tier-beta-tag">BETA</div>
                 )}
                 {!tier.current && (
@@ -250,7 +261,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
                   ))}
                 </ul>
 
-                {!tier.current && betaFeatures[tier.id] && (
+                {!activePlan && !tier.current && betaFeatures[tier.id] && (
                   <button
                     className={`beta-button ${betaTier === tier.id ? 'beta-button-active' : ''}`}
                     onClick={() => onBetaActivate && onBetaActivate(betaTier === tier.id ? null : tier.id)}
@@ -260,7 +271,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
                 )}
                 {tier.current ? (
                   <button className="tier-button current-button" disabled>
-                    Current Plan
+                    {tier.id === 'free' ? 'Current Plan' : 'Active Plan'}
                   </button>
                 ) : (
                   <button

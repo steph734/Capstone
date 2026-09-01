@@ -63,7 +63,7 @@ function CheckIcon() {
   )
 }
 
-export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack, betaTier }) {
+export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack, betaTier, activePlan, onPlanActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState('monthly')
   const [paymentData, setPaymentData] = useState({
@@ -146,6 +146,9 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
 
   const handleSubscribeSuccess = () => {
     setPaymentStatus('success')
+    // Mark this tier as the active paid plan — unlocks sidebar features and
+    // flips the tier card to "Active Plan" once we're back on the tiers page.
+    if (onPlanActivate) onPlanActivate(tier.id)
   }
 
   const handleGoBack = () => {
@@ -161,7 +164,7 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        menuItems={getOwnerMenuItems(betaTier)}
+        menuItems={getOwnerMenuItems(betaTier, activePlan)}
         bottomMenuItems={[]}
         profileRoleLabel="Owner"
       />

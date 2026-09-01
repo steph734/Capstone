@@ -211,6 +211,16 @@
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
 
+.tier-silver.current-tier {
+  border-color: #4a6b5d;
+  box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.25);
+}
+
+.tier-gold.current-tier {
+  border-color: #f4c430;
+  box-shadow: 0 0 0 3px rgba(244, 196, 48, 0.3), 0 8px 20px rgba(244, 196, 48, 0.25);
+}
+
 .tier-badge {
   position: absolute;
   top: -12px;

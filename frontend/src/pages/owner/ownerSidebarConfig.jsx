@@ -91,8 +91,21 @@ const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities',
 
 export const ownerMenuItems = BASE_OWNER_MENU_ITEMS
 
-export function getOwnerMenuItems(betaTier) {
-  if (betaTier === 'gold') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
-  if (betaTier === 'silver') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM]
+const TIER_RANK = { silver: 1, gold: 2 }
+
+// Resolve which tier's features are unlocked. A paid `activePlan` always counts;
+// `betaTier` is the preview flag. When `activePlan` isn't passed we fall back to
+// the persisted value so every owner page unlocks without extra prop plumbing.
+function resolveUnlockedTier(betaTier, activePlan) {
+  const paid = activePlan ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('activePlan') : null)
+  const candidates = [betaTier, paid].filter((t) => TIER_RANK[t])
+  if (!candidates.length) return null
+  return candidates.reduce((best, t) => (TIER_RANK[t] > TIER_RANK[best] ? t : best))
+}
+
+export function getOwnerMenuItems(betaTier, activePlan) {
+  const tier = resolveUnlockedTier(betaTier, activePlan)
+  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
+  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM]
   return BASE_OWNER_MENU_ITEMS
 }

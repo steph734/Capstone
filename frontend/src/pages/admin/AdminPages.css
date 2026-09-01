@@ -9,6 +9,25 @@
   gap: 16px;
 }
 
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-header-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #e6f5f2;
+  font-size: 17px;
+}
+
 .admin-header-badge {
   display: flex;
   align-items: center;

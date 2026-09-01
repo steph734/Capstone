@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
 import OwnerPaymentPage from './OwnerPaymentPage'
@@ -59,7 +60,37 @@ function PlusIcon() {
   )
 }
 
+function PencilIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+function DiamondIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h12l4 6-10 12L2 9Z" />
+      <path d="M2 9h20" />
+      <path d="m10 3-2 6 4 12 4-12-2-6" />
+    </svg>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
 export default function OwnerSubscriptionPage({ user, onLogout, betaTier, activePlan, onPlanActivate }) {
+  const navigate = useNavigate()
+  const tiersRef = useRef(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
   const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history'
@@ -133,6 +164,14 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     current: tier.id === activeTierId,
   }))
 
+  const activeTier = subscriptionTiers.find((tier) => tier.id === activeTierId) || subscriptionTiers[0]
+  const isPaidPlan = activeTierId !== 'free'
+  // "THERAPYPRO: GOLD" -> "Gold"
+  const planShortName = (activeTier.name.split(': ')[1] || activeTier.name)
+  const planLabel = planShortName.charAt(0) + planShortName.slice(1).toLowerCase()
+  const nextBillDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
   const handleSelectPlan = (planId) => {
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
     if (selectedTier && !selectedTier.current) {
@@ -144,8 +183,12 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     setSelectedTierForPayment(null)
   }
 
-  const handleAddSubscription = () => {
-    console.log('Add subscription')
+  const scrollToTiers = () => {
+    tiersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleEditPersonalInfo = () => {
+    navigate('/owner/profile')
   }
 
   const handleUpdatePayment = () => {
@@ -154,6 +197,12 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
   const handlePaymentHistory = () => {
     setActiveModal('payment-history')
+  }
+
+  const handleCancelSubscription = () => {
+    if (window.confirm('Cancel your subscription and move back to the Free plan?')) {
+      onPlanActivate && onPlanActivate(null)
+    }
   }
 
   const closeModal = () => setActiveModal(null)
@@ -200,7 +249,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
             <p className="subscription-subtitle">Manage your subscription plan</p>
           </div>
           <div className="header-actions">
-            <button className="add-subscription-btn" onClick={handleAddSubscription}>
+            <button className="add-subscription-btn" onClick={scrollToTiers}>
               <PlusIcon />
               <span>Add Subscription</span>
             </button>
@@ -212,7 +261,70 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
         </div>
 
         <div className="subscription-content">
-        <section className="tiers-section">
+        <section className="plan-overview">
+          <div className="plan-hero">
+            <span className="plan-hero-badge">Your plan</span>
+            <div className="plan-hero-brand">
+              <img src="/therapy-pro-logo.png" alt="" />
+              <span>THERAPYPRO</span>
+            </div>
+            <h2 className="plan-hero-name">{planLabel}</h2>
+            {isPaidPlan ? (
+              <>
+                <p className="plan-hero-meta">
+                  Your next bill is for <strong>₱{activeTier.monthlyPrice}.00</strong> on {nextBillDate}.
+                </p>
+                <p className="plan-hero-payment">Billed to {billingEmail}</p>
+              </>
+            ) : (
+              <p className="plan-hero-meta">You&rsquo;re on the Free plan &mdash; no billing.</p>
+            )}
+          </div>
+
+          <div className="plan-hero-actions">
+            <button className="plan-hero-action" onClick={handleEditPersonalInfo}>
+              <PencilIcon />
+              <span>Edit personal info</span>
+            </button>
+            {isPaidPlan && (
+              <button className="plan-hero-action" onClick={handleUpdatePayment}>
+                <CreditCardIcon />
+                <span>Update card</span>
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="plan-links-section">
+          <h2 className="section-title">Your {planLabel}</h2>
+          <div className="plan-links">
+            <button className="plan-link-row" onClick={scrollToTiers}>
+              <span className="plan-link-icon"><DiamondIcon /></span>
+              <span className="plan-link-label">Available subscriptions</span>
+              <ChevronRightIcon />
+            </button>
+            <button className="plan-link-row" onClick={handlePaymentHistory}>
+              <span className="plan-link-icon"><ClockIcon /></span>
+              <span className="plan-link-label">Manage your subscription</span>
+              <ChevronRightIcon />
+            </button>
+            {isPaidPlan ? (
+              <button className="plan-link-row danger" onClick={handleCancelSubscription}>
+                <span className="plan-link-icon"><XIcon /></span>
+                <span className="plan-link-label">Cancel subscription</span>
+                <ChevronRightIcon />
+              </button>
+            ) : (
+              <button className="plan-link-row" onClick={scrollToTiers}>
+                <span className="plan-link-icon"><PlusIcon /></span>
+                <span className="plan-link-label">Upgrade your plan</span>
+                <ChevronRightIcon />
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="tiers-section" ref={tiersRef}>
           <h2 className="section-title">Subscription Tiers</h2>
 
           <div className="tiers-grid">
@@ -261,28 +373,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
                 )}
               </div>
             ))}
-          </div>
-        </section>
-
-        <section className="manage-section">
-          <h2 className="section-title">Manage Subscriptions</h2>
-
-          <div className="manage-actions">
-            <button className="manage-btn" onClick={handleUpdatePayment}>
-              <div className="manage-btn-icon">
-                <CreditCardIcon />
-              </div>
-              <span className="manage-btn-text">Update Payment Method</span>
-              <ChevronRightIcon />
-            </button>
-
-            <button className="manage-btn" onClick={handlePaymentHistory}>
-              <div className="manage-btn-icon">
-                <ClockIcon />
-              </div>
-              <span className="manage-btn-text">Payment History</span>
-              <ChevronRightIcon />
-            </button>
           </div>
         </section>
       </div>

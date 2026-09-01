@@ -75,7 +75,14 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
             name: billingName,
             paymentIntentId: result.paymentIntent.id,
           }),
-        }).catch((e) => console.warn('Receipt email could not be sent:', e))
+        })
+          .then(async (r) => {
+            if (!r.ok) {
+              const body = await r.json().catch(() => ({}))
+              console.warn('Receipt email was not sent:', body.error || `HTTP ${r.status}`)
+            }
+          })
+          .catch((e) => console.warn('Receipt email request failed:', e))
 
         onSuccess?.({ subscriptionId: data.subscriptionId, paymentIntent: result.paymentIntent })
       } else {

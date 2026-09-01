@@ -8,6 +8,55 @@
   margin: 0;
 }
 
+/* ── Toolbar ──────────────────────────────────────────────── */
+.orp-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.orp-daterange {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: #fff;
+  border: 1px solid #e0eae4;
+  border-radius: 10px;
+  color: #6b7c75;
+  cursor: pointer;
+}
+
+.orp-daterange select {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+  outline: none;
+  cursor: pointer;
+}
+
+.orp-btn-download-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #2f6f4f;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+}
+.orp-btn-download-all:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
 /* ── Stat cards ───────────────────────────────────────────── */
 .orp-stats-grid {
   display: grid;
@@ -21,7 +70,7 @@
   border-radius: 16px;
   padding: 18px 20px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -61,6 +110,22 @@
   margin-top: 2px;
 }
 
+.orp-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.orp-stat-delta.up { color: #16a34a; }
+.orp-stat-delta.down { color: #dc2626; }
+.orp-stat-delta.down svg { transform: rotate(90deg); }
+.orp-stat-delta-note {
+  color: #9aab9f;
+  font-weight: 600;
+}
+
 /* ── Report Card Grid ─────────────────────────────────────── */
 .orp-grid {
   display: grid;
@@ -91,7 +156,17 @@
   gap: 10px;
 }
 
-.orp-card-head-icon { font-size: 18px; }
+.orp-card-head-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: #f0f7f4;
+  flex-shrink: 0;
+}
 
 .orp-card-title {
   margin: 0;
@@ -148,12 +223,25 @@
   transition: filter 0.15s, transform 0.15s;
   flex: 1;
 }
-.orp-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.orp-btn:hover { transform: translateY(-1px); }
 .orp-btn:active { transform: translateY(0); }
 
-.orp-btn-csv { background: #f59e0b; color: #fff; }
-.orp-btn-pdf { background: #ef4444; color: #fff; }
-.orp-btn-view { background: #4a6b5d; color: #fff; }
+.orp-btn-csv,
+.orp-btn-pdf {
+  background: #f1f5f3;
+  color: #3d5a50;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+}
+.orp-btn-csv:hover,
+.orp-btn-pdf:hover { background: #e6eee9; }
+
+.orp-btn-view {
+  background: #fff;
+  color: #2c4a3e;
+  border: 1px solid #cddbd4;
+}
+.orp-btn-view:hover { background: #f4faf7; }
 .orp-btn:disabled, .orp-btn-lg:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; filter: none !important; }
 
 /* ── Full Export card ─────────────────────────────────────── */
@@ -210,6 +298,48 @@
 
 .orp-btn-csv-lg { background: #16a34a; color: #fff; }
 .orp-btn-pdf-lg { background: #ef4444; color: #fff; }
+
+/* ── Bottom row: Full Export + Custom Builder ─────────────── */
+.orp-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.orp-bottom-card {
+  position: relative;
+  overflow: hidden;
+}
+.orp-bottom-card > *:not(.orp-card-decor) {
+  position: relative;
+  z-index: 1;
+}
+
+.orp-card-decor {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.orp-btn-build {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 1px solid #cddbd4;
+  border-radius: 12px;
+  background: #fff;
+  color: #2c4a3e;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+.orp-btn-build:hover { background: #f4faf7; transform: translateY(-1px); }
 
 /* ── Drill-down modal ─────────────────────────────────────── */
 .orp-modal-backdrop {
@@ -589,12 +719,23 @@
   .orp-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+@media (max-width: 900px) {
+  .orp-bottom-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .orp-card-decor { display: none; }
+}
+
 @media (max-width: 768px) {
   .orp-stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .orp-stat-card { padding: 14px; }
   .orp-stat-value { font-size: 18px; }
+  .orp-toolbar { justify-content: stretch; }
+  .orp-daterange { flex: 1; }
   .orp-fullexport-actions { flex-direction: column; align-items: stretch; }
-  .orp-card-actions { flex-direction: column; align-items: stretch; }
+  .orp-card-actions { flex-wrap: wrap; }
+  .orp-btn-view { flex: 1 0 100%; }
   .orp-filter-row { flex-direction: column; align-items: stretch; }
   .orp-filter-grow { min-width: unset; }
   .orp-schedule-form { flex-direction: column; align-items: stretch; }

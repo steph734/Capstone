@@ -63,7 +63,6 @@ const GROWTH_DATA = [
   { month: 'Jul 2026', newPatients: 18, total: 262, growth: '+7.4%' },
 ]
 const totalPatients = GROWTH_DATA[GROWTH_DATA.length - 1].total
-const newThisMonth = GROWTH_DATA[GROWTH_DATA.length - 1].newPatients
 
 // ── Service Popularity ───────────────────────────────────────
 const SERVICE_BOOKINGS = {
@@ -99,17 +98,19 @@ const STAFF_EFFICIENCY_DATA = [
 const avgEfficiency = Math.round(STAFF_EFFICIENCY_DATA.reduce((s, r) => s + r.rate, 0) / STAFF_EFFICIENCY_DATA.length)
 const STAFF_EFFICIENCY_TREND = [86, 87, 89, 90, 91, avgEfficiency]
 
-const REVENUE_STATS = [
-  { icon: 'coins', color: 'blue', value: fmtPeso(totalGross), label: 'Total Collected (6mo)' },
-  { icon: 'check', color: 'green', value: fmtPeso(totalPaid), label: 'Paid' },
-  { icon: 'clock', color: 'amber', value: fmtPeso(totalOutstanding), label: 'Outstanding' },
-  { icon: 'trend', color: 'purple', value: REVENUE_DATA[REVENUE_DATA.length - 1].growth, label: 'Latest Growth' },
+const COMPARE_LABEL = 'vs Aug 1 – Aug 31'
+const DATE_RANGES = [
+  { key: 'sep', label: 'Sep 1 – Sep 30, 2026' },
+  { key: 'aug', label: 'Aug 1 – Aug 31, 2026' },
+  { key: 'q3', label: 'Jul 1 – Sep 30, 2026' },
+  { key: '6mo', label: 'Feb 1 – Jul 31, 2026' },
 ]
-const PEOPLE_STATS = [
-  { icon: 'people', color: 'pink', value: totalPatients, label: 'Total Patients' },
-  { icon: 'chart', color: 'blue', value: `${avgAttendance}%`, label: 'Avg Staff Attendance' },
-  { icon: 'calendar', color: 'indigo', value: newThisMonth, label: 'New Patients This Month' },
-  { icon: 'staff', color: 'green', value: ATTENDANCE_DATA.length, label: 'Total Staff' },
+
+const SUMMARY_STATS = [
+  { icon: 'coins', color: 'green', value: fmtPeso(totalGross), label: 'Total Collected (Gross)', delta: '12.4%', dir: 'up' },
+  { icon: 'card', color: 'blue', value: fmtPeso(totalPaid), label: 'Paid', delta: '8.7%', dir: 'up' },
+  { icon: 'clock', color: 'amber', value: fmtPeso(totalOutstanding), label: 'Outstanding', delta: '3.2%', dir: 'up' },
+  { icon: 'trend', color: 'purple', value: REVENUE_DATA[REVENUE_DATA.length - 1].growth, label: 'Latest Growth', delta: '7.5%', dir: 'up' },
 ]
 
 // ── Unified report definitions ───────────────────────────────
@@ -391,6 +392,7 @@ function DrilldownModal({ report, onClose, onExport }) {
 
 /* ── Custom Report Builder ────────────────────────────────── */
 function CustomReportBuilder({ onExport }) {
+  const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState(['revenue', 'attendance', 'growth'])
 
   const toggle = (id) => {
@@ -409,26 +411,46 @@ function CustomReportBuilder({ onExport }) {
   }
 
   return (
-    <div className="orp-fullexport-card">
-      <div className="orp-fullexport-head">
-        <span className="orp-card-head-icon">🛠️</span>
-        <h3 className="orp-fullexport-title">Custom Report Builder</h3>
+    <>
+      <div className="orp-fullexport-card orp-bottom-card">
+        <DecorGraphic variant="gear" />
+        <div className="orp-fullexport-head">
+          <span className="orp-card-head-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>⚙️</span>
+          <h3 className="orp-fullexport-title">Custom Report Builder</h3>
+        </div>
+        <p className="orp-fullexport-detail">Pick the metrics to combine into a single file — mix staff performance, revenue, or any report above.</p>
+        <button className="orp-btn-build" onClick={() => setOpen(true)}><FileIcon /> Build Custom Report</button>
       </div>
-      <p className="orp-fullexport-detail">Pick the metrics to combine into a single file — mix staff performance, revenue, or any report above.</p>
-      <div className="orp-checkbox-row">
-        {REPORTS.map((r) => (
-          <label key={r.id} className={`orp-checkbox-chip ${selected.includes(r.id) ? 'checked' : ''}`}>
-            <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} />
-            {r.icon} {r.title}
-          </label>
-        ))}
-      </div>
-      {selected.length === 0 && <p className="orp-hint">Select at least one metric to generate a report.</p>}
-      <div className="orp-fullexport-actions">
-        <button className="orp-btn-lg orp-btn-csv-lg" disabled={selected.length === 0} onClick={handleCSV}>Generate CSV</button>
-        <button className="orp-btn-lg orp-btn-pdf-lg" disabled={selected.length === 0} onClick={handlePDF}>Generate PDF</button>
-      </div>
-    </div>
+
+      {open && (
+        <div className="orp-modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="orp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="orp-modal-header">
+              <div>
+                <h3>🛠️ Custom Report Builder</h3>
+                <p>Select the metrics to combine into a single file.</p>
+              </div>
+              <button className="orp-modal-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="orp-modal-body">
+              <div className="orp-checkbox-row">
+                {REPORTS.map((r) => (
+                  <label key={r.id} className={`orp-checkbox-chip ${selected.includes(r.id) ? 'checked' : ''}`}>
+                    <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} />
+                    {r.icon} {r.title}
+                  </label>
+                ))}
+              </div>
+              {selected.length === 0 && <p className="orp-hint">Select at least one metric to generate a report.</p>}
+              <div className="orp-fullexport-actions" style={{ marginTop: 16 }}>
+                <button className="orp-btn-lg orp-btn-csv-lg" disabled={selected.length === 0} onClick={handleCSV}>Generate CSV</button>
+                <button className="orp-btn-lg orp-btn-pdf-lg" disabled={selected.length === 0} onClick={handlePDF}>Generate PDF</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -549,6 +571,7 @@ export default function OwnerReportsPage({ user, onLogout, betaTier }) {
   const [toast, setToast] = useState('')
   const [viewing, setViewing] = useState(null)
   const [downloads, setDownloads] = useState([])
+  const [dateRange, setDateRange] = useState('sep')
 
   const showToast = (msg) => {
     setToast(msg)
@@ -592,81 +615,93 @@ export default function OwnerReportsPage({ user, onLogout, betaTier }) {
     showToast('Full report exported as PDF')
     logExport('Full Report', 'PDF')
   }
+  const handleDownloadAll = () => {
+    handleFullCSV()
+    handleFullPDF()
+    showToast('All reports exported')
+  }
 
   return (
     <OwnerPageShell
       user={user}
       onLogout={onLogout}
       title="Reports"
-      subtitle="See performance summaries and trends"
+      subtitle="See performance summaries and trends across your therapy practice"
       icon="📑"
       menuItems={getOwnerMenuItems(betaTier)}
     >
-      <p className="orp-section-label">Revenue Overview</p>
+      <div className="orp-toolbar">
+        <label className="orp-daterange">
+          <CalendarIcon />
+          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            {DATE_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </label>
+        <button className="orp-btn-download-all" onClick={handleDownloadAll}>
+          <DownloadIcon /> Download All
+        </button>
+      </div>
+
       <div className="orp-stats-grid">
-        {REVENUE_STATS.map((s) => (
+        {SUMMARY_STATS.map((s) => (
           <div key={s.label} className="orp-stat-card">
             <div className={`orp-stat-icon ${s.color}`}><StatIcon name={s.icon} /></div>
             <div className="orp-stat-info">
               <span className="orp-stat-value">{s.value}</span>
               <span className="orp-stat-label">{s.label}</span>
+              <span className={`orp-stat-delta ${s.dir}`}>
+                <ArrowUpRight /> {s.delta} <span className="orp-stat-delta-note">{COMPARE_LABEL}</span>
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      <p className="orp-section-label">Patients &amp; Staff</p>
-      <div className="orp-stats-grid">
-        {PEOPLE_STATS.map((s) => (
-          <div key={s.label} className="orp-stat-card">
-            <div className={`orp-stat-icon ${s.color}`}><StatIcon name={s.icon} /></div>
-            <div className="orp-stat-info">
-              <span className="orp-stat-value">{s.value}</span>
-              <span className="orp-stat-label">{s.label}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p className="orp-section-label">Reports</p>
       <div className="orp-grid">
-        {REPORTS.map((report) => (
-          <section key={report.id} className="orp-card">
-            <div className="orp-card-head">
-              <span className="orp-card-head-icon">{report.icon}</span>
-              <h3 className="orp-card-title">{report.title}</h3>
-            </div>
-            <p className="orp-card-detail">{report.detail}</p>
+        {REPORTS.map((report) => {
+          const color = REPORT_COLORS[report.id]
+          return (
+            <section key={report.id} className="orp-card" style={{ borderLeft: `4px solid ${color}` }}>
+              <div className="orp-card-head">
+                <span className="orp-card-head-icon" style={{ background: `${color}1a`, color }}>{report.icon}</span>
+                <h3 className="orp-card-title">{report.title}</h3>
+              </div>
+              <p className="orp-card-detail">{report.detail}</p>
 
-            <Sparkline trend={report.trend} color={REPORT_COLORS[report.id]} />
+              <Sparkline trend={report.trend} color={color} />
 
-            <div className="orp-stat-row">
-              <span className="orp-stat-row-label">{report.statLabel}</span>
-              <span className="orp-stat-row-value">{report.statValue}</span>
-            </div>
+              <div className="orp-stat-row">
+                <span className="orp-stat-row-label">{report.statLabel}</span>
+                <span className="orp-stat-row-value">{report.statValue}</span>
+              </div>
 
-            <div className="orp-card-actions">
-              <button className="orp-btn orp-btn-view" onClick={() => setViewing(report)}>View Report</button>
-              <button className="orp-btn orp-btn-csv" onClick={() => handleCardCSV(report)}>CSV</button>
-              <button className="orp-btn orp-btn-pdf" onClick={() => handleCardPDF(report)}>PDF</button>
-            </div>
-          </section>
-        ))}
+              <div className="orp-card-actions">
+                <button className="orp-btn orp-btn-view" onClick={() => setViewing(report)}>View Report</button>
+                <button className="orp-btn orp-btn-csv" onClick={() => handleCardCSV(report)}><FileIcon color="#16a34a" /> CSV</button>
+                <button className="orp-btn orp-btn-pdf" onClick={() => handleCardPDF(report)}><FileIcon color="#ef4444" /> PDF</button>
+              </div>
+            </section>
+          )
+        })}
       </div>
 
-      <div className="orp-fullexport-card">
-        <div className="orp-fullexport-head">
-          <span className="orp-card-head-icon">📤</span>
-          <h3 className="orp-fullexport-title">Full Export</h3>
+      <div className="orp-bottom-grid">
+        <div className="orp-fullexport-card orp-bottom-card">
+          <DecorGraphic variant="bars" />
+          <div className="orp-fullexport-head">
+            <span className="orp-card-head-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>📤</span>
+            <h3 className="orp-fullexport-title">Full Export</h3>
+          </div>
+          <p className="orp-fullexport-detail">Download a comprehensive report including revenue, attendance, patient growth, service popularity, retention, and staff efficiency.</p>
+          <div className="orp-fullexport-actions">
+            <button className="orp-btn-lg orp-btn-csv-lg" onClick={handleFullCSV}>Export Complete CSV</button>
+            <button className="orp-btn-lg orp-btn-pdf-lg" onClick={handleFullPDF}>Export Complete PDF</button>
+          </div>
         </div>
-        <p className="orp-fullexport-detail">Download a comprehensive report including revenue, attendance, patient growth, service popularity, retention, and staff efficiency.</p>
-        <div className="orp-fullexport-actions">
-          <button className="orp-btn-lg orp-btn-csv-lg" onClick={handleFullCSV}>Export Complete CSV</button>
-          <button className="orp-btn-lg orp-btn-pdf-lg" onClick={handleFullPDF}>Export Complete PDF</button>
-        </div>
+
+        <CustomReportBuilder onExport={setDownloads} />
       </div>
 
-      <CustomReportBuilder onExport={setDownloads} />
       <ScheduledReports />
       <RecentDownloads downloads={downloads} />
 
@@ -684,6 +719,8 @@ function StatIcon({ name }) {
   switch (name) {
     case 'coins':
       return <svg {...common}><circle cx="9" cy="9" r="6" /><path d="M14.5 8a6 6 0 1 1 0 8" /></svg>
+    case 'card':
+      return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
     case 'check':
       return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></svg>
     case 'clock':
@@ -701,4 +738,58 @@ function StatIcon({ name }) {
     default:
       return null
   }
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M5 21h14" />
+    </svg>
+  )
+}
+
+function FileIcon({ color = 'currentColor' }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+    </svg>
+  )
+}
+
+function ArrowUpRight() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+    </svg>
+  )
+}
+
+function DecorGraphic({ variant }) {
+  return (
+    <svg className="orp-card-decor" width="150" height="110" viewBox="0 0 150 110" fill="none" aria-hidden="true">
+      {variant === 'gear' ? (
+        <>
+          <circle cx="100" cy="58" r="32" stroke="#7c3aed" strokeWidth="3" opacity="0.22" />
+          <circle cx="100" cy="58" r="11" stroke="#7c3aed" strokeWidth="3" opacity="0.22" />
+          <rect x="42" y="72" width="14" height="30" rx="3" fill="#7c3aed" opacity="0.16" />
+          <rect x="62" y="58" width="14" height="44" rx="3" fill="#7c3aed" opacity="0.16" />
+        </>
+      ) : (
+        <>
+          <rect x="34" y="58" width="18" height="46" rx="3" fill="#16a34a" opacity="0.18" />
+          <rect x="60" y="38" width="18" height="66" rx="3" fill="#16a34a" opacity="0.22" />
+          <rect x="86" y="20" width="18" height="84" rx="3" fill="#16a34a" opacity="0.15" />
+          <rect x="112" y="50" width="18" height="54" rx="3" fill="#16a34a" opacity="0.2" />
+        </>
+      )}
+    </svg>
+  )
 }

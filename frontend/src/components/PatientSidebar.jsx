@@ -123,6 +123,15 @@ const DEFAULT_BOTTOM_MENU_ITEMS = [
   { id: 'help', label: 'Help & Support', icon: <HelpIcon />, path: '/help' },
 ]
 
+// Fallback "View Profile" destination when a page doesn't pass `profilePath`.
+const ROLE_PROFILE_PATHS = {
+  Owner: '/owner/profile',
+  Therapist: '/therapist/profile',
+  'Super Admin': '/admin/profile',
+  Admin: '/admin/profile',
+}
+const DEFAULT_PROFILE_PATH = '/patient/profile'
+
 export default function PatientSidebar({
   user,
   onLogout,
@@ -160,6 +169,11 @@ export default function PatientSidebar({
   const resolvedProfileName = profileName || user?.name || 'Maria Santos'
   const resolvedProfileRole = profileRoleLabel || user?.role || 'Parent'
   const resolvedAvatar = profileAvatar || user?.avatar || '/therapy-pro-logo.png'
+  const resolvedProfilePath =
+    profilePath ||
+    ROLE_PROFILE_PATHS[resolvedProfileRole] ||
+    ROLE_PROFILE_PATHS[user?.role] ||
+    DEFAULT_PROFILE_PATH
 
   return (
     <>
@@ -181,7 +195,7 @@ export default function PatientSidebar({
           </div>
           <button
             className="view-profile-btn"
-            onClick={() => profilePath && navigate(profilePath)}
+            onClick={() => handleNavigation(resolvedProfilePath)}
           >
             View Profile
           </button>

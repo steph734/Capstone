@@ -1,5 +1,5 @@
 import { getStripeClient } from './stripeClient.js'
-import { sendEmail } from './mailersend.js'
+import { sendEmail } from './brevo.js'
 
 const BRAND = 'TherapyPro'
 
@@ -72,7 +72,7 @@ function buildReceiptText({ brand, amount, dateStr, description, cardLine, recei
 }
 
 // Verifies the PaymentIntent really succeeded at Stripe, then emails a
-// receipt for it to `email` via Maileroo. Safe to call fire-and-forget from
+// receipt for it to `email` via Brevo. Safe to call fire-and-forget from
 // the client — it re-checks status server-side and never trusts the caller.
 export async function sendSubscriptionReceipt({ email, name, paymentIntentId }) {
   if (!email) throw new Error('Missing email')

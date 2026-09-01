@@ -197,6 +197,7 @@ export default function PatientSidebar({
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
+              {item.trial && <span className="nav-trial-tag">Trial</span>}
             </button>
           ))}
         </nav>

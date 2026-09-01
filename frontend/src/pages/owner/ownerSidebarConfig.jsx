@@ -93,19 +93,33 @@ export const ownerMenuItems = BASE_OWNER_MENU_ITEMS
 
 const TIER_RANK = { silver: 1, gold: 2 }
 
-// Resolve which tier's features are unlocked. A paid `activePlan` always counts;
-// `betaTier` is the preview flag. When `activePlan` isn't passed we fall back to
-// the persisted value so every owner page unlocks without extra prop plumbing.
-function resolveUnlockedTier(betaTier, activePlan) {
-  const paid = activePlan ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('activePlan') : null)
-  const candidates = [betaTier, paid].filter((t) => TIER_RANK[t])
+function readLS(key) {
+  return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
+}
+
+function pickHighestTier(...tiers) {
+  const candidates = tiers.filter((t) => TIER_RANK[t])
   if (!candidates.length) return null
   return candidates.reduce((best, t) => (TIER_RANK[t] > TIER_RANK[best] ? t : best))
 }
 
+// Resolve which tier's features are unlocked and whether they're on a live trial.
+// A paid `activePlan` (or the persisted fallback) unlocks features; `betaTier` is
+// the preview flag. A free trial unlocks too — but once `activePlanTrialEnds` is
+// in the past with no payment made, those premium features re-lock.
+function resolveUnlock(betaTier, activePlan) {
+  const paid = activePlan ?? readLS('activePlan')
+  const trialEnds = readLS('activePlanTrialEnds')
+  const trialExpired = !!trialEnds && new Date(trialEnds).getTime() <= Date.now()
+  const trialing = !!trialEnds && !trialExpired
+  const tier = pickHighestTier(betaTier, trialExpired ? null : paid)
+  return { tier, trialing }
+}
+
 export function getOwnerMenuItems(betaTier, activePlan) {
-  const tier = resolveUnlockedTier(betaTier, activePlan)
-  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
-  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, SPEECH_ITEM]
+  const { tier, trialing } = resolveUnlock(betaTier, activePlan)
+  const mark = (items) => (trialing ? items.map((it) => ({ ...it, trial: true })) : items)
+  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM])]
+  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM])]
   return BASE_OWNER_MENU_ITEMS
 }

@@ -6,7 +6,6 @@ import OwnerPaymentPage from './OwnerPaymentPage'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
 import '../SubscriptionPage.css'
-import '../../components/BillingModal.css'
 
 // "Possible" next billing date = one calendar month after a given date.
 function addOneMonth(date) {
@@ -19,11 +18,6 @@ function addOneMonth(date) {
 
 function formatLongDate(date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatAmount(amount, currency) {
-  const value = (amount / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return currency === 'PHP' ? `₱${value}` : `${value} ${currency}`
 }
 
 // "THERAPYPRO: GOLD" -> "Gold"
@@ -133,8 +127,17 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history' | 'cancel' | 'trial'
   const [trialTier, setTrialTier] = useState(null) // tier object pending in the trial modal
   const [paymentsState, setPaymentsState] = useState({ status: 'loading', payments: [], error: '' })
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const [trialNoticeDismissed, setTrialNoticeDismissed] = useState(false)
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
+
+  // Re-evaluate the trial clock each minute so the "ending soon" notice appears
+  // and the plan lapses without needing a page reload.
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Pull every Stripe payment on record for this billing email.
   useEffect(() => {
@@ -159,8 +162,19 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     return () => { cancelled = true }
   }, [billingEmail])
 
-  // 'free' is the plan when no paid subscription is active.
-  const activeTierId = activePlan || 'free'
+  // The tier the user signed up for ('free' when nothing is active).
+  const storedTierId = activePlan || 'free'
+
+  // Trial clock. A lapsed trial (past its end date, no payment made) re-locks the
+  // plan — the user is treated as back on Free until they pay the regular price.
+  const trialEndMs = planTrialEnds ? new Date(planTrialEnds).getTime() : null
+  const isTrialExpired = Boolean(trialEndMs) && trialEndMs <= nowMs
+  const isTrialing = Boolean(trialEndMs) && trialEndMs > nowMs
+  const trialDaysLeft = isTrialing ? Math.ceil((trialEndMs - nowMs) / (24 * 60 * 60 * 1000)) : 0
+  const trialEndingSoon = isTrialing && trialDaysLeft <= 2
+
+  // What the page treats as the live plan (Free once a trial lapses).
+  const activeTierId = isTrialExpired ? 'free' : storedTierId
 
   const subscriptionTiersRaw = [
     {
@@ -227,10 +241,11 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   }))
 
   const activeTier = subscriptionTiers.find((tier) => tier.id === activeTierId) || subscriptionTiers[0]
+  // The tier signed up for — used for "trial ended" messaging even after it lapses.
+  const signedUpTier = subscriptionTiersRaw.find((tier) => tier.id === storedTierId) || subscriptionTiersRaw[0]
   const isPaidPlan = activeTierId !== 'free'
   const isOnFreePlan = activeTierId === 'free'
-  const isTrialing = Boolean(planTrialEnds) && new Date(planTrialEnds) > new Date()
-  const trialEndsLabel = planTrialEnds ? formatLongDate(new Date(planTrialEnds)) : ''
+  const trialEndsLabel = trialEndMs ? formatLongDate(new Date(trialEndMs)) : ''
   const planLabel = planLabelFor(activeTier)
 
   // Possible next billing = one month after the most recent successful charge
@@ -238,14 +253,18 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   // free trial, billing starts when the trial ends.
   const lastSucceeded = paymentsState.payments.find((p) => p.status === 'succeeded')
   const lastPaidAt = lastSucceeded ? new Date(lastSucceeded.created * 1000) : new Date()
-  const nextBillingDate = isTrialing ? new Date(planTrialEnds) : addOneMonth(lastPaidAt)
+  const nextBillingDate = isTrialing ? new Date(trialEndMs) : addOneMonth(lastPaidAt)
   const nextBillDate = formatLongDate(nextBillingDate)
+
+  // The trial is a one-time offer — once used (even if it later lapsed), Select
+  // Plan goes straight to payment.
+  const trialUsed = Boolean(planTrialEnds)
 
   const handleSelectPlan = (planId) => {
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
     if (!selectedTier || selectedTier.current) return
-    // From the free plan, offer the 7-day trial first; otherwise go straight to payment.
-    if (isOnFreePlan) {
+    // From the free plan (and never trialed), offer the 7-day trial first.
+    if (isOnFreePlan && !trialUsed) {
       setTrialTier(selectedTier)
       setActiveModal('trial')
     } else {
@@ -288,6 +307,11 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
   const handleCancelSubscription = () => {
     setActiveModal('cancel')
+  }
+
+  // Convert the trial (ending or already lapsed) into a paid subscription.
+  const handleSubscribeTrialPlan = () => {
+    setSelectedTierForPayment(signedUpTier)
   }
 
   const confirmCancelSubscription = () => {
@@ -347,6 +371,45 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
         </div>
 
         <div className="subscription-content">
+        {trialEndingSoon && !trialNoticeDismissed && (
+          <div className="trial-banner warn" role="status">
+            <span className="trial-banner-text">
+              Your <strong>{planLabelFor(signedUpTier)}</strong> free trial ends in{' '}
+              <strong>{trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'}</strong> on{' '}
+              <strong>{trialEndsLabel}</strong>. Subscribe now to keep your features — you&rsquo;ll be
+              charged ₱{signedUpTier.monthlyPrice}.00/month.
+            </span>
+            <div className="trial-banner-actions">
+              <button type="button" className="trial-banner-btn primary" onClick={handleSubscribeTrialPlan}>
+                Subscribe now
+              </button>
+              <button
+                type="button"
+                className="trial-banner-btn ghost"
+                onClick={() => setTrialNoticeDismissed(true)}
+                aria-label="Dismiss"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isTrialExpired && (
+          <div className="trial-banner danger" role="alert">
+            <span className="trial-banner-text">
+              Your <strong>{planLabelFor(signedUpTier)}</strong> free trial ended on{' '}
+              <strong>{trialEndsLabel}</strong>. Premium features are locked. Subscribe for{' '}
+              <strong>₱{signedUpTier.monthlyPrice}.00/month</strong> to restore them.
+            </span>
+            <div className="trial-banner-actions">
+              <button type="button" className="trial-banner-btn primary" onClick={handleSubscribeTrialPlan}>
+                Subscribe for ₱{signedUpTier.monthlyPrice}.00/mo
+              </button>
+            </div>
+          </div>
+        )}
+
         <section className="plan-overview">
           <div className="plan-hero">
             <span className="plan-hero-badge">Your plan</span>
@@ -369,6 +432,10 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
                 </p>
                 <p className="plan-hero-payment">Billed to {billingEmail}</p>
               </>
+            ) : isTrialExpired ? (
+              <p className="plan-hero-meta">
+                Your {planLabelFor(signedUpTier)} free trial has ended &mdash; subscribe to reactivate it.
+              </p>
             ) : (
               <p className="plan-hero-meta">You&rsquo;re on the Free plan &mdash; no billing.</p>
             )}
@@ -417,10 +484,9 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
           </div>
         </section>
 
-        <section className="payments-section">
-          <h2 className="section-title">Payment history</h2>
-
-          {isPaidPlan && (
+        {isPaidPlan && (
+          <section className="payments-section">
+            <h2 className="section-title">Billing</h2>
             <div className="next-billing-card">
               <div className="next-billing-info">
                 <span className="next-billing-label">Possible next billing</span>
@@ -428,48 +494,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
               </div>
               <span className="next-billing-amount">₱{activeTier.monthlyPrice}.00</span>
             </div>
-          )}
-
-          {paymentsState.status === 'loading' && (
-            <div className="billing-modal-loading">Loading payments…</div>
-          )}
-
-          {paymentsState.status === 'error' && (
-            <div className="billing-modal-error">{paymentsState.error}</div>
-          )}
-
-          {paymentsState.status === 'ready' && paymentsState.payments.length === 0 && (
-            <div className="billing-modal-empty">No payments on record with Stripe yet.</div>
-          )}
-
-          {paymentsState.status === 'ready' && paymentsState.payments.length > 0 && (
-            <div className="payment-history-list">
-              {paymentsState.payments.map((p) => (
-                <div key={p.id} className="payment-row">
-                  <span className="payment-row-main">{p.description}</span>
-                  <span className="payment-row-amount">{formatAmount(p.amount, p.currency)}</span>
-                  <span className="payment-row-sub">
-                    {formatLongDate(new Date(p.created * 1000))}
-                    {p.cardBrand && p.cardLast4 ? ` · ${p.cardBrand} ···· ${p.cardLast4}` : ''}
-                  </span>
-                  <span className="payment-row-meta">
-                    <span className={`payment-status ${p.status}`}>{p.status}</span>
-                    {p.receiptUrl && (
-                      <a
-                        className="payment-receipt-link"
-                        href={p.receiptUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Receipt
-                      </a>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+          </section>
+        )}
 
         <section className="tiers-section" ref={tiersRef}>
           <h2 className="section-title">Subscription Tiers</h2>

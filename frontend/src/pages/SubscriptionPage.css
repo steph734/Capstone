@@ -1045,10 +1045,77 @@
   flex-shrink: 0;
 }
 
-.payments-section .payment-history-list {
+/* Trial lifecycle banners */
+.trial-banner {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(12px, 2vw, 20px);
+  flex-wrap: wrap;
+  padding: clamp(14px, 2vw, 18px) clamp(16px, 2.5vw, 22px);
+  margin-bottom: clamp(16px, 2.5vw, 22px);
+  border-radius: clamp(12px, 1.6vw, 16px);
+  border: 1px solid transparent;
+}
+
+.trial-banner.warn {
+  background: #fff8e6;
+  border-color: #f4d78a;
+  color: #7a5b00;
+}
+
+.trial-banner.danger {
+  background: #fdecec;
+  border-color: #f1b7b4;
+  color: #9a2820;
+}
+
+.trial-banner-text {
+  flex: 1;
+  min-width: 240px;
+  font-size: clamp(13px, 1.2vw, 14px);
+  line-height: 1.5;
+}
+
+.trial-banner-text strong {
+  font-weight: 700;
+}
+
+.trial-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.trial-banner-btn {
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.trial-banner-btn.primary {
+  background: #2c4a3e;
+  color: #fff;
+  border: none;
+}
+
+.trial-banner-btn.primary:hover {
+  background: #3d5a50;
+}
+
+.trial-banner-btn.ghost {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  opacity: 0.75;
+}
+
+.trial-banner-btn.ghost:hover {
+  opacity: 1;
 }
 
 /* 7-day free trial modal */

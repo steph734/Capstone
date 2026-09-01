@@ -139,6 +139,18 @@
   flex: 1;
 }
 
+.nav-trial-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #4a9eff;
+  color: #fff;
+}
+
 /* Logout Item */
 .logout-item {
   color: #d93030;

@@ -134,6 +134,8 @@ function App() {
   // The paid, active subscription tier ('silver' | 'gold' | null). Set once a
   // Stripe payment succeeds; supersedes the beta preview flag above.
   const [ownerActivePlan, setOwnerActivePlan] = useState(() => localStorage.getItem('activePlan') || null)
+  // ISO date string when the current plan is on a free trial, else null.
+  const [ownerPlanTrialEnds, setOwnerPlanTrialEnds] = useState(() => localStorage.getItem('activePlanTrialEnds') || null)
 
   useEffect(() => {
     applyAccessibilityPrefs(loadAccessibilityPrefs())
@@ -148,15 +150,26 @@ function App() {
     }
   }
 
-  const handleOwnerPlanActivate = (tier) => {
+  const handleOwnerPlanActivate = (tier, { trial = false } = {}) => {
     setOwnerActivePlan(tier)
     if (tier) {
       localStorage.setItem('activePlan', tier)
       // A paid plan replaces the beta preview — drop the beta tags/features.
       setOwnerBetaTier(null)
       localStorage.removeItem('betaTier')
+
+      if (trial) {
+        const ends = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        setOwnerPlanTrialEnds(ends)
+        localStorage.setItem('activePlanTrialEnds', ends)
+      } else {
+        setOwnerPlanTrialEnds(null)
+        localStorage.removeItem('activePlanTrialEnds')
+      }
     } else {
       localStorage.removeItem('activePlan')
+      setOwnerPlanTrialEnds(null)
+      localStorage.removeItem('activePlanTrialEnds')
     }
   }
 
@@ -355,7 +368,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onBetaActivate={handleOwnerBetaActivate} activePlan={ownerActivePlan} onPlanActivate={handleOwnerPlanActivate} />
+                <OwnerSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onBetaActivate={handleOwnerBetaActivate} activePlan={ownerActivePlan} planTrialEnds={ownerPlanTrialEnds} onPlanActivate={handleOwnerPlanActivate} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

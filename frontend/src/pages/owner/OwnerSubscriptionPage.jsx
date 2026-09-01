@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
@@ -6,6 +6,31 @@ import OwnerPaymentPage from './OwnerPaymentPage'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
 import '../SubscriptionPage.css'
+import '../../components/BillingModal.css'
+
+// "Possible" next billing date = one calendar month after a given date.
+function addOneMonth(date) {
+  const d = new Date(date)
+  const day = d.getDate()
+  d.setMonth(d.getMonth() + 1)
+  if (d.getDate() < day) d.setDate(0) // clamp Jan 31 -> Feb 28/29
+  return d
+}
+
+function formatLongDate(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatAmount(amount, currency) {
+  const value = (amount / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return currency === 'PHP' ? `₱${value}` : `${value} ${currency}`
+}
+
+// "THERAPYPRO: GOLD" -> "Gold"
+function planLabelFor(tier) {
+  const name = tier.name.split(': ')[1] || tier.name
+  return name.charAt(0) + name.slice(1).toLowerCase()
+}
 
 function MenuIcon() {
   return (
@@ -88,14 +113,51 @@ function XIcon() {
   )
 }
 
-export default function OwnerSubscriptionPage({ user, onLogout, betaTier, activePlan, onPlanActivate }) {
+function GiftIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 12 20 22 4 22 4 12" />
+      <rect x="2" y="7" width="20" height="5" />
+      <line x1="12" y1="22" x2="12" y2="7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </svg>
+  )
+}
+
+export default function OwnerSubscriptionPage({ user, onLogout, betaTier, activePlan, planTrialEnds, onPlanActivate }) {
   const navigate = useNavigate()
   const tiersRef = useRef(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
-  const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history'
+  const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history' | 'cancel' | 'trial'
+  const [trialTier, setTrialTier] = useState(null) // tier object pending in the trial modal
+  const [paymentsState, setPaymentsState] = useState({ status: 'loading', payments: [], error: '' })
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
+
+  // Pull every Stripe payment on record for this billing email.
+  useEffect(() => {
+    let cancelled = false
+    setPaymentsState({ status: 'loading', payments: [], error: '' })
+
+    fetch(`/api/payment-history?email=${encodeURIComponent(billingEmail)}`)
+      .then(async (res) => {
+        let data
+        try {
+          data = await res.json()
+        } catch {
+          throw new Error('Could not reach the payment server.')
+        }
+        if (!res.ok) throw new Error(data.error || 'Could not load payment history')
+        if (!cancelled) setPaymentsState({ status: 'ready', payments: data.payments || [], error: '' })
+      })
+      .catch((err) => {
+        if (!cancelled) setPaymentsState({ status: 'error', payments: [], error: err.message })
+      })
+
+    return () => { cancelled = true }
+  }, [billingEmail])
 
   // 'free' is the plan when no paid subscription is active.
   const activeTierId = activePlan || 'free'
@@ -166,17 +228,42 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
   const activeTier = subscriptionTiers.find((tier) => tier.id === activeTierId) || subscriptionTiers[0]
   const isPaidPlan = activeTierId !== 'free'
-  // "THERAPYPRO: GOLD" -> "Gold"
-  const planShortName = (activeTier.name.split(': ')[1] || activeTier.name)
-  const planLabel = planShortName.charAt(0) + planShortName.slice(1).toLowerCase()
-  const nextBillDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const isOnFreePlan = activeTierId === 'free'
+  const isTrialing = Boolean(planTrialEnds) && new Date(planTrialEnds) > new Date()
+  const trialEndsLabel = planTrialEnds ? formatLongDate(new Date(planTrialEnds)) : ''
+  const planLabel = planLabelFor(activeTier)
+
+  // Possible next billing = one month after the most recent successful charge
+  // (or one month from today if Stripe has no payments on file yet). While on a
+  // free trial, billing starts when the trial ends.
+  const lastSucceeded = paymentsState.payments.find((p) => p.status === 'succeeded')
+  const lastPaidAt = lastSucceeded ? new Date(lastSucceeded.created * 1000) : new Date()
+  const nextBillingDate = isTrialing ? new Date(planTrialEnds) : addOneMonth(lastPaidAt)
+  const nextBillDate = formatLongDate(nextBillingDate)
 
   const handleSelectPlan = (planId) => {
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
-    if (selectedTier && !selectedTier.current) {
+    if (!selectedTier || selectedTier.current) return
+    // From the free plan, offer the 7-day trial first; otherwise go straight to payment.
+    if (isOnFreePlan) {
+      setTrialTier(selectedTier)
+      setActiveModal('trial')
+    } else {
       setSelectedTierForPayment(selectedTier)
     }
+  }
+
+  const handleStartTrial = () => {
+    if (trialTier) onPlanActivate && onPlanActivate(trialTier.id, { trial: true })
+    setActiveModal(null)
+    setTrialTier(null)
+  }
+
+  const handleSkipTrialToPayment = () => {
+    const tier = trialTier
+    setActiveModal(null)
+    setTrialTier(null)
+    if (tier) setSelectedTierForPayment(tier)
   }
 
   const handleBackFromPayment = () => {
@@ -200,9 +287,12 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   }
 
   const handleCancelSubscription = () => {
-    if (window.confirm('Cancel your subscription and move back to the Free plan?')) {
-      onPlanActivate && onPlanActivate(null)
-    }
+    setActiveModal('cancel')
+  }
+
+  const confirmCancelSubscription = () => {
+    onPlanActivate && onPlanActivate(null)
+    setActiveModal(null)
   }
 
   const closeModal = () => setActiveModal(null)
@@ -249,10 +339,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
             <p className="subscription-subtitle">Manage your subscription plan</p>
           </div>
           <div className="header-actions">
-            <button className="add-subscription-btn" onClick={scrollToTiers}>
-              <PlusIcon />
-              <span>Add Subscription</span>
-            </button>
             <div className="user-badge">
               <img src={currentUser.avatar} alt={currentUser.name} />
               <span>{currentUser.name}</span>
@@ -269,10 +355,17 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
               <span>THERAPYPRO</span>
             </div>
             <h2 className="plan-hero-name">{planLabel}</h2>
+            {isPaidPlan && isTrialing && (
+              <span className="plan-hero-trial-tag">7-day free trial</span>
+            )}
             {isPaidPlan ? (
               <>
                 <p className="plan-hero-meta">
-                  Your next bill is for <strong>₱{activeTier.monthlyPrice}.00</strong> on {nextBillDate}.
+                  {isTrialing ? (
+                    <>Your free trial ends on <strong>{trialEndsLabel}</strong> — then <strong>₱{activeTier.monthlyPrice}.00</strong>/month.</>
+                  ) : (
+                    <>Your next bill is for <strong>₱{activeTier.monthlyPrice}.00</strong> on {nextBillDate}.</>
+                  )}
                 </p>
                 <p className="plan-hero-payment">Billed to {billingEmail}</p>
               </>
@@ -324,6 +417,60 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
           </div>
         </section>
 
+        <section className="payments-section">
+          <h2 className="section-title">Payment history</h2>
+
+          {isPaidPlan && (
+            <div className="next-billing-card">
+              <div className="next-billing-info">
+                <span className="next-billing-label">Possible next billing</span>
+                <span className="next-billing-date">{nextBillDate}</span>
+              </div>
+              <span className="next-billing-amount">₱{activeTier.monthlyPrice}.00</span>
+            </div>
+          )}
+
+          {paymentsState.status === 'loading' && (
+            <div className="billing-modal-loading">Loading payments…</div>
+          )}
+
+          {paymentsState.status === 'error' && (
+            <div className="billing-modal-error">{paymentsState.error}</div>
+          )}
+
+          {paymentsState.status === 'ready' && paymentsState.payments.length === 0 && (
+            <div className="billing-modal-empty">No payments on record with Stripe yet.</div>
+          )}
+
+          {paymentsState.status === 'ready' && paymentsState.payments.length > 0 && (
+            <div className="payment-history-list">
+              {paymentsState.payments.map((p) => (
+                <div key={p.id} className="payment-row">
+                  <span className="payment-row-main">{p.description}</span>
+                  <span className="payment-row-amount">{formatAmount(p.amount, p.currency)}</span>
+                  <span className="payment-row-sub">
+                    {formatLongDate(new Date(p.created * 1000))}
+                    {p.cardBrand && p.cardLast4 ? ` · ${p.cardBrand} ···· ${p.cardLast4}` : ''}
+                  </span>
+                  <span className="payment-row-meta">
+                    <span className={`payment-status ${p.status}`}>{p.status}</span>
+                    {p.receiptUrl && (
+                      <a
+                        className="payment-receipt-link"
+                        href={p.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Receipt
+                      </a>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="tiers-section" ref={tiersRef}>
           <h2 className="section-title">Subscription Tiers</h2>
 
@@ -361,7 +508,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
                 {tier.current ? (
                   <button className="tier-button current-button" disabled>
-                    {tier.id === 'free' ? 'Current Plan' : 'Active Plan'}
+                    {tier.id === 'free' ? 'Current Plan' : isTrialing ? 'Trial Active' : 'Active Plan'}
                   </button>
                 ) : (
                   <button
@@ -388,6 +535,76 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
     {activeModal === 'payment-history' && (
       <PaymentHistoryModal email={billingEmail} onClose={closeModal} />
+    )}
+
+    {activeModal === 'trial' && trialTier && (
+      <div
+        className="cancel-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="trial-modal-title"
+        onClick={closeModal}
+      >
+        <div className="trial-modal" onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="trial-modal-close" onClick={closeModal} aria-label="Close">
+            <XIcon />
+          </button>
+          <div className="trial-modal-icon">
+            <GiftIcon />
+          </div>
+          <span className="trial-modal-eyebrow">7-day free trial</span>
+          <h2 id="trial-modal-title" className="trial-modal-title">
+            Try {planLabelFor(trialTier)} free for 7 days
+          </h2>
+          <p className="trial-modal-text">
+            Unlock every feature below now. We won&rsquo;t charge you until{' '}
+            <strong>{formatLongDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))}</strong>, then it&rsquo;s{' '}
+            <strong>₱{trialTier.monthlyPrice}.00/month</strong>. Cancel anytime before then and you pay nothing.
+          </p>
+          <ul className="trial-modal-features">
+            {trialTier.features.map((feature, index) => (
+              <li key={index}><CheckIcon /><span>{feature}</span></li>
+            ))}
+          </ul>
+          <div className="trial-modal-actions">
+            <button type="button" className="trial-modal-btn primary" onClick={handleStartTrial}>
+              Start free trial
+            </button>
+            <button type="button" className="trial-modal-btn secondary" onClick={handleSkipTrialToPayment}>
+              Skip trial &mdash; subscribe now
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {activeModal === 'cancel' && (
+      <div
+        className="cancel-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-modal-title"
+        onClick={closeModal}
+      >
+        <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="cancel-modal-icon">
+            <XIcon />
+          </div>
+          <h2 id="cancel-modal-title" className="cancel-modal-title">Cancel subscription?</h2>
+          <p className="cancel-modal-text">
+            Your {planLabel} plan will end and you&rsquo;ll move back to the Free plan.
+            Premium features will be locked.
+          </p>
+          <div className="cancel-modal-actions">
+            <button type="button" className="cancel-modal-btn keep" onClick={closeModal}>
+              Keep my plan
+            </button>
+            <button type="button" className="cancel-modal-btn confirm" onClick={confirmCancelSubscription}>
+              Cancel subscription
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     </div>
   )

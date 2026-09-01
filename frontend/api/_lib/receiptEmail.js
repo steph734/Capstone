@@ -1,5 +1,5 @@
 import { getStripeClient } from './stripeClient.js'
-import { sendEmail } from './maileroo.js'
+import { sendEmail } from './mailersend.js'
 
 const BRAND = 'TherapyPro'
 

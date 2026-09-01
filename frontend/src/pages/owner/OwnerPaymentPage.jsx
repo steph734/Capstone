@@ -79,6 +79,9 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
   })
   const [paymentStatus, setPaymentStatus] = useState(null) // null | 'success'
   const [emailStatus, setEmailStatus] = useState('idle') // idle | verifying | verified
+  // Receipt-email outcome, surfaced on the success screen so a mail failure
+  // isn't silent: null | { status: 'sending' | 'sent' | 'error', to, error }
+  const [receiptResult, setReceiptResult] = useState(null)
 
   const currentUser = user || { 
     name: 'Owner', 
@@ -344,6 +347,7 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                       billingName={paymentData.fullName || currentUser.name}
                       billingPhone={paymentData.phone}
                       onSuccess={handleSubscribeSuccess}
+                      onReceiptResult={setReceiptResult}
                     />
                   ) : (
                     <p className="field-description">
@@ -401,6 +405,21 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
               Your {tier.name.split(': ')[1]} plan (₱{price}.00/{isMonthly ? 'month' : 'year'}) is
               now active and recorded with Stripe.
             </p>
+            {receiptResult && (
+              <p
+                className="payment-success-text"
+                style={{
+                  fontSize: '13px',
+                  marginTop: '-8px',
+                  color: receiptResult.status === 'error' ? '#dc2626' : '#6b7c75',
+                }}
+              >
+                {receiptResult.status === 'sending' && `Sending your receipt to ${receiptResult.to}…`}
+                {receiptResult.status === 'sent' && `📧 Receipt sent to ${receiptResult.to}`}
+                {receiptResult.status === 'error' &&
+                  `⚠️ Receipt email failed: ${receiptResult.error}`}
+              </p>
+            )}
             <button type="button" className="submit-button" onClick={handleGoBack}>
               Back to subscription tiers
             </button>

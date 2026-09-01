@@ -20,7 +20,7 @@ const CARD_ELEMENT_OPTIONS = {
 // fixed server-side), then confirms the first invoice's Payment Intent with
 // the card entered here. Card details go straight to Stripe via CardElement —
 // they never touch our server.
-function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billingName, billingPhone, onSuccess, onError }) {
+function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billingName, billingPhone, onSuccess, onError, onReceiptResult }) {
   const stripe = useStripe()
   const elements = useElements()
   const [submitting, setSubmitting] = useState(false)
@@ -63,10 +63,14 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
 
       if (result.error) throw new Error(result.error.message)
       if (result.paymentIntent.status === 'succeeded') {
+        onSuccess?.({ subscriptionId: data.subscriptionId, paymentIntent: result.paymentIntent })
+
         // Email the receipt to the address the user entered. Fire-and-forget:
         // the payment already went through, so a mail hiccup must not block
         // the success screen. The endpoint re-verifies the PaymentIntent at
-        // Stripe before it sends anything.
+        // Stripe before it sends anything. The outcome is reported back via
+        // onReceiptResult so the success screen can show sent / failed.
+        onReceiptResult?.({ status: 'sending', to: billingEmail })
         fetch('/api/send-receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,14 +81,19 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
           }),
         })
           .then(async (r) => {
+            const body = await r.json().catch(() => ({}))
             if (!r.ok) {
-              const body = await r.json().catch(() => ({}))
-              console.warn('Receipt email was not sent:', body.error || `HTTP ${r.status}`)
+              const msg = body.error || `HTTP ${r.status}`
+              console.warn('Receipt email was not sent:', msg)
+              onReceiptResult?.({ status: 'error', to: billingEmail, error: msg })
+            } else {
+              onReceiptResult?.({ status: 'sent', to: billingEmail })
             }
           })
-          .catch((e) => console.warn('Receipt email request failed:', e))
-
-        onSuccess?.({ subscriptionId: data.subscriptionId, paymentIntent: result.paymentIntent })
+          .catch((e) => {
+            console.warn('Receipt email request failed:', e)
+            onReceiptResult?.({ status: 'error', to: billingEmail, error: e.message })
+          })
       } else {
         throw new Error(`Payment ${result.paymentIntent.status}. Please try a different card.`)
       }

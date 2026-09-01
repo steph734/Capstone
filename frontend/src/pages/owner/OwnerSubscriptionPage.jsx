@@ -129,6 +129,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   const [paymentsState, setPaymentsState] = useState({ status: 'loading', payments: [], error: '' })
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [trialNoticeDismissed, setTrialNoticeDismissed] = useState(false)
+  const [reminderEmail, setReminderEmail] = useState(null) // null | 'sent' | 'error'
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
 
@@ -260,6 +261,45 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   // Plan goes straight to payment.
   const trialUsed = Boolean(planTrialEnds)
 
+  // Once the trial is inside its final 2 days, email the user (once per trial)
+  // that it's about to end and the regular monthly price kicks in. There's no
+  // cron in this stack, so the send is triggered the first time the owner opens
+  // this page within the window — mirroring how receipts are sent client-side.
+  const signedUpLabel = planLabelFor(signedUpTier)
+  const signedUpPrice = signedUpTier.monthlyPrice
+  useEffect(() => {
+    if (!trialEndingSoon || !trialEndMs) return
+    const trialEndIso = new Date(trialEndMs).toISOString()
+    const sentKey = 'trialReminderEmailedFor'
+    if (localStorage.getItem(sentKey) === trialEndIso) {
+      setReminderEmail('sent')
+      return
+    }
+    // Claim it up front so a quick re-render / StrictMode double-run can't double-send.
+    localStorage.setItem(sentKey, trialEndIso)
+
+    fetch('/api/send-trial-reminder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: billingEmail,
+        name: currentUser.name,
+        planName: signedUpLabel,
+        price: signedUpPrice,
+        trialEndsAt: trialEndIso,
+        manageUrl: `${window.location.origin}/owner/subscription`,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('send failed')
+        setReminderEmail('sent')
+      })
+      .catch(() => {
+        localStorage.removeItem(sentKey) // let a later visit retry
+        setReminderEmail('error')
+      })
+  }, [trialEndingSoon, trialEndMs, billingEmail, currentUser.name, signedUpLabel, signedUpPrice])
+
   const handleSelectPlan = (planId) => {
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
     if (!selectedTier || selectedTier.current) return
@@ -374,10 +414,16 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
         {trialEndingSoon && !trialNoticeDismissed && (
           <div className="trial-banner warn" role="status">
             <span className="trial-banner-text">
-              Your <strong>{planLabelFor(signedUpTier)}</strong> free trial ends in{' '}
+              Your <strong>{signedUpLabel}</strong> free trial ends in{' '}
               <strong>{trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'}</strong> on{' '}
               <strong>{trialEndsLabel}</strong>. Subscribe now to keep your features — you&rsquo;ll be
-              charged ₱{signedUpTier.monthlyPrice}.00/month.
+              charged ₱{signedUpPrice}.00/month at the regular price.
+              {reminderEmail === 'sent' && (
+                <><br /><span className="trial-banner-note">A reminder has been emailed to {billingEmail}.</span></>
+              )}
+              {reminderEmail === 'error' && (
+                <><br /><span className="trial-banner-note">We couldn&rsquo;t send the email reminder — we&rsquo;ll try again next time you visit.</span></>
+              )}
             </span>
             <div className="trial-banner-actions">
               <button type="button" className="trial-banner-btn primary" onClick={handleSubscribeTrialPlan}>

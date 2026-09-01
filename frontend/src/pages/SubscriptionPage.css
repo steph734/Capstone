@@ -1081,6 +1081,13 @@
   font-weight: 700;
 }
 
+.trial-banner-note {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 .trial-banner-actions {
   display: flex;
   gap: 8px;

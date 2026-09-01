@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import BetaTag from './BetaTag'
 import './PatientSidebar.css'
-
-const BETA_ITEM_IDS = new Set(['speech-features', 'gamified-activities'])
 
 // SVG Icons
 function HomeIcon() {
@@ -200,7 +197,6 @@ export default function PatientSidebar({
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
-              {BETA_ITEM_IDS.has(item.id) && <BetaTag style={{ marginLeft: 'auto' }} />}
             </button>
           ))}
         </nav>

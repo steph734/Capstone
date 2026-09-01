@@ -59,7 +59,7 @@ function PlusIcon() {
   )
 }
 
-export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBetaActivate, activePlan, onPlanActivate }) {
+export default function OwnerSubscriptionPage({ user, onLogout, betaTier, activePlan, onPlanActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedTierForPayment, setSelectedTierForPayment] = useState(null)
   const [activeModal, setActiveModal] = useState(null) // null | 'update-payment' | 'payment-history'
@@ -132,17 +132,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
     ...tier,
     current: tier.id === activeTierId,
   }))
-
-  const betaFeatures = {
-    silver: [
-      { id: 'speech-to-text', label: 'Speech to Text', icon: '🎤' },
-      { id: 'text-to-speech', label: 'Text to Speech', icon: '🔊' },
-    ],
-    gold: [
-      { id: 'speech-to-text', label: 'Speech to Text', icon: '🎤' },
-      { id: 'text-to-speech', label: 'Text to Speech', icon: '🔊' },
-    ],
-  }
 
   const handleSelectPlan = (planId) => {
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
@@ -235,9 +224,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
                 {tier.badge && (
                   <div className="tier-badge">{tier.badge}</div>
                 )}
-                {!activePlan && betaTier === tier.id && (
-                  <div className="tier-beta-tag">BETA</div>
-                )}
                 {!tier.current && (
                   <div className="tier-lock-badge">
                     <span>Locked</span>
@@ -261,14 +247,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, onBeta
                   ))}
                 </ul>
 
-                {!activePlan && !tier.current && betaFeatures[tier.id] && (
-                  <button
-                    className={`beta-button ${betaTier === tier.id ? 'beta-button-active' : ''}`}
-                    onClick={() => onBetaActivate && onBetaActivate(betaTier === tier.id ? null : tier.id)}
-                  >
-                    {betaTier === tier.id ? 'Beta Active ✓' : 'Beta Testing'}
-                  </button>
-                )}
                 {tier.current ? (
                   <button className="tier-button current-button" disabled>
                     {tier.id === 'free' ? 'Current Plan' : 'Active Plan'}

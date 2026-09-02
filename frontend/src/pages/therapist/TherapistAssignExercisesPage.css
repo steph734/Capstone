@@ -1,0 +1,327 @@
+/* ── Layout ──────────────────────────────────────────────── */
+.tae-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.tae-card {
+  background: #fff;
+  border: 1px solid #e8f0ec;
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Card header ─────────────────────────────────────────── */
+.tae-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tae-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: #e6f5ec;
+  color: #159a72;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tae-card-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.tae-card-head p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #9aab9f;
+}
+
+/* ── Form ────────────────────────────────────────────────── */
+.tae-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tae-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tae-field label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.tae-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tae-input-icon {
+  position: absolute;
+  left: 12px;
+  color: #9aab9f;
+  display: flex;
+  pointer-events: none;
+}
+
+.tae-input-caret {
+  position: absolute;
+  right: 12px;
+  color: #9aab9f;
+  display: flex;
+  pointer-events: none;
+}
+
+.tae-input-wrap input,
+.tae-input-wrap select,
+.tae-input-wrap textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px 12px 38px;
+  border: 1px solid #dfe8e3;
+  border-radius: 10px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  color: #2c4a3e;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tae-input-wrap select {
+  padding-right: 36px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.tae-input-wrap textarea {
+  resize: vertical;
+  min-height: 78px;
+  line-height: 1.5;
+}
+
+.tae-input-wrap-area .tae-input-icon {
+  top: 13px;
+}
+
+.tae-input-wrap input::placeholder,
+.tae-input-wrap textarea::placeholder {
+  color: #a9b7b0;
+}
+
+.tae-input-wrap input:focus,
+.tae-input-wrap select:focus,
+.tae-input-wrap textarea:focus {
+  border-color: #159a72;
+  box-shadow: 0 0 0 3px rgba(21, 154, 114, 0.12);
+}
+
+.tae-input-wrap select:invalid { color: #a9b7b0; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.tae-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.tae-btn-primary,
+.tae-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s, filter 0.15s;
+}
+
+.tae-btn-primary {
+  border: none;
+  background: #1a7f4f;
+  color: #fff;
+}
+.tae-btn-primary:hover { background: #16703f; transform: translateY(-1px); }
+
+.tae-btn-secondary {
+  border: 1px solid #cddbd4;
+  background: #fff;
+  color: #2c4a3e;
+}
+.tae-btn-secondary:hover { background: #f4faf7; }
+
+/* ── Assignments list ────────────────────────────────────── */
+.tae-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tae-assignment {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1px solid #eef4f1;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+}
+
+.tae-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.tae-assignment-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tae-assignment-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+
+.tae-assignment-meta {
+  font-size: 12px;
+  color: #6b7c75;
+}
+
+.tae-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.tae-due-red   { color: #dc2626; }
+.tae-due-amber { color: #d97706; }
+.tae-due-gray  { color: #6b7c75; }
+
+.tae-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 700;
+}
+.tae-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tae-delete {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.tae-delete:hover { background: #fecaca; }
+
+.tae-empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: #9aab9f;
+  border: 1px dashed #dfe8e3;
+  border-radius: 12px;
+}
+
+/* ── Tip ─────────────────────────────────────────────────── */
+.tae-tip {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: #f1f7f3;
+  border-radius: 12px;
+}
+
+.tae-tip-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #e0efe6;
+  color: #159a72;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tae-tip strong {
+  display: block;
+  font-size: 13px;
+  color: #2c4a3e;
+}
+
+.tae-tip p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #5a7a6d;
+  line-height: 1.45;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .tae-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .tae-card { padding: 18px 16px; }
+  .tae-actions { flex-direction: column; }
+  .tae-btn-primary, .tae-btn-secondary { justify-content: center; }
+  .tae-assignment { flex-wrap: wrap; }
+  .tae-delete { align-self: stretch; width: 100%; justify-content: center; }
+}

@@ -532,7 +532,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [editAppt,     setEditAppt]     = useState(null)
   const [confirmArchId,    setConfirmArchId]    = useState(null)
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
-  const [requests,     setRequests]     = useState(INITIAL_REQUESTS)
   const [viewRequest,  setViewRequest]  = useState(null)
   const [toast,        setToast]        = useState('')
 
@@ -607,22 +606,10 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
   }
 
-  const handleAcceptRequest = (req) => {
-    const newAppt = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      patientName: req.name, date: req.date, time: req.start,
-      type: 'Initial', duration: '60 min', status: 'Confirmed', notes: req.note,
-    }
-    setAppointments(p => [...p, newAppt])
-    setRequests(p => p.filter(r => r.id !== req.id))
-    showToast(`Accepted ${req.name}'s request`)
-    logAppt('✅', `Accepted appointment request from ${req.name} for ${fmtDate(req.date)}`, newAppt)
-  }
-  const handleDeclineRequest = (req) => {
-    setRequests(p => p.filter(r => r.id !== req.id))
-    showToast(`Declined ${req.name}'s request`)
-    logAppt('❌', `Declined appointment request from ${req.name}`, { id: req.id }, 'Review')
-  }
+  // Incoming requests are a static, read-only demo list — Accept/Decline give
+  // feedback only and never mutate the list, so it stays identical across reloads.
+  const handleAcceptRequest = (req) => showToast(`Accepted ${req.name}'s request`)
+  const handleDeclineRequest = (req) => showToast(`Declined ${req.name}'s request`)
 
   const scheduleForToday = useMemo(() => {
     const active = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled')
@@ -691,19 +678,18 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onSelectDate={setSelectedDate}
         />
 
-        {/* Incoming Appointment Requests */}
-        {requests.length > 0 && (
-          <section className="tapp-requests">
-            <div className="tapp-requests-head">
-              <div className="tapp-requests-heading">
-                <h3 className="tapp-section-title">Incoming Appointment Requests</h3>
-                <p className="tapp-section-sub">Review and respond to patients' appointment requests.</p>
-              </div>
-              <button type="button" className="tapp-filter-btn"><FilterIcon /> Filter</button>
+        {/* Incoming Appointment Requests (static demo list) */}
+        <section className="tapp-requests">
+          <div className="tapp-requests-head">
+            <div className="tapp-requests-heading">
+              <h3 className="tapp-section-title">Incoming Appointment Requests</h3>
+              <p className="tapp-section-sub">Review and respond to patients' appointment requests.</p>
             </div>
+            <button type="button" className="tapp-filter-btn"><FilterIcon /> Filter</button>
+          </div>
 
-            <div className="tapp-requests-list">
-              {requests.map(req => (
+          <div className="tapp-requests-list">
+            {INITIAL_REQUESTS.map(req => (
                 <div key={req.id} className="tapp-request-card">
                   <div className="tapp-request-patient">
                     <img className="tapp-request-avatar" src={req.avatar} alt={req.name} />
@@ -730,16 +716,15 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
                     <p className="tapp-request-note-text">&ldquo;{req.note}&rdquo;</p>
                   </div>
 
-                  <div className="tapp-request-actions">
-                    <button className="tapp-request-accept" onClick={() => handleAcceptRequest(req)}><CheckIcon /> Accept</button>
-                    <button className="tapp-request-decline" onClick={() => handleDeclineRequest(req)}><XIcon /> Decline</button>
-                    <button className="tapp-request-details" onClick={() => setViewRequest(req)}>View Details</button>
-                  </div>
+                <div className="tapp-request-actions">
+                  <button className="tapp-request-accept" onClick={() => handleAcceptRequest(req)}><CheckIcon /> Accept</button>
+                  <button className="tapp-request-decline" onClick={() => handleDeclineRequest(req)}><XIcon /> Decline</button>
+                  <button className="tapp-request-details" onClick={() => setViewRequest(req)}>View Details</button>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Today's Schedule */}
         <section className="tapp-today">

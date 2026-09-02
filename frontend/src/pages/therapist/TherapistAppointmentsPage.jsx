@@ -34,6 +34,18 @@ const SEED = [
   { id: 12, patientId: 1,  date: '2026-07-12', time: '09:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: ''                          },
 ]
 
+const INITIAL_REQUESTS = [
+  { id: 'req-1', name: 'Liam Garcia', avatar: 'https://i.pravatar.cc/150?img=12', condition: 'Down Syndrome', age: '8 years old', evalType: 'OT Evaluation',
+    date: '2026-05-22', start: '09:00', end: '10:00', location: 'Main Clinic',
+    requestedAt: 'May 19, 2026 - 2:30 PM', note: 'First time consultation for occupational therapy.' },
+  { id: 'req-2', name: 'Sophia Reyes', avatar: 'https://i.pravatar.cc/150?img=45', condition: 'Down Syndrome', age: '7 years old', evalType: 'Fine Motor Therapy',
+    date: '2026-05-22', start: '11:00', end: '12:00', location: 'Main Clinic',
+    requestedAt: 'May 19, 2026 - 4:10 PM', note: 'Follow-up session for fine motor skills improvement.' },
+  { id: 'req-3', name: 'Noah Dela Cruz', avatar: 'https://i.pravatar.cc/150?img=15', condition: 'Down Syndrome', age: '9 years old', evalType: 'ADL Training',
+    date: '2026-05-24', start: '13:30', end: '14:30', location: 'Main Clinic',
+    requestedAt: 'May 20, 2026 - 9:15 AM', note: 'Requesting ADL skills training session.' },
+]
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 /* ── Helpers ──────────────────────────────────────────────── */
@@ -46,6 +58,16 @@ function fmtDate(iso) {
 }
 function fmtDay(iso) {
   return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' })
+}
+function weekdayLong(iso) {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'long' })
+}
+function addMinutes(t, mins) {
+  const [h, m] = t.split(':').map(Number)
+  const total = h * 60 + m + (mins || 0)
+  const nh = Math.floor(total / 60) % 24
+  const nm = total % 60
+  return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
 }
 function groupLabel(iso) {
   const today    = new Date().toISOString().slice(0,10)
@@ -75,6 +97,13 @@ const EyeIcon       = () => <svg width="13" height="13" viewBox="0 0 24 24" fill
 const PencilIcon    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 const ArchiveIcon   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
 const UnarchiveIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 6.5l5.5 5.5H14v2h-4v-2H6.5L12 6.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+const FilterIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+const MiniUserIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+const PinIcon     = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+const ClinicIcon  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="tapp-card-meta-icon"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14h-2v-3H8v-2h3V9h2v3h3v2h-3v3z"/></svg>
+const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 
 /* ── Full Calendar ────────────────────────────────────────── */
 function FullCalendar({ appointments, selectedDate, onSelectDate }) {
@@ -432,6 +461,59 @@ function FormModal({ initial, onClose, onSave, appointments = [] }) {
   )
 }
 
+/* ── Request Details Modal ────────────────────────────────── */
+function RequestDetailsModal({ req, onClose, onAccept, onDecline }) {
+  return (
+    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="tapp-modal">
+        <div className="tapp-modal-header">
+          <h2 className="tapp-modal-title">Appointment Request</h2>
+          <button className="tapp-modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="tapp-modal-body">
+          <div className="tapp-view-hero">
+            <img className="tapp-view-avatar" src={req.avatar} alt={req.name} />
+            <div>
+              <p className="tapp-view-patient-name">{req.name}</p>
+              <p className="tapp-view-patient-cond">{req.condition} · {req.age}</p>
+            </div>
+          </div>
+          <div className="tapp-view-details">
+            <div className="tapp-view-field">
+              <span className="tapp-view-field-lbl">Date</span>
+              <span className="tapp-view-field-val">{fmtDate(req.date)} ({weekdayLong(req.date)})</span>
+            </div>
+            <div className="tapp-view-field">
+              <span className="tapp-view-field-lbl">Time</span>
+              <span className="tapp-view-field-val">{fmt12(req.start)} - {fmt12(req.end)}</span>
+            </div>
+            <div className="tapp-view-field">
+              <span className="tapp-view-field-lbl">Session</span>
+              <span className="tapp-view-field-val">{req.evalType}</span>
+            </div>
+            <div className="tapp-view-field">
+              <span className="tapp-view-field-lbl">Location</span>
+              <span className="tapp-view-field-val">{req.location}</span>
+            </div>
+            <div className="tapp-view-field">
+              <span className="tapp-view-field-lbl">Requested On</span>
+              <span className="tapp-view-field-val">{req.requestedAt}</span>
+            </div>
+          </div>
+          <div className="tapp-view-notes">
+            <span className="tapp-view-notes-lbl">Note from Patient/Parent</span>
+            <p className="tapp-view-notes-text">{req.note}</p>
+          </div>
+        </div>
+        <div className="tapp-modal-footer">
+          <button className="tapp-request-decline" onClick={() => { onDecline(req); onClose() }}><XIcon /> Decline</button>
+          <button className="tapp-request-accept" onClick={() => { onAccept(req); onClose() }}><CheckIcon /> Accept</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Main Page ────────────────────────────────────────────── */
 export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) {
   const [appointments, setAppointments] = useState(() => {
@@ -450,6 +532,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [editAppt,     setEditAppt]     = useState(null)
   const [confirmArchId,    setConfirmArchId]    = useState(null)
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
+  const [requests,     setRequests]     = useState(INITIAL_REQUESTS)
+  const [viewRequest,  setViewRequest]  = useState(null)
   const [toast,        setToast]        = useState('')
 
   useEffect(() => {
@@ -523,6 +607,40 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
   }
 
+  const handleAcceptRequest = (req) => {
+    const newAppt = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      patientName: req.name, date: req.date, time: req.start,
+      type: 'Initial', duration: '60 min', status: 'Confirmed', notes: req.note,
+    }
+    setAppointments(p => [...p, newAppt])
+    setRequests(p => p.filter(r => r.id !== req.id))
+    showToast(`Accepted ${req.name}'s request`)
+    logAppt('✅', `Accepted appointment request from ${req.name} for ${fmtDate(req.date)}`, newAppt)
+  }
+  const handleDeclineRequest = (req) => {
+    setRequests(p => p.filter(r => r.id !== req.id))
+    showToast(`Declined ${req.name}'s request`)
+    logAppt('❌', `Declined appointment request from ${req.name}`, { id: req.id }, 'Review')
+  }
+
+  const scheduleForToday = useMemo(() => {
+    const active = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled')
+    let d = today
+    if (!active.some(a => a.date === d)) {
+      const upcoming = active.map(a => a.date).filter(x => x >= today).sort()
+      d = upcoming[0] || active.map(a => a.date).sort()[0] || today
+    }
+    return {
+      date: d,
+      items: active.filter(a => a.date === d).sort((x, y) => x.time.localeCompare(y.time)),
+    }
+  }, [appointments, today])
+
+  const scrollToAllAppointments = () => {
+    document.getElementById('tapp-all-appointments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <TherapistPageShell
       user={user}
@@ -573,8 +691,99 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onSelectDate={setSelectedDate}
         />
 
+        {/* Incoming Appointment Requests */}
+        {requests.length > 0 && (
+          <section className="tapp-requests">
+            <div className="tapp-requests-head">
+              <div className="tapp-requests-heading">
+                <h3 className="tapp-section-title">Incoming Appointment Requests</h3>
+                <p className="tapp-section-sub">Review and respond to patients' appointment requests.</p>
+              </div>
+              <button type="button" className="tapp-filter-btn"><FilterIcon /> Filter</button>
+            </div>
+
+            <div className="tapp-requests-list">
+              {requests.map(req => (
+                <div key={req.id} className="tapp-request-card">
+                  <div className="tapp-request-patient">
+                    <img className="tapp-request-avatar" src={req.avatar} alt={req.name} />
+                    <div className="tapp-request-patient-info">
+                      <span className="tapp-request-name">{req.name}</span>
+                      <span className="tapp-request-cond">{req.condition}</span>
+                      <div className="tapp-request-tags">
+                        <span className="tapp-request-tag"><MiniUserIcon /> {req.age}</span>
+                        <span className="tapp-request-tag"><PinIcon /> {req.evalType}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="tapp-request-when">
+                    <div className="tapp-request-when-row"><CalIcon /> {fmtDate(req.date)} ({weekdayLong(req.date)})</div>
+                    <div className="tapp-request-when-row"><ClockIcon /> {fmt12(req.start)} - {fmt12(req.end)}</div>
+                    <div className="tapp-request-when-row"><ClinicIcon /> {req.location}</div>
+                  </div>
+
+                  <div className="tapp-request-note">
+                    <span className="tapp-request-note-lbl">Request Date</span>
+                    <span className="tapp-request-note-date">{req.requestedAt}</span>
+                    <span className="tapp-request-note-lbl">Note from Patient/Parent</span>
+                    <p className="tapp-request-note-text">&ldquo;{req.note}&rdquo;</p>
+                  </div>
+
+                  <div className="tapp-request-actions">
+                    <button className="tapp-request-accept" onClick={() => handleAcceptRequest(req)}><CheckIcon /> Accept</button>
+                    <button className="tapp-request-decline" onClick={() => handleDeclineRequest(req)}><XIcon /> Decline</button>
+                    <button className="tapp-request-details" onClick={() => setViewRequest(req)}>View Details</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Today's Schedule */}
+        <section className="tapp-today">
+          <div className="tapp-today-head">
+            <h3 className="tapp-section-title">Today's Schedule</h3>
+            <span className="tapp-today-date">{fmtDate(scheduleForToday.date)}</span>
+          </div>
+
+          {scheduleForToday.items.length === 0 ? (
+            <p className="tapp-today-empty">No sessions scheduled.</p>
+          ) : (
+            <div className="tapp-today-list">
+              {scheduleForToday.items.map(a => {
+                const p = patient(a)
+                return (
+                  <div key={a.id} className="tapp-today-row">
+                    <div className="tapp-today-time">
+                      <span>{fmt12(a.time)}</span>
+                      <span className="tapp-today-time-sep">–</span>
+                      <span>{fmt12(addMinutes(a.time, parseInt(a.duration, 10)))}</span>
+                    </div>
+                    <img className="tapp-today-avatar" src={p.avatar} alt={p.name} />
+                    <div className="tapp-today-patient">
+                      <span className="tapp-today-name">{p.name}</span>
+                      <span className="tapp-today-cond">{p.condition}</span>
+                    </div>
+                    <span className={`tapp-type-badge ${typeClass(a.type)}`}>{a.type}</span>
+                    <span className="tapp-today-desc">{a.notes || `${a.type} session`}</span>
+                    <span className={`tapp-status-badge ${statusClass(a.status)}`}>{a.status}</span>
+                    <button className="tapp-btn tapp-btn-view" onClick={() => setViewAppt(a)}><EyeIcon /> View</button>
+                    <button className="tapp-today-kebab" onClick={() => setEditAppt(a)} aria-label="More options"><DotsIcon /></button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <button type="button" className="tapp-today-viewall" onClick={scrollToAllAppointments}>
+            <CalIcon /> View All Appointments
+          </button>
+        </section>
+
         {/* View mode tabs + toolbar */}
-        <div className="tapp-tabs-row">
+        <div className="tapp-tabs-row" id="tapp-all-appointments">
           <div className="tapp-tabs">
             <button
               className={`tapp-tab${viewMode === 'active' ? ' tapp-tab-active' : ''}`}
@@ -706,6 +915,14 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onConfirm={id => { handleUnarchive(id); setConfirmRestoreAppt(null) }}
           onRebook={a => { setEditAppt(a); setConfirmRestoreAppt(null) }}
           onClose={() => setConfirmRestoreAppt(null)}
+        />
+      )}
+      {viewRequest && (
+        <RequestDetailsModal
+          req={viewRequest}
+          onClose={() => setViewRequest(null)}
+          onAccept={handleAcceptRequest}
+          onDecline={handleDeclineRequest}
         />
       )}
       {toast    && <div className="tapp-toast">{toast}</div>}

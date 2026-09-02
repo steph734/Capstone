@@ -1,0 +1,258 @@
+/* Sales & Billing Analytics */
+.sba-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 22px);
+  align-items: start;
+}
+
+.sba-card {
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 16px;
+  padding: clamp(16px, 2vw, 22px);
+  box-shadow: 0 4px 14px rgba(20, 38, 31, 0.05);
+}
+
+.sba-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sba-card-title {
+  margin: 0;
+  font-size: clamp(15px, 1.5vw, 17px);
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.sba-card-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #9aab9f;
+}
+
+/* Left column */
+.sba-left {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 22px);
+}
+
+.sba-chart-wrap {
+  width: 100%;
+}
+
+.sba-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.sba-stat {
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+}
+
+.sba-stat-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.75;
+}
+
+.sba-stat-value {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(18px, 2vw, 22px);
+  font-weight: 800;
+}
+
+.sba-stat.revenue { background: #e8f5ee; border-color: #cfeadd; color: #1c7a45; }
+.sba-stat.pending { background: #efeafe; border-color: #ddd2fb; color: #5b3fc4; }
+.sba-stat.overdue { background: #fdecec; border-color: #f6cfcd; color: #c9302c; }
+
+.sba-avg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #e6f4f2;
+  border: 1px solid #cde9e4;
+  border-radius: 14px;
+  padding: 16px 18px;
+  color: #1f7a6f;
+}
+
+.sba-avg-value {
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 800;
+}
+
+/* Transactions */
+.sba-search {
+  width: 100%;
+  border: 1px solid #e3efe9;
+  background: #f8fbfa;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #2c4a3e;
+  margin-bottom: 10px;
+}
+
+.sba-search:focus {
+  outline: none;
+  border-color: #4a6b5d;
+  background: #fff;
+}
+
+.sba-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sba-filter-group {
+  display: flex;
+  gap: 6px;
+}
+
+.sba-filter-group.right {
+  margin-left: auto;
+}
+
+.sba-chip {
+  border: 1px solid #e3efe9;
+  background: #fff;
+  color: #6b7c75;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sba-chip:hover {
+  border-color: #4a6b5d;
+  color: #2c4a3e;
+}
+
+.sba-chip.active {
+  background: #2c4a3e;
+  border-color: #2c4a3e;
+  color: #fff;
+}
+
+.sba-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e3efe9;
+  background: #fff;
+  color: #2c4a3e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sba-export:hover {
+  background: #f5faf8;
+  border-color: #4a6b5d;
+}
+
+.sba-txn-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.sba-txn {
+  display: grid;
+  grid-template-columns: 34px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid #f0f5f3;
+}
+
+.sba-txn:last-child { border-bottom: none; }
+
+.sba-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sba-txn-main {
+  min-width: 0;
+}
+
+.sba-txn-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c4a3e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sba-txn-date {
+  font-size: 11px;
+  color: #9aab9f;
+}
+
+.sba-txn-amount {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
+
+.sba-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.sba-status.paid { background: #e3f4ea; color: #1c7a45; }
+.sba-status.pending { background: #fff4d6; color: #8b6e00; }
+.sba-status.overdue { background: #fee2e2; color: #991b1b; }
+
+.sba-empty {
+  text-align: center;
+  padding: 28px 12px;
+  color: #9aab9f;
+  font-size: 13px;
+}
+
+@media (max-width: 960px) {
+  .sba-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .sba-stat-row {
+    grid-template-columns: 1fr;
+  }
+}

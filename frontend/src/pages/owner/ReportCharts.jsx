@@ -85,7 +85,7 @@ export function TrendChart({ months, trend, color = '#2a9d8f', valueFormatter = 
 }
 
 /* ---------- Breakdown bar chart (per-entity snapshot, drill-down modal) ---------- */
-export function BreakdownChart({ labels, values, color = '#3b82f6', valueFormatter = (v) => v, height = 200 }) {
+export function BreakdownChart({ labels, values, color = '#3b82f6', valueFormatter = (v) => v, height = 200, showValueLabels = false }) {
   const data = {
     labels,
     datasets: [
@@ -100,6 +100,7 @@ export function BreakdownChart({ labels, values, color = '#3b82f6', valueFormatt
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: showValueLabels ? { padding: { top: 20 } } : {},
     plugins: {
       legend: { display: false },
       tooltip: { callbacks: { label: (ctx) => valueFormatter(ctx.parsed.y) } },
@@ -109,9 +110,29 @@ export function BreakdownChart({ labels, values, color = '#3b82f6', valueFormatt
       y: { grid: { color: '#eef4f1' }, ticks: { ...AXIS_TICK, callback: (v) => valueFormatter(v) } },
     },
   }
+  const valueLabelPlugin = {
+    id: 'breakdownValueLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart
+      chart.data.datasets.forEach((ds, di) => {
+        const meta = chart.getDatasetMeta(di)
+        meta.data.forEach((bar, i) => {
+          const v = ds.data[i]
+          if (v == null) return
+          ctx.save()
+          ctx.fillStyle = '#2c4a3e'
+          ctx.font = '700 11px sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'bottom'
+          ctx.fillText(valueFormatter(v), bar.x, bar.y - 4)
+          ctx.restore()
+        })
+      })
+    },
+  }
   return (
     <div style={{ height }}>
-      <Bar data={data} options={options} />
+      <Bar data={data} options={options} plugins={showValueLabels ? [valueLabelPlugin] : []} />
     </div>
   )
 }

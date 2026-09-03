@@ -198,8 +198,9 @@ function App() {
   const handleLogin = (email, password) => {
     const matchedUser = getEffectiveUsers().find((user) => {
       if (user.email !== email) return false
-      // Accept the built-in password, or a new one set via the reset-password flow.
-      return password === user.password || password === getResetPassword(user.email)
+      // A password set via the reset-password flow replaces the built-in one.
+      const resetPassword = getResetPassword(user.email)
+      return resetPassword ? password === resetPassword : password === user.password
     })
 
     if (matchedUser) {

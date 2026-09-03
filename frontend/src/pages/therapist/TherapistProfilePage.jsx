@@ -9,7 +9,7 @@ const DEFAULT_PROFILE = {
   title: 'Licensed Occupational Therapist',
   specialization: 'Pediatric Occupational Therapy',
   license: 'OT-PH-2019-00123',
-  email: 'sarah.reyes@therapypro.com',
+  email: 'therapists@gmail.com',
   phone: '+63 917 123 4567',
   clinic: 'TherapyPro Clinic, Makati City',
   availability: 'Mon – Fri, 8:00 AM – 5:00 PM',
@@ -113,7 +113,7 @@ function StarIcon() {
   )
 }
 
-export default function TherapistProfilePage({ user, onLogout, menuItems }) {
+export default function TherapistProfilePage({ user, onLogout, menuItems, onUpdateUser }) {
   const [profile, setProfile] = useState(loadProfile)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
@@ -126,6 +126,7 @@ export default function TherapistProfilePage({ user, onLogout, menuItems }) {
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    onUpdateUser?.({ name: draft.name, email: draft.email, avatar: draft.avatar })
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)

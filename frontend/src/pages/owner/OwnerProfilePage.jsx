@@ -9,7 +9,7 @@ const DEFAULT_PROFILE = {
   title: 'Clinic Owner & Director',
   businessName: 'TherapyPro Clinic Network',
   businessLicense: 'BL-2020-00456',
-  email: 'owner@therapypro.com',
+  email: 'owner@gmail.com',
   phone: '+63 917 555 8888',
   address: 'TherapyPro Main Branch, BGC, Taguig',
   bio: 'Founded TherapyPro with a vision to make quality occupational therapy accessible to every family. Overseeing clinic operations, staff management, and patient care standards across multiple branches.',
@@ -55,7 +55,7 @@ function Field({ icon, label, value, editing, field, draft, onChange }) {
   )
 }
 
-export default function OwnerProfilePage({ user, onLogout, menuItems, betaTier }) {
+export default function OwnerProfilePage({ user, onLogout, menuItems, betaTier, onUpdateUser }) {
   const [profile, setProfile] = useState(() => loadProfile(user))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
@@ -66,6 +66,7 @@ export default function OwnerProfilePage({ user, onLogout, menuItems, betaTier }
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    onUpdateUser?.({ name: draft.name, email: draft.email, avatar: draft.avatar })
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)

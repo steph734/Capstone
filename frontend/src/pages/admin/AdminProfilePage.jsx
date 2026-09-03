@@ -9,7 +9,7 @@ const DEFAULT_PROFILE = {
   title: 'System Administrator',
   department: 'IT & Operations',
   accessLevel: 'Full System Access',
-  email: 'superadmin@therapypro.com',
+  email: 'superadmin@gmail.com',
   phone: '+63 917 000 9999',
   location: 'TherapyPro HQ, Makati City',
   bio: 'Responsible for managing the entire TherapyPro platform, overseeing branch operations, user management, system configurations, and ensuring platform-wide security and compliance.',
@@ -55,7 +55,7 @@ function Field({ icon, label, value, editing, field, draft, onChange }) {
   )
 }
 
-export default function AdminProfilePage({ user, onLogout, menuItems }) {
+export default function AdminProfilePage({ user, onLogout, menuItems, onUpdateUser }) {
   const [profile, setProfile] = useState(() => loadProfile(user))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
@@ -66,6 +66,7 @@ export default function AdminProfilePage({ user, onLogout, menuItems }) {
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    onUpdateUser?.({ name: draft.name, email: draft.email, avatar: draft.avatar })
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)

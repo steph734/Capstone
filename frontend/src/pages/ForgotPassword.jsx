@@ -12,10 +12,86 @@ function EnvelopeIcon() {
   )
 }
 
-export default function ForgotPassword({ onLogoClick, onSignInClick }) {
+function MailSentIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  )
+}
+
+export default function ForgotPassword() {
   const navigate = useNavigate()
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState('idle') // idle | sending | sent | error
+  const [error, setError] = useState('')
+
+  const sendResetLink = async (e) => {
+    e?.preventDefault()
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setError('Please enter your email address.')
+      setStatus('error')
+      return
+    }
+
+    setStatus('sending')
+    setError('')
+
+    try {
+      const res = await fetch('/api/send-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmed, appUrl: window.location.origin }),
+      })
+
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error(
+          "Couldn't reach the email server. If you're running `npm run dev`, the /api routes " +
+          'are not served that way — run `vercel dev` instead.'
+        )
+      }
+      if (!res.ok) throw new Error(data.error || 'Could not send the reset email.')
+
+      setStatus('sent')
+    } catch (err) {
+      setError(err.message || 'Could not send the reset email.')
+      setStatus('error')
+    }
+  }
+
+  if (status === 'sent') {
+    return (
+      <div className="forgot-page">
+        <div className="forgot-container">
+          <div className="forgot-header">
+            <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
+            <div className="forgot-sent-icon"><MailSentIcon /></div>
+            <h1 className="forgot-title">Check your email</h1>
+            <p className="forgot-subtitle">
+              We&rsquo;ve sent a password reset link to <strong>{email.trim()}</strong>. Open it
+              and click <strong>&ldquo;Reset your password&rdquo;</strong> to choose a new one. The
+              link expires in 1 hour.
+            </p>
+          </div>
+
+          <button type="button" className="forgot-btn" onClick={() => navigate('/login')}>
+            Back to Sign In
+          </button>
+
+          <p className="signin-text">
+            Didn&rsquo;t get it?{' '}
+            <button type="button" className="signin-link" onClick={() => setStatus('idle')}>
+              Try another email
+            </button>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -29,7 +105,7 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
           </p>
         </div>
 
-        <form className="forgot-form" onSubmit={handleSubmit}>
+        <form className="forgot-form" onSubmit={sendResetLink}>
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <div className="input-wrapper">
@@ -39,11 +115,20 @@ export default function ForgotPassword({ onLogoClick, onSignInClick }) {
                 type="email"
                 placeholder="Enter your email address"
                 autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (status === 'error') setStatus('idle')
+                }}
               />
             </div>
           </div>
 
-          <button type="submit" className="forgot-btn">Reset Password</button>
+          {status === 'error' && <p className="forgot-error">{error}</p>}
+
+          <button type="submit" className="forgot-btn" disabled={status === 'sending'}>
+            {status === 'sending' ? 'Sending…' : 'Reset Password'}
+          </button>
         </form>
 
         <p className="signin-text">

@@ -4,10 +4,12 @@ import { MessagesProvider } from './context/MessagesContext'
 import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
+import { getResetPassword } from './utils/passwordResets'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import TherapyDetail from './pages/TherapyDetail'
 import AppointmentsPage from './pages/AppointmentsPage'
@@ -88,6 +90,26 @@ const TEMP_USERS = [
     avatar: '/therapy-pro-logo.png'
   }
 ]
+
+// Persisted overrides so a profile email change becomes the new login email
+// (keyed by role — each temp account has a unique role). Password is unchanged.
+const CREDENTIAL_OVERRIDES_KEY = 'credentialOverrides'
+
+const loadCredentialOverrides = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CREDENTIAL_OVERRIDES_KEY)) || {}
+  } catch {
+    return {}
+  }
+}
+
+const getEffectiveUsers = () => {
+  const overrides = loadCredentialOverrides()
+  return TEMP_USERS.map((user) => {
+    const override = overrides[user.role]
+    return override ? { ...user, ...override } : user
+  })
+}
 
 const getHomePath = (role) => {
   if (role === 'Super Admin') return '/admin/dashboard'
@@ -174,7 +196,11 @@ function App() {
   }
 
   const handleLogin = (email, password) => {
-    const matchedUser = TEMP_USERS.find(user => user.email === email && user.password === password)
+    const matchedUser = getEffectiveUsers().find((user) => {
+      if (user.email !== email) return false
+      // Accept the built-in password, or a new one set via the reset-password flow.
+      return password === user.password || password === getResetPassword(user.email)
+    })
 
     if (matchedUser) {
       setIsAuthenticated(true)
@@ -197,6 +223,14 @@ function App() {
     setCurrentUser((prev) => {
       const next = { ...prev, ...updates }
       localStorage.setItem('currentUser', JSON.stringify(next))
+
+      // A profile email change automatically becomes the login email for this role.
+      if (updates.email && updates.email !== prev?.email && prev?.role) {
+        const overrides = loadCredentialOverrides()
+        overrides[prev.role] = { ...overrides[prev.role], email: updates.email }
+        localStorage.setItem(CREDENTIAL_OVERRIDES_KEY, JSON.stringify(overrides))
+      }
+
       return next
     })
   }
@@ -234,11 +268,16 @@ function App() {
           element={<SignUp />} 
         />
         
-        <Route 
-          path="/forgot-password" 
-          element={<ForgotPassword />} 
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
-        
+
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
+
         <Route 
           path="/dashboard" 
           element={
@@ -639,7 +678,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+                <TherapistProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onUpdateUser={handleUpdateUser} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -669,7 +708,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Super Admin' ? (
-                <AdminProfilePage user={currentUser} onLogout={handleLogout} />
+                <AdminProfilePage user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -684,7 +723,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
-                <OwnerProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+                <OwnerProfilePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} onUpdateUser={handleUpdateUser} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

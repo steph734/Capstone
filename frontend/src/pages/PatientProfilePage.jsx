@@ -73,7 +73,7 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
-    onUpdateUser?.({ name: draft.name, avatar: draft.avatar })
+    onUpdateUser?.({ name: draft.name, email: draft.email, avatar: draft.avatar })
     setEditing(false)
     setToast(true)
     setTimeout(() => setToast(false), 2800)

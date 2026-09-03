@@ -103,11 +103,36 @@ const loadCredentialOverrides = () => {
   }
 }
 
+// Each role's profile page persists its own copy of the profile (including the
+// email) under these keys. Login falls back to them so an email changed on the
+// profile page still works even if the credential override was never written
+// (e.g. the profile was edited on an older build, or the user is now locked out).
+const PROFILE_STORAGE_BY_ROLE = {
+  Patient: 'patient_profile',
+  'Super Admin': 'admin_profile',
+  Owner: 'owner_profile',
+  Therapist: 'therapist_profile',
+}
+
+const readProfileEmail = (storageKey) => {
+  if (!storageKey) return null
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey))
+    const email = saved && typeof saved.email === 'string' ? saved.email.trim() : ''
+    return email || null
+  } catch {
+    return null
+  }
+}
+
 const getEffectiveUsers = () => {
   const overrides = loadCredentialOverrides()
   return TEMP_USERS.map((user) => {
-    const override = overrides[user.role]
-    return override ? { ...user, ...override } : user
+    const email =
+      overrides[user.role]?.email ||
+      readProfileEmail(PROFILE_STORAGE_BY_ROLE[user.role]) ||
+      user.email
+    return { ...user, email }
   })
 }
 
@@ -196,8 +221,9 @@ function App() {
   }
 
   const handleLogin = (email, password) => {
+    const typedEmail = String(email || '').trim().toLowerCase()
     const matchedUser = getEffectiveUsers().find((user) => {
-      if (user.email !== email) return false
+      if (user.email.trim().toLowerCase() !== typedEmail) return false
       // A password set via the reset-password flow replaces the built-in one.
       const resetPassword = getResetPassword(user.email)
       return resetPassword ? password === resetPassword : password === user.password

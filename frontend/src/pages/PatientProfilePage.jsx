@@ -70,6 +70,15 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
 
   useEffect(() => { if (editing) setDraft(profile) }, [editing])
 
+  // Keep the login email in sync with the saved profile email (covers profiles
+  // saved before this sync existed).
+  useEffect(() => {
+    if (profile.email && user?.email && profile.email !== user.email) {
+      onUpdateUser?.({ email: profile.email })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleSave = () => {
     setProfile(draft)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))

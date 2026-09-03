@@ -6,13 +6,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { email, name, appUrl } = req.body || {}
+  const { email, name, appUrl, role } = req.body || {}
   if (!email) {
     return res.status(400).json({ error: 'Missing email' })
   }
 
   try {
-    const result = await sendResetPasswordEmail({ email, name, appUrl })
+    const result = await sendResetPasswordEmail({ email, name, appUrl, role })
     return res.status(200).json(result)
   } catch (err) {
     return res.status(400).json({ error: err.message })

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
+import { resolveAccountByEmail } from '../utils/accounts'
 import './ForgotPassword.css'
 
 function EnvelopeIcon() {
@@ -39,11 +40,20 @@ export default function ForgotPassword() {
     setStatus('sending')
     setError('')
 
+    // Tie the reset to a known account so the new password can be stored against
+    // the right role (and used to sign in from any browser/device).
+    const account = resolveAccountByEmail(trimmed)
+
     try {
       const res = await fetch('/api/send-reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmed, appUrl: window.location.origin }),
+        body: JSON.stringify({
+          email: trimmed,
+          appUrl: window.location.origin,
+          role: account?.role || null,
+          name: account?.name || undefined,
+        }),
       })
 
       let data

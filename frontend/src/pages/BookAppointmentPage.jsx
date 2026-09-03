@@ -191,19 +191,17 @@ export default function BookAppointmentPage({ user }) {
 
         {/* ── Step Indicator ── */}
         <div className="step-bar">
-          {STEPS.map((s, idx) => (
-            <div key={s.n} className="step-item">
+          {STEPS.map(s => (
+            <div
+              key={s.n}
+              className={`step-item ${step >= s.n ? 'line-done' : ''}`}
+            >
               <div className={`step-circle ${step > s.n ? 'step-done' : ''} ${step === s.n ? 'step-active' : ''}`}>
                 {step > s.n ? <CheckIcon /> : s.n}
               </div>
-              {idx < STEPS.length - 1 && <div className={`step-line ${step > s.n ? 'line-done' : ''}`} />}
-            </div>
-          ))}
-        </div>
-        <div className="step-labels">
-          {STEPS.map(s => (
-            <div key={s.n} className={`step-label-text ${step === s.n ? 'label-active' : ''}`}>
-              {s.label.split('\n').map((l, i) => <span key={i}>{l}</span>)}
+              <div className={`step-label-text ${step === s.n ? 'label-active' : ''}`}>
+                {s.label.split('\n').map((l, i) => <span key={i}>{l}</span>)}
+              </div>
             </div>
           ))}
         </div>

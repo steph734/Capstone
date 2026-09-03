@@ -68,20 +68,21 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
   const [loginError, setLoginError] = useState('')
   const [socialProvider, setSocialProvider] = useState(null)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (onLogin) {
-      const result = onLogin(email, password)
-      if (!result.success) {
-        setLoginError(result.message || 'Login failed')
+      setLoginError('')
+      const result = await onLogin(email, password)
+      if (!result?.success) {
+        setLoginError(result?.message || 'Login failed')
       }
     }
   }
 
-  const handleSocialSuccess = () => {
+  const handleSocialSuccess = async () => {
     setSocialProvider(null)
     if (onLogin) {
-      const result = onLogin('patient@demo.com', 'demo1234')
+      const result = await onLogin('patient@demo.com', 'demo1234')
       if (result && result.success) return
     }
     navigate('/')

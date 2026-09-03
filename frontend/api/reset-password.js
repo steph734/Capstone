@@ -1,4 +1,5 @@
 import { verifyResetToken } from './_lib/resetPasswordEmail.js'
+import { saveResetCredential } from './_lib/credentialStore.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,8 +24,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: msg })
   }
 
-  // This prototype has no user database — the client persists the new password
-  // locally (localStorage) keyed by the email the server confirms here. In a
-  // real backend this is where the hashed password would be written.
-  return res.status(200).json({ ok: true, email: check.email })
+  // This prototype has no user database. If a Vercel KV store is connected we
+  // persist the new password there (so it works on any browser/device);
+  // otherwise the client falls back to per-browser localStorage. Either way the
+  // reset is not blocked on the store.
+  let persisted = false
+  try {
+    persisted = await saveResetCredential({
+      email: check.email,
+      role: check.role,
+      password,
+    })
+  } catch (err) {
+    console.error('reset-password: could not persist to KV —', err.message)
+  }
+
+  return res.status(200).json({ ok: true, email: check.email, role: check.role || null, persisted })
 }

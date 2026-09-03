@@ -5,6 +5,7 @@ import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import { getResetPassword } from './utils/passwordResets'
+import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/accounts'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -59,82 +60,8 @@ import AdminProfilePage from './pages/admin/AdminProfilePage'
 import OwnerProfilePage from './pages/owner/OwnerProfilePage'
 import PatientProfilePage from './pages/PatientProfilePage'
 
-// Temporary accounts (not connected to database)
-const TEMP_USERS = [
-  {
-    email: 'patient@gmail.com',
-    password: 'patient123',
-    name: 'Alvrin',
-    role: 'Patient',
-    avatar: '/therapy-pro-logo.png'
-  },
-  {
-    email: 'superadmin@gmail.com',
-    password: 'superadmin123',
-    name: 'Super Admin',
-    role: 'Super Admin',
-    avatar: '/therapy-pro-logo.png'
-  },
-  {
-    email: 'owner@gmail.com',
-    password: 'owner123',
-    name: 'Owner',
-    role: 'Owner',
-    avatar: '/therapy-pro-logo.png'
-  },
-  {
-    email: 'therapists@gmail.com',
-    password: 'therapist123',
-    name: 'Therapist',
-    role: 'Therapist',
-    avatar: '/therapy-pro-logo.png'
-  }
-]
-
-// Persisted overrides so a profile email change becomes the new login email
-// (keyed by role — each temp account has a unique role). Password is unchanged.
-const CREDENTIAL_OVERRIDES_KEY = 'credentialOverrides'
-
-const loadCredentialOverrides = () => {
-  try {
-    return JSON.parse(localStorage.getItem(CREDENTIAL_OVERRIDES_KEY)) || {}
-  } catch {
-    return {}
-  }
-}
-
-// Each role's profile page persists its own copy of the profile (including the
-// email) under these keys. Login falls back to them so an email changed on the
-// profile page still works even if the credential override was never written
-// (e.g. the profile was edited on an older build, or the user is now locked out).
-const PROFILE_STORAGE_BY_ROLE = {
-  Patient: 'patient_profile',
-  'Super Admin': 'admin_profile',
-  Owner: 'owner_profile',
-  Therapist: 'therapist_profile',
-}
-
-const readProfileEmail = (storageKey) => {
-  if (!storageKey) return null
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey))
-    const email = saved && typeof saved.email === 'string' ? saved.email.trim() : ''
-    return email || null
-  } catch {
-    return null
-  }
-}
-
-const getEffectiveUsers = () => {
-  const overrides = loadCredentialOverrides()
-  return TEMP_USERS.map((user) => {
-    const email =
-      overrides[user.role]?.email ||
-      readProfileEmail(PROFILE_STORAGE_BY_ROLE[user.role]) ||
-      user.email
-    return { ...user, email }
-  })
-}
+// Prototype accounts and the "effective login email" logic live in
+// ./utils/accounts so the forgot-password flow can resolve accounts the same way.
 
 const getHomePath = (role) => {
   if (role === 'Super Admin') return '/admin/dashboard'
@@ -147,8 +74,8 @@ const getHomePath = (role) => {
 function LoginWrapper({ onLogin }) {
   const navigate = useNavigate()
   
-  const handleLogin = (email, password) => {
-    const result = onLogin(email, password)
+  const handleLogin = async (email, password) => {
+    const result = await onLogin(email, password)
     if (result.success) {
       navigate(getHomePath(result.user?.role))
     }
@@ -220,14 +147,37 @@ function App() {
     }
   }
 
-  const handleLogin = (email, password) => {
+  const handleLogin = async (email, password) => {
     const typedEmail = String(email || '').trim().toLowerCase()
-    const matchedUser = getEffectiveUsers().find((user) => {
+
+    // 1. Local check: built-in password, or one set via the reset flow in THIS
+    //    browser. A local reset password replaces the built-in one.
+    let matchedUser = getEffectiveUsers().find((user) => {
       if (user.email.trim().toLowerCase() !== typedEmail) return false
-      // A password set via the reset-password flow replaces the built-in one.
       const resetPassword = getResetPassword(user.email)
       return resetPassword ? password === resetPassword : password === user.password
     })
+
+    // 2. Server check: a password changed on another browser/device lives only in
+    //    the shared store. Ask the API to verify it and tell us which account.
+    if (!matchedUser) {
+      try {
+        const res = await fetch('/api/verify-credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: typedEmail, password }),
+        })
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          if (data.match) {
+            const base = TEMP_USERS.find((user) => user.role === data.role)
+            if (base) matchedUser = { ...base, email: typedEmail }
+          }
+        }
+      } catch {
+        // API unreachable (offline, or plain `npm run dev`) — step 1 is all we have.
+      }
+    }
 
     if (matchedUser) {
       setIsAuthenticated(true)
@@ -253,9 +203,7 @@ function App() {
 
       // A profile email change automatically becomes the login email for this role.
       if (updates.email && updates.email !== prev?.email && prev?.role) {
-        const overrides = loadCredentialOverrides()
-        overrides[prev.role] = { ...overrides[prev.role], email: updates.email }
-        localStorage.setItem(CREDENTIAL_OVERRIDES_KEY, JSON.stringify(overrides))
+        setCredentialOverride(prev.role, { email: updates.email })
       }
 
       return next

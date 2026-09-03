@@ -37,8 +37,10 @@ function fromBase64url(str) {
   return Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
 }
 
-export function createResetToken(email) {
-  const payload = base64url(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS }))
+export function createResetToken(email, role) {
+  const payload = base64url(
+    JSON.stringify({ email, role: role || null, exp: Date.now() + TOKEN_TTL_MS })
+  )
   const sig = base64url(crypto.createHmac('sha256', signingSecret()).update(payload).digest())
   return `${payload}.${sig}`
 }
@@ -65,7 +67,7 @@ export function verifyResetToken(token) {
   }
   if (!data.email || !data.exp) return { valid: false, reason: 'malformed' }
   if (Date.now() > data.exp) return { valid: false, reason: 'expired' }
-  return { valid: true, email: data.email }
+  return { valid: true, email: data.email, role: data.role || null }
 }
 
 function buildHtml({ brand, name, link }) {
@@ -119,10 +121,10 @@ function buildText({ brand, name, link }) {
 
 // Issues a signed reset token and emails the user a link back to the app's
 // /reset-password page. Called by POST /api/send-reset-password.
-export async function sendResetPasswordEmail({ email, name, appUrl }) {
+export async function sendResetPasswordEmail({ email, name, appUrl, role }) {
   if (!email) throw new Error('Missing email')
 
-  const token = createResetToken(email)
+  const token = createResetToken(email, role)
   const base = (appUrl || readEnv('APP_URL') || 'http://localhost:5173').replace(/\/+$/, '')
   const link =
     `${base}/reset-password?token=${encodeURIComponent(token)}` +

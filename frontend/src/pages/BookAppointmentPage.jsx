@@ -687,6 +687,14 @@ export default function BookAppointmentPage({ user }) {
         lineItems={[
           { name: `Therapy Session (${sessionModeObj?.label || 'Session'})`, qty: 1, unitCentavos: SESSION_FEE * 100 },
         ]}
+        metadata={{
+          booking_type: 'appointment',
+          patient: fullName,
+          therapist: therapistObj?.name || '',
+          session_mode: sessionModeObj?.label || '',
+          appointment_date: bookingDateLabel,
+          appointment_time: pickedTime || '',
+        }}
         redirectSeconds={5}
         onSuccess={(meta) => setOnlinePayment(meta)}
         onRedirect={handleCheckoutDone}

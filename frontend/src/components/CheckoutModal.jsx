@@ -135,9 +135,18 @@ function CheckoutStepsBase({
   demo = false,
   stripe = null,
   elements = null,
+  total = 0,
+  description = 'TherapyPro appointment',
+  metadata = {},
 }) {
   const [pmType, setPmType] = useState(null)
   const [pmComplete, setPmComplete] = useState(false)
+
+  // Which rail the payer picked on step 1: 'card' = Stripe card / e-wallet,
+  // 'qr' = scan-to-pay via the merchant's InstaPay QR (a manual bank transfer,
+  // so it never touches Stripe — it's confirmed on trust like the demo path).
+  const [channel, setChannel] = useState('card')
+  const [qrConfirmed, setQrConfirmed] = useState(false)
 
   useEffect(() => {
     if (demo) {
@@ -145,6 +154,9 @@ function CheckoutStepsBase({
       setPmComplete(true)
     }
   }, [demo])
+
+  const isQr = channel === 'qr'
+  const methodLabel = isQr ? 'InstaPay QR' : labelForMethod(pmType)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -158,8 +170,9 @@ function CheckoutStepsBase({
 
   const nameValid = name.trim().length > 0
   const emailValid = EMAIL_RE.test(email.trim())
+  const needsStripe = !demo && !isQr
   const canComplete =
-    nameValid && emailValid && agree && !submitting && (demo || (!!stripe && !!elements))
+    nameValid && emailValid && agree && !submitting && (!needsStripe || (!!stripe && !!elements))
 
   /* Success-screen countdown → auto-redirect exactly once */
   const redirectedRef = useRef(false)
@@ -197,16 +210,52 @@ function CheckoutStepsBase({
       minute: '2-digit',
     })
 
-    // Demo mode: no payment backend reachable — simulate a successful charge so
-    // the flow can still be demonstrated end to end.
-    if (demo) {
+    // Demo mode (no payment backend reachable) and the QR rail (a manual InstaPay
+    // transfer that never touches Stripe) both settle on trust — simulate a
+    // successful charge so the flow can still complete end to end.
+    if (demo || isQr) {
       await sleep(1200)
-      onPaid({ method: labelForMethod(pmType) || 'Card', dateLabel })
+      onPaid({ method: methodLabel || 'Card', dateLabel })
+      return
+    }
+
+    // Deferred flow: validate the PaymentElement, THEN create the PaymentIntent
+    // (with the customer attached) and confirm it. Nothing is created in Stripe
+    // until the user actually pays — no orphan "Incomplete" intents.
+    const { error: submitError } = await elements.submit()
+    if (submitError) {
+      setPayError(submitError.message || 'Please check your payment details.')
+      setSubmitting(false)
+      return
+    }
+
+    const phone = mobile.trim() ? `+63${mobile.replace(/\D/g, '')}` : ''
+
+    let clientSecret
+    try {
+      const res = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: total,
+          email: email.trim(),
+          name: name.trim(),
+          description,
+          metadata: { ...metadata, ...(phone ? { payer_phone: phone } : {}) },
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.clientSecret) throw new Error(data.error || `HTTP ${res.status}`)
+      clientSecret = data.clientSecret
+    } catch (e) {
+      setPayError(`Could not start the payment. ${e.message}`)
+      setSubmitting(false)
       return
     }
 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
+      clientSecret,
       redirect: 'if_required',
       confirmParams: {
         return_url: window.location.href,
@@ -214,7 +263,8 @@ function CheckoutStepsBase({
           billing_details: {
             name: name.trim(),
             email: email.trim(),
-            ...(mobile.trim() ? { phone: `+63${mobile.replace(/\D/g, '')}` } : {}),
+            ...(phone ? { phone } : {}),
+            address: { country: 'PH' },
           },
         },
       },
@@ -226,7 +276,7 @@ function CheckoutStepsBase({
       return
     }
     if (paymentIntent && paymentIntent.status === 'succeeded') {
-      onPaid({ method: labelForMethod(pmType), dateLabel })
+      onPaid({ method: labelForMethod(paymentIntent.payment_method_types?.[0] || pmType), dateLabel })
     } else {
       setPayError(`Payment status: ${paymentIntent?.status || 'unknown'}. Please try again.`)
       setSubmitting(false)
@@ -241,7 +291,7 @@ function CheckoutStepsBase({
           <CheckIcon />
         </div>
         <h3 className="mt-4 text-base font-semibold text-pm-green-dark">
-          {labelForMethod(pmType)} payment received!
+          {methodLabel} payment received!
         </h3>
         <p className="mt-1 text-xs text-slate-500">
           An automated receipt will be sent to your email.
@@ -267,7 +317,7 @@ function CheckoutStepsBase({
         <div className="mb-4 flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-700">Payment Method</span>
           <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-            {labelForMethod(pmType)}
+            {methodLabel}
           </span>
         </div>
 
@@ -279,7 +329,7 @@ function CheckoutStepsBase({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-          className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 outline-none focus:border-pm-green ${
+          className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-pm-green ${
             touched.name && !nameValid ? 'border-red-400' : 'border-slate-300'
           }`}
         />
@@ -300,7 +350,7 @@ function CheckoutStepsBase({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-            className={`w-full rounded-lg border py-2 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-pm-green ${
+            className={`w-full rounded-lg border bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-pm-green ${
               touched.email && !emailValid ? 'border-red-400' : 'border-slate-300'
             }`}
           />
@@ -323,7 +373,7 @@ function CheckoutStepsBase({
             maxLength={10}
             onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
             placeholder="9XXXXXXXXX"
-            className="w-full rounded-r-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-pm-green"
+            className="w-full rounded-r-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-pm-green"
           />
         </div>
 
@@ -372,7 +422,61 @@ function CheckoutStepsBase({
         </span>
       </div>
 
-      {demo ? (
+      {/* Card vs. QR rail */}
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        {[
+          { id: 'card', label: 'Pay with card' },
+          { id: 'qr', label: 'Pay with QR code' },
+        ].map((opt) => {
+          const active = channel === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setChannel(opt.id)}
+              className={`rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
+                active
+                  ? 'border-pm-green bg-green-50/60 text-slate-800'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {isQr ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="text-center">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Scan to pay
+            </div>
+            <div className="mt-0.5 text-lg font-bold text-pm-green">{peso(total)}</div>
+          </div>
+
+          <img
+            src="/instapay-qr.jpg"
+            alt="InstaPay QR code for ST****N AD***N T."
+            className="w-full max-w-[260px] rounded-lg border border-slate-200 bg-white object-contain"
+          />
+
+          <div className="text-center text-[11px] leading-tight text-slate-400">
+            Open your banking / e-wallet app, scan this code, and send exactly{' '}
+            <span className="font-semibold text-slate-500">{peso(total)}</span>.
+          </div>
+
+          <label className="mt-1 flex items-start gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={qrConfirmed}
+              onChange={(e) => setQrConfirmed(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 accent-pm-green"
+            />
+            <span>I have completed the transfer using the QR code above.</span>
+          </label>
+        </div>
+      ) : demo ? (
         <div className="space-y-2">
           <div className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
             Payment service isn&rsquo;t reachable — running in demo mode (no real charge).
@@ -391,7 +495,14 @@ function CheckoutStepsBase({
         <PaymentElement
           options={{
             layout: 'tabs',
-            fields: { billingDetails: { name: 'never', email: 'never', phone: 'never' } },
+            fields: {
+              billingDetails: {
+                name: 'never',
+                email: 'never',
+                phone: 'never',
+                address: 'never',
+              },
+            },
           }}
           onChange={(e) => {
             setPmComplete(e.complete)
@@ -408,7 +519,7 @@ function CheckoutStepsBase({
           type="button"
           className={btnPrimary}
           onClick={() => setStep(2)}
-          disabled={!pmComplete}
+          disabled={isQr ? !qrConfirmed : !pmComplete}
         >
           Continue
         </button>
@@ -428,6 +539,7 @@ export default function CheckoutModal({
   redirectSeconds = 5,
   onSuccess,
   onRedirect,
+  metadata = {},
 }) {
   const computedTotal = useMemo(
     () => lineItems.reduce((sum, li) => sum + li.unitCentavos * (li.qty || 1), 0),
@@ -437,7 +549,6 @@ export default function CheckoutModal({
 
   const [step, setStep] = useState(1)
   const [paidMeta, setPaidMeta] = useState(null)
-  const [clientSecret, setClientSecret] = useState('')
   const [demo, setDemo] = useState(false)
   const [initializing, setInitializing] = useState(true)
 
@@ -458,27 +569,23 @@ export default function CheckoutModal({
     }
   }, [open])
 
-  /* Create the PaymentIntent. If the API isn't reachable (plain `npm run dev`,
-     or Stripe not configured on the server) fall back to a demo checkout so the
-     flow can still be shown end to end. */
+  /* Probe the payment API on open (no PaymentIntent is created here — the real
+     one is created at "Complete payment" with the customer attached). If the
+     API isn't reachable / Stripe isn't configured, fall back to demo mode. */
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    setClientSecret('')
     setDemo(false)
     setInitializing(true)
 
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: total }),
+      body: JSON.stringify({ probe: true }),
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}))
-        if (!r.ok || !data.clientSecret) {
-          throw new Error(data.error || `payment API returned HTTP ${r.status}`)
-        }
-        if (!cancelled) setClientSecret(data.clientSecret)
+        if (!r.ok || !data.ok) throw new Error(data.error || `payment API returned HTTP ${r.status}`)
       })
       .catch((e) => {
         if (cancelled) return
@@ -492,7 +599,7 @@ export default function CheckoutModal({
     return () => {
       cancelled = true
     }
-  }, [open, total])
+  }, [open])
 
   if (!open) return null
 
@@ -517,7 +624,7 @@ export default function CheckoutModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative flex max-h-[92vh] w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:flex-row"
+        className="relative flex max-h-[92vh] w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl [color-scheme:light] md:flex-row"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
@@ -551,6 +658,9 @@ export default function CheckoutModal({
                 redirectSeconds,
                 onRedirect: onRedirect || onClose,
                 onPaid,
+                total,
+                description: merchantName,
+                metadata,
               }
 
               if (initializing) {
@@ -561,11 +671,14 @@ export default function CheckoutModal({
                   </div>
                 )
               }
-              if (demo || !clientSecret) {
+              if (demo) {
                 return <CheckoutStepsBase {...stepProps} demo />
               }
               return (
-                <Elements stripe={getStripe()} options={{ clientSecret, appearance }}>
+                <Elements
+                  stripe={getStripe()}
+                  options={{ mode: 'payment', amount: total, currency: 'php', appearance }}
+                >
                   <RealCheckoutSteps {...stepProps} />
                 </Elements>
               )

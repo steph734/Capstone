@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await createPaymentIntent()
+    const result = await createPaymentIntent(req.body?.amount)
     return res.status(200).json(result)
   } catch (err) {
     return res.status(500).json({ error: err.message })

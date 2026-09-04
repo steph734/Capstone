@@ -15,6 +15,7 @@ const ShieldIcon  = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="
 const InfoIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4a9e6b" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 const ArrowRight  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
 const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+const ChevronIcon = ({ open }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9"/></svg>
 const CheckLgIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
 
 /* ─── Session mode icons ─── */
@@ -27,9 +28,8 @@ const BehaviorIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill
 const STEPS = [
   { n: 1, label: 'Personal\nDetails' },
   { n: 2, label: 'Booking\nDetails' },
-  { n: 3, label: 'Booking\nSummary' },
-  { n: 4, label: 'Payment' },
-  { n: 5, label: 'Confirmation' },
+  { n: 3, label: 'Summary &\nPayment' },
+  { n: 4, label: 'Confirmation' },
 ]
 
 const CHILD_CONDITIONS = [
@@ -60,11 +60,13 @@ const TIME_SLOTS = [
 ]
 
 const PAYMENT_METHODS = [
-  { id: 'gcash', label: 'GCash',             icon: '📱' },
-  { id: 'maya',  label: 'Maya',              icon: '💚' },
-  { id: 'card',  label: 'Credit/Debit Card', icon: '💳' },
-  { id: 'cash',  label: 'Cash on Clinic',    icon: '💵' },
+  { id: 'cash',   label: 'Cash',                desc: 'Pay in cash at the clinic' },
+  { id: 'stripe', label: 'Pay Online (Stripe)', desc: 'Card / online banking via Stripe' },
 ]
+
+const SESSION_FEE = 300
+const SERVICE_CHARGE = 50
+const TOTAL_DUE = SESSION_FEE + SERVICE_CHARGE
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -99,9 +101,15 @@ export default function BookAppointmentPage({ user }) {
   const [pickedTime, setPickedTime]               = useState(null)
   const [errors2, setErrors2]                     = useState({})
 
-  /* ── Step 4: Payment ── */
+  /* ── Step 3: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
-  const [errors4, setErrors4]     = useState({})
+  const [errors3, setErrors3]     = useState({})
+  const [cashOpen, setCashOpen]   = useState(true)
+  const [cash, setCash] = useState({ received: '' })
+  const setCashField = (k, v) => { setCash(p => ({ ...p, [k]: v })); setErrors3(p => ({ ...p, [k]: '' })) }
+  const cashReceived = parseFloat(cash.received) || 0
+  // Change is measured against the per-session rate.
+  const cashChange = cashReceived > SESSION_FEE ? cashReceived - SESSION_FEE : 0
 
   /* ── Validation ── */
   const validate1 = () => {
@@ -123,17 +131,21 @@ export default function BookAppointmentPage({ user }) {
     if (!pickedTime)        e.time      = 'Please select a time slot'
     return e
   }
-  const validate4 = () => {
+  const validate3 = () => {
     const e = {}
     if (!payMethod) e.method = 'Please select a payment method'
+    if (payMethod === 'cash') {
+      if (!String(cash.received).trim()) e.received = 'Required'
+      else if (cashReceived < SESSION_FEE) e.received = `Must be at least ₱${SESSION_FEE.toFixed(2)}`
+    }
     return e
   }
 
   const handleNext = () => {
     if (step === 1) { const e = validate1(); if (Object.keys(e).length) { setErrors1(e); return } }
     if (step === 2) { const e = validate2(); if (Object.keys(e).length) { setErrors2(e); return } }
-    if (step === 4) { const e = validate4(); if (Object.keys(e).length) { setErrors4(e); return } }
-    setStep(s => Math.min(s + 1, 5))
+    if (step === 3) { const e = validate3(); if (Object.keys(e).length) { setErrors3(e); if (e.received) setCashOpen(true); return } }
+    setStep(s => Math.min(s + 1, 4))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const handleBack = () => {
@@ -147,10 +159,15 @@ export default function BookAppointmentPage({ user }) {
   const sessionModeObj = SESSION_MODES.find(m => m.id === sessionMode)
   const fullName = `${form1.firstName} ${form1.lastName}`.trim() || '—'
 
-  /* Record the booking in the audit log once the confirmation step is reached */
+  /* Confirmation email status: null | 'sending' | 'sent' | 'error' */
+  const [emailStatus, setEmailStatus] = useState(null)
+  const [emailError, setEmailError]   = useState('')
+
+  /* Record the booking in the audit log + email a confirmation once the
+     confirmation step is reached. Runs exactly once. */
   const loggedBookingRef = useRef(false)
   useEffect(() => {
-    if (step !== 5 || loggedBookingRef.current) return
+    if (step !== 4 || loggedBookingRef.current) return
     loggedBookingRef.current = true
     logActivity({
       role: 'Patient',
@@ -162,6 +179,53 @@ export default function BookAppointmentPage({ user }) {
       entity: `Appointment · ${bookingDateLabel}`,
       status: 'Success',
     })
+
+    // Email the confirmation to the address entered on the form. The booking is
+    // already done, so a mail hiccup must not block the success screen — but the
+    // outcome is surfaced on the confirmation card so a silent failure is visible.
+    const to = form1.email.trim()
+    if (!to) return
+    setEmailStatus('sending')
+    fetch('/api/send-appointment-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: to,
+        guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
+        patient: fullName,
+        condition: form1.condition,
+        therapist: therapistObj?.name || '',
+        therapistRole: therapistObj?.role || '',
+        sessionMode: sessionModeObj?.label || '',
+        date: bookingDateLabel,
+        time: pickedTime || '',
+        payment: PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
+        total: TOTAL_DUE,
+        ...(payMethod === 'cash' && cashReceived > 0
+          ? { amountReceived: cashReceived, amountChange: cashChange }
+          : {}),
+      }),
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          const msg =
+            body.error ||
+            (r.status === 404
+              ? 'Email service not reachable — run the app with `vercel dev`.'
+              : `HTTP ${r.status}`)
+          console.warn('Appointment confirmation email was not sent:', msg)
+          setEmailStatus('error')
+          setEmailError(msg)
+        } else {
+          setEmailStatus('sent')
+        }
+      })
+      .catch((e) => {
+        console.warn('Appointment confirmation email request failed:', e)
+        setEmailStatus('error')
+        setEmailError(e.message || 'Request failed')
+      })
   }, [step]) // eslint-disable-line
 
   return (
@@ -425,7 +489,7 @@ export default function BookAppointmentPage({ user }) {
             </>
           )}
 
-          {/* ══ STEP 3: Booking Summary ══ */}
+          {/* ══ STEP 3: Booking Summary & Payment ══ */}
           {step === 3 && (
             <>
               <h2 className="book-heading">Booking Summary</h2>
@@ -457,44 +521,96 @@ export default function BookAppointmentPage({ user }) {
                 <div className="summary-row"><span>Session Mode</span><strong>{sessionModeObj?.label || '—'}</strong></div>
                 <div className="summary-row total-row"><span>Rate</span><strong>₱300.00 / Session</strong></div>
               </div>
-            </>
-          )}
 
-          {/* ══ STEP 4: Payment ══ */}
-          {step === 4 && (
-            <>
-              <h2 className="book-heading">Payment Method</h2>
-              <h3 className="book-section-title">Choose how you'll pay</h3>
-              {errors4.method && <div className="step-error">{errors4.method}</div>}
+              {/* ── Payment (combined into the summary step) ── */}
+              <h3 className="book-section-title" style={{ marginTop: '22px' }}>
+                Select Payment Method <span className="req">*</span>
+              </h3>
+              {errors3.method && <div className="step-error">{errors3.method}</div>}
               <div className="payment-methods">
                 {PAYMENT_METHODS.map(pm => (
                   <button key={pm.id}
                     className={`pay-option ${payMethod === pm.id ? 'selected' : ''}`}
-                    onClick={() => { setPayMethod(pm.id); setErrors4({}) }}
+                    onClick={() => { setPayMethod(pm.id); setErrors3({}) }}
                   >
-                    <span className="pay-icon">{pm.icon}</span>
-                    <span className="pay-label">{pm.label}</span>
                     <span className={`pay-check ${payMethod === pm.id ? 'visible' : ''}`}><CheckIcon /></span>
+                    <span className="pay-label">{pm.label}</span>
+                    <span className="pay-desc">{pm.desc}</span>
                   </button>
                 ))}
               </div>
-              <div className="pricing-box">
-                <div className="pricing-row"><span>Session Fee</span><span>₱300.00</span></div>
-                <div className="pricing-row"><span>Service Charge</span><span>₱50.00</span></div>
-                <div className="pricing-divider" />
-                <div className="pricing-row total"><span>Total</span><span>₱350.00</span></div>
-              </div>
+
+              {/* ── Cash payment details (shown when Cash is selected) ── */}
+              {payMethod === 'cash' && (
+                <div className="pay-details">
+                  <button
+                    type="button"
+                    className="pay-details-toggle"
+                    onClick={() => setCashOpen(o => !o)}
+                    aria-expanded={cashOpen}
+                  >
+                    <ChevronIcon open={cashOpen} />
+                    Cash payment details
+                  </button>
+
+                  {cashOpen && (
+                    <div className="pay-details-body">
+                      <div className="book-field">
+                        <label>Amount received <span className="req">*</span></label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={cash.received}
+                          onChange={e => setCashField('received', e.target.value)}
+                          placeholder="0.00"
+                          className={errors3.received ? 'err' : ''}
+                        />
+                        {errors3.received && <span className="field-err">{errors3.received}</span>}
+
+                        <div className="cash-compute">
+                          <span className="cc-row">
+                            <span>Amount received</span>
+                            <span>₱{cashReceived.toFixed(2)}</span>
+                          </span>
+                          <span className="cc-row">
+                            <span>Less: Rate per Session</span>
+                            <span>− ₱{SESSION_FEE.toFixed(2)}</span>
+                          </span>
+                          <span className="cc-row cc-total">
+                            <span>Amount change</span>
+                            <span>₱{cashChange.toFixed(2)}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
-          {/* ══ STEP 5: Confirmation ══ */}
-          {step === 5 && (
+          {/* ══ STEP 4: Confirmation ══ */}
+          {step === 4 && (
             <>
               <div className="confirm-check-wrap">
                 <div className="confirm-check-circle"><CheckLgIcon /></div>
               </div>
               <h2 className="book-heading" style={{ textAlign: 'center' }}>Appointment Booked!</h2>
               <p className="confirm-sub">Your appointment has been successfully scheduled. We'll send a reminder before your session.</p>
+
+              {emailStatus === 'sending' && (
+                <p className="confirm-email-note">Sending a confirmation to {form1.email}…</p>
+              )}
+              {emailStatus === 'sent' && (
+                <p className="confirm-email-note ok">✓ Confirmation email sent to {form1.email}</p>
+              )}
+              {emailStatus === 'error' && (
+                <p className="confirm-email-note err">
+                  Couldn't email the confirmation to {form1.email}. {emailError}
+                </p>
+              )}
 
               <div className="summary-block">
                 <div className="summary-block-title">Appointment Summary</div>
@@ -505,7 +621,13 @@ export default function BookAppointmentPage({ user }) {
                 <div className="summary-row"><span>Date</span><strong>{bookingDateLabel}</strong></div>
                 <div className="summary-row"><span>Time</span><strong>{pickedTime || '—'}</strong></div>
                 <div className="summary-row"><span>Payment</span><strong>{PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '—'}</strong></div>
-                <div className="summary-row total-row"><span>Total</span><strong>₱350.00</strong></div>
+                <div className="summary-row total-row"><span>Total</span><strong>₱{TOTAL_DUE.toFixed(2)}</strong></div>
+                {payMethod === 'cash' && cashReceived > 0 && (
+                  <>
+                    <div className="summary-row"><span>Amount Received</span><strong>₱{cashReceived.toFixed(2)}</strong></div>
+                    <div className="summary-row"><span>Amount Change</span><strong>₱{cashChange.toFixed(2)}</strong></div>
+                  </>
+                )}
               </div>
 
               <button className="book-done-btn" onClick={() => navigate('/appointments')}>
@@ -516,13 +638,13 @@ export default function BookAppointmentPage({ user }) {
         </div>
 
         {/* ── Action Buttons ── */}
-        {step < 5 && (
+        {step < 4 && (
           <div className="book-actions">
             <button className="book-cancel-btn" onClick={handleBack}>
               {step === 1 ? 'CANCEL' : 'BACK'}
             </button>
             <button className="book-continue-btn" onClick={handleNext}>
-              {step === 2 ? 'PROCEED TO SUMMARY' : step === 3 ? 'GO TO PAYMENT' : step === 4 ? 'CONFIRM' : 'CONTINUE'}
+              {step === 2 ? 'PROCEED TO SUMMARY' : step === 3 ? 'CONFIRM BOOKING' : 'CONTINUE'}
               <ArrowRight />
             </button>
           </div>

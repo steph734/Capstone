@@ -559,17 +559,21 @@
 
 /* ── Payment Options ── */
 .payment-methods {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
   margin-bottom: 20px;
 }
 
 .pay-option {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 18px;
   border-radius: 13px;
   border: 2px solid #e4eee8;
   background: #fafdfb;
@@ -577,14 +581,17 @@
   transition: all 0.2s;
 }
 
-.pay-option:hover   { border-color: #4a9e6b; background: #f0fbf5; }
+.pay-option:hover    { border-color: #4a9e6b; background: #f0fbf5; }
 .pay-option.selected { border-color: #2c4a3e; background: linear-gradient(135deg, #f0fbf5, #e6f5ec); }
 
-.pay-icon  { font-size: 22px; }
-.pay-label { font-size: 14px; font-weight: 600; color: #2c4a3e; flex: 1; text-align: left; }
+.pay-label { font-size: 15px; font-weight: 700; color: #2c4a3e; }
+.pay-desc  { font-size: 12px; color: #7c9488; }
 
 .pay-check {
-  width: 24px; height: 24px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px; height: 22px;
   border-radius: 50%;
   border: 2px solid #d8eae0;
   display: flex;
@@ -597,24 +604,68 @@
 
 .pay-check.visible { background: #2c4a3e; border-color: #2c4a3e; color: #fff; }
 
-/* Pricing */
-.pricing-box {
-  background: #f5faf8;
-  border: 1.5px solid #d8eae0;
-  border-radius: 14px;
-  padding: 16px;
+/* Cash payment details (collapsible) */
+.pay-details {
+  border: 2px solid #e4eee8;
+  border-radius: 13px;
+  background: #fafdfb;
+  margin-bottom: 20px;
+  overflow: hidden;
 }
 
-.pricing-row {
+.pay-details-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c4a3e;
+  text-align: left;
+}
+
+.pay-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 16px 18px;
+  border-top: 1px solid #e4eee8;
+}
+
+.pay-details-body textarea { resize: vertical; min-height: 72px; }
+
+/* Amount received − rate per session = amount change */
+.cash-compute {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px dashed #cfe3d8;
+  border-radius: 10px;
+  background: #f7fbf9;
+  font-size: 12px;
+  color: #5c7266;
+}
+
+.cash-compute .cc-row {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
-  color: #4a7a62;
-  padding: 4px 0;
+  gap: 12px;
 }
 
-.pricing-row.total { font-weight: 800; color: #2c4a3e; font-size: 16px; }
-.pricing-divider   { border-top: 1.5px dashed #c8eeda; margin: 8px 0; }
+.cash-compute .cc-total {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid #cfe3d8;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+}
 
 /* ── Confirmation ── */
 .confirm-check-wrap {
@@ -649,6 +700,16 @@
   margin: -8px 0 20px;
   line-height: 1.5;
 }
+
+.confirm-email-note {
+  text-align: center;
+  font-size: 12.5px;
+  color: #7a9a8e;
+  margin: -12px 0 20px;
+  line-height: 1.5;
+}
+.confirm-email-note.ok  { color: #3f9e6b; }
+.confirm-email-note.err { color: #c0492e; }
 
 .confirm-summary {
   background: #f5faf8;
@@ -766,4 +827,5 @@
   .time-slots-grid   { grid-template-columns: repeat(2, 1fr); }
   .session-mode-row  { gap: 6px; }
   .step-label-text   { font-size: 9px; }
+  .payment-methods   { grid-template-columns: 1fr; }
 }

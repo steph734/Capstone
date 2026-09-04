@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { getStripe } from '../utils/stripe'
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
 /* ─────────────────────────  helpers  ───────────────────────── */
 
 const peso = (centavos) =>
@@ -115,12 +117,34 @@ const btnBase =
 const btnOutline = `${btnBase} border border-slate-300 text-slate-600 hover:bg-slate-50`
 const btnPrimary = `${btnBase} bg-pm-green text-white hover:bg-pm-green-dark`
 
-function CheckoutSteps({ step, setStep, onClose, onPaid, redirectSeconds, onRedirect }) {
+// Wrapper that lives inside <Elements> and feeds the Stripe hooks in as props,
+// so CheckoutStepsBase can also run in demo mode without an <Elements> provider.
+function RealCheckoutSteps(props) {
   const stripe = useStripe()
   const elements = useElements()
+  return <CheckoutStepsBase {...props} stripe={stripe} elements={elements} />
+}
 
+function CheckoutStepsBase({
+  step,
+  setStep,
+  onClose,
+  onPaid,
+  redirectSeconds,
+  onRedirect,
+  demo = false,
+  stripe = null,
+  elements = null,
+}) {
   const [pmType, setPmType] = useState(null)
   const [pmComplete, setPmComplete] = useState(false)
+
+  useEffect(() => {
+    if (demo) {
+      setPmType('card')
+      setPmComplete(true)
+    }
+  }, [demo])
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -134,7 +158,8 @@ function CheckoutSteps({ step, setStep, onClose, onPaid, redirectSeconds, onRedi
 
   const nameValid = name.trim().length > 0
   const emailValid = EMAIL_RE.test(email.trim())
-  const canComplete = nameValid && emailValid && agree && !submitting && !!stripe && !!elements
+  const canComplete =
+    nameValid && emailValid && agree && !submitting && (demo || (!!stripe && !!elements))
 
   /* Success-screen countdown → auto-redirect exactly once */
   const redirectedRef = useRef(false)
@@ -164,6 +189,22 @@ function CheckoutSteps({ step, setStep, onClose, onPaid, redirectSeconds, onRedi
     setSubmitting(true)
     setPayError('')
 
+    const dateLabel = new Date().toLocaleString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+
+    // Demo mode: no payment backend reachable — simulate a successful charge so
+    // the flow can still be demonstrated end to end.
+    if (demo) {
+      await sleep(1200)
+      onPaid({ method: labelForMethod(pmType) || 'Card', dateLabel })
+      return
+    }
+
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: 'if_required',
@@ -185,13 +226,6 @@ function CheckoutSteps({ step, setStep, onClose, onPaid, redirectSeconds, onRedi
       return
     }
     if (paymentIntent && paymentIntent.status === 'succeeded') {
-      const dateLabel = new Date().toLocaleString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
       onPaid({ method: labelForMethod(pmType), dateLabel })
     } else {
       setPayError(`Payment status: ${paymentIntent?.status || 'unknown'}. Please try again.`)
@@ -338,16 +372,33 @@ function CheckoutSteps({ step, setStep, onClose, onPaid, redirectSeconds, onRedi
         </span>
       </div>
 
-      <PaymentElement
-        options={{
-          layout: 'tabs',
-          fields: { billingDetails: { name: 'never', email: 'never', phone: 'never' } },
-        }}
-        onChange={(e) => {
-          setPmComplete(e.complete)
-          setPmType(e.value?.type ?? null)
-        }}
-      />
+      {demo ? (
+        <div className="space-y-2">
+          <div className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+            Payment service isn&rsquo;t reachable — running in demo mode (no real charge).
+          </div>
+          <div className="flex items-center justify-between rounded-lg border-2 border-pm-green bg-green-50/50 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-700">Card</span>
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-pm-green">
+              <span className="h-2 w-2 rounded-full bg-pm-green" />
+            </span>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs tracking-widest text-slate-400">
+            •••• •••• •••• 4242
+          </div>
+        </div>
+      ) : (
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+            fields: { billingDetails: { name: 'never', email: 'never', phone: 'never' } },
+          }}
+          onChange={(e) => {
+            setPmComplete(e.complete)
+            setPmType(e.value?.type ?? null)
+          }}
+        />
+      )}
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <button type="button" className={btnOutline} onClick={onClose}>
@@ -387,8 +438,8 @@ export default function CheckoutModal({
   const [step, setStep] = useState(1)
   const [paidMeta, setPaidMeta] = useState(null)
   const [clientSecret, setClientSecret] = useState('')
-  const [intentError, setIntentError] = useState('')
-  const [retry, setRetry] = useState(0)
+  const [demo, setDemo] = useState(false)
+  const [initializing, setInitializing] = useState(true)
 
   /* Reset every time the modal is (re)opened */
   useEffect(() => {
@@ -407,12 +458,15 @@ export default function CheckoutModal({
     }
   }, [open])
 
-  /* Create the PaymentIntent (server picks the real amount) */
+  /* Create the PaymentIntent. If the API isn't reachable (plain `npm run dev`,
+     or Stripe not configured on the server) fall back to a demo checkout so the
+     flow can still be shown end to end. */
   useEffect(() => {
     if (!open) return
     let cancelled = false
     setClientSecret('')
-    setIntentError('')
+    setDemo(false)
+    setInitializing(true)
 
     fetch('/api/create-payment-intent', {
       method: 'POST',
@@ -421,23 +475,24 @@ export default function CheckoutModal({
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(data.error || `Could not start payment (HTTP ${r.status}).`)
-        if (!data.clientSecret) throw new Error('Payment could not be initialized.')
+        if (!r.ok || !data.clientSecret) {
+          throw new Error(data.error || `payment API returned HTTP ${r.status}`)
+        }
         if (!cancelled) setClientSecret(data.clientSecret)
       })
       .catch((e) => {
         if (cancelled) return
-        setIntentError(
-          /Failed to fetch|NetworkError|Unexpected token|<!DOCTYPE/i.test(e.message || '')
-            ? "Couldn't reach the payment server. If you're on `npm run dev`, run `vercel dev` so /api routes respond."
-            : e.message
-        )
+        console.warn('[CheckoutModal] real payment unavailable, using demo mode:', e.message)
+        setDemo(true)
+      })
+      .finally(() => {
+        if (!cancelled) setInitializing(false)
       })
 
     return () => {
       cancelled = true
     }
-  }, [open, total, retry])
+  }, [open, total])
 
   if (!open) return null
 
@@ -483,38 +538,38 @@ export default function CheckoutModal({
           />
 
           <div className="flex w-full flex-col p-6 md:w-[55%]">
-            {intentError ? (
-              <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
-                <p className="text-sm text-red-500">{intentError}</p>
-                <button
-                  type="button"
-                  className={btnOutline}
-                  onClick={() => setRetry((n) => n + 1)}
-                >
-                  Try again
-                </button>
-              </div>
-            ) : !clientSecret ? (
-              <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-sm text-slate-500">
-                <Spinner />
-                Preparing secure checkout…
-              </div>
-            ) : (
-              <Elements stripe={getStripe()} options={{ clientSecret, appearance }}>
-                <CheckoutSteps
-                  step={step}
-                  setStep={setStep}
-                  onClose={onClose}
-                  redirectSeconds={redirectSeconds}
-                  onRedirect={onRedirect || onClose}
-                  onPaid={(meta) => {
-                    setPaidMeta(meta)
-                    setStep(3)
-                    onSuccess?.(meta)
-                  }}
-                />
-              </Elements>
-            )}
+            {(() => {
+              const onPaid = (meta) => {
+                setPaidMeta(meta)
+                setStep(3)
+                onSuccess?.(meta)
+              }
+              const stepProps = {
+                step,
+                setStep,
+                onClose,
+                redirectSeconds,
+                onRedirect: onRedirect || onClose,
+                onPaid,
+              }
+
+              if (initializing) {
+                return (
+                  <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                    <Spinner />
+                    Preparing secure checkout…
+                  </div>
+                )
+              }
+              if (demo || !clientSecret) {
+                return <CheckoutStepsBase {...stepProps} demo />
+              }
+              return (
+                <Elements stripe={getStripe()} options={{ clientSecret, appearance }}>
+                  <RealCheckoutSteps {...stepProps} />
+                </Elements>
+              )
+            })()}
           </div>
         </div>
       </div>

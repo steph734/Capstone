@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
 import { logActivity } from '../utils/auditLog'
+import { markDateBooked } from '../utils/appointmentBookings'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -185,6 +186,11 @@ export default function BookAppointmentPage({ user }) {
   useEffect(() => {
     if (step !== 4 || loggedBookingRef.current) return
     loggedBookingRef.current = true
+
+    // Persist the booked day so the Appointments calendar shows it as "booked"
+    // for everyone on this browser — permanently, across reloads.
+    markDateBooked(preselectedYear, preselectedMonth, preselectedDate)
+
     logActivity({
       role: 'Patient',
       user: user?.name || 'Patient',

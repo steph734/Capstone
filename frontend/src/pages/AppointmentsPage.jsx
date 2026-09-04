@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
+import { getAvailability } from '../utils/appointmentBookings'
 import './AppointmentsPage.css'
 
 /* ── Icons ── */
@@ -64,19 +65,6 @@ function firstDayOfMonth(year, month) {
   return new Date(year, month, 1).getDay()
 }
 
-/* Mock availability data — keyed "YYYY-M-D" */
-function buildAvailability(year, month) {
-  const total = daysInMonth(year, month)
-  const map = {}
-  for (let d = 1; d <= total; d++) {
-    const r = Math.random()
-    if (r < 0.35) map[`${year}-${month}-${d}`] = 'booked'
-    else if (r < 0.55) map[`${year}-${month}-${d}`] = 'closed'
-    else map[`${year}-${month}-${d}`] = 'available'
-  }
-  return map
-}
-
 export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
   const today = new Date()
@@ -85,7 +73,14 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [viewMonth, setViewMonth]       = useState(today.getMonth())
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())
-  const [availability]                  = useState(() => buildAvailability(today.getFullYear(), today.getMonth()))
+  /* Fixed clinic calendar for the month in view, with any date this browser
+     has already booked forced to "booked". Recomputed only when the month
+     changes; reading from storage each time keeps a fresh booking visible
+     without a full reload, and it never reshuffles on refresh. */
+  const availability = useMemo(
+    () => getAvailability(viewYear, viewMonth),
+    [viewYear, viewMonth]
+  )
   const [showConfirm, setShowConfirm]   = useState(false)
 
   /* ── Calendar navigation ── */
@@ -112,9 +107,11 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
     ? `${MONTHS[viewMonth]} ${selectedDate}, ${viewYear}`
     : 'No date selected'
 
+  const selectedStatus = selectedDate ? dotStatus(selectedDate) : null
+  const canSchedule = selectedStatus === 'available'
+
   const handleSchedule = () => {
-    const status = dotStatus(selectedDate)
-    if (status === 'closed') return
+    if (!canSchedule) return
     navigate('/appointments/book', {
       state: { selectedDate, month: viewMonth, year: viewYear }
     })
@@ -187,9 +184,11 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                         ${isToday(day) ? 'cal-today' : ''}
                         ${isSelected(day) ? 'cal-selected' : ''}
                         ${status === 'closed' ? 'cal-closed' : ''}
+                        ${status === 'booked' ? 'cal-booked' : ''}
                       `}
                       onClick={() => setSelectedDate(day)}
                       disabled={status === 'closed'}
+                      title={status === 'booked' ? 'Already booked' : undefined}
                     >
                       <span className="cal-day-num">{day}</span>
                       <span className={`dot dot-${status} dot-sm`} />
@@ -211,11 +210,18 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
               <button
                 className="schedule-btn"
                 onClick={handleSchedule}
-                disabled={!selectedDate || dotStatus(selectedDate) === 'closed'}
+                disabled={!canSchedule}
               >
                 Schedule Appointment
               </button>
             </div>
+
+            {selectedStatus === 'booked' && (
+              <p className="schedule-hint">This date is already booked. Please choose an available date.</p>
+            )}
+            {selectedStatus === 'closed' && (
+              <p className="schedule-hint">The clinic is closed on this date.</p>
+            )}
 
             {/* ── Confirm Toast ── */}
             {showConfirm && (

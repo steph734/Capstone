@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
+import CheckoutModal from '../components/CheckoutModal'
 import { logActivity } from '../utils/auditLog'
 import './BookAppointmentPage.css'
 
@@ -111,6 +112,10 @@ export default function BookAppointmentPage({ user }) {
   // Change is measured against the per-session rate.
   const cashChange = cashReceived > SESSION_FEE ? cashReceived - SESSION_FEE : 0
 
+  // Pay Online (Stripe): the checkout modal runs before the confirmation screen.
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [onlinePayment, setOnlinePayment] = useState(null) // { method, dateLabel }
+
   /* ── Validation ── */
   const validate1 = () => {
     const e = {}
@@ -144,8 +149,19 @@ export default function BookAppointmentPage({ user }) {
   const handleNext = () => {
     if (step === 1) { const e = validate1(); if (Object.keys(e).length) { setErrors1(e); return } }
     if (step === 2) { const e = validate2(); if (Object.keys(e).length) { setErrors2(e); return } }
-    if (step === 3) { const e = validate3(); if (Object.keys(e).length) { setErrors3(e); if (e.received) setCashOpen(true); return } }
+    if (step === 3) {
+      const e = validate3()
+      if (Object.keys(e).length) { setErrors3(e); if (e.received) setCashOpen(true); return }
+      // Pay Online → run the Stripe checkout first; advance only once it's paid.
+      if (payMethod === 'stripe' && !onlinePayment) { setCheckoutOpen(true); return }
+    }
     setStep(s => Math.min(s + 1, 4))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleCheckoutDone = () => {
+    setCheckoutOpen(false)
+    setStep(4)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const handleBack = () => {
@@ -628,6 +644,12 @@ export default function BookAppointmentPage({ user }) {
                     <div className="summary-row"><span>Amount Change</span><strong>₱{cashChange.toFixed(2)}</strong></div>
                   </>
                 )}
+                {onlinePayment && (
+                  <>
+                    <div className="summary-row"><span>Payment Status</span><strong>Paid online · {onlinePayment.method}</strong></div>
+                    <div className="summary-row"><span>Paid On</span><strong>{onlinePayment.dateLabel}</strong></div>
+                  </>
+                )}
               </div>
 
               <button className="book-done-btn" onClick={() => navigate('/appointments')}>
@@ -650,6 +672,19 @@ export default function BookAppointmentPage({ user }) {
           </div>
         )}
       </div>
+
+      <CheckoutModal
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        merchantName={`TherapyPro · ${sessionModeObj?.label || 'Session'} with ${therapistObj?.name || 'Therapist'}`}
+        amountCentavos={SESSION_FEE * 100}
+        lineItems={[
+          { name: `Therapy Session (${sessionModeObj?.label || 'Session'})`, qty: 1, unitCentavos: SESSION_FEE * 100 },
+        ]}
+        redirectSeconds={5}
+        onSuccess={(meta) => setOnlinePayment(meta)}
+        onRedirect={handleCheckoutDone}
+      />
     </div>
   )
 }

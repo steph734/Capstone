@@ -42,12 +42,51 @@ const CheckIcon = () => (
     <polyline points="20 6 9 17 4 12" />
   </svg>
 )
+const ArrowRightIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
+  </svg>
+)
 const Spinner = () => (
   <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke="#cbd5e1" strokeWidth="4" />
     <path d="M22 12a10 10 0 0 1-10 10" stroke="#22c55e" strokeWidth="4" strokeLinecap="round" />
   </svg>
 )
+
+// The app's global reset sets `appearance: none` on every <input> (see
+// index.css) so it can restyle text inputs — but that also strips a native
+// checkbox down to an invisible 0-decoration box. Building the check state
+// ourselves keeps it visible everywhere it's used.
+function Checkbox({ checked, onChange, children, className = '' }) {
+  return (
+    <label className={`flex cursor-pointer items-start gap-2 text-xs text-slate-600 ${className}`}>
+      <span
+        role="checkbox"
+        aria-checked={checked}
+        tabIndex={0}
+        onClick={() => onChange(!checked)}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault()
+            onChange(!checked)
+          }
+        }}
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+          checked ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'
+        }`}
+      >
+        {checked && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </span>
+      <span>{children}</span>
+    </label>
+  )
+}
 
 /* ─────────────────────────  left panel  ───────────────────────── */
 
@@ -113,9 +152,9 @@ function OrderSummary({ total, merchantName, lineItems, paidMeta }) {
 /* ─────────────────────────  right panel (inside <Elements>)  ───────────────────────── */
 
 const btnBase =
-  'rounded-lg px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50'
-const btnOutline = `${btnBase} border border-slate-300 text-slate-600 hover:bg-slate-50`
-const btnPrimary = `${btnBase} bg-pm-green text-white hover:bg-pm-green-dark`
+  'inline-flex items-center justify-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 disabled:cursor-not-allowed disabled:opacity-40'
+const btnOutline = `${btnBase} border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 active:scale-[.98]`
+const btnPrimary = `${btnBase} bg-pm-green text-white shadow-sm shadow-pm-green/30 hover:bg-pm-green-dark hover:shadow-md active:scale-[.98]`
 
 // Wrapper that lives inside <Elements> and feeds the Stripe hooks in as props,
 // so CheckoutStepsBase can also run in demo mode without an <Elements> provider.
@@ -378,25 +417,17 @@ function CheckoutStepsBase({
         </div>
 
         {/* Terms */}
-        <label className="mt-4 flex items-start gap-2 text-xs text-slate-600">
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={(e) => setAgree(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 accent-pm-green"
-          />
-          <span>
-            I have read and agreed to the{' '}
-            <a href="#" onClick={(e) => e.preventDefault()} className="font-medium text-pm-blue underline">
-              Terms
-            </a>{' '}
-            /{' '}
-            <a href="#" onClick={(e) => e.preventDefault()} className="font-medium text-pm-blue underline">
-              Privacy Policy
-            </a>
-            .
-          </span>
-        </label>
+        <Checkbox checked={agree} onChange={setAgree} className="mt-4">
+          I have read and agreed to the{' '}
+          <a href="#" onClick={(e) => e.preventDefault()} className="font-medium text-pm-blue underline">
+            Terms
+          </a>{' '}
+          /{' '}
+          <a href="#" onClick={(e) => e.preventDefault()} className="font-medium text-pm-blue underline">
+            Privacy Policy
+          </a>
+          .
+        </Checkbox>
 
         {payError && <p className="mt-3 text-xs text-red-500">{payError}</p>}
 
@@ -422,8 +453,8 @@ function CheckoutStepsBase({
         </span>
       </div>
 
-      {/* Card vs. QR rail */}
-      <div className="mb-4 grid grid-cols-2 gap-2">
+      {/* Card vs. QR — tab bar */}
+      <div className="mb-5 flex gap-7 border-b border-slate-200" role="tablist">
         {[
           { id: 'card', label: 'Pay with card' },
           { id: 'qr', label: 'Pay with QR code' },
@@ -433,11 +464,13 @@ function CheckoutStepsBase({
             <button
               key={opt.id}
               type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setChannel(opt.id)}
-              className={`rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
+              className={`-mb-px border-b-2 pb-2.5 pt-1 text-sm font-semibold transition-colors focus:outline-none ${
                 active
-                  ? 'border-pm-green bg-green-50/60 text-slate-800'
-                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                  ? 'border-pm-green text-pm-green-dark'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
               {opt.label}
@@ -466,15 +499,9 @@ function CheckoutStepsBase({
             <span className="font-semibold text-slate-500">{peso(total)}</span>.
           </div>
 
-          <label className="mt-1 flex items-start gap-2 text-xs text-slate-600">
-            <input
-              type="checkbox"
-              checked={qrConfirmed}
-              onChange={(e) => setQrConfirmed(e.target.checked)}
-              className="mt-0.5 h-3.5 w-3.5 accent-pm-green"
-            />
-            <span>I have completed the transfer using the QR code above.</span>
-          </label>
+          <Checkbox checked={qrConfirmed} onChange={setQrConfirmed} className="mt-1">
+            I have completed the transfer using the QR code above.
+          </Checkbox>
         </div>
       ) : demo ? (
         <div className="space-y-2">
@@ -522,6 +549,7 @@ function CheckoutStepsBase({
           disabled={isQr ? !qrConfirmed : !pmComplete}
         >
           Continue
+          <ArrowRightIcon />
         </button>
       </div>
     </div>

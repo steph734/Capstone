@@ -1,4 +1,6 @@
-const STORAGE_KEY = 'therapypro_appointment_bookings'
+// Bumped to _v2 to reset every previously stored booking — the calendar now
+// starts with a clean slate and only this browser's new bookings are kept.
+const STORAGE_KEY = 'therapypro_appointment_bookings_v2'
 
 /* A date is keyed the same way the calendar keys its cells: "YYYY-M-D"
    where M is the 0-based month (0 = January). */
@@ -6,30 +8,14 @@ export function dateKey(year, month, day) {
   return `${year}-${month}-${day}`
 }
 
-/* Deterministic 0..1 value derived from the date key (FNV-1a hash).
-   Unlike Math.random(), this returns the SAME status for a given day on
-   every reload, so the clinic's base calendar never reshuffles. */
-function hash01(str) {
-  let h = 2166136261
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return ((h >>> 0) % 1000) / 1000
-}
-
-/* Fixed clinic availability for a month — same thresholds as the old mock,
-   but stable per date instead of random. Some days come back "booked" to
-   represent slots other patients have already taken. */
+/* Clinic base calendar: every day of the month starts "available". Days only
+   become "booked" once this browser confirms a booking on them (see
+   getAvailability). */
 export function baseAvailability(year, month) {
   const total = new Date(year, month + 1, 0).getDate()
   const map = {}
   for (let d = 1; d <= total; d++) {
-    const key = dateKey(year, month, d)
-    const r = hash01(key)
-    if (r < 0.35) map[key] = 'booked'
-    else if (r < 0.55) map[key] = 'closed'
-    else map[key] = 'available'
+    map[dateKey(year, month, d)] = 'available'
   }
   return map
 }

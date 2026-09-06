@@ -102,13 +102,17 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const dotStatus = (day) => availability[`${viewYear}-${viewMonth}-${day}`] || 'available'
   const isToday   = (day) => day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear()
   const isSelected = (day) => day === selectedDate
+  /* Past dates can't be booked — anything before midnight today is off-limits. */
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const isPast = (day) => new Date(viewYear, viewMonth, day) < startOfToday
 
   const selectedLabel = selectedDate
     ? `${MONTHS[viewMonth]} ${selectedDate}, ${viewYear}`
     : 'No date selected'
 
   const selectedStatus = selectedDate ? dotStatus(selectedDate) : null
-  const canSchedule = selectedStatus === 'available'
+  const selectedIsPast = selectedDate ? isPast(selectedDate) : false
+  const canSchedule = selectedStatus === 'available' && !selectedIsPast
 
   const handleSchedule = () => {
     if (!canSchedule) return
@@ -177,6 +181,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                 {cells.map((day, idx) => {
                   if (!day) return <div key={`empty-${idx}`} />
                   const status = dotStatus(day)
+                  const past = isPast(day)
                   return (
                     <button
                       key={day}
@@ -185,10 +190,17 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                         ${isSelected(day) ? 'cal-selected' : ''}
                         ${status === 'closed' ? 'cal-closed' : ''}
                         ${status === 'booked' ? 'cal-booked' : ''}
+                        ${past ? 'cal-past' : ''}
                       `}
                       onClick={() => setSelectedDate(day)}
-                      disabled={status === 'closed'}
-                      title={status === 'booked' ? 'Already booked' : undefined}
+                      disabled={status === 'closed' || past}
+                      title={
+                        past
+                          ? 'Past date'
+                          : status === 'booked'
+                            ? 'Already booked'
+                            : undefined
+                      }
                     >
                       <span className="cal-day-num">{day}</span>
                       <span className={`dot dot-${status} dot-sm`} />
@@ -216,10 +228,13 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
               </button>
             </div>
 
-            {selectedStatus === 'booked' && (
+            {selectedIsPast && (
+              <p className="schedule-hint">You can&apos;t book a date in the past. Please choose today or a later date.</p>
+            )}
+            {!selectedIsPast && selectedStatus === 'booked' && (
               <p className="schedule-hint">This date is already booked. Please choose an available date.</p>
             )}
-            {selectedStatus === 'closed' && (
+            {!selectedIsPast && selectedStatus === 'closed' && (
               <p className="schedule-hint">The clinic is closed on this date.</p>
             )}
 

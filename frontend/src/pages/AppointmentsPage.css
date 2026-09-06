@@ -257,6 +257,10 @@
 
 .cal-closed { opacity: 0.4; }
 
+/* Past dates — visible for context but not selectable. */
+.cal-past:not(.cal-selected) { opacity: 0.3; cursor: not-allowed; }
+.cal-past:not(.cal-selected) .cal-day-num { text-decoration: line-through; }
+
 /* Booked by someone else — visible but not selectable for a new booking. */
 .cal-booked:not(.cal-selected) { opacity: 0.55; cursor: not-allowed; }
 

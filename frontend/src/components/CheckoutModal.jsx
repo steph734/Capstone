@@ -55,6 +55,24 @@ const ArrowRightIcon = () => (
     <polyline points="12 5 19 12 12 19" />
   </svg>
 )
+const CardIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+    <line x1="6" y1="15" x2="10" y2="15" />
+  </svg>
+)
+const QrIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <line x1="14" y1="14" x2="14" y2="17" />
+    <line x1="17.5" y1="14" x2="21" y2="14" />
+    <line x1="21" y1="17.5" x2="21" y2="21" />
+    <line x1="14" y1="21" x2="17.5" y2="21" />
+  </svg>
+)
 const Spinner = () => (
   <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke="#cbd5e1" strokeWidth="4" />
@@ -258,10 +276,10 @@ function CheckoutStepsBase({
       minute: '2-digit',
     })
 
-    // Demo mode (no payment backend reachable) and the QR rail (a manual InstaPay
-    // transfer that never touches Stripe) both settle on trust — simulate a
-    // successful charge so the flow can still complete end to end.
-    if (demo || isQr) {
+    // Demo mode (no payment backend reachable): simulate a successful charge so
+    // the flow can still complete end to end. (The QR rail records itself on
+    // step 1 via handleQrConfirm and never reaches this handler.)
+    if (demo) {
       await sleep(1200)
       onPaid({ method: methodLabel || 'Card', dateLabel })
       return
@@ -331,6 +349,24 @@ function CheckoutStepsBase({
     }
   }
 
+  // QR rail: the payer already transferred the money in their wallet app, so
+  // there's no card form to fill — confirm the transfer and record it straight
+  // away, skipping the Customer Information step.
+  const handleQrConfirm = async () => {
+    if (!qrConfirmed || submitting) return
+    setSubmitting(true)
+    setPayError('')
+    const dateLabel = new Date().toLocaleString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    await sleep(1000)
+    onPaid({ method: methodLabel || 'QR', dateLabel })
+  }
+
   /* ── Step 3: success ── */
   if (step === 3) {
     return (
@@ -339,10 +375,12 @@ function CheckoutStepsBase({
           <CheckIcon />
         </div>
         <h3 className="mt-4 text-base font-semibold text-pm-green-dark">
-          {methodLabel} payment received!
+          {isQr ? 'Payment recorded!' : `${methodLabel} payment received!`}
         </h3>
         <p className="mt-1 text-xs text-slate-500">
-          An automated receipt will be sent to your email.
+          {isQr
+            ? `Your ${methodLabel} transfer has been recorded and your booking is confirmed.`
+            : 'An automated receipt will be sent to your email.'}
         </p>
         <button
           type="button"
@@ -462,27 +500,46 @@ function CheckoutStepsBase({
         </span>
       </div>
 
-      {/* Card vs. QR — tab bar */}
-      <div className="mb-5 flex gap-7 border-b border-slate-200" role="tablist">
+      {/* Card vs. QR — selectable method cards */}
+      <div className="mb-5 grid grid-cols-2 gap-3" role="tablist">
         {[
-          { id: 'card', label: 'Pay with card' },
-          { id: 'qr', label: 'Pay with QR code' },
-        ].map((opt) => {
-          const active = channel === opt.id
+          { id: 'card', label: 'Pay with card', desc: 'Visa, Mastercard, e-wallets', Icon: CardIcon },
+          { id: 'qr', label: 'Pay with QR code', desc: 'GCash or Maya · scan to pay', Icon: QrIcon },
+        ].map(({ id, label, desc, Icon }) => {
+          const active = channel === id
           return (
             <button
-              key={opt.id}
+              key={id}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setChannel(opt.id)}
-              className={`-mb-px border-b-2 pb-2.5 pt-1 text-sm font-semibold transition-colors focus:outline-none ${
+              onClick={() => setChannel(id)}
+              className={`group relative flex flex-col gap-2 rounded-xl border p-3 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${
                 active
-                  ? 'border-pm-green text-pm-green-dark'
-                  : 'border-transparent text-slate-400 hover:text-slate-600'
+                  ? 'border-pm-green bg-pm-green/5 shadow-sm'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
-              {opt.label}
+              <span
+                className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border transition-colors ${
+                  active ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'
+                }`}
+              >
+                {active && (
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  active ? 'bg-pm-green text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
+                }`}
+              >
+                <Icon />
+              </span>
+              <span className="block text-sm font-semibold text-slate-800">{label}</span>
+              <span className="block text-[11px] leading-tight text-slate-400">{desc}</span>
             </button>
           )
         })}
@@ -572,18 +629,30 @@ function CheckoutStepsBase({
       )}
 
       <div className="mt-6 flex items-center justify-between gap-3">
-        <button type="button" className={btnOutline} onClick={onClose}>
+        <button type="button" className={btnOutline} onClick={onClose} disabled={submitting}>
           Back
         </button>
-        <button
-          type="button"
-          className={btnPrimary}
-          onClick={() => setStep(2)}
-          disabled={isQr ? !qrConfirmed : !pmComplete}
-        >
-          Continue
-          <ArrowRightIcon />
-        </button>
+        {isQr ? (
+          <button
+            type="button"
+            className={btnPrimary}
+            onClick={handleQrConfirm}
+            disabled={!qrConfirmed || submitting}
+          >
+            {submitting ? 'Recording…' : 'Confirm payment'}
+            {!submitting && <ArrowRightIcon />}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={btnPrimary}
+            onClick={() => setStep(2)}
+            disabled={!pmComplete}
+          >
+            Continue
+            <ArrowRightIcon />
+          </button>
+        )}
       </div>
     </div>
   )

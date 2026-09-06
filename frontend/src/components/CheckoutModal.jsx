@@ -29,6 +29,13 @@ const DEFAULT_LINE_ITEMS = [
   { name: 'JBRB Booking - Downpayment', qty: 1, unitCentavos: 712500 },
 ]
 
+// Scan-to-pay wallets offered on the QR tab. Each `src` is a static image in
+// /public; drop a new file there and add a row to support another wallet.
+const QR_PROVIDERS = [
+  { id: 'gcash', label: 'GCash', src: '/instapay-qr.jpg' },
+  { id: 'maya', label: 'Maya', src: '/maya-qr.jpg' },
+]
+
 /* ─────────────────────────  icons  ───────────────────────── */
 
 const MailIcon = () => (
@@ -186,6 +193,7 @@ function CheckoutStepsBase({
   // so it never touches Stripe — it's confirmed on trust like the demo path).
   const [channel, setChannel] = useState('card')
   const [qrConfirmed, setQrConfirmed] = useState(false)
+  const [qrProvider, setQrProvider] = useState('gcash')
 
   useEffect(() => {
     if (demo) {
@@ -195,7 +203,8 @@ function CheckoutStepsBase({
   }, [demo])
 
   const isQr = channel === 'qr'
-  const methodLabel = isQr ? 'InstaPay QR' : labelForMethod(pmType)
+  const qrProviderLabel = QR_PROVIDERS.find((p) => p.id === qrProvider)?.label || 'QR'
+  const methodLabel = isQr ? `${qrProviderLabel} QR` : labelForMethod(pmType)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -488,15 +497,39 @@ function CheckoutStepsBase({
             <div className="mt-0.5 text-lg font-bold text-pm-green">{peso(total)}</div>
           </div>
 
+          {/* Wallet picker */}
+          <div className="flex flex-wrap justify-center gap-2">
+            {QR_PROVIDERS.map((p) => {
+              const active = qrProvider === p.id
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setQrProvider(p.id)
+                    setQrConfirmed(false)
+                  }}
+                  className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ${
+                    active
+                      ? 'bg-pm-green text-white'
+                      : 'border border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              )
+            })}
+          </div>
+
           <img
-            src="/instapay-qr.jpg"
-            alt="InstaPay QR code for ST****N AD***N T."
+            src={QR_PROVIDERS.find((p) => p.id === qrProvider)?.src}
+            alt={`${QR_PROVIDERS.find((p) => p.id === qrProvider)?.label} QR code`}
             className="w-full max-w-[260px] rounded-lg border border-slate-200 bg-white object-contain"
           />
 
           <div className="text-center text-[11px] leading-tight text-slate-400">
-            Open your banking / e-wallet app, scan this code, and send exactly{' '}
-            <span className="font-semibold text-slate-500">{peso(total)}</span>.
+            Open your {QR_PROVIDERS.find((p) => p.id === qrProvider)?.label} app, scan this code, and
+            send exactly <span className="font-semibold text-slate-500">{peso(total)}</span>.
           </div>
 
           <Checkbox checked={qrConfirmed} onChange={setQrConfirmed} className="mt-1">

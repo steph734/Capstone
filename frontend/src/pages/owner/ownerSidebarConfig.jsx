@@ -76,6 +76,14 @@ function GamepadIcon() {
   )
 }
 
+function SettingsIcon() {
+  return (
+    <Icon>
+      <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.74 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.24.42.32.6.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.24.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
+    </Icon>
+  )
+}
+
 const BASE_OWNER_MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/owner/dashboard' },
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/owner/appointments' },
@@ -88,8 +96,9 @@ const BASE_OWNER_MENU_ITEMS = [
 
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/owner/speech-features' }
 const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/owner/gamified-activities' }
+const SETTINGS_ITEM = { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/owner/settings' }
 
-export const ownerMenuItems = BASE_OWNER_MENU_ITEMS
+export const ownerMenuItems = [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM]
 
 const TIER_RANK = { silver: 1, gold: 2 }
 
@@ -119,7 +128,7 @@ function resolveUnlock(betaTier, activePlan) {
 export function getOwnerMenuItems(betaTier, activePlan) {
   const { tier, trialing } = resolveUnlock(betaTier, activePlan)
   const mark = (items) => (trialing ? items.map((it) => ({ ...it, trial: true })) : items)
-  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM])]
-  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM])]
-  return BASE_OWNER_MENU_ITEMS
+  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM]), SETTINGS_ITEM]
+  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM]), SETTINGS_ITEM]
+  return [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM]
 }

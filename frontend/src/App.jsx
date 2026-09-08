@@ -38,6 +38,7 @@ import OwnerSpeechToTextPage from './pages/owner/OwnerSpeechToTextPage'
 import OwnerTextToSpeechPage from './pages/owner/OwnerTextToSpeechPage'
 import OwnerSpeechFeaturesPage from './pages/owner/OwnerSpeechFeaturesPage'
 import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPage'
+import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
 import TherapistSpeechToTextPage from './pages/therapist/TherapistSpeechToTextPage'
 import TherapistTextToSpeechPage from './pages/therapist/TherapistTextToSpeechPage'
 import TherapistSpeechFeaturesPage from './pages/therapist/TherapistSpeechFeaturesPage'
@@ -370,6 +371,21 @@ function App() {
                 <OwnerBillingPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/settings"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerSettingsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
               )
             ) : (
               <Navigate to="/login" replace />

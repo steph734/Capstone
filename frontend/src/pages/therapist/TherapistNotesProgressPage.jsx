@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -417,6 +417,17 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const selectedPatient = PATIENTS.find(p => p.id === selectedId)
   const patientNotes    = selectedId !== null ? (notes[selectedId] || []) : []
 
+  // On phones the detail panel renders below the patient table, so tapping
+  // "View Notes" / "+ New Note" would otherwise look like nothing happened —
+  // bring the panel into view once it mounts / changes view.
+  const detailRef = useRef(null)
+  useEffect(() => {
+    if (selectedId === null) return
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [selectedId, view, viewingNote])
+
   const viewNotesFor = (id) => { setSelectedId(id); setView('overview'); setViewingNote(null) }
   const newNoteFor   = (id) => { setSelectedId(id); setView('new'); setViewingNote(null) }
 
@@ -526,7 +537,15 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
 
         {/* ── Detail panel for the selected patient ── */}
         {selectedPatient && (
-          <div className="tnp-detail-card">
+          <div className="tnp-detail-card" ref={detailRef}>
+            <button
+              type="button"
+              className="tnp-detail-close"
+              onClick={() => { setSelectedId(null); setView('overview'); setViewingNote(null) }}
+            >
+              ← Back to patient list
+            </button>
+
             {view === 'overview' && (
               <PatientOverview
                 patient={selectedPatient}

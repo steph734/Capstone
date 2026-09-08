@@ -1175,4 +1175,75 @@
   .os-day-dots-lg {
     gap: 8px;
   }
+
+  /* ── Staff table → stacked cards on mobile ──────────────── */
+  .os-staff-table-card .admin-table-scroll { overflow-x: visible; }
+
+  .os-staff-table-card .admin-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .os-staff-table-card .admin-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .os-staff-table-card .admin-table tbody { display: block; }
+
+  .os-staff-table-card .admin-table tr {
+    display: block;
+    border: 1px solid #e6efe9;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+  .os-staff-table-card .admin-table tr:last-child { margin-bottom: 0; }
+
+  .os-staff-table-card .admin-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f2f6f4;
+    white-space: normal;
+    text-align: right;
+  }
+  .os-staff-table-card .admin-table td:last-child { border-bottom: none; }
+
+  .os-staff-table-card .admin-table td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8a9b91;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  /* Staff person cell spans full width, label hidden */
+  .os-staff-table-card .admin-table td[data-label="Staff"] {
+    padding-top: 2px;
+  }
+  .os-staff-table-card .admin-table td[data-label="Staff"]::before { display: none; }
+  .os-staff-table-card .os-table-person { width: 100%; }
+
+  .os-staff-table-card .os-attendance-cell {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .os-staff-table-card .os-table-actions { justify-content: flex-end; }
+
+  .os-staff-table-card .admin-table td[data-label="Actions"] { padding-bottom: 2px; }
+  .os-staff-table-card .admin-table td[data-label="Actions"]::before { display: none; }
+
+  .os-staff-table-card .os-empty { text-align: center; }
 }

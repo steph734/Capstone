@@ -900,7 +900,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       />
 
       {/* Staff Table */}
-      <div className="admin-table-card">
+      <div className="admin-table-card os-staff-table-card">
         <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
@@ -921,7 +921,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                 const rate = attendanceRate(s.attendance)
                 return (
                   <tr key={s.id}>
-                    <td>
+                    <td data-label="Staff">
                       <div className="os-table-person">
                         <div className="os-avatar-wrap">
                           <img src={s.avatar} alt={s.name} className="os-avatar" />
@@ -933,17 +933,17 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                         </div>
                       </div>
                     </td>
-                    <td><SpecialtyBadge specialty={s.specialty} /></td>
-                    <td><span className="os-branch-badge">{s.branch}</span></td>
-                    <td><span className={`os-pill ${s.status === 'On Duty' ? 'os-pill-green' : 'os-pill-yellow'}`}>{s.status}</span></td>
-                    <td>{s.caseload} patients</td>
-                    <td>
+                    <td data-label="Specialty"><SpecialtyBadge specialty={s.specialty} /></td>
+                    <td data-label="Branch"><span className="os-branch-badge">{s.branch}</span></td>
+                    <td data-label="Status"><span className={`os-pill ${s.status === 'On Duty' ? 'os-pill-green' : 'os-pill-yellow'}`}>{s.status}</span></td>
+                    <td data-label="Caseload">{s.caseload} patients</td>
+                    <td data-label="Attendance">
                       <div className="os-attendance-cell">
                         <span className={`os-attendance-rate ${rateTone(rate)}`}>{rate}%</span>
                         <DayDots week={s.attendance.week} />
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                       <div className="os-table-actions">
                         <button className="os-icon-btn os-icon-view" onClick={() => setViewing(s)} title="View" aria-label={`View ${s.name}`}>
                           <EyeIcon />

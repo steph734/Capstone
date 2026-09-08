@@ -442,10 +442,10 @@
 
   .oa-appts-table tr {
     border: 1px solid #e6efea;
-    border-radius: 14px;
-    margin-bottom: 12px;
+    border-radius: 12px;
+    margin-bottom: 10px;
     background: #fff;
-    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
     overflow: hidden;
   }
   .oa-appts-table tr:last-child { margin-bottom: 0; }
@@ -454,21 +454,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 7px 11px;
     border-bottom: 1px solid #f2f7f4;
     white-space: normal;
     text-align: right;
+    font-size: 13px;
   }
   .oa-appts-table td:last-child { border-bottom: none; }
 
   .oa-appts-table td::before {
     content: attr(data-label);
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.3px;
     color: #9aab9f;
     text-align: left;
   }
@@ -477,17 +478,31 @@
   .oa-appts-table td.oa-cell-patient {
     background: #f8fbf9;
     border-bottom: 1px solid #e8f0ec;
-    padding: 12px 14px;
+    padding: 9px 11px;
   }
   .oa-appts-table td.oa-cell-patient::before { display: none; }
-  .oa-appts-table .oa-table-person { white-space: normal; }
+  .oa-appts-table .oa-table-person { white-space: normal; gap: 8px; }
+  .oa-appts-table .oa-avatar { width: 32px; height: 32px; }
+  .oa-appts-table .oa-table-name { font-size: 13px; }
 
-  .oa-appts-table td.oa-cell-actions { justify-content: flex-end; }
+  .oa-appts-table td.oa-cell-actions { justify-content: flex-end; padding: 7px 11px; }
   .oa-appts-table td.oa-cell-actions::before { display: none; }
   .oa-appts-table .oa-datetime { align-items: flex-end; }
+  .oa-appts-table .oa-datetime .oa-date { font-size: 12.5px; }
+  .oa-appts-table .oa-icon-btn { width: 28px; height: 28px; }
 
   /* Empty-state row */
   .oa-appts-table td[colspan] { text-align: center; }
   .oa-appts-table td[colspan]::before { display: none; }
   .oa-appts-table td[colspan] .oa-empty { padding: 40px 16px; }
+}
+
+@media (max-width: 400px) {
+  .oa-appts-table td { padding: 6px 9px; gap: 8px; font-size: 12.5px; }
+  .oa-appts-table td.oa-cell-patient,
+  .oa-appts-table td.oa-cell-actions { padding: 8px 9px; }
+  .oa-appts-table td::before { font-size: 9.5px; }
+  .oa-appts-table .oa-avatar { width: 30px; height: 30px; }
+  .oa-service-badge,
+  .oa-branch-badge { padding: 4px 9px; font-size: 11px; }
 }

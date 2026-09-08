@@ -517,68 +517,69 @@
 }
 
 .th-cal-nav-btn {
-  width: 24px;
-  height: 24px;
+  width: 34px;
+  height: 34px;
   min-width: unset;
   min-height: unset;
-  border-radius: 6px;
-  border: 1px solid #e8f5f0;
-  background: none;
+  border-radius: 50%;
+  border: 1.5px solid #d8eae0;
+  background: #f5faf8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
-  color: #6b9c8c;
+  color: #2c4a3e;
   padding: 0;
-  transition: background 0.12s;
+  transition: background 0.2s, border-color 0.2s;
 }
-.th-cal-nav-btn:hover { background: #f0f7f4; }
+.th-cal-nav-btn:hover { background: #e6f5ec; border-color: #4a9e6b; }
 
 .th-cal-month-label {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   color: #2c4a3e;
-  min-width: 90px;
+  min-width: 120px;
   text-align: center;
 }
 
 .th-cal-dow-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  margin: 12px 0 2px;
+  margin: 14px 0 4px;
 }
 
 .th-cal-dow {
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  color: #b0bdb5;
-  padding: 2px 0;
+  color: #7a9a8e;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 0;
 }
 
 .th-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
 .th-cal-cell {
-  height: 36px;
-  border-radius: 8px;
+  min-height: 46px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   background: none;
-  border: none;
+  border: 1.5px solid transparent;
   cursor: pointer;
-  transition: background 0.12s ease;
-  min-height: unset;
+  transition: background 0.15s ease, border-color 0.15s ease;
   min-width: unset;
-  padding: 0;
+  padding: 6px 2px;
   font-family: inherit;
 }
 
@@ -587,55 +588,61 @@
   pointer-events: none;
 }
 
-.th-cal-has-sess:not(.th-cal-today):hover {
-  background: #f0f7f4;
+.th-cal-cell:not(.th-cal-empty):not(.th-cal-today):not(.th-cal-selected):hover {
+  background: #f0faf4;
+  border-color: #c8eeda;
 }
 
+/* Today — light green fill + green outline, matching the patient calendar */
 .th-cal-today {
-  background: #4a6b5d !important;
-  border-radius: 8px;
+  background: #e8f5ec !important;
+  border-color: #4a9e6b;
+  border-radius: 10px;
 }
-.th-cal-today .th-cal-dn { color: #fff; font-weight: 800; }
+.th-cal-today .th-cal-dn { color: #1a7a4a; font-weight: 700; }
 
+/* Selected — deep green gradient with a white day number */
 .th-cal-selected:not(.th-cal-today) {
-  background: #eef6f2;
+  background: linear-gradient(135deg, #2c4a3e 0%, #4a7a62 100%);
+  border-color: #2c4a3e;
 }
+.th-cal-selected:not(.th-cal-today) .th-cal-dn { color: #fff; font-weight: 700; }
+.th-cal-selected:not(.th-cal-today) .th-cal-pip { border: 1.5px solid rgba(255, 255, 255, 0.6); }
 
 .th-cal-dn {
-  font-size: 12px;
-  font-weight: 500;
-  color: #3d5a50;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c4a3e;
   line-height: 1;
 }
 
 .th-cal-pip {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 .th-pip-low  { background: #22c55e; }
 .th-pip-med  { background: #eab308; }
 .th-pip-high { background: #ef4444; }
-.th-cal-today .th-pip-low,
-.th-cal-today .th-pip-med,
-.th-cal-today .th-pip-high { background: rgba(255,255,255,0.7); }
 
 .th-cal-legend-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  font-size: 10px;
-  color: #b0bdb5;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a6a5e;
 }
 .th-cal-leg-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
+.th-cal-legend-row .th-cal-pip { width: 10px; height: 10px; }
 .th-cal-leg-sep { flex: 1; }
-.th-cal-leg-total { font-size: 10px; color: #9aab9f; }
+.th-cal-leg-total { font-size: 12px; color: #9aab9f; }
 .th-cal-leg-total strong { color: #4a6b5d; }
 
 /* Compact detail strip */
@@ -755,15 +762,16 @@
      day numbers stay legible on a phone. */
   .th-cal-panel .th-panel-head { flex-wrap: wrap; gap: 10px; }
   .th-cal-panel .th-cal-nav { margin-left: auto; }
-  .th-cal-nav-btn { width: 30px; height: 30px; font-size: 18px; }
-  .th-cal-month-label { font-size: 14px; min-width: 108px; }
+  .th-cal-nav-btn { width: 32px; height: 32px; font-size: 18px; }
+  .th-cal-month-label { font-size: 15px; min-width: 112px; }
   .th-cal-dow-row { margin: 14px 0 4px; }
-  .th-cal-dow { font-size: 12px; }
+  .th-cal-dow { font-size: 11px; }
   .th-cal-grid { gap: 4px; }
-  .th-cal-cell { height: 46px; border-radius: 10px; gap: 3px; }
-  .th-cal-dn { font-size: 15px; }
-  .th-cal-pip { width: 5px; height: 5px; }
-  .th-cal-legend-row { flex-wrap: wrap; gap: 8px 12px; font-size: 11px; }
+  .th-cal-cell { min-height: 46px; border-radius: 10px; gap: 3px; }
+  .th-cal-dn { font-size: 13px; }
+  .th-cal-pip { width: 6px; height: 6px; }
+  .th-cal-legend-row { flex-wrap: wrap; gap: 8px 14px; font-size: 12px; }
+  .th-cal-legend-row .th-cal-pip { width: 9px; height: 9px; }
 
   .th-task-text { font-size: 12px; }
   .th-activity-text { font-size: 12px; }
@@ -786,11 +794,11 @@
   .th-bar-label { font-size: 8px; padding: 2px 4px; }
 
   .th-cal-dow-row { margin: 10px 0 3px; }
-  .th-cal-dow { font-size: 11px; }
+  .th-cal-dow { font-size: 10px; }
   .th-cal-grid { gap: 3px; }
-  .th-cal-cell { height: 42px; }
-  .th-cal-dn { font-size: 14px; }
-  .th-cal-pip { width: 4px; height: 4px; }
+  .th-cal-cell { min-height: 42px; }
+  .th-cal-dn { font-size: 12.5px; }
+  .th-cal-pip { width: 5px; height: 5px; }
 }
 
 @media (max-width: 380px) {

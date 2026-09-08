@@ -47,7 +47,7 @@ function ClockIcon() {
 
 function HandHeartIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5a7a6d" strokeWidth="1.5">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M11 8c0-2.21-1.79-4-4-4S3 5.79 3 8s1.79 4 4 4 4-1.79 4-4z" />
       <path d="M18.5 6c-1.38 0-2.5 1.12-2.5 2.5 0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5S19.88 6 18.5 6z" />
       <path d="M12 14v7" />
@@ -58,7 +58,7 @@ function HandHeartIcon() {
 
 function ChatIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5a7a6d" strokeWidth="1.5">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
     </svg>
   )
@@ -66,7 +66,7 @@ function ChatIcon() {
 
 function DumbbellIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#c77b3a" strokeWidth="1.5">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M6.5 6.5l11 11" />
       <path d="M6.5 17.5l11-11" />
       <circle cx="5" cy="5" r="2" />
@@ -79,7 +79,7 @@ function DumbbellIcon() {
 
 function BrainIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d4a944" strokeWidth="1.5">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M12 2a4 4 0 0 1 4 4c0 .73-.19 1.41-.54 2" />
       <path d="M12 2a4 4 0 0 0-4 4c0 .73.19 1.41.54 2" />
       <path d="M8 12a4 4 0 0 1-4-4" />
@@ -92,7 +92,7 @@ function BrainIcon() {
 
 function ChartIcon() {
   return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4a9eff" strokeWidth="2">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6b5d" strokeWidth="2">
       <line x1="12" y1="20" x2="12" y2="10" />
       <line x1="18" y1="20" x2="18" y2="4" />
       <line x1="6" y1="20" x2="6" y2="16" />
@@ -100,10 +100,11 @@ function ChartIcon() {
   )
 }
 
-function CheckIcon() {
+function PencilNoteIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-      <polyline points="20 6 9 17 4 12" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6b5d" strokeWidth="2">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   )
 }
@@ -134,15 +135,33 @@ function DirectionsIcon() {
   )
 }
 
-// Pain scale: fewer, larger, color-coded options instead of an 11-button 0-10 grid —
-// easier to scan and tap for users who find plain numbers abstract.
-const PAIN_LEVELS = [
-  { level: 0, emoji: '😄', label: 'No Pain', color: '#22c55e' },
-  { level: 3, emoji: '🙂', label: 'Mild Pain', color: '#84cc16' },
-  { level: 5, emoji: '😐', label: 'Some Pain', color: '#eab308' },
-  { level: 7, emoji: '🙁', label: 'A Lot of Pain', color: '#f97316' },
-  { level: 10, emoji: '😣', label: 'Severe Pain', color: '#ef4444' },
-]
+function WaveIcon() {
+  return (
+    <svg className="welcome-wave" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V10" />
+      <path d="M10 10V5a1.5 1.5 0 0 1 3 0v5" />
+      <path d="M13 10V6a1.5 1.5 0 0 1 3 0v5" />
+      <path d="M16 8.5a1.5 1.5 0 0 1 3 0V13a7 7 0 0 1-7 7h-1a7 7 0 0 1-6.3-3.9L4 13.4a1.5 1.5 0 0 1 2.6-1.5L7.7 14" />
+    </svg>
+  )
+}
+
+// Small progress donut used for the hero stat pills
+function MiniRing({ value, color }) {
+  const r = 16
+  const c = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(100, value))
+  return (
+    <svg className="mini-ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+      <circle cx="22" cy="22" r={r} fill="none" stroke="#dcebe4" strokeWidth="5" />
+      <circle
+        cx="22" cy="22" r={r} fill="none" stroke={color} strokeWidth="5"
+        strokeLinecap="round" transform="rotate(-90 22 22)"
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)}
+      />
+    </svg>
+  )
+}
 
 const CLINIC = {
   name: 'TherapyPro — Main Branch',
@@ -159,12 +178,6 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     avatar: '/therapy-pro-logo.png'
   })
 
-  // Quick-Log Progress Tracker State
-  const [dailyMood, setDailyMood] = useState(null)
-  const [exerciseCompleted, setExerciseCompleted] = useState(false)
-  const [painLevel, setPainLevel] = useState(null)
-  const [showQuickLog, setShowQuickLog] = useState(false)
-  const [showXpBadge, setShowXpBadge] = useState(false)
   const [showAppointmentDetails, setShowAppointmentDetails] = useState(false)
 
   // Calendar State
@@ -176,8 +189,15 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     new Date(2026, 6, 12), // July 12, 2026
   ])
 
-  // Progress/Gamification State
-  const [weeklyProgress, setWeeklyProgress] = useState(75)
+  // Progress / gamification stats shown in the hero
+  const [weeklyProgress] = useState(75)
+  const [gameStats] = useState({
+    level: 9,
+    xp: 340,
+    xpTarget: 500,
+    gamesThisWeek: 5,
+    streakDays: 4,
+  })
 
   // Therapy Modal State
   const [selectedTherapy, setSelectedTherapy] = useState(null)
@@ -194,14 +214,14 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     type: 'Speech Therapy',
     therapist: 'Stephen Tatel',
     date: 'June 29, 2026',
-    time: '10:00 AM'
+    time: '10:00 AM',
+    inDays: 3,
   })
 
-  const [recentNote] = useState({
-    title: 'Great Progress today!',
-    description: 'Alvrin was able to complete all activities',
-    time: '2h ago'
-  })
+  const recentNotes = [
+    { icon: <ChartIcon />, title: 'Great progress today!', description: 'Alvrin was able to complete all activities', time: '2h ago' },
+    { icon: <PencilNoteIcon />, title: 'Homework assigned', description: "Practice 10 words from this week's list", time: '1d ago' },
+  ]
 
   // Therapy categories data
   const therapyCategories = {
@@ -217,7 +237,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     },
     speech: {
       title: 'Speech Therapy',
-      description: 'Support Speech & Language',
+      description: 'Support speech & language',
       exercises: [
         'Articulation drills',
         'Reading aloud practice',
@@ -254,33 +274,6 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     }
   }, [])
 
-  // Handlers
-  const handleMoodSelect = (mood) => {
-    setDailyMood(mood)
-    // In production, send to backend: POST /api/logs/mood
-    console.log('Mood logged:', mood)
-  }
-
-  const handleExerciseToggle = () => {
-    const next = !exerciseCompleted
-    setExerciseCompleted(next)
-    // In production: POST /api/logs/exercise
-    console.log('Exercise completed:', next)
-
-    // Update weekly progress + celebrate with a quick XP reward
-    if (next) {
-      setWeeklyProgress(Math.min(100, weeklyProgress + 5))
-      setShowXpBadge(true)
-      setTimeout(() => setShowXpBadge(false), 1600)
-    }
-  }
-
-  const handlePainLevel = (level) => {
-    setPainLevel(level)
-    // In production: POST /api/logs/pain
-    console.log('Pain level logged:', level)
-  }
-
   const handleTherapyClick = (category) => {
     setSelectedTherapy(category)
   }
@@ -310,6 +303,10 @@ export default function Dashboard({ onLogout, user, betaTier }) {
     return isAppointment ? 'appointment-day' : null
   }
 
+  const xpRemaining = gameStats.xpTarget - gameStats.xp
+  const levelRingR = 42
+  const levelRingC = 2 * Math.PI * levelRingR
+
   return (
     <div className="dashboard-layout">
       {/* Patient Sidebar */}
@@ -325,7 +322,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
       {/* Main Dashboard Content */}
       <div className="dashboard-main">
         {/* Mobile Menu Toggle */}
-        <button 
+        <button
           className="mobile-menu-btn"
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
@@ -339,10 +336,10 @@ export default function Dashboard({ onLogout, user, betaTier }) {
             <img src="/therapy-pro-logo.png" alt="Therapy Pro" className="header-logo-img" />
             <span className="header-brand">Therapy Pro</span>
           </div>
-          
+
           <div className="header-right">
-            <button 
-              className="header-notification-btn" 
+            <button
+              className="header-notification-btn"
               aria-label="Notifications"
               onClick={handleNotificationClick}
             >
@@ -376,301 +373,238 @@ export default function Dashboard({ onLogout, user, betaTier }) {
 
         {/* Dashboard Content */}
         <main className="dashboard-content-area">
-          {/* Welcome Banner with Progress Ring */}
+          {/* Welcome Hero */}
           <div className="welcome-banner">
             <div className="welcome-text">
-              <h1 className="welcome-title">Welcome back, {currentUser.name}! 👋</h1>
+              <h1 className="welcome-title">
+                Welcome back, {currentUser.name}
+                <WaveIcon />
+              </h1>
               <p className="welcome-subtitle">
                 Track appointments, notes, and therapy progress all in one place.
               </p>
-              
-              {/* Weekly Progress */}
-              <div className="progress-container">
-                <div className="progress-ring-wrapper">
-                  <svg className="progress-ring" width="60" height="60">
-                    <circle
-                      className="progress-ring-circle-bg"
-                      stroke="#d5ebe3"
-                      strokeWidth="6"
-                      fill="transparent"
-                      r="24"
-                      cx="30"
-                      cy="30"
-                    />
-                    <circle
-                      className="progress-ring-circle"
-                      stroke="#4a6b5d"
-                      strokeWidth="6"
-                      fill="transparent"
-                      r="24"
-                      cx="30"
-                      cy="30"
-                      strokeDasharray={`${2 * Math.PI * 24}`}
-                      strokeDashoffset={`${2 * Math.PI * 24 * (1 - weeklyProgress / 100)}`}
-                      strokeLinecap="round"
-                    />
-                    <text
-                      x="30"
-                      y="35"
-                      textAnchor="middle"
-                      fontSize="14"
-                      fontWeight="bold"
-                      fill="#2c4a3e"
-                    >
-                      {weeklyProgress}%
-                    </text>
-                  </svg>
+
+              <div className="hero-stats">
+                <div className="hero-stat">
+                  <MiniRing value={weeklyProgress} color="#4a6b5d" />
+                  <div className="hero-stat-text">
+                    <span className="hero-stat-label">Weekly goals</span>
+                    <span className="hero-stat-value">{weeklyProgress}% met</span>
+                  </div>
                 </div>
-                <div className="progress-text">
-                  <p className="progress-label">Weekly Goals</p>
-                  <p className="progress-description">{weeklyProgress}% of goals met!</p>
+                <div className="hero-stat">
+                  <MiniRing value={(gameStats.gamesThisWeek / 7) * 100} color="#7c5cff" />
+                  <div className="hero-stat-text">
+                    <span className="hero-stat-label">Games this week</span>
+                    <span className="hero-stat-value">{gameStats.gamesThisWeek} played</span>
+                  </div>
+                </div>
+                <div className="hero-stat">
+                  <MiniRing value={(gameStats.streakDays / 7) * 100} color="#f59e0b" />
+                  <div className="hero-stat-text">
+                    <span className="hero-stat-label">Current streak</span>
+                    <span className="hero-stat-value">{gameStats.streakDays} days</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="welcome-illustration">
-              <span className="illustration-emoji">👩‍⚕️👦</span>
-            </div>
-          </div>
 
-        {/* Quick-Log Progress Tracker */}
-        <div className="quick-log-card">
-          <div className="quick-log-header">
-            <h2 className="quick-log-title">Quick Log</h2>
-            <button 
-              className="quick-log-toggle"
-              onClick={() => setShowQuickLog(!showQuickLog)}
-            >
-              {showQuickLog ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          
-          {showQuickLog && (
-            <div className="quick-log-content">
-              {/* Mood Tracker */}
-              <div className="log-section">
-                <label className="log-label">How are you feeling today?</label>
-                <div className="mood-emojis">
-                  {['😢', '😟', '😐', '😊', '😄'].map((emoji, index) => (
-                    <button
-                      key={index}
-                      className={`mood-emoji ${dailyMood === index ? 'selected' : ''} ${dailyMood !== null && dailyMood !== index ? 'dimmed' : ''}`}
-                      onClick={() => handleMoodSelect(index)}
-                      aria-label={`Feeling ${index + 1} out of 5`}
-                      aria-pressed={dailyMood === index}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Exercise Completion */}
-              <div className="log-section">
-                <label className="checkbox-container">
-                  <input
-                    type="checkbox"
-                    checked={exerciseCompleted}
-                    onChange={handleExerciseToggle}
+            <div className="hero-level-card">
+              <div className="hero-level-ring">
+                <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+                  <circle cx="48" cy="48" r={levelRingR} fill="none" stroke="#e6efe9" strokeWidth="7" />
+                  <circle
+                    cx="48" cy="48" r={levelRingR} fill="none" stroke="#f59e0b" strokeWidth="7"
+                    strokeLinecap="round" transform="rotate(-90 48 48)"
+                    strokeDasharray={levelRingC}
+                    strokeDashoffset={levelRingC * (1 - gameStats.xp / gameStats.xpTarget)}
                   />
-                  <span className={`checkmark ${exerciseCompleted ? 'checked-pop' : ''}`}>
-                    {exerciseCompleted && <CheckIcon />}
-                  </span>
-                  <span className="checkbox-label-text">I did my speech exercises today</span>
-                  {showXpBadge && <span className="xp-badge">+10 XP ⭐</span>}
-                </label>
-              </div>
-
-              {/* Pain Level */}
-              <div className="log-section">
-                <label className="log-label">How much does it hurt?</label>
-                <div className="pain-scale">
-                  {PAIN_LEVELS.map((p) => (
-                    <button
-                      key={p.level}
-                      className={`pain-option ${painLevel === p.level ? 'selected' : ''}`}
-                      style={{ '--pain-color': p.color }}
-                      onClick={() => handlePainLevel(p.level)}
-                      aria-label={p.label}
-                      aria-pressed={painLevel === p.level}
-                    >
-                      <span className="pain-emoji">{p.emoji}</span>
-                      <span className="pain-option-label">{p.label}</span>
-                    </button>
-                  ))}
+                </svg>
+                <div className="hero-level-ring-label">
+                  <span className="hero-level-num">{gameStats.level}</span>
+                  <span className="hero-level-word">Level</span>
                 </div>
               </div>
-
-              {dailyMood !== null || exerciseCompleted || painLevel !== null ? (
-                <p className="log-saved">✓ Progress logged successfully!</p>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming Appointment with Mini Calendar */}
-        <div className="appointment-card">
-          <div className="appointment-header">
-            <div className="appointment-icon">
-              <CalendarIcon />
-            </div>
-            <h2 className="appointment-heading">Upcoming Appointment</h2>
-            <button 
-              className="calendar-toggle-btn"
-              onClick={() => setShowCalendar(!showCalendar)}
-            >
-              {showCalendar ? 'Hide' : 'View'} Calendar
-            </button>
-          </div>
-          
-          {showCalendar ? (
-            <div className="calendar-widget">
-              <Calendar
-                value={selectedDate}
-                onChange={setSelectedDate}
-                tileClassName={tileClassName}
-                minDate={new Date()}
-              />
-              <p className="calendar-hint">
-                <span className="appointment-dot"></span> Days with appointments
+              <p className="hero-level-xp">
+                {gameStats.xp} / {gameStats.xpTarget} XP · {xpRemaining} to level {gameStats.level + 1}
               </p>
+              <button
+                className="hero-play-btn"
+                onClick={() => navigate('/patient/gamified-activities')}
+              >
+                Play a game
+              </button>
             </div>
-          ) : (
-            <div className="appointment-body">
-              <h3 className="appointment-type">{appointment.type}</h3>
-              <p className="appointment-therapist">with {appointment.therapist}</p>
-              
-              <div className="appointment-details">
-                <div className="detail-item">
-                  <CalendarIcon />
-                  <span>{appointment.date}</span>
+          </div>
+
+          {/* Upcoming Appointment */}
+          <div className="appointment-card">
+            <div className="appointment-header">
+              <div className="appointment-icon">
+                <CalendarIcon />
+              </div>
+              <h2 className="appointment-heading">Upcoming Appointment</h2>
+              <span className="appointment-badge">In {appointment.inDays} days</span>
+            </div>
+
+            {showCalendar ? (
+              <div className="calendar-widget">
+                <Calendar
+                  value={selectedDate}
+                  onChange={setSelectedDate}
+                  tileClassName={tileClassName}
+                  minDate={new Date()}
+                />
+                <p className="calendar-hint">
+                  <span className="appointment-dot"></span> Days with appointments
+                </p>
+              </div>
+            ) : (
+              <div className="appointment-body">
+                <div className="appointment-title-row">
+                  <span className="appt-type-icon"><CalendarIcon /></span>
+                  <div>
+                    <h3 className="appointment-type">{appointment.type}</h3>
+                    <p className="appointment-therapist">with {appointment.therapist}</p>
+                  </div>
                 </div>
-                <div className="detail-item">
-                  <ClockIcon />
-                  <span>{appointment.time}</span>
+
+                <div className="appointment-details">
+                  <div className="detail-item">
+                    <CalendarIcon />
+                    <span>{appointment.date}</span>
+                  </div>
+                  <div className="detail-item">
+                    <ClockIcon />
+                    <span>{appointment.time}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="appointment-actions">
+              <button className="appt-action-btn" onClick={() => setShowAppointmentDetails(true)}>
+                View Details
+              </button>
+              <button className="appt-action-btn" onClick={() => setShowCalendar(!showCalendar)}>
+                {showCalendar ? 'Hide Calendar' : 'View Calendar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Clinic + Recent Notes */}
+          <div className="dashboard-two-col">
+            <div className="clinic-card">
+              <div className="clinic-header">
+                <div className="clinic-icon">
+                  <MapPinIcon />
+                </div>
+                <h2 className="clinic-heading">Our Clinic</h2>
+              </div>
+              <div className="clinic-body">
+                <a
+                  className="clinic-map-thumb"
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CLINIC.mapsQuery)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open clinic location in Google Maps"
+                >
+                  <div className="clinic-map-art">
+                    <span className="clinic-map-pin"><MapPinIcon /></span>
+                  </div>
+                </a>
+                <h3 className="clinic-name">{CLINIC.name}</h3>
+                <p className="clinic-address">{CLINIC.address}</p>
+                <a
+                  className="get-directions-btn"
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(CLINIC.mapsQuery)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <DirectionsIcon />
+                  Get Directions
+                </a>
+              </div>
+            </div>
+
+            <div className="recent-notes-section">
+              <div className="section-header">
+                <h2 className="section-title">Recent Notes</h2>
+                <button className="see-all-btn" onClick={() => navigate('/notes')}>See all</button>
+              </div>
+
+              <div className="notes-list-card">
+                {recentNotes.map((n, i) => (
+                  <div key={i} className="note-row">
+                    <div className="note-row-icon">{n.icon}</div>
+                    <div className="note-row-content">
+                      <h3 className="note-row-title">{n.title}</h3>
+                      <p className="note-row-desc">{n.description}</p>
+                    </div>
+                    <span className="note-row-time">{n.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Therapy Types */}
+          <div className="services-section">
+            <h2 className="section-title">Therapy Types</h2>
+            <div className="services-grid">
+              <div
+                className="service-card blue clickable"
+                onClick={() => handleTherapyClick('occupational')}
+              >
+                <div className="service-icon">
+                  <HandHeartIcon />
+                </div>
+                <div className="service-info">
+                  <h3 className="service-title">Occupational Therapy</h3>
+                  <p className="service-description">Improve daily skills</p>
                 </div>
               </div>
 
-              <button className="view-details-btn" onClick={() => setShowAppointmentDetails(true)}>View Details</button>
-            </div>
-          )}
-        </div>
-
-        {/* My Clinic Card */}
-        <div className="clinic-card">
-          <div className="clinic-header">
-            <div className="clinic-icon">
-              <MapPinIcon />
-            </div>
-            <h2 className="clinic-heading">Our Clinic</h2>
-          </div>
-          <div className="clinic-body">
-            <h3 className="clinic-name">{CLINIC.name}</h3>
-            <p className="clinic-address">{CLINIC.address}</p>
-            <a
-              className="clinic-map-thumb"
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CLINIC.mapsQuery)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open clinic location in Google Maps"
-            >
-              <div className="clinic-map-art">
-                <span className="clinic-map-pin"><MapPinIcon /></span>
+              <div
+                className="service-card green clickable"
+                onClick={() => handleTherapyClick('speech')}
+              >
+                <div className="service-icon">
+                  <ChatIcon />
+                </div>
+                <div className="service-info">
+                  <h3 className="service-title">Speech Therapy</h3>
+                  <p className="service-description">Support speech & language</p>
+                </div>
               </div>
-              <span className="clinic-map-caption">Tap to view map</span>
-            </a>
-            <a
-              className="get-directions-btn"
-              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(CLINIC.mapsQuery)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <DirectionsIcon />
-              Get Directions
-            </a>
-          </div>
-        </div>
 
-        {/* Therapy Services Grid - Now Interactive */}
-        <div className="services-grid">
-          <div 
-            className="service-card blue clickable" 
-            onClick={() => handleTherapyClick('occupational')}
-          >
-            <div className="service-icon">
-              <HandHeartIcon />
-            </div>
-            <div className="service-info">
-              <h3 className="service-title">Occupational Therapy</h3>
-              <p className="service-description">Improve daily skills</p>
-            </div>
-          </div>
+              <div
+                className="service-card peach clickable"
+                onClick={() => handleTherapyClick('physical')}
+              >
+                <div className="service-icon">
+                  <DumbbellIcon />
+                </div>
+                <div className="service-info">
+                  <h3 className="service-title">Physical Therapy</h3>
+                  <p className="service-description">Improve movement & strength</p>
+                </div>
+              </div>
 
-          <div 
-            className="service-card green clickable"
-            onClick={() => handleTherapyClick('speech')}
-          >
-            <div className="service-icon">
-              <ChatIcon />
-            </div>
-            <div className="service-info">
-              <h3 className="service-title">Speech Therapy</h3>
-              <p className="service-description">Support Speech & Language</p>
+              <div
+                className="service-card yellow clickable"
+                onClick={() => handleTherapyClick('cognitive')}
+              >
+                <div className="service-icon">
+                  <BrainIcon />
+                </div>
+                <div className="service-info">
+                  <h3 className="service-title">Cognitive Therapy</h3>
+                  <p className="service-description">Enhance thinking & learning</p>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div 
-            className="service-card peach clickable"
-            onClick={() => handleTherapyClick('physical')}
-          >
-            <div className="service-icon">
-              <DumbbellIcon />
-            </div>
-            <div className="service-info">
-              <h3 className="service-title">Physical Therapy</h3>
-              <p className="service-description">Improve movement & strength</p>
-            </div>
-          </div>
-
-          <div 
-            className="service-card yellow clickable"
-            onClick={() => handleTherapyClick('cognitive')}
-          >
-            <div className="service-icon">
-              <BrainIcon />
-            </div>
-            <div className="service-info">
-              <h3 className="service-title">Cognitive Therapy</h3>
-              <p className="service-description">Enhance thinking & learning</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Notes */}
-        <div className="recent-notes-section">
-          <div className="section-header">
-            <h2 className="section-title">Recent Notes</h2>
-            <button className="see-all-btn">See all</button>
-          </div>
-
-          <div className="note-card">
-            <div className="note-icon">
-              <ChartIcon />
-            </div>
-            <div className="note-content">
-              <h3 className="note-title">{recentNote.title}</h3>
-              <p className="note-description">{recentNote.description}</p>
-            </div>
-            <span className="note-time">{recentNote.time}</span>
-          </div>
-        </div>
-
-          {/* Logout Button */}
-          <button className="logout-btn" onClick={() => {
-            onLogout()
-            navigate('/')
-          }}>
-            Logout
-          </button>
         </main>
       </div>
 
@@ -721,14 +655,14 @@ export default function Dashboard({ onLogout, user, betaTier }) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{therapyCategories[selectedTherapy].title}</h2>
-              <button 
+              <button
                 className="modal-close"
                 onClick={() => setSelectedTherapy(null)}
               >
                 <XIcon />
               </button>
             </div>
-            
+
             <div className="modal-body">
               <section className="modal-section">
                 <h3>Today's Exercises</h3>
@@ -754,7 +688,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
                 </ul>
               </section>
 
-              <button 
+              <button
                 className="modal-action-btn"
                 onClick={() => {
                   setSelectedTherapy(null)

@@ -38,6 +38,8 @@ import OwnerSpeechToTextPage from './pages/owner/OwnerSpeechToTextPage'
 import OwnerTextToSpeechPage from './pages/owner/OwnerTextToSpeechPage'
 import OwnerSpeechFeaturesPage from './pages/owner/OwnerSpeechFeaturesPage'
 import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPage'
+import OwnerActivityLibraryPage from './pages/owner/OwnerActivityLibraryPage'
+import OwnerRequestGamePage from './pages/owner/OwnerRequestGamePage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
 import TherapistSpeechToTextPage from './pages/therapist/TherapistSpeechToTextPage'
 import TherapistTextToSpeechPage from './pages/therapist/TherapistTextToSpeechPage'
@@ -640,6 +642,36 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
                 <OwnerGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/gamified-activities/library"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerActivityLibraryPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/gamified-activities/request"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerRequestGamePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

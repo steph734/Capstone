@@ -151,6 +151,42 @@
   color: #fff;
 }
 
+/* Sub-navigation (nested menu items) */
+.nav-subnav {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0 6px;
+  background: #f2faf6;
+}
+
+.nav-subitem {
+  width: 100%;
+  text-align: left;
+  padding: 9px 20px 9px 56px;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #5a7a6d;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.nav-subitem:hover {
+  background: #e8f5f0;
+  color: #2c4a3e;
+  border-left-color: #9cbcae;
+}
+
+.nav-subitem.active {
+  background: #e8f5f0;
+  color: #2c4a3e;
+  font-weight: 700;
+  border-left-color: #4a6b5d;
+}
+
 /* Logout Item */
 .logout-item {
   color: #d93030;

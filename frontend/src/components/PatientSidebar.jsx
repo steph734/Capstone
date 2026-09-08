@@ -203,17 +203,42 @@ export default function PatientSidebar({
 
         {/* Main Navigation */}
         <nav className="sidebar-nav">
-          {resolvedMenuItems.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-              onClick={() => handleNavigation(item.path)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
-              {item.trial && <span className="nav-trial-tag">Trial</span>}
-            </button>
-          ))}
+          {resolvedMenuItems.map(item => {
+            const itemActive = location.pathname === item.path
+            const hasChildren = Array.isArray(item.children) && item.children.length > 0
+            const sectionActive =
+              hasChildren &&
+              (itemActive ||
+                location.pathname.startsWith(item.path + '/') ||
+                item.children.some(c => location.pathname === c.path))
+
+            return (
+              <div key={item.id} className="nav-group">
+                <button
+                  className={`nav-item ${itemActive ? 'active' : ''}`}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                  {item.trial && <span className="nav-trial-tag">Trial</span>}
+                </button>
+
+                {sectionActive && (
+                  <div className="nav-subnav">
+                    {item.children.map(child => (
+                      <button
+                        key={child.id}
+                        className={`nav-subitem ${location.pathname === child.path ? 'active' : ''}`}
+                        onClick={() => handleNavigation(child.path)}
+                      >
+                        {child.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </nav>
 
         {/* Bottom Navigation */}

@@ -429,4 +429,65 @@
   .oa-filter-tabs { width: 100%; }
 
   .oa-detail-grid { grid-template-columns: 1fr; }
+
+  /* ── Table → stacked cards (no horizontal scroll on phones) ── */
+  .oa-table-card { overflow: visible; }
+  .oa-table-card .admin-table-scroll { overflow-x: visible; }
+  .oa-appts-table { min-width: 0; }
+  .oa-appts-table thead { display: none; }
+  .oa-appts-table,
+  .oa-appts-table tbody,
+  .oa-appts-table tr,
+  .oa-appts-table td { display: block; width: 100%; }
+
+  .oa-appts-table tr {
+    border: 1px solid #e6efea;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+  .oa-appts-table tr:last-child { margin-bottom: 0; }
+
+  .oa-appts-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f2f7f4;
+    white-space: normal;
+    text-align: right;
+  }
+  .oa-appts-table td:last-child { border-bottom: none; }
+
+  .oa-appts-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #9aab9f;
+    text-align: left;
+  }
+
+  /* Patient row acts as the card header */
+  .oa-appts-table td.oa-cell-patient {
+    background: #f8fbf9;
+    border-bottom: 1px solid #e8f0ec;
+    padding: 12px 14px;
+  }
+  .oa-appts-table td.oa-cell-patient::before { display: none; }
+  .oa-appts-table .oa-table-person { white-space: normal; }
+
+  .oa-appts-table td.oa-cell-actions { justify-content: flex-end; }
+  .oa-appts-table td.oa-cell-actions::before { display: none; }
+  .oa-appts-table .oa-datetime { align-items: flex-end; }
+
+  /* Empty-state row */
+  .oa-appts-table td[colspan] { text-align: center; }
+  .oa-appts-table td[colspan]::before { display: none; }
+  .oa-appts-table td[colspan] .oa-empty { padding: 40px 16px; }
 }

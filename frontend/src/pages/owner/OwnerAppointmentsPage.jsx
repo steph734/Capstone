@@ -236,9 +236,9 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
       </div>
 
       {/* Appointments Table */}
-      <section className="admin-table-card">
+      <section className="admin-table-card oa-table-card">
         <div className="admin-table-scroll">
-          <table className="admin-table">
+          <table className="admin-table oa-appts-table">
             <thead>
               <tr>
                 <th>Patient</th>
@@ -255,7 +255,7 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
                 <tr><td colSpan={7}><p className="oa-empty">No appointments match your search.</p></td></tr>
               ) : filtered.map((a) => (
                 <tr key={a.id}>
-                  <td>
+                  <td className="oa-cell-patient" data-label="Patient">
                     <div className="oa-table-person">
                       <img src={a.avatar} alt={a.patient} className="oa-avatar" />
                       <div>
@@ -264,17 +264,17 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
                       </div>
                     </div>
                   </td>
-                  <td>{a.therapist}</td>
-                  <td><span className="oa-service-badge">{a.service}</span></td>
-                  <td><span className="oa-branch-badge">{a.branch}</span></td>
-                  <td>
+                  <td data-label="Therapist">{a.therapist}</td>
+                  <td data-label="Service"><span className="oa-service-badge">{a.service}</span></td>
+                  <td data-label="Branch"><span className="oa-branch-badge">{a.branch}</span></td>
+                  <td data-label="Date & Time">
                     <div className="oa-datetime">
                       <span className="oa-date">{a.date}</span>
                       <span className="oa-time">{a.time}</span>
                     </div>
                   </td>
-                  <td><span className={`oa-pill ${STATUS_PILL[a.status]}`}>{a.status}</span></td>
-                  <td>
+                  <td data-label="Status"><span className={`oa-pill ${STATUS_PILL[a.status]}`}>{a.status}</span></td>
+                  <td className="oa-cell-actions" data-label="Actions">
                     <div className="oa-table-actions">
                       <button className="oa-icon-btn oa-icon-view" onClick={() => setViewing(a)} title="View" aria-label={`View ${a.patient}'s appointment`}>
                         <EyeIcon />

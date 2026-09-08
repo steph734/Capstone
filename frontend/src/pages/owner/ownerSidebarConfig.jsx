@@ -95,7 +95,17 @@ const BASE_OWNER_MENU_ITEMS = [
 ]
 
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/owner/speech-features' }
-const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/owner/gamified-activities' }
+const GAMIFIED_ITEM = {
+  id: 'gamified-activities',
+  label: 'Gamified Activities',
+  icon: <GamepadIcon />,
+  path: '/owner/gamified-activities',
+  children: [
+    { id: 'ga-overview', label: 'Overview', path: '/owner/gamified-activities' },
+    { id: 'ga-library', label: 'Activity Library', path: '/owner/gamified-activities/library' },
+    { id: 'ga-request', label: 'Request a Game', path: '/owner/gamified-activities/request' },
+  ],
+}
 const SETTINGS_ITEM = { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/owner/settings' }
 
 export const ownerMenuItems = [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM]

@@ -98,6 +98,9 @@
   overflow: hidden;
 }
 
+/* Only useful on mobile, where the panel stacks below the list. */
+.tnp-detail-close { display: none; }
+
 .tnp-scroll-area {
   padding: 24px 20px 48px;
   display: flex;
@@ -718,6 +721,23 @@
   .tnp-notes-table td.tnp-cell-actions { justify-content: flex-end; }
   .tnp-full-table td.tnp-cell-actions::before,
   .tnp-notes-table td.tnp-cell-actions::before { display: none; }
-  .tnp-table-actions { flex-wrap: wrap; justify-content: flex-end; }
-  .tnp-table-actions button { flex: 1 1 auto; text-align: center; }
+  .tnp-table-actions { flex-wrap: wrap; justify-content: stretch; gap: 8px; width: 100%; }
+  .tnp-table-actions button { flex: 1 1 140px; text-align: center; }
+
+  /* Back-to-list control for the stacked detail panel */
+  .tnp-detail-close {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    border-bottom: 1px solid #e4d4fc;
+    background: #ece5ff;
+    color: #5b3ea8;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+  .tnp-detail-close:hover { background: #e3d9ff; }
 }

@@ -596,12 +596,14 @@
   .msg-page {
     height: auto !important;
     overflow: visible !important;
-    padding-top: 64px !important;
+    padding-top: 56px !important;
     min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .msg-shell {
-    height: calc(100vh - 64px);
+    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
     overflow: hidden;
     position: relative;
   }
@@ -640,17 +642,57 @@
   .msg-right { display: none; }
 
   .msg-chat-header-actions .msg-icon-btn:nth-child(n+3) { display: none; }
+
+  /* ── Tighter sizing for phones ── */
+  .msg-left-header { padding: 12px 12px 8px; }
+  .msg-left-title { font-size: 18px; }
+  .msg-icon-btn { width: 34px; height: 34px; }
+
+  .msg-search-wrap { margin: 2px 10px 6px; padding: 7px 13px; }
+  .msg-search-input { font-size: 13px; }
+
+  .msg-section-label { padding: 8px 14px 3px; font-size: 10px; }
+
+  .msg-conv-item { padding: 8px 12px; gap: 10px; }
+  .msg-conv-item .msg-avatar { width: 40px !important; height: 40px !important; font-size: 14px !important; }
+  .msg-conv-name { font-size: 13.5px; }
+  .msg-conv-preview { font-size: 12.5px; }
+  .msg-conv-time { font-size: 10.5px; }
+
+  .msg-chat-header { padding: 8px 10px; gap: 8px; }
+  .msg-chat-header-avatar .msg-avatar { width: 36px !important; height: 36px !important; font-size: 13px !important; }
+  .msg-chat-header-name { font-size: 14px; }
+  .msg-chat-header-status { font-size: 11px; }
+
+  .msg-chat-body { padding: 14px 12px 6px; }
+  .msg-bubble-content { max-width: 80%; }
+  .msg-bubble { font-size: 13.5px; padding: 9px 13px; }
+  .msg-date-sep { margin: 4px 0 14px; }
+
+  .msg-input-bar { padding: 8px 8px 10px; gap: 6px; }
+  .msg-input-wrap { padding: 7px 12px; }
+  .msg-input { font-size: 13.5px; }
+  .msg-send-btn { width: 38px; height: 38px; }
 }
 
 /* ══════════════════════════════════════════
    SMALL MOBILE  (≤ 400 px)
 ══════════════════════════════════════════ */
 @media (max-width: 400px) {
-  .msg-page { padding-top: 58px !important; }
+  .msg-page { padding-top: 52px !important; }
 
-  .msg-shell { height: calc(100vh - 58px); }
+  .msg-shell {
+    height: calc(100vh - 52px);
+    height: calc(100dvh - 52px);
+  }
+
+  .msg-conv-item { padding: 7px 10px; }
+  .msg-conv-item .msg-avatar { width: 38px !important; height: 38px !important; }
 
   .msg-bubble { padding: 8px 12px; font-size: 13px; }
+  .msg-bubble-content { max-width: 84%; }
 
+  .msg-chat-header-actions { gap: 0; }
   .msg-input-icon { width: 30px; height: 30px; }
+  .msg-input-bar { padding: 7px 6px 9px; }
 }

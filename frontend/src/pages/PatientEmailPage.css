@@ -591,11 +591,12 @@
   .pe-page {
     height: auto !important;
     overflow: visible !important;
-    padding-top: 64px !important;   /* space for fixed ☰ button */
+    padding-top: 56px !important;   /* space for fixed ☰ button */
     padding-left: 0 !important;
     padding-right: 0 !important;
     padding-bottom: 0 !important;
     min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .pe-gmail {
@@ -603,7 +604,8 @@
     height: auto;
     overflow: visible;
     background: #fff;
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - 56px);
+    min-height: calc(100dvh - 56px);
   }
 
   /* ── Folder bar ── */
@@ -611,8 +613,8 @@
     width: 100%;
     flex-direction: row;
     align-items: center;
-    padding: 10px 12px;
-    gap: 8px;
+    padding: 8px 10px;
+    gap: 6px;
     background: #f6f8fc;
     border-bottom: 1px solid #e8eaed;
     overflow-x: auto;
@@ -625,13 +627,14 @@
 
   .pe-compose-btn {
     margin: 0;
-    padding: 9px 16px;
-    border-radius: 20px;
-    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 18px;
+    font-size: 12.5px;
     white-space: nowrap;
     flex-shrink: 0;
-    gap: 8px;
+    gap: 7px;
   }
+  .pe-compose-btn svg { width: 16px; height: 16px; }
 
   .pe-folders {
     flex-direction: row;
@@ -641,11 +644,11 @@
 
   .pe-folder-item {
     flex-direction: row;
-    padding: 7px 14px;
-    border-radius: 20px;
+    padding: 6px 12px;
+    border-radius: 18px;
     border: 1.5px solid #dadce0;
     gap: 6px;
-    font-size: 13px;
+    font-size: 12.5px;
     margin-right: 0;
     min-height: auto;
     white-space: nowrap;
@@ -681,28 +684,30 @@
   }
 
   .pe-search-bar {
-    margin: 10px 10px 4px;
-    padding: 9px 14px;
-    border-radius: 20px;
+    margin: 8px 10px 2px;
+    padding: 8px 13px;
+    border-radius: 18px;
+    gap: 10px;
   }
 
-  .pe-search-input { font-size: 14px; }
+  .pe-search-input { font-size: 13.5px; }
 
   .pe-list { overflow-y: visible; }
 
-  .pe-list-header { padding: 8px 14px 4px; }
+  .pe-list-header { padding: 6px 14px 3px; }
+  .pe-list-title { font-size: 12px; }
 
   /* ── 2-line email rows on mobile ── */
   .pe-row {
-    padding: 10px 12px;
+    padding: 8px 12px;
     gap: 10px;
     align-items: flex-start;
   }
 
   .pe-row-avatar {
-    width: 38px;
-    height: 38px;
-    font-size: 14px;
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
     margin-top: 2px;
   }
 
@@ -726,7 +731,7 @@
   /* Sender name shown inline above subject on mobile */
   .pe-row-from-mobile {
     display: block;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #202124;
     overflow: hidden;
@@ -735,7 +740,7 @@
   }
 
   .pe-row-subject {
-    font-size: 13px;
+    font-size: 12.5px;
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -745,23 +750,30 @@
   .pe-row-preview { display: none; }
 
   .pe-row-time {
-    font-size: 11px;
-    min-width: 38px;
+    font-size: 10.5px;
+    min-width: 36px;
     margin-top: 2px;
     flex-shrink: 0;
   }
 
   /* ── Email detail ── */
   .pe-detail {
-    padding: 14px 14px 28px;
+    padding: 12px 14px 24px;
     overflow-y: visible;
   }
 
-  .pe-detail-subject { font-size: 18px; }
+  .pe-detail-toolbar { margin-bottom: 12px; }
+  .pe-detail-subject { font-size: 17px; margin-bottom: 12px; }
 
-  .pe-detail-meta { flex-wrap: wrap; }
+  .pe-detail-meta {
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
 
+  .pe-detail-avatar { width: 34px; height: 34px; font-size: 14px; }
   .pe-detail-sender-email { display: none; }
+  .pe-detail-body { font-size: 13.5px; line-height: 1.65; }
 
   /* ── Compose modal → full-width bottom sheet ── */
   .pe-compose-modal {
@@ -782,19 +794,25 @@
    SMALL MOBILE  (≤ 400 px)
 ══════════════════════════════════════════ */
 @media (max-width: 400px) {
-  .pe-page { padding-top: 58px !important; }
+  .pe-page {
+    padding-top: 52px !important;
+    min-height: 100dvh;
+  }
+  .pe-gmail { min-height: calc(100dvh - 52px); }
 
   .pe-compose-btn {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 7px 11px;
+    font-size: 11.5px;
     gap: 6px;
   }
 
-  .pe-folder-item { padding: 6px 10px; font-size: 12px; }
+  .pe-folder-item { padding: 6px 10px; font-size: 11.5px; }
 
-  .pe-row { padding: 8px 10px; gap: 8px; }
+  .pe-row { padding: 7px 10px; gap: 8px; }
 
-  .pe-row-avatar { width: 34px; height: 34px; font-size: 13px; }
+  .pe-row-avatar { width: 32px; height: 32px; font-size: 12px; }
 
   .pe-row-time { min-width: 32px; font-size: 10px; }
+
+  .pe-detail-subject { font-size: 16px; }
 }

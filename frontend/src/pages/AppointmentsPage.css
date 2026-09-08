@@ -161,58 +161,63 @@
   flex-shrink: 0;
 }
 
-.dot-sm { width: 6px; height: 6px; margin-top: 2px; }
+.dot-sm { width: 5px; height: 5px; margin-top: 0; }
 
 .dot-available { background: #22c55e; }
 .dot-booked    { background: #eab308; }
 .dot-closed    { background: #ef4444; }
 
-/* ── Calendar ── */
+/* ── Calendar (matches the therapist Session Calendar style) ── */
 .calendar-wrap { margin-bottom: 16px; }
 
 .cal-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 2px;
 }
 
 .cal-nav-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1.5px solid #d8eae0;
-  background: #f5faf8;
-  color: #2c4a3e;
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 7px;
+  border: 1px solid #e8f5f0;
+  background: #fff;
+  color: #6b9c8c;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  padding: 0;
+  transition: background 0.12s;
 }
 
-.cal-nav-btn:hover { background: #e6f5ec; border-color: #4a9e6b; }
+.cal-nav-btn:hover { background: #f0f7f4; }
 
 .cal-month-label {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   color: #2c4a3e;
-  letter-spacing: 0.2px;
+  min-width: 128px;
+  text-align: center;
 }
 
 /* Calendar Grid — 7 columns */
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 3px;
 }
 
 .cal-day-header {
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  color: #7a9a8e;
-  padding: 6px 2px;
+  color: #b0bdb5;
+  padding: 10px 0 4px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -222,47 +227,44 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 6px 2px;
-  border-radius: 10px;
-  border: 1.5px solid transparent;
-  background: transparent;
+  gap: 3px;
+  height: 40px;
+  padding: 0;
+  border-radius: 9px;
+  border: none;
+  background: none;
   cursor: pointer;
-  transition: all 0.15s;
-  min-height: 44px;
+  transition: background 0.12s ease;
+  min-height: 0;
+  min-width: 0;
 }
 
-.cal-day:hover:not(:disabled):not(.cal-selected) {
-  background: #f0faf4;
-  border-color: #c8eeda;
+.cal-day:hover:not(:disabled):not(.cal-selected):not(.cal-today) {
+  background: #f0f7f4;
 }
 
-.cal-day:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
+.cal-day:disabled { cursor: not-allowed; }
 
 .cal-today {
-  background: #e8f5ec;
-  border-color: #4a9e6b;
+  background: #4a6b5d;
+  border-radius: 9px;
 }
+.cal-today .cal-day-num { color: #fff; font-weight: 800; }
+.cal-today .dot { background: rgba(255, 255, 255, 0.75) !important; }
 
-.cal-selected {
-  background: linear-gradient(135deg, #2c4a3e 0%, #4a7a62 100%) !important;
-  border-color: #2c4a3e !important;
+.cal-selected:not(.cal-today) {
+  background: #eef6f2;
 }
+.cal-selected:not(.cal-today) .cal-day-num { color: #1a3a30; font-weight: 800; }
 
-.cal-selected .cal-day-num { color: #fff !important; }
-.cal-selected .dot          { border: 1.5px solid rgba(255,255,255,.6); }
-
-.cal-closed { opacity: 0.4; }
+.cal-closed:not(.cal-today) { opacity: 0.4; }
 
 /* Past dates — visible for context but not selectable. */
-.cal-past:not(.cal-selected) { opacity: 0.3; cursor: not-allowed; }
-.cal-past:not(.cal-selected) .cal-day-num { text-decoration: line-through; }
+.cal-past:not(.cal-selected):not(.cal-today) { opacity: 0.3; cursor: not-allowed; }
+.cal-past:not(.cal-selected):not(.cal-today) .cal-day-num { text-decoration: line-through; }
 
 /* Booked by someone else — visible but not selectable for a new booking. */
-.cal-booked:not(.cal-selected) { opacity: 0.55; cursor: not-allowed; }
+.cal-booked:not(.cal-selected):not(.cal-today) { opacity: 0.55; cursor: not-allowed; }
 
 .schedule-hint {
   margin: 8px 2px 0;
@@ -272,13 +274,11 @@
 }
 
 .cal-day-num {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2c4a3e;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3d5a50;
   line-height: 1;
 }
-
-.cal-today .cal-day-num { color: #1a7a4a; }
 
 /* ── Schedule Bar ── */
 .schedule-bar {
@@ -372,4 +372,13 @@
   .appt-card    { margin: 12px 12px 0; padding: 16px; }
   .schedule-bar { flex-direction: column; align-items: stretch; }
   .schedule-btn { width: 100%; text-align: center; }
+
+  /* Keep the calendar legible on a phone (matches the therapist calendar). */
+  .cal-nav-btn      { width: 30px; height: 30px; }
+  .cal-month-label  { font-size: 14px; }
+  .cal-grid         { gap: 4px; }
+  .cal-day          { height: 44px; }
+  .cal-day-num      { font-size: 15px; }
+  .cal-day-header   { font-size: 11px; }
+  .dot-sm           { width: 6px; height: 6px; }
 }

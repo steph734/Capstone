@@ -7,30 +7,38 @@
 .pp-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .pp-header {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .pp-title {
-  font-size: clamp(24px, 3vw, 30px);
+  font-size: clamp(20px, 2.4vw, 26px);
   font-weight: 800;
   color: #2c4a3e;
-  margin: 0 0 6px 0;
+  margin: 0 0 5px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.pp-title-icon { color: #f5a623; flex-shrink: 0; }
+
 .pp-subtitle {
-  font-size: 15px;
+  font-size: 14px;
   color: #7a8a83;
   margin: 0;
 }
 
 .pp-card {
   background: #fff;
-  border-radius: 20px;
-  padding: 24px;
+  border-radius: 18px;
+  padding: 20px;
   box-shadow: 0 4px 16px rgba(44, 74, 62, 0.06);
   border: 1px solid #f0ede3;
 }
@@ -50,12 +58,15 @@
 }
 
 .pp-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: #ffd166;
   color: #7a4b00;
   font-weight: 800;
   border-radius: 20px;
-  padding: 6px 16px;
-  font-size: 15px;
+  padding: 6px 15px;
+  font-size: 13.5px;
   white-space: nowrap;
 }
 
@@ -87,14 +98,17 @@
 }
 
 .pp-badges-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   color: #b8460e;
-  font-size: 15px;
+  font-size: 13.5px;
   white-space: nowrap;
 }
 
 .pp-snapshot-summary {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   color: #2c4a3e;
   margin: 0;
@@ -111,10 +125,10 @@
 }
 
 .pp-section-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: #2c4a3e;
-  margin: 0 0 16px 0;
+  margin: 0 0 14px 0;
 }
 
 .pp-section-header .pp-section-title {
@@ -163,7 +177,7 @@
 }
 
 .pp-recap-num {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   color: #2c4a3e;
 }
@@ -184,7 +198,7 @@
 .pp-domain-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   border-radius: 20px;
   padding: 5px 12px;
   font-size: 12.5px;
@@ -192,32 +206,48 @@
   white-space: nowrap;
 }
 
+.pp-domain-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+
 .pp-trend-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #2c4a3e;
-  background: #f5faf8;
+  background: #eef7f0;
   border-radius: 10px;
   padding: 10px 14px;
 }
+
+.pp-trend-note svg { color: #2c7a4e; flex-shrink: 0; }
 
 /* ── Streak ── */
 .pp-streak-card {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   background: linear-gradient(135deg, #fff1f0 0%, #fff7e6 100%);
   border: 1px solid #ffd9cc;
 }
 
 .pp-streak-flame {
-  font-size: 44px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(184, 70, 14, 0.12);
   flex-shrink: 0;
 }
 
+.pp-streak-flame svg { color: #ff7a45; }
+
 .pp-streak-num {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: #b8460e;
   margin-bottom: 6px;
@@ -242,11 +272,16 @@
 }
 
 .pp-streak-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin: 0;
   font-size: 12.5px;
   color: #8a7256;
   font-weight: 600;
 }
+
+.pp-streak-sub svg { color: #f5a623; flex-shrink: 0; }
 
 /* ── Domain engagement pie ── */
 .pp-pie-wrap {
@@ -258,8 +293,8 @@
 }
 
 .pp-pie-chart {
-  width: 160px;
-  height: 160px;
+  width: 150px;
+  height: 150px;
   flex-shrink: 0;
 }
 
@@ -278,21 +313,26 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .pp-pie-legend-dot {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .pp-pie-legend-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #2c4a3e;
   font-weight: 700;
   flex: 1;
 }
+
+.pp-pie-legend-label svg { width: 14px; height: 14px; flex-shrink: 0; color: #6b7c75; }
 
 .pp-pie-legend-pct {
   color: #6b7c75;
@@ -316,7 +356,14 @@
 }
 
 .pp-personal-best-icon {
-  font-size: 36px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #e4f2ec;
+  color: #2c6e4f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 

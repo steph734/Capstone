@@ -7,11 +7,47 @@ import './PatientProgressPage.css'
 
 ChartJS.register(ArcElement, Tooltip)
 
+/* ── Line icons (replace decorative emoji) ── */
+const svgBase = {
+  viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+  strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+}
+const IconBrain = (p) => (
+  <svg {...svgBase} {...p}><path d="M12 5a3 3 0 1 0-5.997.142 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.142 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>
+)
+const IconActivity = (p) => (
+  <svg {...svgBase} {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+)
+const IconHand = (p) => (
+  <svg {...svgBase} {...p}><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+)
+const IconSpeech = (p) => (
+  <svg {...svgBase} {...p}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+)
+const IconSun = (p) => (
+  <svg {...svgBase} {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+)
+const IconStar = (p) => (
+  <svg {...svgBase} {...p} fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"/></svg>
+)
+const IconTrophy = (p) => (
+  <svg {...svgBase} {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+)
+const IconFlame = (p) => (
+  <svg {...svgBase} {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5Z"/></svg>
+)
+const IconTrendUp = (p) => (
+  <svg {...svgBase} {...p}><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
+)
+const IconSparkles = (p) => (
+  <svg {...svgBase} {...p}><path d="M9.94 14.06 8 20l-1.94-5.94L1 12l5.06-2.06L8 4l1.94 5.94L15 12Z"/><path d="M18 5v4M20 7h-4"/></svg>
+)
+
 const DOMAIN_META = {
-  Cognitive:     { color: '#6366f1', icon: '🧩', friendly: 'focus and thinking games' },
-  Physical:      { color: '#10b981', icon: '🤸', friendly: 'balance and movement games' },
-  Occupational:  { color: '#f59e0b', icon: '✋', friendly: 'everyday skills practice' },
-  Speech:        { color: '#ec4899', icon: '🗣️', friendly: 'talking and word games' },
+  Cognitive:     { color: '#6366f1', icon: <IconBrain width={13} height={13} />,    friendly: 'focus and thinking games' },
+  Physical:      { color: '#10b981', icon: <IconActivity width={13} height={13} />, friendly: 'balance and movement games' },
+  Occupational:  { color: '#f59e0b', icon: <IconHand width={13} height={13} />,     friendly: 'everyday skills practice' },
+  Speech:        { color: '#ec4899', icon: <IconSpeech width={13} height={13} />,   friendly: 'talking and word games' },
 }
 
 function Confetti() {
@@ -50,8 +86,8 @@ function MilestoneModal({ badge, onClose }) {
         <div className="pp-milestone-icon">{badge.icon}</div>
         <p className="pp-milestone-eyebrow">New Badge Unlocked!</p>
         <h2 className="pp-milestone-name">{badge.label}</h2>
-        <p className="pp-milestone-sub">Way to go! Celebrate this win together. 🎉</p>
-        <button className="pp-milestone-btn" onClick={onClose}>Yay! ⭐</button>
+        <p className="pp-milestone-sub">Way to go! Celebrate this win together.</p>
+        <button className="pp-milestone-btn" onClick={onClose}>Yay!</button>
       </div>
     </div>
   )
@@ -111,7 +147,7 @@ function DomainEngagementPie({ domainEngagement }) {
 function StreakTracker({ streak }) {
   return (
     <div className="pp-card pp-streak-card">
-      <div className="pp-streak-flame">🔥</div>
+      <div className="pp-streak-flame"><IconFlame width={26} height={26} /></div>
       <div>
         <div className="pp-streak-num">{streak.current}-day play streak!</div>
         <div className="pp-streak-days">
@@ -119,7 +155,9 @@ function StreakTracker({ streak }) {
             <span key={i} className={`pp-streak-dot ${played ? 'pp-streak-dot-on' : ''}`} />
           ))}
         </div>
-        <p className="pp-streak-sub">Best ever: {streak.longest} days in a row 🏆</p>
+        <p className="pp-streak-sub">
+          Best ever: {streak.longest} days in a row <IconTrophy width={13} height={13} />
+        </p>
       </div>
     </div>
   )
@@ -153,10 +191,11 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
   const stats = period === 'weekly' ? progress.weekly : progress.monthly
   const prevGames = period === 'weekly' ? progress.weekly.gamesCompletedPrev : progress.monthly.gamesCompletedPrev
   const gamesDelta = stats.gamesCompleted - prevGames
+  const trendUp = gamesDelta > 0
   const trendNote = gamesDelta === 0
     ? `Same number of games as last ${period === 'weekly' ? 'week' : 'month'}.`
     : gamesDelta > 0
-      ? `🎉 ${gamesDelta} more game${gamesDelta === 1 ? '' : 's'} completed than last ${period === 'weekly' ? 'week' : 'month'}!`
+      ? `${gamesDelta} more game${gamesDelta === 1 ? '' : 's'} completed than last ${period === 'weekly' ? 'week' : 'month'}!`
       : `${Math.abs(gamesDelta)} fewer games than last ${period === 'weekly' ? 'week' : 'month'} — that's okay, every day is different!`
 
   const bestDelta = progress.personalBest.current - progress.personalBest.best
@@ -179,19 +218,22 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
         <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
 
         <div className="pp-header">
-          <h1 className="pp-title">{progress.patientName}'s Progress Journey 🌟</h1>
+          <h1 className="pp-title">
+            {progress.patientName}'s Progress Journey
+            <IconSun width={22} height={22} className="pp-title-icon" />
+          </h1>
           <p className="pp-subtitle">A warm look at how things are going — celebrate every step together!</p>
         </div>
 
         {/* ── Snapshot ── */}
         <div className="pp-card pp-snapshot-card">
           <div className="pp-snapshot-top">
-            <div className="pp-level-badge">⭐ Level {progress.level}</div>
+            <div className="pp-level-badge"><IconStar width={13} height={13} /> Level {progress.level}</div>
             <div className="pp-xp-wrap">
               <span className="pp-xp-label">XP {progress.xp} / {progress.xpNeeded}</span>
               <div className="pp-xp-bar"><div className="pp-xp-fill" style={{ width: `${(progress.xp / progress.xpNeeded) * 100}%` }} /></div>
             </div>
-            <div className="pp-badges-count">🏆 {progress.badges.length} Badges</div>
+            <div className="pp-badges-count"><IconTrophy width={16} height={16} /> {progress.badges.length} Badges</div>
           </div>
           <p className="pp-snapshot-summary">{friendlySummary}</p>
         </div>
@@ -226,7 +268,10 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
               </span>
             ))}
           </div>
-          <p className="pp-trend-note">{trendNote}</p>
+          <p className="pp-trend-note">
+            {trendUp && <IconSparkles width={15} height={15} />}
+            {trendNote}
+          </p>
         </div>
 
         {/* ── Streak ── */}
@@ -241,7 +286,7 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
 
         {/* ── Personal best ── */}
         <div className="pp-card pp-personal-best-card">
-          <div className="pp-personal-best-icon">📈</div>
+          <div className="pp-personal-best-icon"><IconTrendUp width={26} height={26} /></div>
           <div>
             <h3 className="pp-personal-best-title">Comparing to {progress.patientName}'s Own Best</h3>
             <p className="pp-personal-best-note">{personalBestNote}</p>

@@ -376,19 +376,19 @@ function PatientOverview({ patient, notes, onNewNote, onViewNote, onToggleShare 
             <tbody>
               {notes.map(n => (
                 <tr key={n.id}>
-                  <td className="tnp-notes-table-date">{n.date}</td>
-                  <td className="tnp-notes-table-preview">{n.subjective?.slice(0, 90)}…</td>
-                  <td>
+                  <td className="tnp-notes-table-date" data-label="Date">{n.date}</td>
+                  <td className="tnp-notes-table-preview" data-label="Preview">{n.subjective?.slice(0, 90)}…</td>
+                  <td data-label="Status">
                     {n.signed
                       ? <span className="tnp-signed-pill">✅ Signed</span>
                       : <span className="tnp-pending-pill">Pending</span>}
                   </td>
-                  <td>
+                  <td data-label="Parent Sharing">
                     {n.shareable
                       ? <span className="tnp-shared-pill">🏡 Shared</span>
                       : <span className="tnp-pending-pill">Private</span>}
                   </td>
-                  <td>
+                  <td className="tnp-cell-actions" data-label="">
                     <div className="tnp-table-actions">
                       <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
                       <button className="tnp-share-toggle-btn" onClick={() => onToggleShare(n)}>
@@ -494,23 +494,23 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
                   const last = pNotes[0]
                   return (
                     <tr key={p.id} className={selectedId === p.id ? 'tnp-row-active' : ''}>
-                      <td>
+                      <td className="tnp-cell-patient" data-label="Patient">
                         <div className="tnp-table-patient-cell">
                           <img className="tnp-patient-avatar" src={p.avatar} alt={p.name} />
                           <span className="tnp-patient-name">{p.name}</span>
                         </div>
                       </td>
-                      <td>{p.diagnosis}</td>
-                      <td className="tnp-table-notes-count">{pNotes.length}</td>
-                      <td>{last ? last.date : '—'}</td>
-                      <td>
+                      <td data-label="Diagnosis">{p.diagnosis}</td>
+                      <td className="tnp-table-notes-count" data-label="Total Notes">{pNotes.length}</td>
+                      <td data-label="Last Note">{last ? last.date : '—'}</td>
+                      <td data-label="Status">
                         {pNotes.length === 0
                           ? <span className="tnp-pending-pill">No notes</span>
                           : last.signed
                             ? <span className="tnp-signed-pill">✅ Signed</span>
                             : <span className="tnp-pending-pill">Pending</span>}
                       </td>
-                      <td>
+                      <td className="tnp-cell-actions" data-label="">
                         <div className="tnp-table-actions">
                           <button className="tnp-table-view-btn" onClick={() => viewNotesFor(p.id)}>View Notes</button>
                           <button className="tnp-table-new-btn" onClick={() => newNoteFor(p.id)}>+ New Note</button>

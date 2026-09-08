@@ -284,7 +284,7 @@ export default function GamifiedActivitiesOverview({ Shell, shellProps, patients
                 </tr>
               ) : filtered.map((p) => (
                 <tr key={p.id}>
-                  <td>
+                  <td data-label="Patient">
                     <div className="ga-patient-cell">
                       <img src={p.avatar} alt={p.name} className="ga-avatar" />
                       <div>
@@ -293,10 +293,10 @@ export default function GamifiedActivitiesOverview({ Shell, shellProps, patients
                       </div>
                     </div>
                   </td>
-                  {showBranchColumn && <td><span className="ga-branch-badge">{p.branch}</span></td>}
-                  {showBranchColumn && <td>{p.therapist}</td>}
-                  <td><span className="ga-level-badge">⭐ {p.level}</span></td>
-                  <td>
+                  {showBranchColumn && <td data-label="Branch"><span className="ga-branch-badge">{p.branch}</span></td>}
+                  {showBranchColumn && <td data-label="Therapist">{p.therapist}</td>}
+                  <td data-label="Level"><span className="ga-level-badge">⭐ {p.level}</span></td>
+                  <td data-label="XP">
                     <div className="ga-xp-wrap">
                       <span className="ga-xp-label">{p.xp}/{p.xpNeeded}</span>
                       <div className="ga-xp-bar">
@@ -304,10 +304,10 @@ export default function GamifiedActivitiesOverview({ Shell, shellProps, patients
                       </div>
                     </div>
                   </td>
-                  <td>{p.gamesCompleted}</td>
-                  <td><span className="ga-badge-count">🏆 {p.badges}</span></td>
-                  <td>{p.lastPlayed}</td>
-                  <td>
+                  <td data-label="Games Completed">{p.gamesCompleted}</td>
+                  <td data-label="Badges"><span className="ga-badge-count">🏆 {p.badges}</span></td>
+                  <td data-label="Last Played">{p.lastPlayed}</td>
+                  <td data-label="" className="ga-td-action">
                     <button className="ga-view-btn" onClick={() => setViewPatient(p)}>View Stats</button>
                   </td>
                 </tr>

@@ -524,3 +524,87 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Mobile: fit the overview to a narrow screen ──────────── */
+@media (max-width: 768px) {
+  .ga-stats-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 8px;
+    padding: 16px;
+  }
+  .ga-stat-item { padding: 0 4px; }
+  .ga-stat-num { font-size: 22px; }
+  .ga-stat-sep { display: none; }
+
+  .ga-toolbar { flex-direction: column; align-items: stretch; }
+  .ga-search-wrap { min-width: 0; }
+  .ga-sort-select { width: 100%; }
+
+  /* Patient table → stacked cards */
+  .ga-table-scroll { overflow-x: visible; }
+
+  .ga-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .ga-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .ga-table tbody { display: block; }
+
+  .ga-table tbody tr {
+    display: block;
+    border: 1px solid #e8f5f0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .ga-table tbody tr:last-child { margin-bottom: 0; }
+  .ga-table tbody tr:hover { background: #fff; }
+
+  .ga-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f2f7f5;
+    white-space: normal;
+    text-align: right;
+  }
+  .ga-table td:last-child { border-bottom: none; }
+
+  .ga-table td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #9aab9f;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  /* Patient cell: full-width, no label */
+  .ga-table td[data-label="Patient"] { padding-top: 2px; }
+  .ga-table td[data-label="Patient"]::before { display: none; }
+  .ga-table .ga-patient-cell { width: 100%; }
+
+  /* XP bar needs room to breathe */
+  .ga-table td[data-label="XP"] { align-items: flex-start; }
+  .ga-table td[data-label="XP"] .ga-xp-wrap { flex: 1; max-width: 60%; }
+
+  /* Action button: full-width, bottom of card */
+  .ga-table td.ga-td-action { padding-bottom: 2px; }
+  .ga-table td.ga-td-action::before { display: none; }
+  .ga-table td.ga-td-action .ga-view-btn { width: 100%; }
+
+  .ga-table-empty { display: block; text-align: center; }
+}

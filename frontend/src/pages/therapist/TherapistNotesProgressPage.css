@@ -627,4 +627,97 @@
   .tnp-overview-prog { margin-left: 0; }
   .tnp-sig-row   { flex-direction: column; align-items: flex-start; }
   .tnp-sig-right { align-self: flex-end; }
+
+  /* ── Tables → stacked cards (no horizontal scroll) ── */
+  .tnp-page { gap: 14px; }
+  .tnp-table-scroll,
+  .tnp-notes-table-wrap { overflow-x: visible; }
+  .tnp-full-table { min-width: 0; }
+
+  .tnp-full-table thead,
+  .tnp-notes-table thead { display: none; }
+
+  .tnp-full-table,
+  .tnp-full-table tbody,
+  .tnp-full-table tr,
+  .tnp-full-table td,
+  .tnp-notes-table,
+  .tnp-notes-table tbody,
+  .tnp-notes-table tr,
+  .tnp-notes-table td { display: block; width: 100%; }
+
+  .tnp-full-table tr,
+  .tnp-notes-table tr {
+    border: 1px solid #e8eef0;
+    border-radius: 12px;
+    margin: 10px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+  .tnp-notes-table tr { margin: 10px 0; }
+
+  .tnp-full-table td,
+  .tnp-notes-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f3;
+    font-size: 13px;
+    text-align: right;
+  }
+  .tnp-full-table td:last-child,
+  .tnp-notes-table td:last-child { border-bottom: none; }
+
+  .tnp-full-table td::before,
+  .tnp-notes-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #9aab9f;
+    text-align: left;
+  }
+
+  /* First cell = card header (patient / date) */
+  .tnp-full-table td.tnp-cell-patient,
+  .tnp-notes-table td.tnp-notes-table-date {
+    background: #f8fbf9;
+    border-bottom: 1px solid #e8f0ec;
+    padding: 10px 12px;
+  }
+  .tnp-full-table td.tnp-cell-patient::before,
+  .tnp-notes-table td.tnp-notes-table-date::before { display: none; }
+  .tnp-notes-table td.tnp-notes-table-date { justify-content: flex-start; font-size: 13px; }
+
+  .tnp-table-patient-cell { min-width: 0; }
+  .tnp-patient-avatar { width: 34px; height: 34px; }
+  .tnp-patient-name { white-space: normal; }
+
+  /* Diagnosis / preview can wrap onto their own line */
+  .tnp-full-table td[data-label="Diagnosis"],
+  .tnp-notes-table td.tnp-notes-table-preview {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    text-align: left;
+  }
+  .tnp-notes-table td.tnp-notes-table-preview {
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Action cells */
+  .tnp-full-table td.tnp-cell-actions,
+  .tnp-notes-table td.tnp-cell-actions { justify-content: flex-end; }
+  .tnp-full-table td.tnp-cell-actions::before,
+  .tnp-notes-table td.tnp-cell-actions::before { display: none; }
+  .tnp-table-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .tnp-table-actions button { flex: 1 1 auto; text-align: center; }
 }

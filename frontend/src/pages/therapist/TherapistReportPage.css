@@ -4,7 +4,9 @@
   grid-template-columns: 260px 1fr;
   gap: 20px;
   align-items: flex-start;
+  min-width: 0;
 }
+.rpt-layout > * { min-width: 0; }
 
 /* ── Left sidebar ────────────────────────────────────────────── */
 .rpt-sidebar {
@@ -79,6 +81,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .rpt-main-head {
@@ -265,6 +268,7 @@
   border-radius: 14px;
   padding: 16px 18px 20px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  min-width: 0;
 }
 
 .rpt-kpi-top {
@@ -350,6 +354,7 @@
   border-radius: 14px;
   padding: 16px 18px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  min-width: 0;
 }
 
 .rpt-chart-head {
@@ -503,17 +508,75 @@
   .rpt-sidebar { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 14px; }
   .rpt-sidebar-label { width: 100%; }
   .rpt-type-btn { flex: 1 1 200px; }
+  .rpt-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .rpt-charts-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
   .rpt-main-head { flex-direction: column; }
+  .rpt-main-title { font-size: 18px; }
+  .rpt-main-title-icon { width: 32px; height: 32px; }
   .rpt-export-btns { width: 100%; }
-  .rpt-btn { flex: 1; justify-content: center; }
-  .rpt-kpi-row { grid-template-columns: 1fr 1fr; }
-  .rpt-charts-row { grid-template-columns: 1fr; }
-  .rpt-table-wrap { overflow-x: auto; }
-  .rpt-table { min-width: 480px; }
+  .rpt-btn { flex: 1; justify-content: center; padding: 10px 12px; }
+
+  .rpt-type-btn { flex: 1 1 100%; }
+
+  /* Filters stack full-width */
+  .rpt-filters { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px; }
+  .rpt-filter-group { width: 100%; }
   .rpt-daterange-inputs { flex-wrap: wrap; }
   .rpt-daterange-inputs input[type="date"] { flex: 1 1 130px; }
   .rpt-daterange-sep { display: none; }
+  .rpt-granularity { width: 100%; }
+  .rpt-granularity-btn { flex: 1; padding: 8px 6px; }
+  .rpt-filter-meta { margin-left: 0; align-self: flex-start; }
+
+  .rpt-kpi { padding: 14px 14px 16px; }
+  .rpt-kpi-val { font-size: 22px; }
+
+  /* Appointments table → stacked cards */
+  .rpt-table-wrap { overflow-x: visible; }
+  .rpt-table { display: block; min-width: 0; }
+  .rpt-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .rpt-table tbody { display: block; }
+  .rpt-table tbody tr {
+    display: block;
+    border: 1px solid #e8f5f0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 12px;
+  }
+  .rpt-table tbody tr:hover td { background: transparent; }
+  .rpt-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f0f7f4;
+    text-align: right;
+  }
+  .rpt-table td:last-child { border-bottom: none; }
+  .rpt-table td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #9aab9f;
+    flex-shrink: 0;
+    text-align: left;
+  }
+  .rpt-progress-cell { flex: 1; max-width: 60%; }
+  .rpt-progress-bar { min-width: 0; }
+}
+
+@media (max-width: 400px) {
+  .rpt-kpi-row { grid-template-columns: 1fr; }
 }

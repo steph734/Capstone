@@ -502,43 +502,43 @@ export default function TherapistReportPage({ user, onLogout, betaTier }) {
                   {rawData.map((row, i) => (
                     <tr key={i}>
                       {reportType === 'appointments' && <>
-                        <td>{row.date}</td>
-                        <td><strong>{row.patient}</strong></td>
-                        <td>{row.type}</td>
-                        <td><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
-                        <td>{row.duration}</td>
+                        <td data-label={cols[0]}>{row.date}</td>
+                        <td data-label={cols[1]}><strong>{row.patient}</strong></td>
+                        <td data-label={cols[2]}>{row.type}</td>
+                        <td data-label={cols[3]}><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
+                        <td data-label={cols[4]}>{row.duration}</td>
                       </>}
                       {reportType === 'progress' && <>
-                        <td><strong>{row.patient}</strong></td>
-                        <td>{row.condition}</td>
-                        <td>{row.sessions}</td>
-                        <td>
+                        <td data-label={cols[0]}><strong>{row.patient}</strong></td>
+                        <td data-label={cols[1]}>{row.condition}</td>
+                        <td data-label={cols[2]}>{row.sessions}</td>
+                        <td data-label={cols[3]}>
                           <div className="rpt-progress-cell">
                             <div className="rpt-progress-bar"><div className="rpt-progress-fill" style={{ width: `${row.progress}%` }} /></div>
                             <span>{row.progress}%</span>
                           </div>
                         </td>
-                        <td><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
+                        <td data-label={cols[4]}><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
                       </>}
                       {reportType === 'sessions' && <>
-                        <td><strong>{row.month}</strong></td>
-                        <td>{row.total}</td>
-                        <td>{row.completed}</td>
-                        <td>{row.cancelled}</td>
-                        <td>{row.avgDuration}</td>
+                        <td data-label={cols[0]}><strong>{row.month}</strong></td>
+                        <td data-label={cols[1]}>{row.total}</td>
+                        <td data-label={cols[2]}>{row.completed}</td>
+                        <td data-label={cols[3]}>{row.cancelled}</td>
+                        <td data-label={cols[4]}>{row.avgDuration}</td>
                       </>}
                       {reportType === 'exercise' && <>
-                        <td><strong>{row.patient}</strong></td>
-                        <td>{row.exercise}</td>
-                        <td>{row.assigned}</td>
-                        <td>{row.completed}</td>
-                        <td>
+                        <td data-label={cols[0]}><strong>{row.patient}</strong></td>
+                        <td data-label={cols[1]}>{row.exercise}</td>
+                        <td data-label={cols[2]}>{row.assigned}</td>
+                        <td data-label={cols[3]}>{row.completed}</td>
+                        <td data-label={cols[4]}>
                           <div className="rpt-progress-cell">
                             <div className="rpt-progress-bar"><div className="rpt-progress-fill" style={{ width: `${row.accuracy}%` }} /></div>
                             <span>{row.accuracy}%</span>
                           </div>
                         </td>
-                        <td><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
+                        <td data-label={cols[5]}><span className={`rpt-status ${STATUS_CLASS[row.status]}`}>{row.status}</span></td>
                       </>}
                     </tr>
                   ))}

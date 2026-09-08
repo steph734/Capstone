@@ -751,9 +751,19 @@
   .th-appt-type { font-size: 10px; }
   .th-appt-badge { font-size: 10px; padding: 2px 7px; }
 
-  .th-cal-grid { gap: 1px; }
-  .th-cal-cell { height: 30px; }
-  .th-cal-dn { font-size: 11px; }
+  /* Calendar: give the grid room to breathe and bump the text up so
+     day numbers stay legible on a phone. */
+  .th-cal-panel .th-panel-head { flex-wrap: wrap; gap: 10px; }
+  .th-cal-panel .th-cal-nav { margin-left: auto; }
+  .th-cal-nav-btn { width: 30px; height: 30px; font-size: 18px; }
+  .th-cal-month-label { font-size: 14px; min-width: 108px; }
+  .th-cal-dow-row { margin: 14px 0 4px; }
+  .th-cal-dow { font-size: 12px; }
+  .th-cal-grid { gap: 4px; }
+  .th-cal-cell { height: 46px; border-radius: 10px; gap: 3px; }
+  .th-cal-dn { font-size: 15px; }
+  .th-cal-pip { width: 5px; height: 5px; }
+  .th-cal-legend-row { flex-wrap: wrap; gap: 8px 12px; font-size: 11px; }
 
   .th-task-text { font-size: 12px; }
   .th-activity-text { font-size: 12px; }
@@ -775,11 +785,12 @@
   .th-bar-count { font-size: 10px; }
   .th-bar-label { font-size: 8px; padding: 2px 4px; }
 
-  .th-cal-dow { margin: 8px 0 2px; }
-  .th-cal-dow .th-cal-dow { font-size: 9px; }
-  .th-cal-cell { height: 26px; }
-  .th-cal-dn { font-size: 10px; }
-  .th-cal-pip { width: 3px; height: 3px; }
+  .th-cal-dow-row { margin: 10px 0 3px; }
+  .th-cal-dow { font-size: 11px; }
+  .th-cal-grid { gap: 3px; }
+  .th-cal-cell { height: 42px; }
+  .th-cal-dn { font-size: 14px; }
+  .th-cal-pip { width: 4px; height: 4px; }
 }
 
 @media (max-width: 380px) {

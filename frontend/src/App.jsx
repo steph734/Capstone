@@ -33,6 +33,9 @@ import OwnerPatientsPage from './pages/owner/OwnerPatientsPage'
 import OwnerStaffPage from './pages/owner/OwnerStaffPage'
 import OwnerReportsPage from './pages/owner/OwnerReportsPage'
 import OwnerBillingPage from './pages/owner/OwnerBillingPage'
+import OwnerBillingInvoicesPage from './pages/owner/OwnerBillingInvoicesPage'
+import OwnerBillingPayoutsPage from './pages/owner/OwnerBillingPayoutsPage'
+import OwnerBillingSettingsPage from './pages/owner/OwnerBillingSettingsPage'
 import OwnerSubscriptionPage from './pages/owner/OwnerSubscriptionPage'
 import OwnerSpeechToTextPage from './pages/owner/OwnerSpeechToTextPage'
 import OwnerTextToSpeechPage from './pages/owner/OwnerTextToSpeechPage'
@@ -371,6 +374,51 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
                 <OwnerBillingPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/billing/invoices"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerBillingInvoicesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/billing/payouts"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerBillingPayoutsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/billing/settings"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerBillingSettingsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={currentUser?.role === 'Super Admin' ? '/admin/dashboard' : '/dashboard'} replace />
               )

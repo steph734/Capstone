@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { TrendChart } from './ReportCharts'
+import { NewInvoiceButton, BILLING_SUBTITLE } from './OwnerBillingShared'
 import './OwnerBillingPage.css'
 
 const peso = (n) => `₱${Number(n).toLocaleString('en-US')}`
@@ -101,10 +102,11 @@ export default function OwnerBillingPage({ user, onLogout, betaTier }) {
     <OwnerPageShell
       user={user}
       onLogout={onLogout}
-      title="Sales & Billing Analytics"
-      subtitle="Financial Performance Overview"
+      title="Sales / Billing"
+      subtitle={BILLING_SUBTITLE}
       icon="💰"
       menuItems={getOwnerMenuItems(betaTier)}
+      headerActions={<NewInvoiceButton />}
     >
       <div className="sba-grid">
         {/* Left column */}

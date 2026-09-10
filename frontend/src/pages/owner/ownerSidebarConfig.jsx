@@ -91,7 +91,18 @@ const BASE_OWNER_MENU_ITEMS = [
   { id: 'patients', label: 'Patients', icon: <PatientsIcon />, path: '/owner/patients' },
   { id: 'staff', label: 'Staff', icon: <StaffIcon />, path: '/owner/staff' },
   { id: 'reports', label: 'Reports', icon: <ReportsIcon />, path: '/owner/reports' },
-  { id: 'billing', label: 'Sales / Billing', icon: <BillingIcon />, path: '/owner/billing' },
+  {
+    id: 'billing',
+    label: 'Sales / Billing',
+    icon: <BillingIcon />,
+    path: '/owner/billing',
+    children: [
+      { id: 'billing-overview', label: 'Overview', path: '/owner/billing' },
+      { id: 'billing-invoices', label: 'Invoices', path: '/owner/billing/invoices' },
+      { id: 'billing-payouts', label: 'Payouts', path: '/owner/billing/payouts' },
+      { id: 'billing-settings', label: 'Settings', path: '/owner/billing/settings' },
+    ],
+  },
 ]
 
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/owner/speech-features' }

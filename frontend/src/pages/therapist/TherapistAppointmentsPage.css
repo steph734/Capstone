@@ -155,29 +155,29 @@
   flex-shrink: 0;
 }
 
-/* Today — light green fill + green outline, matching the patient calendar */
+/* Today — solid dark pill with a white day number, matching the patient calendar */
 .tapp-cal-today {
-  background: #e8f5ec;
-  border-color: #4a9e6b;
+  background: #4a6b5d;
+  border-color: #4a6b5d;
   border-radius: 10px;
 }
 .tapp-cal-today .tapp-cal-day-num {
-  font-weight: 700;
-  color: #1a7a4a;
-}
-
-/* Selected — deep green gradient with a white day number */
-.tapp-cal-selected {
-  background: linear-gradient(135deg, #2c4a3e 0%, #4a7a62 100%);
-  border-color: #2c4a3e;
-  border-radius: 10px;
-}
-.tapp-cal-selected .tapp-cal-day-num {
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
 }
-.tapp-cal-selected .tapp-cal-dot {
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
+.tapp-cal-today .tapp-cal-dot {
+  background: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Selected (not today) — light green fill with a dark day number */
+.tapp-cal-selected:not(.tapp-cal-today) {
+  background: #eef6f2;
+  border-color: #eef6f2;
+  border-radius: 10px;
+}
+.tapp-cal-selected:not(.tapp-cal-today) .tapp-cal-day-num {
+  font-weight: 800;
+  color: #1a3a30;
 }
 
 .tapp-cal-dots {

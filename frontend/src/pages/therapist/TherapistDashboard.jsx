@@ -189,7 +189,9 @@ function CalendarPanel() {
   const selSess  = sessions[selectedDay] || 0
   const monthTotal = Object.values(sessions).reduce((s, v) => s + v, 0)
 
-  const sessLevel = (n) => !n ? null : n <= 3 ? 'low' : n <= 6 ? 'med' : 'high'
+  // Matches the patient calendar's meaning: green = nothing booked yet,
+  // yellow = the day already has sessions on it.
+  const sessLevel = (n) => n > 0 ? 'med' : 'low'
 
   const goPrev = () => setView(v => {
     const nm = v.month === 0  ? { year: v.year - 1, month: 11 } : { year: v.year, month: v.month - 1 }
@@ -239,9 +241,7 @@ function CalendarPanel() {
               aria-label={`${MONTH_NAMES[month]} ${day} ${year}`}
             >
               <span className="th-cal-dn">{day}</span>
-              {sessions[day] && (
-                <span className={`th-cal-pip th-pip-${sessLevel(sessions[day])}`} />
-              )}
+              <span className={`th-cal-pip th-pip-${sessLevel(sessions[day] || 0)}`} />
             </button>
           )
         )}

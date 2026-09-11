@@ -82,10 +82,11 @@ function typeClass(t) {
 function statusClass(s) {
   return ({Confirmed:'tapp-status-confirmed',Pending:'tapp-status-pending',Cancelled:'tapp-status-cancelled',Completed:'tapp-status-completed',Archived:'tapp-status-archived'})[s]||''
 }
+/* Matches the patient calendar's meaning: green = nothing booked yet,
+   yellow = the day already has sessions on it. "Closed" stays defined in
+   the legend/CSS for clinic-closed dates, same as the patient calendar. */
 function dotClass(n) {
-  if (n >= 7) return 'tapp-dot-many'
-  if (n >= 4) return 'tapp-dot-mid'
-  return 'tapp-dot-few'
+  return n > 0 ? 'tapp-dot-mid' : 'tapp-dot-few'
 }
 
 /* ── Icons ────────────────────────────────────────────────── */
@@ -172,11 +173,9 @@ function FullCalendar({ appointments, selectedDate, onSelectDate }) {
               {d && (
                 <>
                   <span className="tapp-cal-day-num">{d}</span>
-                  {count > 0 && (
-                    <div className="tapp-cal-dots">
-                      <span className={`tapp-cal-dot ${dotClass(count)}`} />
-                    </div>
-                  )}
+                  <div className="tapp-cal-dots">
+                    <span className={`tapp-cal-dot ${dotClass(count)}`} />
+                  </div>
                 </>
               )}
             </button>

@@ -593,21 +593,21 @@
   border-color: #c8eeda;
 }
 
-/* Today — light green fill + green outline, matching the patient calendar */
+/* Today — solid dark pill with a white day number, matching the patient calendar */
 .th-cal-today {
-  background: #e8f5ec !important;
-  border-color: #4a9e6b;
+  background: #4a6b5d !important;
+  border-color: #4a6b5d;
   border-radius: 10px;
 }
-.th-cal-today .th-cal-dn { color: #1a7a4a; font-weight: 700; }
+.th-cal-today .th-cal-dn { color: #fff; font-weight: 800; }
+.th-cal-today .th-cal-pip { background: rgba(255, 255, 255, 0.75) !important; }
 
-/* Selected — deep green gradient with a white day number */
+/* Selected (not today) — light green fill with a dark day number */
 .th-cal-selected:not(.th-cal-today) {
-  background: linear-gradient(135deg, #2c4a3e 0%, #4a7a62 100%);
-  border-color: #2c4a3e;
+  background: #eef6f2;
+  border-color: #eef6f2;
 }
-.th-cal-selected:not(.th-cal-today) .th-cal-dn { color: #fff; font-weight: 700; }
-.th-cal-selected:not(.th-cal-today) .th-cal-pip { border: 1.5px solid rgba(255, 255, 255, 0.6); }
+.th-cal-selected:not(.th-cal-today) .th-cal-dn { color: #1a3a30; font-weight: 800; }
 
 .th-cal-dn {
   font-size: 13px;

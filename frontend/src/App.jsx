@@ -11,6 +11,7 @@ import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import VerifyOtp from './pages/VerifyOtp'
 import ForgotPassword from './pages/ForgotPassword'
+import VerifyResetOtp from './pages/VerifyResetOtp'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import TherapyDetail from './pages/TherapyDetail'
@@ -289,6 +290,11 @@ function App() {
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
+        />
+
+        <Route
+          path="/verify-reset-otp"
+          element={<VerifyResetOtp />}
         />
 
         <Route

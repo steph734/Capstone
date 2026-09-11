@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import { savePasswordReset } from '../utils/passwordResets'
 import './ForgotPassword.css'
@@ -33,9 +33,12 @@ function CheckIcon() {
 
 export default function ResetPassword() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [params] = useSearchParams()
-  const token = params.get('token') || ''
-  const email = params.get('email') || ''
+  // The OTP flow (ForgotPassword -> VerifyResetOtp) hands the token through
+  // navigation state; an emailed link (older flow) carries it as query params.
+  const token = location.state?.token || params.get('token') || ''
+  const email = location.state?.email || params.get('email') || ''
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')

@@ -58,7 +58,11 @@ export default async function handler(req, res) {
     }
 
     // 2. Patient record (created straight from the booking; user_id may be null).
+    // `patients` has a unique index on `PatientID` (a legacy *ID-style key,
+    // same pattern as `OtpID` on user_otps) that the app never reads — it just
+    // needs a unique value per insert so it doesn't collide on `null`.
     const patientDoc = {
+      PatientID: new ObjectId().toString(),
       user_id: bookedById || null,
       first_name: str(patient.firstName),
       middle_name: null,

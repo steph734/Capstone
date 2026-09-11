@@ -180,6 +180,10 @@ export default function BookAppointmentPage({ user }) {
   const [emailStatus, setEmailStatus] = useState(null)
   const [emailError, setEmailError]   = useState('')
 
+  /* Confirmation SMS status: null | 'sending' | 'sent' | 'error' */
+  const [smsStatus, setSmsStatus] = useState(null)
+  const [smsError, setSmsError]   = useState('')
+
   /* MongoDB save status: null | 'saving' | 'saved' | 'error' */
   const [saveStatus, setSaveStatus] = useState(null)
   const [saveError, setSaveError]   = useState('')
@@ -265,52 +269,88 @@ export default function BookAppointmentPage({ user }) {
       status: 'Success',
     })
 
-    // Email the confirmation to the address entered on the form. The booking is
-    // already done, so a mail hiccup must not block the success screen — but the
-    // outcome is surfaced on the confirmation card so a silent failure is visible.
+    // Email the confirmation to the address entered on the form, and text it
+    // to the guardian's contact number. The booking is already done, so a
+    // delivery hiccup on either channel must not block the success screen —
+    // each is independent and its outcome is surfaced on the confirmation card.
     const to = form1.email.trim()
-    if (!to) return
-    setEmailStatus('sending')
-    fetch('/api/send-appointment-confirmation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: to,
-        guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
-        patient: fullName,
-        condition: form1.condition,
-        therapist: therapistObj?.name || '',
-        therapistRole: therapistObj?.role || '',
-        sessionMode: sessionModeObj?.label || '',
-        date: bookingDateLabel,
-        time: pickedTime || '',
-        payment: PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
-        total: TOTAL_DUE,
-        ...(payMethod === 'cash' && cashReceived > 0
-          ? { amountReceived: cashReceived, amountChange: cashChange }
-          : {}),
-      }),
-    })
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}))
-        if (!r.ok) {
-          const msg =
-            body.error ||
-            (r.status === 404
-              ? 'Email service not reachable — run the app with `vercel dev`.'
-              : `HTTP ${r.status}`)
-          console.warn('Appointment confirmation email was not sent:', msg)
+    if (to) {
+      setEmailStatus('sending')
+      fetch('/api/send-appointment-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: to,
+          guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
+          patient: fullName,
+          condition: form1.condition,
+          therapist: therapistObj?.name || '',
+          therapistRole: therapistObj?.role || '',
+          sessionMode: sessionModeObj?.label || '',
+          date: bookingDateLabel,
+          time: pickedTime || '',
+          payment: PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
+          total: TOTAL_DUE,
+          ...(payMethod === 'cash' && cashReceived > 0
+            ? { amountReceived: cashReceived, amountChange: cashChange }
+            : {}),
+        }),
+      })
+        .then(async (r) => {
+          const body = await r.json().catch(() => ({}))
+          if (!r.ok) {
+            const msg =
+              body.error ||
+              (r.status === 404
+                ? 'Email service not reachable — run the app with `vercel dev`.'
+                : `HTTP ${r.status}`)
+            console.warn('Appointment confirmation email was not sent:', msg)
+            setEmailStatus('error')
+            setEmailError(msg)
+          } else {
+            setEmailStatus('sent')
+          }
+        })
+        .catch((e) => {
+          console.warn('Appointment confirmation email request failed:', e)
           setEmailStatus('error')
-          setEmailError(msg)
-        } else {
-          setEmailStatus('sent')
-        }
+          setEmailError(e.message || 'Request failed')
+        })
+    }
+
+    const phone = form1.contactNumber.trim()
+    if (phone) {
+      setSmsStatus('sending')
+      fetch('/api/send-appointment-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone,
+          patient: fullName,
+          therapist: therapistObj?.name || '',
+          date: bookingDateLabel,
+          time: pickedTime || '',
+        }),
       })
-      .catch((e) => {
-        console.warn('Appointment confirmation email request failed:', e)
-        setEmailStatus('error')
-        setEmailError(e.message || 'Request failed')
-      })
+        .then(async (r) => {
+          const body = await r.json().catch(() => ({}))
+          if (!r.ok) {
+            const msg = body.error || (r.status === 404
+              ? 'SMS service not reachable — run the app with `vercel dev`.'
+              : `HTTP ${r.status}`)
+            console.warn('Appointment confirmation SMS was not sent:', msg)
+            setSmsStatus('error')
+            setSmsError(msg)
+          } else {
+            setSmsStatus('sent')
+          }
+        })
+        .catch((e) => {
+          console.warn('Appointment confirmation SMS request failed:', e)
+          setSmsStatus('error')
+          setSmsError(e.message || 'Request failed')
+        })
+    }
   }, [step]) // eslint-disable-line
 
   return (
@@ -694,6 +734,18 @@ export default function BookAppointmentPage({ user }) {
               {emailStatus === 'error' && (
                 <p className="confirm-email-note err">
                   Couldn't email the confirmation to {form1.email}. {emailError}
+                </p>
+              )}
+
+              {smsStatus === 'sending' && (
+                <p className="confirm-email-note">Texting a confirmation to {form1.contactNumber}…</p>
+              )}
+              {smsStatus === 'sent' && (
+                <p className="confirm-email-note ok">✓ Confirmation text sent to {form1.contactNumber}</p>
+              )}
+              {smsStatus === 'error' && (
+                <p className="confirm-email-note err">
+                  Couldn't text the confirmation to {form1.contactNumber}. {smsError}
                 </p>
               )}
 

@@ -1,8 +1,7 @@
 import crypto from 'node:crypto'
-import { sendEmail } from './brevo.js'
 
-const BRAND = 'TherapyPro'
-// A reset link is only good for one hour after it is issued.
+// A reset token (minted after the user verifies their 6-digit email code) is
+// only good for one hour, matching the old emailed-link flow this replaced.
 const TOKEN_TTL_MS = 60 * 60 * 1000
 
 // Env values pasted into a dashboard often arrive with wrapping quotes or a
@@ -68,77 +67,4 @@ export function verifyResetToken(token) {
   if (!data.email || !data.exp) return { valid: false, reason: 'malformed' }
   if (Date.now() > data.exp) return { valid: false, reason: 'expired' }
   return { valid: true, email: data.email, role: data.role || null }
-}
-
-function buildHtml({ brand, name, link }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
-  return `<!doctype html>
-<html>
-  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
-    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
-      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
-        <h1 style="margin:0 0 4px;font-size:20px;">Reset your password</h1>
-        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
-
-        <p style="margin:0 0 20px;font-size:14px;color:#2c4a3e;">
-          We received a request to reset the password for your ${brand} account. Click the button
-          below to choose a new password. This link expires in 1 hour.
-        </p>
-
-        <p style="margin:24px 0;text-align:center;">
-          <a href="${link}" style="display:inline-block;background:#4a6b5d;color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-size:15px;font-weight:700;">
-            Reset your password
-          </a>
-        </p>
-
-        <p style="margin:20px 0 0;font-size:12px;color:#6b7c75;">
-          If the button doesn&rsquo;t work, copy and paste this link into your browser:<br />
-          <a href="${link}" style="color:#4a6b5d;word-break:break-all;">${link}</a>
-        </p>
-
-        <p style="margin:22px 0 0;color:#9aab9f;font-size:11px;">
-          If you didn&rsquo;t ask to reset your password, you can safely ignore this email &mdash;
-          your password won&rsquo;t change.
-        </p>
-      </div>
-    </div>
-  </body>
-</html>`
-}
-
-function buildText({ brand, name, link }) {
-  return [
-    name ? `Hi ${name},` : 'Hi,',
-    '',
-    `We received a request to reset the password for your ${brand} account.`,
-    'Open this link to choose a new password (it expires in 1 hour):',
-    '',
-    link,
-    '',
-    "If you didn't ask to reset your password, you can safely ignore this email.",
-  ].join('\n')
-}
-
-// Issues a signed reset token and emails the user a link back to the app's
-// /reset-password page. Called by POST /api/send-reset-password.
-export async function sendResetPasswordEmail({ email, name, appUrl, role }) {
-  if (!email) throw new Error('Missing email')
-
-  const token = createResetToken(email, role)
-  const base = (appUrl || readEnv('APP_URL') || 'http://localhost:5173').replace(/\/+$/, '')
-  const link =
-    `${base}/reset-password?token=${encodeURIComponent(token)}` +
-    `&email=${encodeURIComponent(email)}`
-
-  const view = { brand: BRAND, name: name || '', link }
-
-  const { referenceId } = await sendEmail({
-    to: email,
-    toName: name,
-    subject: `Reset your ${BRAND} password`,
-    html: buildHtml(view),
-    plain: buildText(view),
-  })
-
-  return { sent: true, referenceId }
 }

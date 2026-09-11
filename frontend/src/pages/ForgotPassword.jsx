@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
-import { resolveAccountByEmail } from '../utils/accounts'
 import './ForgotPassword.css'
 
 function EnvelopeIcon() {
@@ -13,24 +12,15 @@ function EnvelopeIcon() {
   )
 }
 
-function MailSentIcon() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </svg>
-  )
-}
-
 export default function ForgotPassword() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState('idle') // idle | sending | sent | error
+  const [status, setStatus] = useState('idle') // idle | sending | error
   const [error, setError] = useState('')
 
-  const sendResetLink = async (e) => {
+  const sendResetCode = async (e) => {
     e?.preventDefault()
-    const trimmed = email.trim()
+    const trimmed = email.trim().toLowerCase()
     if (!trimmed) {
       setError('Please enter your email address.')
       setStatus('error')
@@ -40,20 +30,11 @@ export default function ForgotPassword() {
     setStatus('sending')
     setError('')
 
-    // Tie the reset to a known account so the new password can be stored against
-    // the right role (and used to sign in from any browser/device).
-    const account = resolveAccountByEmail(trimmed)
-
     try {
-      const res = await fetch('/api/send-reset-password', {
+      const res = await fetch('/api/auth/send-reset-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmed,
-          appUrl: window.location.origin,
-          role: account?.role || null,
-          name: account?.name || undefined,
-        }),
+        body: JSON.stringify({ email: trimmed }),
       })
 
       let data
@@ -65,43 +46,15 @@ export default function ForgotPassword() {
           'are not served that way — run `vercel dev` instead.'
         )
       }
-      if (!res.ok) throw new Error(data.error || 'Could not send the reset email.')
+      if (!res.ok) throw new Error(data.error || 'Could not send the reset code.')
 
-      setStatus('sent')
+      // A 6-digit code was emailed (if that account exists) — take them to the
+      // verification screen, same as the signup flow.
+      navigate('/verify-reset-otp', { state: { email: trimmed } })
     } catch (err) {
-      setError(err.message || 'Could not send the reset email.')
+      setError(err.message || 'Could not send the reset code.')
       setStatus('error')
     }
-  }
-
-  if (status === 'sent') {
-    return (
-      <div className="forgot-page">
-        <div className="forgot-container">
-          <div className="forgot-header">
-            <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
-            <div className="forgot-sent-icon"><MailSentIcon /></div>
-            <h1 className="forgot-title">Check your email</h1>
-            <p className="forgot-subtitle">
-              We&rsquo;ve sent a password reset link to <strong>{email.trim()}</strong>. Open it
-              and click <strong>&ldquo;Reset your password&rdquo;</strong> to choose a new one. The
-              link expires in 1 hour.
-            </p>
-          </div>
-
-          <button type="button" className="forgot-btn" onClick={() => navigate('/login')}>
-            Back to Sign In
-          </button>
-
-          <p className="signin-text">
-            Didn&rsquo;t get it?{' '}
-            <button type="button" className="signin-link" onClick={() => setStatus('idle')}>
-              Try another email
-            </button>
-          </p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -115,7 +68,7 @@ export default function ForgotPassword() {
           </p>
         </div>
 
-        <form className="forgot-form" onSubmit={sendResetLink}>
+        <form className="forgot-form" onSubmit={sendResetCode}>
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <div className="input-wrapper">

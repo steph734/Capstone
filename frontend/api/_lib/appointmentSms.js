@@ -1,4 +1,4 @@
-import { sendSms } from './vonage.js'
+import { sendSms } from './semaphore.js'
 
 const BRAND = 'TherapyPro'
 

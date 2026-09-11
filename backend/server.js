@@ -11,6 +11,10 @@ app.use(express.json());
 // Auth: POST /api/auth/signup, POST /api/auth/login
 app.use('/api/auth', require('./routes/auth'));
 
+// Staff: GET/POST /api/employees, GET /api/branches
+app.use('/api/employees', require('./routes/employees'));
+app.use('/api/branches', require('./routes/branches'));
+
 // Test endpoint — always up, reports live DB status.
 app.get('/api/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;

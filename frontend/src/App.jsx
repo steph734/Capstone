@@ -189,11 +189,12 @@ function App() {
     }
 
     // 3. MongoDB check: accounts created through the Sign Up page live in the
-    //    `users` collection, served by the Express backend (backend/server.js).
+    //    `users` collection, served by the Vercel function at /api/auth/login
+    //    (frontend/api/_lib/routes/auth-login.js) — same origin, so it works
+    //    both locally (`vercel dev`) and once deployed.
     if (!matchedUser) {
       try {
-        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-        const res = await fetch(`${apiBase}/api/auth/login`, {
+        const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: typedEmail, password }),
@@ -212,7 +213,7 @@ function App() {
           }
         }
       } catch {
-        // Backend not running — fall through to the "invalid" response below.
+        // /api not reachable (plain `npm run dev`) — fall through to "invalid" below.
       }
     }
 

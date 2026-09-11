@@ -73,8 +73,6 @@ function BadgeIcon() {
 
 const ROLES = ['Therapist', 'Patient']
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-
 export default function SignUp({ onLogoClick, onLoginClick }) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
@@ -107,7 +105,7 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -128,7 +126,7 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
     } catch (err) {
       setError(
         err instanceof TypeError
-          ? 'Cannot reach the server. Is the backend running on port 5000?'
+          ? "Cannot reach the server. Run the app with `vercel dev` so /api routes are served."
           : err.message
       )
     } finally {

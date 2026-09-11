@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import './VerifyOtp.css'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const CODE_LEN = 6
 const RESEND_COOLDOWN = 60 // seconds
 
@@ -95,7 +94,7 @@ export default function VerifyOtp() {
     setError('')
     setNotice('')
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+      const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
@@ -111,7 +110,7 @@ export default function VerifyOtp() {
       setStatus('error')
       setError(
         err instanceof TypeError
-          ? 'Cannot reach the server. Is the backend running on port 5000?'
+          ? "Cannot reach the server. Run the app with `vercel dev` so /api routes are served."
           : err.message
       )
       setDigits(Array(CODE_LEN).fill(''))
@@ -124,7 +123,7 @@ export default function VerifyOtp() {
     setError('')
     setNotice('')
     try {
-      const res = await fetch(`${API_BASE}/api/auth/resend-otp`, {
+      const res = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

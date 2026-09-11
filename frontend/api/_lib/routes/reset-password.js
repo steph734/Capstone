@@ -1,5 +1,7 @@
+import bcrypt from 'bcryptjs'
 import { verifyResetToken } from '../resetPasswordEmail.js'
 import { saveResetCredential } from '../credentialStore.js'
+import { getDb } from '../mongo.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -24,10 +26,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: msg })
   }
 
-  // This prototype has no user database. If a Vercel KV store is connected we
-  // persist the new password there (so it works on any browser/device);
-  // otherwise the client falls back to per-browser localStorage. Either way the
-  // reset is not blocked on the store.
+  // Primary: overwrite the hashed password on the MongoDB `users` document, the
+  // same collection /api/auth/login checks. Accounts created via Sign Up live
+  // here, so this is what makes their reset actually take effect.
+  let mongoUpdated = false
+  try {
+    const db = await getDb()
+    const password_hash = await bcrypt.hash(String(password), 10)
+    const result = await db.collection('users').updateOne(
+      { email: check.email },
+      { $set: { password: password_hash, password_change_at: new Date(), updated_at: new Date() } }
+    )
+    mongoUpdated = result.matchedCount > 0
+  } catch (err) {
+    console.error('reset-password: could not update MongoDB —', err.message)
+  }
+
+  // Secondary/legacy: the built-in demo accounts (TEMP_USERS) aren't in MongoDB
+  // at all, so also write to Vercel KV (if connected) / let the client fall back
+  // to localStorage, exactly as before. Non-fatal either way.
   let persisted = false
   try {
     persisted = await saveResetCredential({
@@ -39,5 +56,11 @@ export default async function handler(req, res) {
     console.error('reset-password: could not persist to KV —', err.message)
   }
 
-  return res.status(200).json({ ok: true, email: check.email, role: check.role || null, persisted })
+  return res.status(200).json({
+    ok: true,
+    email: check.email,
+    role: check.role || null,
+    persisted: mongoUpdated || persisted,
+    mongoUpdated,
+  })
 }

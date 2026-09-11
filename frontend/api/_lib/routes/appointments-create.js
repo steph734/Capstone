@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import { getDb } from '../_lib/mongo.js'
+import { getDb } from '../mongo.js'
 
 const { ObjectId } = mongoose.Types
 

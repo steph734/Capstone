@@ -1,4 +1,4 @@
-import { sendSubscriptionReceipt } from './_lib/receiptEmail.js'
+import { sendSubscriptionReceipt } from '../receiptEmail.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

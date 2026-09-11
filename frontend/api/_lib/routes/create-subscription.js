@@ -1,4 +1,4 @@
-import { createSubscription } from './_lib/createSubscription.js'
+import { createSubscription } from '../createSubscription.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

@@ -1,4 +1,4 @@
-import { sendTrialEndingEmail } from './_lib/trialEndingEmail.js'
+import { sendTrialEndingEmail } from '../trialEndingEmail.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

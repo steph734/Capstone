@@ -1,4 +1,4 @@
-import { createCardSetupIntent } from './_lib/updatePaymentMethod.js'
+import { createCardSetupIntent } from '../updatePaymentMethod.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

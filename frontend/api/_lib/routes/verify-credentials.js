@@ -1,4 +1,4 @@
-import { getResetCredential } from './_lib/credentialStore.js'
+import { getResetCredential } from '../credentialStore.js'
 
 // Checks a typed email + password against the server-side reset store (Vercel
 // KV). Only knows about passwords set through the "forgot password" flow — the

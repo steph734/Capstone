@@ -1,4 +1,4 @@
-import { setDefaultPaymentMethod } from './_lib/updatePaymentMethod.js'
+import { setDefaultPaymentMethod } from '../updatePaymentMethod.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

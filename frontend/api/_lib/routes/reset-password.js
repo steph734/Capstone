@@ -1,5 +1,5 @@
-import { verifyResetToken } from './_lib/resetPasswordEmail.js'
-import { saveResetCredential } from './_lib/credentialStore.js'
+import { verifyResetToken } from '../resetPasswordEmail.js'
+import { saveResetCredential } from '../credentialStore.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

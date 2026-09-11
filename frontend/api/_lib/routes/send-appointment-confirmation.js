@@ -1,4 +1,4 @@
-import { sendResetPasswordEmail } from './_lib/resetPasswordEmail.js'
+import { sendAppointmentConfirmationEmail } from '../appointmentEmail.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,13 +6,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { email, name, appUrl, role } = req.body || {}
+  const { email } = req.body || {}
   if (!email) {
     return res.status(400).json({ error: 'Missing email' })
   }
 
   try {
-    const result = await sendResetPasswordEmail({ email, name, appUrl, role })
+    const result = await sendAppointmentConfirmationEmail(req.body || {})
     return res.status(200).json(result)
   } catch (err) {
     return res.status(400).json({ error: err.message })

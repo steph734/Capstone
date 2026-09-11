@@ -8,6 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Auth: POST /api/auth/signup, POST /api/auth/login
+app.use('/api/auth', require('./routes/auth'));
+
 // Test endpoint — always up, reports live DB status.
 app.get('/api/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;

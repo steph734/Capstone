@@ -63,13 +63,14 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
   const navigate = useNavigate()
   const location = useLocation()
   const signupEmail = location.state?.signupEmail || ''
+  const passedNotice = location.state?.notice || ''
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [email, setEmail] = useState(signupEmail)
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [notice, setNotice] = useState(
-    signupEmail ? 'Account created! Sign in with your new credentials.' : ''
+    passedNotice || (signupEmail ? 'Account created! Sign in with your new credentials.' : '')
   )
   const [socialProvider, setSocialProvider] = useState(null)
 
@@ -79,9 +80,11 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
       setLoginError('')
       setNotice('')
       const result = await onLogin(email, password)
-      if (!result?.success) {
-        setLoginError(result?.message || 'Login failed')
+      if (result?.success || result?.requiresVerification) {
+        // On requiresVerification the wrapper redirects to /verify-otp — no error.
+        return
       }
+      setLoginError(result?.message || 'Login failed')
     }
   }
 

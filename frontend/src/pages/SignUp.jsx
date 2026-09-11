@@ -120,8 +120,11 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Could not create your account.')
-      // Account created in MongoDB — send them to login.
-      navigate('/login', { state: { signupEmail: email.trim().toLowerCase() } })
+      // Account created in MongoDB (unverified). A 6-digit code was emailed —
+      // send them to the verification screen before they can sign in.
+      navigate('/verify-otp', {
+        state: { email: (data.email || email.trim()).toLowerCase() },
+      })
     } catch (err) {
       setError(
         err instanceof TypeError

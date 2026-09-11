@@ -9,6 +9,7 @@ import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/ac
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
+import VerifyOtp from './pages/VerifyOtp'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
@@ -84,6 +85,8 @@ function LoginWrapper({ onLogin }) {
     const result = await onLogin(email, password)
     if (result.success) {
       navigate(getHomePath(result.user?.role))
+    } else if (result.requiresVerification) {
+      navigate('/verify-otp', { state: { email: result.email || email } })
     }
     return result
   }
@@ -198,6 +201,15 @@ function App() {
         const data = await res.json().catch(() => ({}))
         if (res.ok && data.user) {
           matchedUser = { avatar: '/therapy-pro-logo.png', ...data.user }
+        } else if (res.status === 403 && data.requiresVerification) {
+          // Right password, but the email was never confirmed. The backend just
+          // re-sent a code — route the user to the verification screen.
+          return {
+            success: false,
+            requiresVerification: true,
+            email: data.email || typedEmail,
+            message: data.error || 'Please verify your email to continue.',
+          }
         }
       } catch {
         // Backend not running — fall through to the "invalid" response below.
@@ -263,11 +275,16 @@ function App() {
           } 
         />
         
-        <Route 
-          path="/signup" 
-          element={<SignUp />} 
+        <Route
+          path="/signup"
+          element={<SignUp />}
         />
-        
+
+        <Route
+          path="/verify-otp"
+          element={<VerifyOtp />}
+        />
+
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}

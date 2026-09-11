@@ -180,6 +180,10 @@ export default function BookAppointmentPage({ user }) {
   const [emailStatus, setEmailStatus] = useState(null)
   const [emailError, setEmailError]   = useState('')
 
+  /* MongoDB save status: null | 'saving' | 'saved' | 'error' */
+  const [saveStatus, setSaveStatus] = useState(null)
+  const [saveError, setSaveError]   = useState('')
+
   /* Record the booking in the audit log + email a confirmation once the
      confirmation step is reached. Runs exactly once. */
   const loggedBookingRef = useRef(false)
@@ -190,6 +194,65 @@ export default function BookAppointmentPage({ user }) {
     // Persist the booked day so the Appointments calendar shows it as "booked"
     // for everyone on this browser — permanently, across reloads.
     markDateBooked(preselectedYear, preselectedMonth, preselectedDate)
+
+    // Save the appointment (and a patient record) to MongoDB via the serverless
+    // function. Non-blocking — the success screen shows regardless; the outcome
+    // is surfaced on the confirmation card.
+    setSaveStatus('saving')
+    fetch('/api/appointments/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient: {
+          firstName: form1.firstName,
+          lastName: form1.lastName,
+          nickname: form1.nickname,
+          gender: form1.gender,
+          birthdate: form1.birthdate,
+          address: form1.address,
+          condition: form1.condition,
+          guardianFirst: form1.guardianFirst,
+          guardianLast: form1.guardianLast,
+          relationship: form1.relationship,
+          contactNumber: form1.contactNumber,
+          email: form1.email,
+        },
+        therapist: { name: therapistObj?.name || '', role: therapistObj?.role || '' },
+        session: {
+          mode: sessionMode,
+          timeSlot: pickedTime || '',
+          year: preselectedYear,
+          month: preselectedMonth,
+          day: preselectedDate,
+        },
+        payment: {
+          method: payMethod,
+          sessionFee: SESSION_FEE,
+          serviceCharge: SERVICE_CHARGE,
+          total: TOTAL_DUE,
+          amountReceived: payMethod === 'cash' ? cashReceived : undefined,
+        },
+        bookedBy: { id: user?.id, email: user?.email },
+      }),
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          const msg = body.error || (r.status === 404
+            ? 'API not reachable — run the app with `vercel dev`.'
+            : `HTTP ${r.status}`)
+          console.warn('Appointment was not saved to MongoDB:', msg)
+          setSaveStatus('error')
+          setSaveError(msg)
+        } else {
+          setSaveStatus('saved')
+        }
+      })
+      .catch((e) => {
+        console.warn('Appointment save request failed:', e)
+        setSaveStatus('error')
+        setSaveError(e.message || 'Request failed')
+      })
 
     logActivity({
       role: 'Patient',
@@ -631,6 +694,18 @@ export default function BookAppointmentPage({ user }) {
               {emailStatus === 'error' && (
                 <p className="confirm-email-note err">
                   Couldn't email the confirmation to {form1.email}. {emailError}
+                </p>
+              )}
+
+              {saveStatus === 'saving' && (
+                <p className="confirm-email-note">Saving your appointment…</p>
+              )}
+              {saveStatus === 'saved' && (
+                <p className="confirm-email-note ok">✓ Appointment saved to your records</p>
+              )}
+              {saveStatus === 'error' && (
+                <p className="confirm-email-note err">
+                  Couldn't save the appointment to the database. {saveError}
                 </p>
               )}
 

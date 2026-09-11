@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import SocialAuthModal from '../components/SocialAuthModal'
 import './Login.css'
@@ -61,17 +61,23 @@ function GoogleIcon() {
 
 export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick, onLogin }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const signupEmail = location.state?.signupEmail || ''
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(signupEmail)
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [notice, setNotice] = useState(
+    signupEmail ? 'Account created! Sign in with your new credentials.' : ''
+  )
   const [socialProvider, setSocialProvider] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (onLogin) {
       setLoginError('')
+      setNotice('')
       const result = await onLogin(email, password)
       if (!result?.success) {
         setLoginError(result?.message || 'Login failed')
@@ -136,6 +142,7 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
             </div>
           </div>
 
+          {notice && <p className="login-notice">{notice}</p>}
           {loginError && <p className="login-error">{loginError}</p>}
 
           <div className="form-options">

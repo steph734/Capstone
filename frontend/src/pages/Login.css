@@ -270,6 +270,16 @@
   border: 1px solid #fcc;
 }
 
+.login-notice {
+  background: #eafaf1;
+  color: #1e7e4f;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin: -8px 0 0 0;
+  border: 1px solid #b7e4c7;
+}
+
 .captcha-error {
   color: #c33;
   font-size: 13px;

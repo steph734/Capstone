@@ -185,6 +185,25 @@ function App() {
       }
     }
 
+    // 3. MongoDB check: accounts created through the Sign Up page live in the
+    //    `users` collection, served by the Express backend (backend/server.js).
+    if (!matchedUser) {
+      try {
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${apiBase}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: typedEmail, password }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data.user) {
+          matchedUser = { avatar: '/therapy-pro-logo.png', ...data.user }
+        }
+      } catch {
+        // Backend not running — fall through to the "invalid" response below.
+      }
+    }
+
     if (matchedUser) {
       setIsAuthenticated(true)
       setCurrentUser(matchedUser)

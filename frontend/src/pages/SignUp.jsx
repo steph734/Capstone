@@ -73,19 +73,64 @@ function BadgeIcon() {
 
 const ROLES = ['Therapist', 'Patient']
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
 export default function SignUp({ onLogoClick, onLoginClick }) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [socialProvider, setSocialProvider] = useState(null)
+  const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [role, setRole] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSocialSuccess = () => {
     setSocialProvider(null)
     navigate('/')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+
+    if (!fullName.trim() || !username.trim() || !email.trim() || !role || !password) {
+      setError('Please fill in every field.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          username: username.trim(),
+          email: email.trim(),
+          role,
+          password,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not create your account.')
+      // Account created in MongoDB — send them to login.
+      navigate('/login', { state: { signupEmail: email.trim().toLowerCase() } })
+    } catch (err) {
+      setError(
+        err instanceof TypeError
+          ? 'Cannot reach the server. Is the backend running on port 5000?'
+          : err.message
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -107,6 +152,8 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
                 type="text"
                 placeholder="Enter your full name"
                 autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
               />
             </div>
           </div>
@@ -120,6 +167,8 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
                 type="text"
                 placeholder="Choose a username"
                 autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             </div>
           </div>
@@ -133,6 +182,8 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
                 type="email"
                 placeholder="Enter your email"
                 autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
@@ -163,6 +214,8 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Create a password"
                 autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
               <button
                 type="button"
@@ -188,7 +241,11 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
             </div>
           </div>
 
-          <button type="submit" className="signup-btn">Sign up</button>
+          {error && <p className="signup-error" role="alert">{error}</p>}
+
+          <button type="submit" className="signup-btn" disabled={submitting}>
+            {submitting ? 'Creating account…' : 'Sign up'}
+          </button>
         </form>
 
         <p className="su-divider-text">or continue with</p>

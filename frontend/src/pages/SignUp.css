@@ -246,3 +246,18 @@
     height: 52px;
   }
 }
+
+.signup-error {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin: 4px 0 0 0;
+  border: 1px solid #fcc;
+}
+
+.signup-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

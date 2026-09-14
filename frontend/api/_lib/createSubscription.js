@@ -1,4 +1,4 @@
-const Stripe = require('stripe')
+import Stripe from 'stripe'
 
 // Fixed, server-side Stripe Price IDs — the client only ever sends a tier id
 // and billing period, never a price or amount, so what gets charged can't be
@@ -8,7 +8,7 @@ const PRICE_IDS = {
   gold: { monthly: 'price_1U8LYt6BClqAeYB0t0Ps5kNO' },
 }
 
-async function createSubscription({ tierId, billingPeriod, email, name }) {
+export async function createSubscription({ tierId, billingPeriod, email, name }) {
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not set on the server')
   }
@@ -20,7 +20,7 @@ async function createSubscription({ tierId, billingPeriod, email, name }) {
     throw new Error('Missing billing email')
   }
 
-  const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
   // Reuse an existing customer for this email if one exists, otherwise create one.
   const existing = await stripe.customers.list({ email, limit: 1 })
@@ -41,5 +41,3 @@ async function createSubscription({ tierId, billingPeriod, email, name }) {
     clientSecret: subscription.latest_invoice.payment_intent.client_secret,
   }
 }
-
-module.exports = { createSubscription }

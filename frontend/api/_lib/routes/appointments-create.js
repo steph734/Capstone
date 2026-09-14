@@ -14,17 +14,19 @@ const MODE_MAP = {
 
 const PAYMENT_MAP = { cash: 'Cash', stripe: 'Stripe', gcash: 'GCash QR' }
 
-// The `payments` collection isn't restricted to the appointments enum, so it
-// can record which payment method was actually used: Cash, a real card charge
-// ("Credit Card"), or a scan-to-pay QR transfer (the specific wallet, e.g.
-// "GCash QR" — CheckoutModal never touches Stripe for the QR rail).
+// Maps the free-form label CheckoutModal reports (e.g. "Card", "GCash QR",
+// "GrabPay") onto the `payments` collection's strict method enum
+// (gcash | card | bank_transfer | cash | paymaya). GrabPay and anything else
+// Stripe reports that has no matching slot falls back to "card" rather than
+// fail the schema-validated insert.
 function resolvePaymentMethod(payment) {
   const top = String(payment.method || '').toLowerCase()
-  if (top === 'cash') return 'Cash'
+  if (top === 'cash') return 'cash'
   if (top === 'stripe') {
-    const online = str(payment.onlineMethod)
-    if (!online || /^card$/i.test(online)) return 'Credit Card'
-    return online // e.g. "GCash QR", "Maya QR", "GrabPay"
+    const online = str(payment.onlineMethod).toLowerCase()
+    if (online.includes('gcash')) return 'gcash'
+    if (online.includes('maya')) return 'paymaya'
+    return 'card'
   }
   return null
 }
@@ -174,23 +176,19 @@ export default async function handler(req, res) {
 
     // 4. Best-effort payment row. `method` here is the raw one constrained to
     // the appointments enum (Cash/Stripe); paymentMethod is the specific
-    // method the payments collection actually records (Cash/Credit Card/the
-    // QR wallet used).
+    // method the payments collection actually records (cash/card/gcash/paymaya).
     const paymentMethod = resolvePaymentMethod(payment)
     if (paymentMethod && total != null) {
       try {
         const payRes = await db.collection('payments').insertOne({
-          // `payments` has a unique index on `PaymentID` (same *ID-style legacy
-          // key as `patients.PatientID` above) that the app never reads — it
-          // just needs a unique value per insert so it doesn't collide on
-          // `null` with every other payment row.
-          PaymentID: new ObjectId().toString(),
+          payment_for: 'appointment',
           appointment_id: appointmentId,
           patient_id: patientId,
           amount: total,
+          currency: 'PHP',
           method: paymentMethod,
           payment_date: now,
-          status: paymentMethod === 'Cash' ? 'Pending' : 'Paid',
+          status: paymentMethod === 'cash' ? 'pending' : 'completed',
           created_at: now,
           updated_at: now,
         })

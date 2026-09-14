@@ -6,13 +6,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { email, name, paymentIntentId } = req.body || {}
+  const { email, name, paymentIntentId, tierId } = req.body || {}
   if (!email || !paymentIntentId) {
     return res.status(400).json({ error: 'Missing email or paymentIntentId' })
   }
 
   try {
-    const result = await sendSubscriptionReceipt({ email, name, paymentIntentId })
+    const result = await sendSubscriptionReceipt({ email, name, paymentIntentId, tierId })
     return res.status(200).json(result)
   } catch (err) {
     return res.status(400).json({ error: err.message })

@@ -1,5 +1,6 @@
 import { getStripeClient } from './stripeClient.js'
 import { sendEmail } from './brevo.js'
+import { getDb } from './mongo.js'
 
 const BRAND = 'TherapyPro'
 
@@ -71,10 +72,40 @@ function buildReceiptText({ brand, amount, dateStr, description, cardLine, recei
     .join('\n')
 }
 
+// Best-effort: records the subscription payment in the `payments` collection
+// once Stripe has confirmed it succeeded. Mirrors the appointment payment
+// insert in appointments-create.js — non-fatal, since a Mongo hiccup must
+// not stop the receipt email (the payment already went through at Stripe).
+async function recordSubscriptionPayment({ pi, tierId }) {
+  try {
+    const db = await getDb()
+    let subscriptionId = null
+    if (tierId) {
+      const tier = await db.collection('subscription').findOne({ slug: String(tierId).toLowerCase() })
+      subscriptionId = tier?._id || null
+    }
+    const now = new Date()
+    await db.collection('payments').insertOne({
+      payment_for: 'subscription',
+      ...(subscriptionId ? { subscription_id: subscriptionId } : {}),
+      amount: Math.round(pi.amount_received || pi.amount) / 100,
+      currency: (pi.currency || 'php').toUpperCase(),
+      method: 'card', // subscriptions only take CardElement today (StripeSubscribeForm.jsx)
+      payment_date: now,
+      status: 'completed',
+      reference_number: pi.id,
+      created_at: now,
+      updated_at: now,
+    })
+  } catch (err) {
+    console.error('sendSubscriptionReceipt: failed to record payment:', err)
+  }
+}
+
 // Verifies the PaymentIntent really succeeded at Stripe, then emails a
 // receipt for it to `email` via Brevo. Safe to call fire-and-forget from
 // the client — it re-checks status server-side and never trusts the caller.
-export async function sendSubscriptionReceipt({ email, name, paymentIntentId }) {
+export async function sendSubscriptionReceipt({ email, name, paymentIntentId, tierId }) {
   if (!email) throw new Error('Missing email')
   if (!paymentIntentId) throw new Error('Missing paymentIntentId')
 
@@ -86,6 +117,8 @@ export async function sendSubscriptionReceipt({ email, name, paymentIntentId }) 
   if (pi.status !== 'succeeded') {
     throw new Error(`PaymentIntent is not succeeded (status: ${pi.status})`)
   }
+
+  await recordSubscriptionPayment({ pi, tierId })
 
   const charge = pi.latest_charge && typeof pi.latest_charge === 'object' ? pi.latest_charge : null
   const card = charge?.payment_method_details?.card

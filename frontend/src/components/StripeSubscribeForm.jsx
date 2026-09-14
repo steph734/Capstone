@@ -78,6 +78,7 @@ function CheckoutInner({ tierId, billingPeriod, submitLabel, billingEmail, billi
             email: billingEmail,
             name: billingName,
             paymentIntentId: result.paymentIntent.id,
+            tierId,
           }),
         })
           .then(async (r) => {

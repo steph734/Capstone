@@ -77,11 +77,22 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
      month changes so the calendar always reflects the real appointments
      table rather than a client-side guess. */
   const [serverBooked, setServerBooked] = useState([])
+  const [availabilityError, setAvailabilityError] = useState(false)
   useEffect(() => {
     let cancelled = false
+    setAvailabilityError(false)
     fetchBookedDates(viewYear, viewMonth)
       .then(booked => { if (!cancelled) setServerBooked(booked) })
-      .catch(() => { if (!cancelled) setServerBooked([]) })
+      .catch((err) => {
+        if (cancelled) return
+        // Swallowing this used to mean a broken /api/appointments/availability
+        // call was indistinguishable from "no appointments this month" — every
+        // day just rendered available. Surface it instead so a real outage is
+        // visible rather than silently mimicking an empty calendar.
+        console.error('Could not load booked dates:', err)
+        setServerBooked([])
+        setAvailabilityError(true)
+      })
     return () => { cancelled = true }
   }, [viewYear, viewMonth])
 
@@ -172,6 +183,13 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                 <span className="legend-item"><span className="dot dot-closed"    />Closed</span>
               </div>
             </div>
+
+            {availabilityError && (
+              <p className="schedule-hint">
+                Couldn&apos;t check which dates are already booked, so every date below is
+                shown as available. Refresh to try again.
+              </p>
+            )}
 
             {/* ── Calendar ── */}
             <div className="calendar-wrap">

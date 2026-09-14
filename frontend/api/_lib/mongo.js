@@ -20,6 +20,14 @@ export async function getMongo() {
     cached.promise = mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 15000,
       maxPoolSize: 5,
+    }).catch((err) => {
+      // A failed connect must not stick around as a permanently-rejected
+      // promise — every later call in this warm container would await the
+      // same rejection forever instead of retrying, so this route (and only
+      // this route, on whichever container got the bad connect) would be
+      // broken until Vercel recycles the instance.
+      cached.promise = null
+      throw err
     })
   }
   cached.conn = await cached.promise

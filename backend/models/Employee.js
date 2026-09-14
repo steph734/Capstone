@@ -7,7 +7,10 @@ const employeeSchema = new mongoose.Schema(
     user_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     branch_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Branch' },
     first_name: { type: String, required: true, trim: true },
-    middle_name: { type: String, required: true, trim: true, default: '' },
+    // Not everyone has a middle name — plain `default: ''` won't satisfy
+    // `required` here since Mongoose treats an empty string as "missing" for
+    // String paths, so this must stay optional rather than required.
+    middle_name: { type: String, trim: true, default: '' },
     last_name: { type: String, required: true, trim: true },
     position: { type: String, required: true, trim: true },
     hired_at: { type: Date, required: true },

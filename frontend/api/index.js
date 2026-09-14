@@ -26,6 +26,7 @@ import setDefaultPaymentMethod from './_lib/routes/set-default-payment-method.js
 import tts from './_lib/routes/tts.js'
 import verifyCredentials from './_lib/routes/verify-credentials.js'
 import appointmentsCreate from './_lib/routes/appointments-create.js'
+import appointmentsAvailability from './_lib/routes/appointments-availability.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
 import authResendOtp from './_lib/routes/auth-resend-otp.js'
@@ -52,6 +53,7 @@ app.all('/api/set-default-payment-method', setDefaultPaymentMethod)
 app.all('/api/tts', tts)
 app.all('/api/verify-credentials', verifyCredentials)
 app.all('/api/appointments/create', appointmentsCreate)
+app.all('/api/appointments/availability', appointmentsAvailability)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)

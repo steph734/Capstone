@@ -9,8 +9,8 @@ export function dateKey(year, month, day) {
 }
 
 /* Clinic base calendar: every day of the month starts "available". Days only
-   become "booked" once this browser confirms a booking on them (see
-   getAvailability). */
+   become "booked" once they have a matching appointment (see
+   buildAvailability). */
 export function baseAvailability(year, month) {
   const total = new Date(year, month + 1, 0).getDate()
   const map = {}
@@ -51,11 +51,22 @@ export function isDateBooked(year, month, day) {
   return getBookedDates().includes(dateKey(year, month, day))
 }
 
-/* Full availability for a month: the fixed base map with every booked date
-   (this browser's confirmed bookings) forced to "booked". */
-export function getAvailability(year, month) {
+/* Every day in the month that already has a live appointment in MongoDB,
+   keyed the same way as baseAvailability ("YYYY-M-D"). */
+export async function fetchBookedDates(year, month) {
+  const res = await fetch(`/api/appointments/availability?year=${year}&month=${month}`)
+  if (!res.ok) throw new Error('Could not load appointment availability.')
+  const data = await res.json()
+  return Array.isArray(data.booked) ? data.booked : []
+}
+
+/* Full availability for a month: the fixed base map with every date that has
+   a MongoDB appointment (plus any booking this browser just made, so it
+   shows instantly even before the server round-trip settles) forced to
+   "booked". Every other day stays "available". */
+export function buildAvailability(year, month, serverBooked = []) {
   const map = baseAvailability(year, month)
-  for (const key of getBookedDates()) {
+  for (const key of [...serverBooked, ...getBookedDates()]) {
     if (key in map) map[key] = 'booked'
   }
   return map

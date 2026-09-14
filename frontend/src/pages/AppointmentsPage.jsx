@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
-import { getAvailability } from '../utils/appointmentBookings'
+import { buildAvailability, fetchBookedDates } from '../utils/appointmentBookings'
 import './AppointmentsPage.css'
 
 /* ── Icons ── */
@@ -73,13 +73,24 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [viewMonth, setViewMonth]       = useState(today.getMonth())
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())
-  /* Fixed clinic calendar for the month in view, with any date this browser
-     has already booked forced to "booked". Recomputed only when the month
-     changes; reading from storage each time keeps a fresh booking visible
-     without a full reload, and it never reshuffles on refresh. */
+  /* Dates booked in MongoDB for the month in view. Re-fetched every time the
+     month changes so the calendar always reflects the real appointments
+     table rather than a client-side guess. */
+  const [serverBooked, setServerBooked] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    fetchBookedDates(viewYear, viewMonth)
+      .then(booked => { if (!cancelled) setServerBooked(booked) })
+      .catch(() => { if (!cancelled) setServerBooked([]) })
+    return () => { cancelled = true }
+  }, [viewYear, viewMonth])
+
+  /* Fixed clinic calendar for the month in view: every day starts
+     "available" and only flips to "booked" when it has a matching
+     appointment in MongoDB (or a booking this browser just made). */
   const availability = useMemo(
-    () => getAvailability(viewYear, viewMonth),
-    [viewYear, viewMonth]
+    () => buildAvailability(viewYear, viewMonth, serverBooked),
+    [viewYear, viewMonth, serverBooked]
   )
   const [showConfirm, setShowConfirm]   = useState(false)
 

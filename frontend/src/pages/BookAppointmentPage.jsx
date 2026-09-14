@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
 import { logActivity } from '../utils/auditLog'
-import { markDateBooked } from '../utils/appointmentBookings'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -194,10 +193,6 @@ export default function BookAppointmentPage({ user }) {
   useEffect(() => {
     if (step !== 4 || loggedBookingRef.current) return
     loggedBookingRef.current = true
-
-    // Persist the booked day so the Appointments calendar shows it as "booked"
-    // for everyone on this browser — permanently, across reloads.
-    markDateBooked(preselectedYear, preselectedMonth, preselectedDate)
 
     // Save the appointment (and a patient record) to MongoDB via the serverless
     // function. Non-blocking — the success screen shows regardless; the outcome

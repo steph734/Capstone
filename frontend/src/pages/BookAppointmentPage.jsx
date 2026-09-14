@@ -226,6 +226,11 @@ export default function BookAppointmentPage({ user }) {
         },
         payment: {
           method: payMethod,
+          // For 'stripe', the checkout modal lets the payer pick card vs. a QR
+          // wallet (GCash/Maya) — onlinePayment.method carries which one, e.g.
+          // "Card" or "GCash QR", so the payments collection can record the
+          // real method instead of a generic "Stripe".
+          onlineMethod: onlinePayment?.method || undefined,
           sessionFee: SESSION_FEE,
           serviceCharge: SERVICE_CHARGE,
           total: TOTAL_DUE,

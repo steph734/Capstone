@@ -14,6 +14,21 @@ const MODE_MAP = {
 
 const PAYMENT_MAP = { cash: 'Cash', stripe: 'Stripe', gcash: 'GCash QR' }
 
+// The `payments` collection isn't restricted to the appointments enum, so it
+// can record which payment method was actually used: Cash, a real card charge
+// ("Credit Card"), or a scan-to-pay QR transfer (the specific wallet, e.g.
+// "GCash QR" — CheckoutModal never touches Stripe for the QR rail).
+function resolvePaymentMethod(payment) {
+  const top = String(payment.method || '').toLowerCase()
+  if (top === 'cash') return 'Cash'
+  if (top === 'stripe') {
+    const online = str(payment.onlineMethod)
+    if (!online || /^card$/i.test(online)) return 'Credit Card'
+    return online // e.g. "GCash QR", "Maya QR", "GrabPay"
+  }
+  return null
+}
+
 // "10:00 - 11:00 AM" / "1:00 - 2:00 PM"  ->  { start: "10:00", end: "11:00" }
 function parseSlot(label) {
   const m = String(label || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i)
@@ -157,16 +172,20 @@ export default async function handler(req, res) {
     const apptRes = await db.collection('appointments').insertOne(appointmentDoc)
     const appointmentId = apptRes.insertedId
 
-    // 4. Best-effort payment row.
-    if (method && total != null) {
+    // 4. Best-effort payment row. `method` here is the raw one constrained to
+    // the appointments enum (Cash/Stripe); paymentMethod is the specific
+    // method the payments collection actually records (Cash/Credit Card/the
+    // QR wallet used).
+    const paymentMethod = resolvePaymentMethod(payment)
+    if (paymentMethod && total != null) {
       try {
         const payRes = await db.collection('payments').insertOne({
           appointment_id: appointmentId,
           patient_id: patientId,
           amount: total,
-          method,
+          method: paymentMethod,
           payment_date: now,
-          status: method === 'Cash' ? 'Pending' : 'Paid',
+          status: paymentMethod === 'Cash' ? 'Pending' : 'Paid',
           created_at: now,
           updated_at: now,
         })

@@ -5,6 +5,13 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
+const { INVITE_TTL_MS, generateInviteToken, hashInviteToken, sendStaffInviteEmail } = require('../utils/staffInvite');
+
+function readEnv(name) {
+  const raw = process.env[name];
+  if (raw == null) return '';
+  return String(raw).trim().replace(/^["']|["']$/g, '').trim();
+}
 
 const router = express.Router();
 
@@ -30,12 +37,13 @@ async function uniqueUsername(base) {
   return candidate;
 }
 
-// GET /api/employees -> newest first, with branch name populated
+// GET /api/employees -> newest first, with branch name + account status populated
 router.get('/', async (req, res) => {
   try {
     const employees = await Employee.find()
       .sort({ created_at: -1 })
       .populate('branch_id', 'branch_name')
+      .populate('user_id', 'is_verified')
       .lean();
     res.json({ employees });
   } catch (err) {
@@ -132,13 +140,11 @@ router.post('/', async (req, res) => {
       const d = new Date(body.licenseExpiry);
       if (!Number.isNaN(d.getTime())) doc.license_expiry = d;
     }
-    if (body.documents && typeof body.documents === 'object') {
-      const docs = {};
-      for (const key of ['ptr', 'prc', 'diploma', 'id']) {
-        if (body.documents[key]) docs[key] = String(body.documents[key]);
-      }
-      if (Object.keys(docs).length) doc.documents = docs;
-    }
+    // Documents are no longer collected from the owner — the hire uploads
+    // their own PTR/PRC/diploma/ID during self-setup (see routes/staffSetup.js).
+    const rawInviteToken = generateInviteToken();
+    doc.invite_token_hash = hashInviteToken(rawInviteToken);
+    doc.invite_expires_at = new Date(Date.now() + INVITE_TTL_MS);
 
     let employee;
     try {
@@ -148,10 +154,53 @@ router.post('/', async (req, res) => {
       throw err;
     }
 
+    const appUrl = readEnv('PUBLIC_APP_URL') || 'http://localhost:5174';
+    const setupLink = `${appUrl.replace(/\/$/, '')}/staff-setup?token=${rawInviteToken}`;
+    try {
+      await sendStaffInviteEmail({ email, name: fullName, link: setupLink });
+    } catch (err) {
+      await Employee.deleteOne({ _id: employee._id }).catch(() => {});
+      await User.deleteOne({ _id: user._id }).catch(() => {});
+      console.error('send staff invite email error:', err);
+      return res.status(500).json({ error: 'Could not send the invite email. Please try again.' });
+    }
+
     return res.status(201).json({ success: true, employee, user: user.toSafeJSON() });
   } catch (err) {
     console.error('create employee error:', err);
     return res.status(500).json({ error: 'Could not save the employee record.' });
+  }
+});
+
+// GET /api/employees/:id/documents/:key/file -> streams an uploaded document
+// (stored in GridFS by routes/staffSetup.js) back to the owner's dashboard.
+router.get('/:id/documents/:key/file', async (req, res) => {
+  const { id, key } = req.params;
+  if (!['ptr', 'prc', 'diploma', 'id'].includes(key)) {
+    return res.status(400).json({ error: 'Unknown document type.' });
+  }
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ error: 'Invalid employee id.' });
+  }
+
+  try {
+    const employee = await Employee.findById(id).lean();
+    const fileId = employee?.documents?.[key];
+    if (!fileId || !mongoose.isValidObjectId(fileId)) {
+      return res.status(404).json({ error: 'No document uploaded for this field.' });
+    }
+
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'staff_documents' });
+    const files = await bucket.find({ _id: new mongoose.Types.ObjectId(fileId) }).toArray();
+    const file = files[0];
+    if (!file) return res.status(404).json({ error: 'Document not found.' });
+
+    res.set('Content-Type', file.metadata?.contentType || file.contentType || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${(file.filename || key).replace(/"/g, '')}"`);
+    bucket.openDownloadStream(file._id).on('error', () => res.status(404).end()).pipe(res);
+  } catch (err) {
+    console.error('stream employee document error:', err);
+    res.status(500).json({ error: 'Could not load the document.' });
   }
 });
 

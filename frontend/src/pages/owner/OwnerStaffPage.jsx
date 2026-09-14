@@ -3,7 +3,7 @@ import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
-import { apiGet, apiPost } from '../../utils/api'
+import { apiGet, apiPost, API_BASE } from '../../utils/api'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -219,13 +219,6 @@ function ChevronIcon({ up }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: up ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
       <path d="M6 9l6 6 6-6" />
-    </svg>
-  )
-}
-function UploadIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
     </svg>
   )
 }
@@ -642,13 +635,22 @@ function ViewModal({ staffMember, onClose }) {
               <h4 className="os-section-title">Uploaded Documents</h4>
               {DOC_FIELDS.map((f) => {
                 const doc = staffMember.documents?.[f.key]
+                // Real hires store a GridFS file id (string) once they upload it
+                // during self-setup; demo rows carry a legacy {name} object.
+                const fileUrl = doc && staffMember.mongoEmployeeId
+                  ? `${API_BASE}/api/employees/${staffMember.mongoEmployeeId}/documents/${f.key}/file`
+                  : null
                 return (
                   <div key={f.key} className="os-doc-card">
                     <div className="os-doc-icon" style={{ background: f.tint, color: f.color }}>{f.icon}</div>
                     <div className="os-doc-info">
                       <div className="os-doc-label">{f.label}</div>
                       <div className={`os-doc-hint ${doc ? 'uploaded' : ''}`}>
-                        {doc ? `✓ ${doc.name}` : 'Not uploaded'}
+                        {doc
+                          ? (fileUrl
+                            ? <a href={fileUrl} target="_blank" rel="noreferrer">✓ View file</a>
+                            : `✓ ${doc.name || 'Uploaded'}`)
+                          : 'Not uploaded'}
                       </div>
                     </div>
                     {doc && <span className="os-pill os-pill-green">On File</span>}
@@ -746,48 +748,16 @@ function EditStaffModal({ staffMember, onClose, onSave }) {
 }
 
 /* ── Add Staff Modal (multi-step wizard) ───────────────────── */
-const WIZARD_STEPS = ['Personal Information', 'Professional Information', 'Documents & Verification', 'Review & Invite']
+// Documents are uploaded by the hire themselves during self-setup (see
+// StaffSetup.jsx), not by the owner — this list is only used here to render
+// a staff member's already-uploaded documents in the read-only ViewModal tab.
+const WIZARD_STEPS = ['Personal Information', 'Professional Information', 'Review & Invite']
 const DOC_FIELDS = [
-  { key: 'ptr', icon: <DocLicenseIcon />, tint: '#e6f5f2', color: '#159a72', label: 'Professional License (PTR)', desc: 'Upload a clear photo or scan of your valid PTR.' },
-  { key: 'prc', icon: <DocMedalIcon />, tint: '#fdf2f8', color: '#db2777', label: 'PRC License', desc: 'Upload your Professional Regulation Commission license.' },
-  { key: 'diploma', icon: <DocCapIcon />, tint: '#fffbeb', color: '#d97706', label: 'Diploma / Certificate', desc: 'Upload your diploma or certification.' },
-  { key: 'id', icon: <DocIdIcon />, tint: '#eff6ff', color: '#3b82f6', label: 'Valid ID', desc: 'Upload a valid government-issued ID.' },
+  { key: 'ptr', icon: <DocLicenseIcon />, tint: '#e6f5f2', color: '#159a72', label: 'Professional License (PTR)' },
+  { key: 'prc', icon: <DocMedalIcon />, tint: '#fdf2f8', color: '#db2777', label: 'PRC License' },
+  { key: 'diploma', icon: <DocCapIcon />, tint: '#fffbeb', color: '#d97706', label: 'Diploma / Certificate' },
+  { key: 'id', icon: <DocIdIcon />, tint: '#eff6ff', color: '#3b82f6', label: 'Valid ID' },
 ]
-
-function DocUpload({ field, value, onChange }) {
-  const inputRef = useRef(null)
-  return (
-    <div className="os-doc-card">
-      <div className="os-doc-icon" style={{ background: field.tint, color: field.color }}>{field.icon}</div>
-      <div className="os-doc-info">
-        <div className="os-doc-label">{field.label} <span className="os-req">*</span></div>
-        <div className="os-doc-desc">{field.desc}</div>
-        <div className={`os-doc-hint ${value ? 'uploaded' : ''}`}>
-          {value ? `✓ ${value.name}` : 'PDF, JPG, PNG (Max 5MB)'}
-        </div>
-      </div>
-      <button type="button" className="os-doc-btn" onClick={() => inputRef.current?.click()}>
-        <UploadIcon /> {value ? 'Replace' : 'Upload File'}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        hidden
-        onChange={(e) => onChange(e.target.files?.[0] || null)}
-      />
-    </div>
-  )
-}
-
-function DocsConfidentialNote() {
-  return (
-    <div className="os-doc-note">
-      <ShieldIcon />
-      <p>Your documents are securely stored and will only be used for verification purposes. All information will remain confidential.</p>
-    </div>
-  )
-}
 
 function DOBPicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
@@ -879,51 +849,6 @@ function ExpiryDatePicker({ value, onChange }) {
   )
 }
 
-// Same pattern again, but for a past-facing date (date hired) — opens on the
-// month view and disallows future dates.
-function HiredDatePicker({ value, onChange }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-
-  useEffect(() => {
-    const onClickOutside = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
-
-  const dateVal = value ? new Date(`${value}T00:00:00`) : null
-  const display = dateVal
-    ? dateVal.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : ''
-
-  const handlePick = (d) => {
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    onChange(iso)
-    setOpen(false)
-  }
-
-  return (
-    <div className="os-dob-wrap" ref={wrapRef}>
-      <button type="button" className="os-dob-input" onClick={() => setOpen((o) => !o)}>
-        <span className={display ? '' : 'os-dob-placeholder'}>{display || 'mm/dd/yyyy'}</span>
-        <CalendarSmallIcon />
-      </button>
-      {open && (
-        <div className="os-dob-popover">
-          <Calendar
-            onChange={handlePick}
-            value={dateVal}
-            maxDate={new Date()}
-            defaultActiveStartDate={dateVal || new Date()}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
 function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
@@ -932,10 +857,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
     specialty: null, branch: BRANCHES[0], status: STATUSES[0],
     employeeId: `EMP-${String(staffCount + 1).padStart(4, '0')}`,
     prcNumber: '', experience: '', employment: EMPLOYMENT_TYPES[0], licenseExpiry: '',
-    position: '', hiredAt: '',
   })
-  const [docs, setDocs] = useState({ ptr: null, prc: null, diploma: null, id: null })
-
   // The DB's `employees` collection needs a real branch_id (ObjectId), not the
   // demo branch names above, so this pulls the live list from the `branchs`
   // collection instead of reusing BRANCHES.
@@ -963,7 +885,6 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   }, [])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
-  const setDoc = (key, val) => setDocs((d) => ({ ...d, [key]: val }))
 
   const selectBranch = (id) => {
     setBranchId(id)
@@ -974,23 +895,24 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   const stepValid = [
     form.name.trim() && form.email.trim(),
     !!form.specialty && form.prcNumber.trim() && String(form.experience).trim() && !!form.licenseExpiry
-      && form.position.trim() && !!form.hiredAt && !!branchId,
-    true,
+      && !!branchId,
     true,
   ]
 
   const next = () => setStep((s) => Math.min(s + 1, WIZARD_STEPS.length - 1))
   const back = () => setStep((s) => Math.max(s - 1, 0))
 
-  const nextLabel = submitting ? 'Saving…' : ['Next', 'Next', 'Next: Review', 'Send Invite'][step]
+  const nextLabel = submitting ? 'Saving…' : ['Next', 'Next', 'Add Staff'][step]
 
   const submit = async () => {
     setSubmitError('')
     setSubmitting(true)
     try {
-      const uploadedDocs = Object.fromEntries(
-        Object.entries(docs).filter(([, file]) => file).map(([key, file]) => [key, file.name])
-      )
+      const today = new Date()
+      // The DB requires `position` and `hired_at` but the wizard doesn't ask for
+      // them separately — the therapy specialty doubles as the position, and
+      // the hire date defaults to today (the day the invite is sent).
+      const hiredAt = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       const data = await apiPost('/api/employees', {
         name: form.name.trim(),
         email: form.email.trim(),
@@ -1004,15 +926,14 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
         emergencyPhone: form.emergencyPhone,
         branchId,
         specialty: form.specialty,
-        position: form.position.trim(),
-        hiredAt: form.hiredAt,
+        position: form.specialty,
+        hiredAt,
         employeeId: form.employeeId,
         prcNumber: form.prcNumber,
         experience: form.experience,
         employment: form.employment,
         licenseExpiry: form.licenseExpiry,
         status: form.status,
-        documents: uploadedDocs,
       })
 
       onAdd({
@@ -1032,12 +953,11 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
         experience: form.experience,
         employment: form.employment,
         licenseExpiry: form.licenseExpiry,
-        position: form.position,
-        hiredAt: form.hiredAt,
+        position: form.specialty,
+        hiredAt,
         mongoEmployeeId: data.employee?._id,
-        documents: Object.fromEntries(
-          Object.entries(docs).filter(([, file]) => file).map(([key, file]) => [key, { name: file.name }])
-        ),
+        accountStatus: 'pending',
+        documents: {},
       })
     } catch (err) {
       setSubmitError(err.message || 'Could not save this staff member.')
@@ -1139,16 +1059,6 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
               </div>
               <div className="os-form-row">
                 <div className="os-form-group">
-                  <label>Position / Job Title <span className="os-req">*</span></label>
-                  <input placeholder="e.g. Senior Therapist" value={form.position} onChange={(e) => set('position', e.target.value)} />
-                </div>
-                <div className="os-form-group">
-                  <label>Date Hired <span className="os-req">*</span></label>
-                  <HiredDatePicker value={form.hiredAt} onChange={(v) => set('hiredAt', v)} />
-                </div>
-              </div>
-              <div className="os-form-row">
-                <div className="os-form-group">
                   <label>Branch <span className="os-req">*</span></label>
                   <select
                     value={branchId}
@@ -1192,33 +1102,19 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
 
           {step === 2 && (
             <div className="os-wizard-single">
-              <h4 className="os-wizard-section">Documents &amp; Verification</h4>
-              <p className="os-wizard-section-sub">Upload the required documents for {form.name || 'this staff member'}.</p>
-              {DOC_FIELDS.map((f) => (
-                <DocUpload key={f.key} field={f} value={docs[f.key]} onChange={(v) => setDoc(f.key, v)} />
-              ))}
-              <DocsConfidentialNote />
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="os-wizard-single">
               <h4 className="os-wizard-section">Review &amp; Invite</h4>
               <div className="os-detail-grid">
                 <div className="os-detail-row"><span className="os-detail-lbl">Full Name</span><span className="os-detail-val">{form.name || '—'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Email</span><span className="os-detail-val">{form.email || '—'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Phone</span><span className="os-detail-val">{form.phone ? `${form.phoneCode} ${form.phone}` : '—'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Specialty</span><span className="os-detail-val">{form.specialty || 'Unassigned'}</span></div>
-                <div className="os-detail-row"><span className="os-detail-lbl">Position</span><span className="os-detail-val">{form.position || '—'}</span></div>
-                <div className="os-detail-row"><span className="os-detail-lbl">Date Hired</span><span className="os-detail-val">{formatDate(form.hiredAt)}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Branch</span><span className="os-detail-val">{form.branch}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Duty Status</span><span className="os-detail-val">{form.status}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Employment</span><span className="os-detail-val">{form.employment}</span></div>
-                <div className="os-detail-row"><span className="os-detail-lbl">Documents</span><span className="os-detail-val">{Object.values(docs).filter(Boolean).length} / {DOC_FIELDS.length} uploaded</span></div>
               </div>
               <div className="os-doc-note">
                 <ShieldIcon />
-                <p>An invitation email will be sent to {form.email || 'the staff member'} to complete their account setup.</p>
+                <p>An invitation email will be sent to {form.email || 'the staff member'} with a link to set their password and upload their PTR, PRC license, diploma, and ID.</p>
               </div>
               {submitError && <p className="os-form-error">{submitError}</p>}
             </div>
@@ -1242,6 +1138,47 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   )
 }
 
+// Reverses the shorthand maps `backend/routes/employees.js` uses when saving.
+const REVERSE_EMPLOYEE_STATUS = { active: 'On Duty', on_leave: 'On Leave' }
+const REVERSE_EMPLOYMENT_TYPE = { 'full-time': 'Full-time', 'part-time': 'Part-time', contract: 'Contract', locum: 'Locum' }
+const REVERSE_GENDER = { male: 'Male', female: 'Female', prefer_not_to_say: 'Prefer not to say' }
+
+// Maps a GET /api/employees document (+ populated branch_id/user_id) into the
+// shape the rest of this page already expects from the demo INITIAL_STAFF rows.
+function mapEmployeeDoc(emp) {
+  const name = [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ')
+  const seed = Math.abs(String(emp._id).split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % 1000
+  return {
+    id: emp._id,
+    mongoEmployeeId: emp._id,
+    name,
+    email: emp.email || '',
+    specialty: emp.specialty || null,
+    branch: emp.branch_id?.branch_name || '',
+    status: REVERSE_EMPLOYEE_STATUS[emp.status] || 'On Duty',
+    archived: emp.status === 'terminated',
+    caseload: 0,
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=${(seed % 2 ? '159a72' : '3b82f6')}&color=fff`,
+    joined: emp.hired_at ? new Date(emp.hired_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—',
+    attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
+    phone: emp.phone?.number ? `${emp.phone.country_code || ''} ${emp.phone.number}`.trim() : '',
+    dob: emp.dob ? new Date(emp.dob).toISOString().slice(0, 10) : '',
+    gender: REVERSE_GENDER[emp.gender] || emp.gender || '',
+    address: emp.address || '',
+    emergencyContact: emp.emergency_contact || '',
+    emergencyPhone: emp.emergency_phone || '',
+    employeeId: emp.employee_id || '',
+    prcNumber: emp.prc_number || '',
+    experience: emp.experience ?? '',
+    employment: REVERSE_EMPLOYMENT_TYPE[emp.employment_type] || emp.employment_type || '',
+    licenseExpiry: emp.license_expiry ? new Date(emp.license_expiry).toISOString().slice(0, 10) : '',
+    position: emp.position || '',
+    hiredAt: emp.hired_at || '',
+    documents: emp.documents || {},
+    accountStatus: emp.user_id?.is_verified ? 'active' : 'pending',
+  }
+}
+
 /* ── Main Page ─────────────────────────────────────────────── */
 export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [staff, setStaff] = useState(INITIAL_STAFF)
@@ -1257,6 +1194,20 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [editing, setEditing] = useState(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  // Real hires created through the wizard live in MongoDB — pull them in
+  // alongside the demo roster so the table reflects actual invite/setup state.
+  useEffect(() => {
+    let cancelled = false
+    apiGet('/api/employees')
+      .then((data) => {
+        if (cancelled) return
+        const mapped = (data.employees || []).map(mapEmployeeDoc)
+        setStaff((prev) => [...mapped, ...prev.filter((s) => !s.mongoEmployeeId)])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const activeStaff = staff.filter((s) => !s.archived)
   const archivedStaff = staff.filter((s) => s.archived)
@@ -1347,6 +1298,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         employeeId: form.employeeId, prcNumber: form.prcNumber, experience: form.experience,
         employment: form.employment, licenseExpiry: form.licenseExpiry, documents: form.documents,
         position: form.position, hiredAt: form.hiredAt, mongoEmployeeId: form.mongoEmployeeId,
+        accountStatus: form.accountStatus || 'pending',
       },
       ...prev,
     ])
@@ -1548,7 +1500,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                         <div className="os-table-person">
                           <div className="os-avatar-wrap">
                             <img src={s.avatar} alt={s.name} className="os-avatar" />
-                            <span className={`os-status-dot ${s.status === 'On Duty' ? 'os-dot-green' : 'os-dot-yellow'}`} />
+                            <span className={`os-status-dot ${s.accountStatus === 'pending' ? 'os-dot-yellow' : s.status === 'On Duty' ? 'os-dot-green' : 'os-dot-yellow'}`} />
                           </div>
                           <div>
                             <div className="os-table-name">{s.name}{s.archived && <span className="os-archived-pill">Archived</span>}</div>
@@ -1558,7 +1510,13 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                       </td>
                       <td data-label="Specialty"><SpecialtyBadge specialty={s.specialty} /></td>
                       <td data-label="Branch"><span className="os-branch-badge">{s.branch}</span></td>
-                      <td data-label="Status"><span className={`os-pill ${s.status === 'On Duty' ? 'os-pill-green' : 'os-pill-yellow'}`}>{s.status}</span></td>
+                      <td data-label="Status">
+                        {s.accountStatus === 'pending' ? (
+                          <span className="os-pill os-pill-yellow">Pending Setup</span>
+                        ) : (
+                          <span className={`os-pill ${s.status === 'On Duty' ? 'os-pill-green' : 'os-pill-yellow'}`}>{s.status}</span>
+                        )}
+                      </td>
                       <td data-label="Caseload">{s.caseload} patients</td>
                       <td data-label="Actions">
                         <div className="os-table-actions">

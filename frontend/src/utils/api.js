@@ -1,6 +1,6 @@
 // Thin wrapper around the Express backend (backend/server.js).
 // Base URL comes from VITE_API_URL; falls back to localhost:5000 in dev.
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`)
@@ -14,6 +14,18 @@ export async function apiPost(path, body) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
+  return data
+}
+
+// Like apiPost, but for multipart/form-data bodies (file uploads) — the
+// browser sets the multipart boundary itself, so no Content-Type header here.
+export async function apiPostForm(path, formData) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    body: formData,
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)

@@ -37,6 +37,11 @@ const employeeSchema = new mongoose.Schema(
       diploma: { type: String },
       id: { type: String },
     },
+
+    // Set when the owner sends the setup invite; cleared once the hire
+    // finishes self-setup (single-use). Never returned by default queries.
+    invite_token_hash: { type: String, select: false },
+    invite_expires_at: { type: Date },
   },
   {
     collection: 'employees',

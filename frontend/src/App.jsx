@@ -13,6 +13,7 @@ import VerifyOtp from './pages/VerifyOtp'
 import ForgotPassword from './pages/ForgotPassword'
 import VerifyResetOtp from './pages/VerifyResetOtp'
 import ResetPassword from './pages/ResetPassword'
+import StaffSetup from './pages/StaffSetup'
 import Dashboard from './pages/Dashboard'
 import TherapyDetail from './pages/TherapyDetail'
 import AppointmentsPage from './pages/AppointmentsPage'
@@ -300,6 +301,11 @@ function App() {
         <Route
           path="/reset-password"
           element={<ResetPassword />}
+        />
+
+        <Route
+          path="/staff-setup"
+          element={<StaffSetup />}
         />
 
         <Route 

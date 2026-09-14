@@ -180,6 +180,11 @@ export default async function handler(req, res) {
     if (paymentMethod && total != null) {
       try {
         const payRes = await db.collection('payments').insertOne({
+          // `payments` has a unique index on `PaymentID` (same *ID-style legacy
+          // key as `patients.PatientID` above) that the app never reads — it
+          // just needs a unique value per insert so it doesn't collide on
+          // `null` with every other payment row.
+          PaymentID: new ObjectId().toString(),
           appointment_id: appointmentId,
           patient_id: patientId,
           amount: total,
@@ -193,8 +198,11 @@ export default async function handler(req, res) {
           { _id: appointmentId },
           { $set: { payment_id: payRes.insertedId, updated_at: new Date() } }
         )
-      } catch {
-        /* non-critical */
+      } catch (err) {
+        // Not fatal to the booking, but must not vanish silently — this is
+        // exactly the kind of failure (e.g. schema/index violations) that
+        // would otherwise leave a booking "successful" with no payment row.
+        console.error('appointments/create: failed to record payment:', err)
       }
     }
 

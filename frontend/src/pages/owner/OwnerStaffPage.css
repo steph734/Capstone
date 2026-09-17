@@ -1191,19 +1191,43 @@
   color: #333;
   background: #fff;
   box-sizing: border-box;
-  cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+button.os-dob-input { cursor: pointer; }
 .os-dob-input:hover { border-color: #c3d4cb; }
-.os-dob-input:focus-visible {
+.os-dob-input:focus-within {
   border-color: #5a7a6d;
   box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.1);
-  outline: none;
 }
 
 .os-dob-input svg { flex-shrink: 0; color: #6b7c75; }
 .os-dob-placeholder { color: #9aab9f; }
+
+.os-dob-text {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  background: transparent;
+}
+.os-dob-text::placeholder { color: #9aab9f; }
+
+.os-dob-icon-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6b7c75;
+}
 
 .os-dob-popover {
   position: absolute;

@@ -805,10 +805,16 @@ function DOBPicker({ value, onChange }) {
 
 // Same dropdown-calendar pattern as DOBPicker, but for a future-facing date
 // (license expiry) — opens on the month view and disallows past dates
-// instead of restricting to 25 years back.
+// instead of restricting to 25 years back. Also accepts the date typed in
+// directly (mm/dd/yyyy), so the calendar is an assist rather than the only way in.
+const formatMDY = (d) =>
+  `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`
+
 function ExpiryDatePicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
   const wrapRef = useRef(null)
+  const inputRef = useRef(null)
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -819,22 +825,80 @@ function ExpiryDatePicker({ value, onChange }) {
   }, [])
 
   const dateVal = value ? new Date(`${value}T00:00:00`) : null
-  const display = dateVal
-    ? dateVal.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : ''
+
+  // Keep the typed text in sync with the stored value, but don't clobber
+  // whatever the user is mid-typing while the input is focused.
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) {
+      setText(dateVal ? formatMDY(dateVal) : '')
+    }
+  }, [value])
 
   const handlePick = (d) => {
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     onChange(iso)
+    setText(formatMDY(d))
     setOpen(false)
+  }
+
+  // Parses "mm/dd/yyyy" digits into a real, non-past date, or null if invalid/incomplete.
+  const parseTyped = (digits) => {
+    if (digits.length !== 8) return null
+    const month = parseInt(digits.slice(0, 2), 10)
+    const day = parseInt(digits.slice(2, 4), 10)
+    const year = parseInt(digits.slice(4), 10)
+    const d = new Date(year, month - 1, day)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const isRealDate = d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day
+    if (!isRealDate || d < today) return null
+    return d
+  }
+
+  const handleTextChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 8)
+    const formatted = digits.length > 4
+      ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+      : digits.length > 2
+        ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+        : digits
+    setText(formatted)
+
+    const d = parseTyped(digits)
+    if (d) onChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  }
+
+  const handleBlur = () => {
+    const digits = text.replace(/\D/g, '')
+    if (!parseTyped(digits)) {
+      // Incomplete or invalid (e.g. a past date) — snap back to the last valid value.
+      setText(dateVal ? formatMDY(dateVal) : '')
+    }
   }
 
   return (
     <div className="os-dob-wrap" ref={wrapRef}>
-      <button type="button" className="os-dob-input" onClick={() => setOpen((o) => !o)}>
-        <span className={display ? '' : 'os-dob-placeholder'}>{display || 'mm/dd/yyyy'}</span>
-        <CalendarSmallIcon />
-      </button>
+      <div className="os-dob-input">
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          className="os-dob-text"
+          placeholder="mm/dd/yyyy"
+          value={text}
+          onChange={handleTextChange}
+          onFocus={() => setOpen(true)}
+          onBlur={handleBlur}
+        />
+        <button
+          type="button"
+          className="os-dob-icon-btn"
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Open calendar"
+        >
+          <CalendarSmallIcon />
+        </button>
+      </div>
       {open && (
         <div className="os-dob-popover">
           <Calendar

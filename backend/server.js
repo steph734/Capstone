@@ -5,6 +5,18 @@ require('dotenv').config();
 
 const app = express();
 
+// Chrome's Private Network Access check adds its own preflight requirement
+// on top of normal CORS whenever a public site (like the Vercel-hosted
+// frontend) calls a private address like localhost — it sends
+// `Access-Control-Request-Private-Network: true` on the OPTIONS preflight
+// and refuses the real request unless we explicitly allow it back. This must
+// run BEFORE `cors()`, since `cors()` ends the OPTIONS response itself.
+app.use((req, res, next) => {
+  if (req.headers['access-control-request-private-network']) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
+  next();
+});
 app.use(cors());
 app.use(express.json());
 

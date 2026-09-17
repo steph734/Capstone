@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
-import { apiGet, apiPost, apiPatch, apiDelete, API_BASE } from '../../utils/api'
+import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -787,7 +787,7 @@ function EditStaffModal({ staffMember, onClose, onSave }) {
 // Documents are uploaded by the hire themselves during self-setup (see
 // StaffSetup.jsx), not by the owner — this list is only used here to render
 // a staff member's already-uploaded documents in the read-only ViewModal tab.
-const WIZARD_STEPS = ['Personal Information', 'Professional Information', 'Review & Invite']
+const WIZARD_STEPS = ['Personal Information', 'Professional Information', 'Upload Documents', 'Review & Add']
 const DOC_FIELDS = [
   { key: 'ptr', icon: <DocLicenseIcon />, tint: '#e6f5f2', color: '#159a72', label: 'Professional License (PTR)' },
   { key: 'prc', icon: <DocMedalIcon />, tint: '#fdf2f8', color: '#db2777', label: 'PRC License' },
@@ -964,8 +964,10 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState('')
   const [branchesLoading, setBranchesLoading] = useState(true)
+  const [files, setFiles] = useState({ ptr: null, prc: null, diploma: null, id: null })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -985,6 +987,8 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   }, [])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  const setFile = (key, file) => setFiles((f) => ({ ...f, [key]: file }))
+  const allFilesChosen = DOC_FIELDS.every((d) => files[d.key])
 
   const selectBranch = (id) => {
     setBranchId(id)
@@ -996,13 +1000,14 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
     form.name.trim() && form.email.trim(),
     !!form.specialty && form.prcNumber.trim() && String(form.experience).trim() && !!form.licenseExpiry
       && !!branchId,
+    allFilesChosen,
     true,
   ]
 
   const next = () => setStep((s) => Math.min(s + 1, WIZARD_STEPS.length - 1))
   const back = () => setStep((s) => Math.max(s - 1, 0))
 
-  const nextLabel = submitting ? 'Saving…' : ['Next', 'Next', 'Add Staff'][step]
+  const nextLabel = submitting ? 'Saving…' : ['Next', 'Next', 'Next', 'Add Staff'][step]
 
   const submit = async () => {
     setSubmitError('')
@@ -1011,9 +1016,11 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
       const today = new Date()
       // The DB requires `position` and `hired_at` but the wizard doesn't ask for
       // them separately — the therapy specialty doubles as the position, and
-      // the hire date defaults to today (the day the invite is sent).
+      // the hire date defaults to today (the day they're added).
       const hiredAt = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-      const data = await apiPost('/api/employees', {
+
+      const formData = new FormData()
+      const fields = {
         name: form.name.trim(),
         email: form.email.trim(),
         phoneCode: form.phoneCode,
@@ -1034,7 +1041,11 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
         employment: form.employment,
         licenseExpiry: form.licenseExpiry,
         status: form.status,
-      })
+      }
+      Object.entries(fields).forEach(([key, val]) => formData.append(key, val ?? ''))
+      DOC_FIELDS.forEach((d) => formData.append(d.key, files[d.key]))
+
+      const data = await apiPostForm('/api/employees', formData)
 
       onAdd({
         name: form.name.trim(),
@@ -1057,8 +1068,9 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
         hiredAt,
         mongoEmployeeId: data.employee?._id,
         accountStatus: 'pending',
-        documents: {},
+        documents: data.employee?.documents || {},
       })
+      setSubmitted(true)
     } catch (err) {
       setSubmitError(err.message || 'Could not save this staff member.')
     } finally {
@@ -1080,17 +1092,22 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
           <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        <div className="os-wizard-steps">
-          {WIZARD_STEPS.map((label, i) => (
-            <div key={label} className={`os-wizard-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-              <span className="os-wizard-step-num">{i < step ? '✓' : i + 1}</span>
-              <span className="os-wizard-step-label">{label}</span>
-            </div>
-          ))}
-        </div>
+        {!submitted && (
+          <div className="os-wizard-steps">
+            {WIZARD_STEPS.map((label, i) => (
+              <Fragment key={label}>
+                {i > 0 && <div className={`os-wizard-connector ${i <= step ? 'done' : ''}`} />}
+                <div className={`os-wizard-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
+                  <span className="os-wizard-step-num">{i < step ? '✓' : i + 1}</span>
+                  <span className="os-wizard-step-label">{label}</span>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        )}
 
         <div className="os-modal-body">
-          {step === 0 && (
+          {!submitted && step === 0 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Personal Information</h4>
               <div className="os-form-group">
@@ -1147,7 +1164,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
             </div>
           )}
 
-          {step === 1 && (
+          {!submitted && step === 1 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Professional Information</h4>
               <div className="os-form-group">
@@ -1200,9 +1217,34 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
             </div>
           )}
 
-          {step === 2 && (
+          {!submitted && step === 2 && (
             <div className="os-wizard-single">
-              <h4 className="os-wizard-section">Review &amp; Invite</h4>
+              <h4 className="os-wizard-section">Upload Documents</h4>
+              <p className="os-wizard-hint">Upload {form.name || 'the new hire'}'s PTR, PRC license, diploma, and a valid ID. PDF, JPG, or PNG — up to 5MB each.</p>
+              {DOC_FIELDS.map((f) => (
+                <label key={f.key} className="os-doc-card os-doc-upload">
+                  <div className="os-doc-icon" style={{ background: f.tint, color: f.color }}>{f.icon}</div>
+                  <div className="os-doc-info">
+                    <div className="os-doc-label">{f.label} <span className="os-req">*</span></div>
+                    <div className={`os-doc-hint ${files[f.key] ? 'uploaded' : ''}`}>
+                      {files[f.key] ? files[f.key].name : 'PDF, JPG, PNG (max 5MB)'}
+                    </div>
+                  </div>
+                  <span className="os-doc-btn">{files[f.key] ? 'Replace' : 'Upload'}</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    hidden
+                    onChange={(e) => setFile(f.key, e.target.files?.[0] || null)}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+
+          {!submitted && step === 3 && (
+            <div className="os-wizard-single">
+              <h4 className="os-wizard-section">Review &amp; Add</h4>
               <div className="os-detail-grid">
                 <div className="os-detail-row"><span className="os-detail-lbl">Full Name</span><span className="os-detail-val">{form.name || '—'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Email</span><span className="os-detail-val">{form.email || '—'}</span></div>
@@ -1214,24 +1256,44 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
               </div>
               <div className="os-doc-note">
                 <ShieldIcon />
-                <p>An invitation email will be sent to {form.email || 'the staff member'} with a link to set their password and upload their PTR, PRC license, diploma, and ID.</p>
+                <p>{form.name || 'They'} will appear under "For Review" with the documents you uploaded, so you can double-check them before approving {form.name ? `${form.name.split(' ')[0]}` : 'them'} onto your staff.</p>
               </div>
               {submitError && <p className="os-form-error">{submitError}</p>}
+            </div>
+          )}
+
+          {submitted && (
+            <div className="os-wizard-single os-wizard-success">
+              <div className="os-success-check"><CheckCircleIcon /></div>
+              <h4 className="os-wizard-section">Staff added</h4>
+              <p>
+                <strong>{form.name}</strong>'s details and documents have been saved.
+              </p>
+              <p>
+                They now appear under <strong>For Review</strong> — check their documents there and approve to add
+                {form.name ? ` ${form.name.split(' ')[0]}` : ' them'} to your Employees list.
+              </p>
             </div>
           )}
         </div>
 
         <div className="os-modal-footer os-wizard-footer">
-          <button className="os-btn-cancel" onClick={step === 0 ? onClose : back} disabled={submitting}>
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-          <button
-            className="os-btn-save"
-            disabled={!stepValid[step] || submitting}
-            onClick={() => (step === WIZARD_STEPS.length - 1 ? submit() : next())}
-          >
-            {nextLabel}
-          </button>
+          {submitted ? (
+            <button className="os-btn-save" onClick={onClose}>Done</button>
+          ) : (
+            <>
+              <button className="os-btn-cancel" onClick={step === 0 ? onClose : back} disabled={submitting}>
+                {step === 0 ? 'Cancel' : 'Back'}
+              </button>
+              <button
+                className="os-btn-save"
+                disabled={!stepValid[step] || submitting}
+                onClick={() => (step === WIZARD_STEPS.length - 1 ? submit() : next())}
+              >
+                {nextLabel}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1339,18 +1401,18 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Real hires created through the wizard live in MongoDB. A hire who hasn't
-  // uploaded their documents yet (not verified) isn't shown anywhere yet —
-  // they only reach "For Review" once they've finished self-setup, and only
-  // join the Employees table once the owner has approved them.
+  // Real hires created through the wizard live in MongoDB. A hire shows up in
+  // "For Review" as soon as they're invited (the Documents column reflects
+  // whether they've uploaded yet), and only joins the Employees table once
+  // the owner has approved them.
   useEffect(() => {
     let cancelled = false
     apiGet('/api/employees')
       .then((data) => {
         if (cancelled) return
         const docs = data.employees || []
-        const approved = docs.filter((e) => e.user_id?.is_verified && e.approved_at)
-        const forReview = docs.filter((e) => e.user_id?.is_verified && !e.approved_at)
+        const approved = docs.filter((e) => e.approved_at)
+        const forReview = docs.filter((e) => !e.approved_at)
         const mappedStaff = approved.map(mapEmployeeDoc)
         const mappedApplicants = forReview.map(mapEmployeeToApplicant)
         setStaff((prev) => [...mappedStaff, ...prev.filter((s) => !s.mongoEmployeeId)])
@@ -1435,14 +1497,35 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     })
   }
 
-  // A newly-invited hire isn't shown in the Employees table OR "For Review"
-  // yet — they only show up in "For Review" once they've actually opened
-  // their invite email and uploaded their documents (see the mount fetch,
-  // which re-derives both lists from the DB's verified/approved state).
+  // A newly-invited hire isn't a real staff member yet — they land in "For
+  // Review" right away (their invite email just went out), and the
+  // Documents column reflects whether they've uploaded yet. They only move
+  // into the Employees table once the owner approves them. The modal itself
+  // stays open to show its own confirmation screen, so this doesn't close it.
   const handleAdd = (form) => {
-    setShowAdd(false)
     const role = form.specialty || form.position || ''
-    logStaff('✉️', `Invited ${form.name} as ${role} (${branchLabel(form.branch)}) — awaiting document upload`, form.mongoEmployeeId || form.email)
+    const checklist = buildDocChecklist(form.documents)
+    setApplicants((prev) => [
+      {
+        id: form.mongoEmployeeId ? `inv-${form.mongoEmployeeId}` : `inv-${Date.now()}`,
+        mongoEmployeeId: form.mongoEmployeeId,
+        name: form.name, initials: initialsFromName(form.name),
+        appliedFor: role, branch: form.branch,
+        appliedOn: new Date().toISOString().slice(0, 10),
+        missingDocs: checklist.filter((c) => !c.done).length,
+        email: form.email, phone: form.phone, experience: form.experience,
+        coverLetter: `Invited to join as ${role || 'a team member'} at ${branchLabel(form.branch)}. An email was sent to ${form.email} asking them to upload their PTR, PRC license, diploma, and ID for your review.`,
+        checklist,
+        dob: form.dob, gender: form.gender, address: form.address,
+        emergencyContact: form.emergencyContact, emergencyPhone: form.emergencyPhone,
+        employeeId: form.employeeId, prcNumber: form.prcNumber,
+        employment: form.employment, licenseExpiry: form.licenseExpiry,
+        position: form.position, hiredAt: form.hiredAt, status: form.status,
+        documents: form.documents || {},
+      },
+      ...prev,
+    ])
+    logStaff('✉️', `Invited ${form.name} as ${role} (${branchLabel(form.branch)}) — for review`, form.mongoEmployeeId || form.email)
   }
 
   const handleEditSave = (updates) => {

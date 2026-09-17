@@ -2,18 +2,20 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
-const { INVITE_TTL_MS, generateInviteToken, hashInviteToken, sendStaffInviteEmail } = require('../utils/staffInvite');
-
-function readEnv(name) {
-  const raw = process.env[name];
-  if (raw == null) return '';
-  return String(raw).trim().replace(/^["']|["']$/g, '').trim();
-}
 
 const router = express.Router();
+
+const DOC_KEYS = ['ptr', 'prc', 'diploma', 'id'];
+const ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
+  fileFilter: (req, file, cb) => cb(null, ALLOWED_MIME.has(file.mimetype)),
+});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GENDER_MAP = { Male: 'male', Female: 'female', 'Prefer not to say': 'prefer_not_to_say' };
@@ -56,9 +58,15 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/employees — creates a linked User account (role: Therapist,
-// unverified) plus the Employee record. Rolls the User back if the Employee
+// unverified) plus the Employee record. The owner uploads the hire's PTR,
+// PRC license, diploma, and ID right here (no self-setup email/link) — the
+// new hire shows up in "For Review" immediately, and the owner checks the
+// documents and approves them there. Rolls the User back if the Employee
 // insert fails, so a bad request never leaves an orphaned account behind.
-router.post('/', async (req, res) => {
+router.post(
+  '/',
+  upload.fields(DOC_KEYS.map((key) => ({ name: key, maxCount: 1 }))),
+  async (req, res) => {
   try {
     const body = req.body || {};
     const fullName = String(body.name || '').trim();
@@ -143,11 +151,15 @@ router.post('/', async (req, res) => {
       const d = new Date(body.licenseExpiry);
       if (!Number.isNaN(d.getTime())) doc.license_expiry = d;
     }
-    // Documents are no longer collected from the owner — the hire uploads
-    // their own PTR/PRC/diploma/ID during self-setup (see routes/staffSetup.js).
-    const rawInviteToken = generateInviteToken();
-    doc.invite_token_hash = hashInviteToken(rawInviteToken);
-    doc.invite_expires_at = new Date(Date.now() + INVITE_TTL_MS);
+
+    // The owner uploads the 4 required documents right here in the wizard —
+    // multer's fileFilter silently drops any file with a disallowed
+    // mimetype, so a bad-type upload shows up the same way a missing one does.
+    const files = req.files || {};
+    const missing = DOC_KEYS.filter((key) => !files[key]?.[0]);
+    if (missing.length) {
+      return res.status(400).json({ error: `Please upload PDF/JPG/PNG files (under 5MB) for: ${missing.join(', ')}.` });
+    }
 
     let employee;
     try {
@@ -157,19 +169,44 @@ router.post('/', async (req, res) => {
       throw err;
     }
 
-    const appUrl = readEnv('PUBLIC_APP_URL') || 'http://localhost:5174';
-    const setupLink = `${appUrl.replace(/\/$/, '')}/staff-setup?token=${rawInviteToken}`;
     try {
-      await sendStaffInviteEmail({ email, name: fullName, link: setupLink });
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'staff_documents' });
+      const documents = {};
+      for (const key of DOC_KEYS) {
+        const file = files[key][0];
+        const fileId = new mongoose.Types.ObjectId();
+        await new Promise((resolve, reject) => {
+          // The driver's GridFS API stores `contentType` under `metadata`,
+          // not as a top-level field — see the matching read below.
+          const uploadStream = bucket.openUploadStreamWithId(fileId, file.originalname, {
+            metadata: { contentType: file.mimetype },
+          });
+          uploadStream.on('error', reject);
+          uploadStream.on('finish', resolve);
+          uploadStream.end(file.buffer);
+        });
+        documents[key] = fileId.toString();
+      }
+      employee.documents = documents;
+      await employee.save();
     } catch (err) {
       await Employee.deleteOne({ _id: employee._id }).catch(() => {});
       await User.deleteOne({ _id: user._id }).catch(() => {});
-      console.error('send staff invite email error:', err);
-      return res.status(500).json({ error: 'Could not send the invite email. Please try again.' });
+      console.error('upload employee documents error:', err);
+      return res.status(500).json({ error: 'Could not save the uploaded documents. Please try again.' });
     }
+
+    // Documents already came from the owner, so there's nothing left for the
+    // hire to "verify" — this just satisfies the same is_verified check the
+    // approve route uses, matching what self-setup used to signal.
+    await User.updateOne({ _id: user._id }, { $set: { is_verified: true } });
+    user.is_verified = true;
 
     return res.status(201).json({ success: true, employee, user: user.toSafeJSON() });
   } catch (err) {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: 'One of your files is too large (max 5MB each).' });
+    }
     console.error('create employee error:', err);
     return res.status(500).json({ error: 'Could not save the employee record.' });
   }

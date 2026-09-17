@@ -27,15 +27,16 @@ function buildInviteHtml({ name, link }) {
         <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
 
         <p style="margin:0 0 20px;font-size:14px;">
-          Your account has been created. Click below to set your password and upload
-          your PTR, PRC license, diploma, and a valid ID to activate it.
+          Your account has been created. Click below to upload your PTR, PRC
+          license, diploma, and a valid ID — the owner will review them and
+          activate your account.
         </p>
 
         <p style="margin:0 0 20px;text-align:center;">
           <a href="${link}" style="display:inline-block;background:#16a34a;color:#fff;
             text-decoration:none;font-weight:700;font-size:14px;padding:12px 26px;
             border-radius:10px;">
-            Set up my account
+            Upload Documents
           </a>
         </p>
 
@@ -58,7 +59,7 @@ function buildInviteText({ name, link }) {
   return [
     name ? `Hi ${name},` : 'Hi,',
     '',
-    `Your account has been created. Use this link to set your password and upload your documents:`,
+    `Your account has been created. Use this link to upload your documents:`,
     link,
     '',
     'This link expires in 7 days.',
@@ -70,7 +71,7 @@ async function sendStaffInviteEmail({ email, name, link }) {
   return sendEmail({
     to: email,
     toName: name || undefined,
-    subject: `You've been added to ${BRAND} — set up your account`,
+    subject: `You've been added to ${BRAND} — upload your documents`,
     html: buildInviteHtml({ name, link }),
     plain: buildInviteText({ name, link }),
   });

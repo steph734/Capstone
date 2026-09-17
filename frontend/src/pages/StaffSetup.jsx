@@ -38,6 +38,7 @@ export default function StaffSetup() {
   const [info, setInfo] = useState(null)
   const [loadError, setLoadError] = useState('')
 
+  const [showUpload, setShowUpload] = useState(false)
   const [files, setFiles] = useState({ ptr: null, prc: null, diploma: null, id: null })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -82,6 +83,7 @@ export default function StaffSetup() {
       const formData = new FormData()
       DOC_FIELDS.forEach((f) => formData.append(f.key, files[f.key]))
       await apiPostForm(`/api/staff-setup/${token}/complete`, formData)
+      setShowUpload(false)
       setDone(true)
     } catch (err) {
       setError(err.message || 'Could not complete your account setup.')
@@ -122,37 +124,11 @@ export default function StaffSetup() {
                 </p>
               </div>
 
-              <form className="rp-form" onSubmit={handleSubmit}>
-                <div className="ss-docs">
-                  <p className="ss-docs-title">Upload your documents</p>
-                  {DOC_FIELDS.map((f) => (
-                    <label key={f.key} className={`ss-doc-row ${files[f.key] ? 'chosen' : ''}`}>
-                      <span className="ss-doc-icon"><UploadIcon /></span>
-                      <span className="ss-doc-info">
-                        <span className="ss-doc-label">{f.label}</span>
-                        <span className="ss-doc-hint">
-                          {files[f.key] ? files[f.key].name : 'PDF, JPG, PNG (max 5MB)'}
-                        </span>
-                      </span>
-                      <span className="ss-doc-btn">{files[f.key] ? 'Replace' : 'Upload'}</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        hidden
-                        onChange={(e) => setFile(f.key, e.target.files?.[0] || null)}
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                {error && <p className="rp-error">{error}</p>}
-
-                <div className="rp-actions">
-                  <button type="submit" className="rp-btn primary" disabled={submitting}>
-                    {submitting ? 'Saving…' : 'Complete Setup'}
-                  </button>
-                </div>
-              </form>
+              <div className="rp-actions">
+                <button type="button" className="rp-btn primary" onClick={() => setShowUpload(true)}>
+                  Upload Documents
+                </button>
+              </div>
             </>
           )}
 
@@ -166,6 +142,51 @@ export default function StaffSetup() {
           )}
         </div>
       </div>
+
+      {showUpload && (
+        <div className="rp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ss-upload-title" onClick={() => !submitting && setShowUpload(false)}>
+          <div className="rp-modal ss-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="rp-modal-header">
+              <h2 id="ss-upload-title">Upload your documents</h2>
+              <p>PTR, PRC license, diploma, and a valid ID — PDF, JPG, or PNG, up to 5MB each.</p>
+            </div>
+
+            <form className="rp-form" onSubmit={handleSubmit}>
+              <div className="ss-docs">
+                {DOC_FIELDS.map((f) => (
+                  <label key={f.key} className={`ss-doc-row ${files[f.key] ? 'chosen' : ''}`}>
+                    <span className="ss-doc-icon"><UploadIcon /></span>
+                    <span className="ss-doc-info">
+                      <span className="ss-doc-label">{f.label}</span>
+                      <span className="ss-doc-hint">
+                        {files[f.key] ? files[f.key].name : 'PDF, JPG, PNG (max 5MB)'}
+                      </span>
+                    </span>
+                    <span className="ss-doc-btn">{files[f.key] ? 'Replace' : 'Upload'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      hidden
+                      onChange={(e) => setFile(f.key, e.target.files?.[0] || null)}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              {error && <p className="rp-error">{error}</p>}
+
+              <div className="rp-actions">
+                <button type="button" className="rp-btn secondary" onClick={() => setShowUpload(false)} disabled={submitting}>
+                  Cancel
+                </button>
+                <button type="submit" className="rp-btn primary" disabled={submitting}>
+                  {submitting ? 'Saving…' : 'Submit Documents'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

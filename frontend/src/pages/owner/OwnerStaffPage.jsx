@@ -3,7 +3,7 @@ import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
-import { apiGet, apiPost, API_BASE } from '../../utils/api'
+import { apiGet, apiPost, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -99,6 +99,34 @@ const INITIAL_STAFF = [
 const INITIAL_LEAVE_REQUESTS = [
   { id: 'lr1', staffId: 2, type: 'Vacation Leave', range: 'May 15 – May 17, 2026', days: 3, reason: 'Family vacation' },
 ]
+
+function initialsFromName(name) {
+  return (
+    (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('') || '?'
+  )
+}
+
+const DOC_LABELS = [
+  { key: 'ptr', label: 'PTR license' },
+  { key: 'prc', label: 'PRC license' },
+  { key: 'diploma', label: 'Diploma' },
+  { key: 'id', label: 'Valid ID' },
+]
+
+// A newly-invited hire's documents are all uploaded together in one step
+// (see backend staff-setup completion), so until that happens every item
+// here is "awaiting upload".
+function buildDocChecklist(documents = {}) {
+  return DOC_LABELS.map(({ key, label }) => {
+    const done = Boolean(documents?.[key])
+    return { label, note: done ? 'uploaded' : 'awaiting upload', done }
+  })
+}
 
 const INITIAL_APPLICANTS = [
   {
@@ -421,7 +449,7 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
                 <div className="os-ap-detail-avatar">{reviewing.initials}</div>
                 <div className="os-ap-detail-info">
                   <div className="os-ap-detail-name">{reviewing.name}</div>
-                  <div className="os-ap-detail-sub">Applying as {reviewing.appliedFor.toLowerCase()} · {reviewing.branch} branch</div>
+                  <div className="os-ap-detail-sub">Applying as {reviewing.appliedFor.toLowerCase()} · {branchLabel(reviewing.branch)}</div>
                 </div>
                 <span className="os-pill os-pill-yellow">Pending review</span>
               </div>
@@ -466,7 +494,7 @@ function ApplicantModal({ applicant, onClose, onApprove, onReject }) {
           <button className="os-profile-close" onClick={onClose} aria-label="Close">✕</button>
           <div className="os-ap-modal-avatar">{applicant.initials}</div>
           <h2 className="os-profile-name">{applicant.name}</h2>
-          <p className="os-ap-detail-sub">Applying as {applicant.appliedFor.toLowerCase()} · {applicant.branch} branch</p>
+          <p className="os-ap-detail-sub">Applying as {applicant.appliedFor.toLowerCase()} · {branchLabel(applicant.branch)}</p>
           <span className="os-pill os-pill-yellow">Pending review</span>
         </div>
 
@@ -529,6 +557,14 @@ const VIEW_TABS = ['Personal Info', 'Documents']
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+// Mock applicants use short branch names ("Main"), but real branches loaded
+// from the DB already end in "Branch" ("Davao Main Branch") — avoid "Davao
+// Main Branch branch" by only appending the word when it isn't there yet.
+function branchLabel(branch) {
+  if (!branch) return ''
+  return /\bbranch\b/i.test(branch) ? branch : `${branch} branch`
 }
 
 function ViewModal({ staffMember, onClose }) {
@@ -1203,8 +1239,9 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
 }
 
 // Reverses the shorthand maps `backend/routes/employees.js` uses when saving.
+// (employment_type is stored pre-capitalized to match Atlas's validator, so
+// it needs no reverse mapping — it's already display-ready.)
 const REVERSE_EMPLOYEE_STATUS = { active: 'On Duty', on_leave: 'On Leave' }
-const REVERSE_EMPLOYMENT_TYPE = { 'full-time': 'Full-time', 'part-time': 'Part-time', contract: 'Contract', locum: 'Locum' }
 const REVERSE_GENDER = { male: 'Male', female: 'Female', prefer_not_to_say: 'Prefer not to say' }
 
 // Maps a GET /api/employees document (+ populated branch_id/user_id) into the
@@ -1234,12 +1271,55 @@ function mapEmployeeDoc(emp) {
     employeeId: emp.employee_id || '',
     prcNumber: emp.prc_number || '',
     experience: emp.experience ?? '',
-    employment: REVERSE_EMPLOYMENT_TYPE[emp.employment_type] || emp.employment_type || '',
+    employment: emp.employment_type || '',
     licenseExpiry: emp.license_expiry ? new Date(emp.license_expiry).toISOString().slice(0, 10) : '',
     position: emp.position || '',
     hiredAt: emp.hired_at || '',
     documents: emp.documents || {},
     accountStatus: emp.user_id?.is_verified ? 'active' : 'pending',
+  }
+}
+
+// A newly-invited employee whose account isn't verified yet (hasn't set a
+// password / uploaded documents) belongs in the "For Review" panel instead
+// of the Employees table — map it into the shape ApplicantsPanel expects.
+function mapEmployeeToApplicant(emp) {
+  const name = [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ')
+  const branchName = emp.branch_id?.branch_name || ''
+  const role = emp.specialty || emp.position || ''
+  const checklist = buildDocChecklist(emp.documents)
+  return {
+    id: `inv-${emp._id}`,
+    mongoEmployeeId: emp._id,
+    name,
+    initials: initialsFromName(name),
+    appliedFor: role,
+    branch: branchName,
+    appliedOn: emp.created_at
+      ? new Date(emp.created_at).toISOString().slice(0, 10)
+      : emp.hired_at
+        ? new Date(emp.hired_at).toISOString().slice(0, 10)
+        : '',
+    missingDocs: checklist.filter((c) => !c.done).length,
+    email: emp.email || '',
+    phone: emp.phone?.number ? `${emp.phone.country_code || ''} ${emp.phone.number}`.trim() : '',
+    experience: emp.experience ?? '',
+    coverLetter: `Invited to join as ${role || 'a team member'} at ${branchName || 'the branch'}. An account setup email was sent to ${emp.email} to collect their password, PTR, PRC license, diploma, and ID.`,
+    checklist,
+    // Kept so "Approve and hire" can promote this record with its full profile.
+    dob: emp.dob ? new Date(emp.dob).toISOString().slice(0, 10) : '',
+    gender: REVERSE_GENDER[emp.gender] || emp.gender || '',
+    address: emp.address || '',
+    emergencyContact: emp.emergency_contact || '',
+    emergencyPhone: emp.emergency_phone || '',
+    employeeId: emp.employee_id || '',
+    prcNumber: emp.prc_number || '',
+    employment: emp.employment_type || '',
+    licenseExpiry: emp.license_expiry ? new Date(emp.license_expiry).toISOString().slice(0, 10) : '',
+    position: emp.position || '',
+    hiredAt: emp.hired_at || '',
+    status: REVERSE_EMPLOYEE_STATUS[emp.status] || 'On Duty',
+    documents: emp.documents || {},
   }
 }
 
@@ -1259,15 +1339,22 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Real hires created through the wizard live in MongoDB — pull them in
-  // alongside the demo roster so the table reflects actual invite/setup state.
+  // Real hires created through the wizard live in MongoDB. A hire who hasn't
+  // uploaded their documents yet (not verified) isn't shown anywhere yet —
+  // they only reach "For Review" once they've finished self-setup, and only
+  // join the Employees table once the owner has approved them.
   useEffect(() => {
     let cancelled = false
     apiGet('/api/employees')
       .then((data) => {
         if (cancelled) return
-        const mapped = (data.employees || []).map(mapEmployeeDoc)
-        setStaff((prev) => [...mapped, ...prev.filter((s) => !s.mongoEmployeeId)])
+        const docs = data.employees || []
+        const approved = docs.filter((e) => e.user_id?.is_verified && e.approved_at)
+        const forReview = docs.filter((e) => e.user_id?.is_verified && !e.approved_at)
+        const mappedStaff = approved.map(mapEmployeeDoc)
+        const mappedApplicants = forReview.map(mapEmployeeToApplicant)
+        setStaff((prev) => [...mappedStaff, ...prev.filter((s) => !s.mongoEmployeeId)])
+        setApplicants((prev) => [...mappedApplicants, ...prev.filter((a) => !a.mongoEmployeeId)])
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -1348,26 +1435,14 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     })
   }
 
+  // A newly-invited hire isn't shown in the Employees table OR "For Review"
+  // yet — they only show up in "For Review" once they've actually opened
+  // their invite email and uploaded their documents (see the mount fetch,
+  // which re-derives both lists from the DB's verified/approved state).
   const handleAdd = (form) => {
-    const seed = Math.floor(Math.random() * 70) + 1
-    const newId = Date.now()
-    setStaff((prev) => [
-      {
-        id: newId, name: form.name, email: form.email, specialty: form.specialty || null, branch: form.branch, status: form.status,
-        caseload: 0, avatar: `https://i.pravatar.cc/150?img=${seed}`,
-        joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        archived: false, attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
-        phone: form.phone, dob: form.dob, gender: form.gender, address: form.address,
-        emergencyContact: form.emergencyContact, emergencyPhone: form.emergencyPhone,
-        employeeId: form.employeeId, prcNumber: form.prcNumber, experience: form.experience,
-        employment: form.employment, licenseExpiry: form.licenseExpiry, documents: form.documents,
-        position: form.position, hiredAt: form.hiredAt, mongoEmployeeId: form.mongoEmployeeId,
-        accountStatus: form.accountStatus || 'pending',
-      },
-      ...prev,
-    ])
     setShowAdd(false)
-    logStaff('➕', `Added new staff member ${form.name} (${form.branch} branch)`, newId)
+    const role = form.specialty || form.position || ''
+    logStaff('✉️', `Invited ${form.name} as ${role} (${branchLabel(form.branch)}) — awaiting document upload`, form.mongoEmployeeId || form.email)
   }
 
   const handleEditSave = (updates) => {
@@ -1403,7 +1478,39 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     if (member) logStaff('❌', `Declined ${req.type.toLowerCase()} for ${member.name}`, member.id, 'Review')
   }
 
-  const handleApproveApplicant = (applicant) => {
+  const handleApproveApplicant = async (applicant) => {
+    // A real invited hire (created via Add Staff) has already uploaded their
+    // documents by the time they reach "For Review" — persist the owner's
+    // approval so they stick in the Employees table across page reloads.
+    if (applicant.mongoEmployeeId) {
+      try {
+        await apiPatch(`/api/employees/${applicant.mongoEmployeeId}/approve`)
+      } catch (err) {
+        window.alert(err.message || 'Could not approve this employee. Please try again.')
+        return
+      }
+      setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
+      setStaff((prev) => [
+        {
+          id: applicant.mongoEmployeeId, mongoEmployeeId: applicant.mongoEmployeeId,
+          name: applicant.name, email: applicant.email, specialty: applicant.appliedFor || null,
+          branch: applicant.branch, status: applicant.status || 'On Duty', caseload: 0,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(applicant.name || '?')}&background=159a72&color=fff`,
+          joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          archived: false, attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
+          phone: applicant.phone, dob: applicant.dob, gender: applicant.gender, address: applicant.address,
+          emergencyContact: applicant.emergencyContact, emergencyPhone: applicant.emergencyPhone,
+          employeeId: applicant.employeeId, prcNumber: applicant.prcNumber, experience: applicant.experience,
+          employment: applicant.employment, licenseExpiry: applicant.licenseExpiry, documents: applicant.documents,
+          position: applicant.position, hiredAt: applicant.hiredAt, accountStatus: 'active',
+        },
+        ...prev,
+      ])
+      logStaff('✅', `Approved and hired ${applicant.name} as ${applicant.appliedFor} (${branchLabel(applicant.branch)})`, applicant.mongoEmployeeId)
+      return
+    }
+
+    setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
     const seed = Math.floor(Math.random() * 70) + 1
     const newId = Date.now()
     setStaff((prev) => [
@@ -1417,11 +1524,18 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       },
       ...prev,
     ])
-    setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
-    logStaff('✅', `Approved and hired ${applicant.name} as ${applicant.appliedFor} (${applicant.branch} branch)`, newId)
+    logStaff('✅', `Approved and hired ${applicant.name} as ${applicant.appliedFor} (${branchLabel(applicant.branch)})`, newId)
   }
 
-  const handleRejectApplicant = (applicant) => {
+  const handleRejectApplicant = async (applicant) => {
+    if (applicant.mongoEmployeeId) {
+      try {
+        await apiDelete(`/api/employees/${applicant.mongoEmployeeId}`)
+      } catch (err) {
+        window.alert(err.message || 'Could not reject this applicant. Please try again.')
+        return
+      }
+    }
     setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
     logActivity({
       role: 'Owner',

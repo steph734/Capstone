@@ -17,7 +17,10 @@ const router = express.Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GENDER_MAP = { Male: 'male', Female: 'female', 'Prefer not to say': 'prefer_not_to_say' };
-const EMPLOYMENT_MAP = { 'Full-time': 'full-time', 'Part-time': 'part-time', Contract: 'contract' };
+// Atlas's `employees` collection validator requires these exact capitalized
+// values for `employment_type` — must match, not the lowercase-hyphenated
+// style used for `status`/`gender` below.
+const EMPLOYMENT_MAP = { 'Full-time': 'Full-time', 'Part-time': 'Part-time', Contract: 'Contract', Locum: 'Locum' };
 const STATUS_MAP = { 'On Duty': 'active', 'On Leave': 'on_leave' };
 
 // "Jade Ann Dela Cruz Tan" -> { first_name: 'Jade', middle_name: 'Ann Dela Cruz', last_name: 'Tan' }
@@ -169,6 +172,48 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('create employee error:', err);
     return res.status(500).json({ error: 'Could not save the employee record.' });
+  }
+});
+
+// PATCH /api/employees/:id/approve -> owner signs off on a hire's uploaded
+// documents, moving them out of "For Review" and into the Employees list.
+router.patch('/:id/approve', async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ error: 'Invalid employee id.' });
+  }
+  try {
+    const employee = await Employee.findById(id).populate('user_id', 'is_verified');
+    if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+    if (!employee.user_id?.is_verified) {
+      return res.status(400).json({ error: 'This hire has not finished uploading their documents yet.' });
+    }
+    employee.approved_at = new Date();
+    await employee.save();
+    return res.json({ success: true, employee });
+  } catch (err) {
+    console.error('approve employee error:', err);
+    return res.status(500).json({ error: 'Could not approve this employee.' });
+  }
+});
+
+// DELETE /api/employees/:id -> owner rejects a reviewed hire; since they were
+// never actually hired, this removes both the Employee record and its linked
+// (still-unhired) User account.
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ error: 'Invalid employee id.' });
+  }
+  try {
+    const employee = await Employee.findById(id);
+    if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+    await Employee.deleteOne({ _id: id });
+    await User.deleteOne({ _id: employee.user_id }).catch(() => {});
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('reject employee error:', err);
+    return res.status(500).json({ error: 'Could not reject this applicant.' });
   }
 });
 

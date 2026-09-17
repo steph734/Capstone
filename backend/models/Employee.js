@@ -30,7 +30,7 @@ const employeeSchema = new mongoose.Schema(
     employee_id: { type: String, trim: true },
     prc_number: { type: String, trim: true },
     experience: { type: Number, min: 0 },
-    employment_type: { type: String, enum: ['full-time', 'part-time', 'contract', 'locum'] },
+    employment_type: { type: String, enum: ['Full-time', 'Part-time', 'Contract', 'Locum'] },
     license_expiry: { type: Date },
     status: { type: String, enum: ['active', 'inactive', 'on_leave', 'terminated'], default: 'active' },
 
@@ -45,6 +45,11 @@ const employeeSchema = new mongoose.Schema(
     // finishes self-setup (single-use). Never returned by default queries.
     invite_token_hash: { type: String, select: false },
     invite_expires_at: { type: Date },
+
+    // Set only once the owner reviews the hire's uploaded documents and
+    // approves them — this is what actually moves them into the Employees
+    // list (finishing setup only makes them show up in "For Review").
+    approved_at: { type: Date, default: null },
   },
   {
     collection: 'employees',

@@ -138,7 +138,7 @@ export default function StaffSetup() {
               <div className="rp-modal-header">
                 <h2 id="ss-modal-title">Welcome, {info.name}</h2>
                 <p>
-                  {info.position}{info.branch_name ? ` · ${info.branch_name} branch` : ''} — set your
+                  {info.position}{info.branch_name ? ` · ${/\bbranch\b/i.test(info.branch_name) ? info.branch_name : `${info.branch_name} branch`}` : ''} — set your
                   password and upload your documents to activate your account.
                 </p>
               </div>

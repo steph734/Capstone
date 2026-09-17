@@ -20,6 +20,24 @@ export async function apiPost(path, body) {
   return data
 }
 
+export async function apiPatch(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `PATCH ${path} failed: ${res.status}`)
+  return data
+}
+
+export async function apiDelete(path) {
+  const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `DELETE ${path} failed: ${res.status}`)
+  return data
+}
+
 // Like apiPost, but for multipart/form-data bodies (file uploads) — the
 // browser sets the multipart boundary itself, so no Content-Type header here.
 export async function apiPostForm(path, formData) {

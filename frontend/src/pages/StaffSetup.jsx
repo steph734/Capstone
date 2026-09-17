@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import { apiGet, apiPostForm } from '../utils/api'
-import './ForgotPassword.css'
+import './Splash.css'
 import './ResetPassword.css'
 import './StaffSetup.css'
 
@@ -56,6 +56,7 @@ export default function StaffSetup() {
         if (cancelled) return
         setInfo(data)
         setStatus('ready')
+        setShowUpload(true)
       })
       .catch((err) => {
         if (cancelled) return
@@ -93,55 +94,42 @@ export default function StaffSetup() {
   }
 
   return (
-    <div className="forgot-page">
-      <div className="forgot-container">
-        <div className="forgot-header">
-          <LogoCircle onClick={() => navigate('/')} size="small" label="Back to home" />
-          <h1 className="forgot-title">Account Setup</h1>
-          <p className="forgot-subtitle">Opening your secure setup form…</p>
-        </div>
-      </div>
+    <div className="splash-container">
+      <LogoCircle onClick={() => navigate('/')} size="large" label="Go to home" />
+      <h1 className="app-title">Therapy Pro</h1>
 
-      <div className="rp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ss-modal-title">
-        <div className="rp-modal ss-modal">
-          {status === 'loading' && <p className="ss-loading">Checking your invite…</p>}
+      {status === 'loading' && <p className="ss-loading">Checking your invite…</p>}
 
-          {status === 'invalid' && (
+      {status === 'invalid' && (
+        <div className="rp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ss-modal-title">
+          <div className="rp-modal ss-modal">
             <div className="ss-invalid">
               <h2 id="ss-modal-title">Link invalid or expired</h2>
               <p>{loadError}</p>
               <button type="button" className="rp-btn primary" onClick={goToLogin}>Go to Sign In</button>
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {status === 'ready' && !done && (
-            <>
-              <div className="rp-modal-header">
-                <h2 id="ss-modal-title">Welcome, {info.name}</h2>
-                <p>
-                  {info.position}{info.branch_name ? ` · ${/\bbranch\b/i.test(info.branch_name) ? info.branch_name : `${info.branch_name} branch`}` : ''} — upload
-                  your documents to activate your account.
-                </p>
-              </div>
+      {status === 'ready' && !done && !showUpload && (
+        <button type="button" className="rp-btn primary" onClick={() => setShowUpload(true)}>
+          Upload Documents
+        </button>
+      )}
 
-              <div className="rp-actions">
-                <button type="button" className="rp-btn primary" onClick={() => setShowUpload(true)}>
-                  Upload Documents
-                </button>
-              </div>
-            </>
-          )}
-
-          {done && (
+      {done && (
+        <div className="rp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ss-done-title">
+          <div className="rp-modal ss-modal">
             <div className="rp-success">
               <div className="rp-success-check"><CheckIcon /></div>
-              <h2>Documents submitted</h2>
+              <h2 id="ss-done-title">Documents submitted</h2>
               <p>Your documents are on file and awaiting the owner's review. You'll be notified once your account is approved.</p>
               <button type="button" className="rp-btn primary" onClick={goToLogin}>Go to Sign In</button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {showUpload && (
         <div className="rp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ss-upload-title" onClick={() => !submitting && setShowUpload(false)}>

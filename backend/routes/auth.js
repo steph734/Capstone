@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const UserOtp = require('../models/UserOtp');
+const Employee = require('../models/Employee');
 const {
   OTP_TTL_MS,
   OTP_MAX_ATTEMPTS,
@@ -254,6 +255,18 @@ router.post('/login', async (req, res) => {
         requiresVerification: true,
         email: user.email,
       });
+    }
+
+    // A therapist invited via Add Staff isn't a real login until the owner
+    // approves their reviewed documents — even if they somehow got a
+    // password set (e.g. via password reset), block sign-in until then.
+    if (user.role === 'Therapist') {
+      const employee = await Employee.findOne({ user_id: user._id }).select('approved_at').lean();
+      if (!employee || !employee.approved_at) {
+        return res.status(403).json({
+          error: "Your account is still awaiting the owner's approval. You'll be notified once it's active.",
+        });
+      }
     }
 
     user.failed_login_attempts = 0;

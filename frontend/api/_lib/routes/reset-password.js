@@ -32,6 +32,20 @@ export default async function handler(req, res) {
   let mongoUpdated = false
   try {
     const db = await getDb()
+
+    // A therapist invited via Add Staff shouldn't gain real login credentials
+    // by resetting their password before the owner has approved their
+    // reviewed documents — otherwise this flow would be a backdoor around
+    // that approval gate.
+    if (check.role === 'Therapist') {
+      const employee = await db.collection('employees').findOne({ email: check.email })
+      if (!employee || !employee.approved_at) {
+        return res.status(403).json({
+          error: "Your account is still awaiting the owner's approval. You'll be notified once it's active.",
+        })
+      }
+    }
+
     const password_hash = await bcrypt.hash(String(password), 10)
     const result = await db.collection('users').updateOne(
       { email: check.email },

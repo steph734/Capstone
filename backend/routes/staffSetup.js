@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
@@ -51,8 +50,9 @@ router.get('/:token', async (req, res) => {
   }
 });
 
-// POST /api/staff-setup/:token/complete -> sets the password, stores the 4
-// uploaded documents in GridFS, and activates the account.
+// POST /api/staff-setup/:token/complete -> stores the 4 uploaded documents in
+// GridFS and marks the account verified (the hire sets a real password later
+// via the normal "Forgot Password" flow — this step is documents-only).
 router.post(
   '/:token/complete',
   upload.fields(DOC_KEYS.map((key) => ({ name: key, maxCount: 1 }))),
@@ -61,11 +61,6 @@ router.post(
       const employee = await findByToken(req.params.token);
       if (!employee) {
         return res.status(410).json({ error: 'This setup link is invalid or has expired.' });
-      }
-
-      const password = String(req.body?.password || '');
-      if (password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters.' });
       }
 
       // multer's fileFilter silently drops any file with a disallowed mimetype,
@@ -94,10 +89,9 @@ router.post(
         documents[key] = fileId.toString();
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
       await User.updateOne(
         { _id: employee.user_id },
-        { $set: { password: passwordHash, is_verified: true } }
+        { $set: { is_verified: true } }
       );
 
       employee.documents = { ...(employee.documents || {}), ...documents };

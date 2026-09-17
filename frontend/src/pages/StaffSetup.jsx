@@ -13,15 +13,6 @@ const DOC_FIELDS = [
   { key: 'id', label: 'Valid ID' },
 ]
 
-function LockIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <rect x="3" y="11" width="18" height="11" rx="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  )
-}
-
 function CheckIcon() {
   return (
     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -47,9 +38,6 @@ export default function StaffSetup() {
   const [info, setInfo] = useState(null)
   const [loadError, setLoadError] = useState('')
 
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [files, setFiles] = useState({ ptr: null, prc: null, diploma: null, id: null })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -84,14 +72,6 @@ export default function StaffSetup() {
     e.preventDefault()
     setError('')
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match.')
-      return
-    }
     if (!allFilesChosen) {
       setError('Please upload all 4 documents.')
       return
@@ -100,7 +80,6 @@ export default function StaffSetup() {
     setSubmitting(true)
     try {
       const formData = new FormData()
-      formData.append('password', password)
       DOC_FIELDS.forEach((f) => formData.append(f.key, files[f.key]))
       await apiPostForm(`/api/staff-setup/${token}/complete`, formData)
       setDone(true)
@@ -138,45 +117,12 @@ export default function StaffSetup() {
               <div className="rp-modal-header">
                 <h2 id="ss-modal-title">Welcome, {info.name}</h2>
                 <p>
-                  {info.position}{info.branch_name ? ` · ${/\bbranch\b/i.test(info.branch_name) ? info.branch_name : `${info.branch_name} branch`}` : ''} — set your
-                  password and upload your documents to activate your account.
+                  {info.position}{info.branch_name ? ` · ${/\bbranch\b/i.test(info.branch_name) ? info.branch_name : `${info.branch_name} branch`}` : ''} — upload
+                  your documents to activate your account.
                 </p>
               </div>
 
               <form className="rp-form" onSubmit={handleSubmit}>
-                <div className="rp-field">
-                  <label htmlFor="ss-password">New Password</label>
-                  <div className="rp-input-wrapper">
-                    <span className="rp-input-icon"><LockIcon /></span>
-                    <input
-                      id="ss-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="At least 8 characters"
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <button type="button" className="rp-toggle" onClick={() => setShowPassword((v) => !v)}>
-                      {showPassword ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rp-field">
-                  <label htmlFor="ss-confirm">Confirm Password</label>
-                  <div className="rp-input-wrapper">
-                    <span className="rp-input-icon"><LockIcon /></span>
-                    <input
-                      id="ss-confirm"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Re-enter your new password"
-                      autoComplete="new-password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                    />
-                  </div>
-                </div>
-
                 <div className="ss-docs">
                   <p className="ss-docs-title">Upload your documents</p>
                   {DOC_FIELDS.map((f) => (
@@ -213,8 +159,8 @@ export default function StaffSetup() {
           {done && (
             <div className="rp-success">
               <div className="rp-success-check"><CheckIcon /></div>
-              <h2>Account activated</h2>
-              <p>Your password is set and your documents are on file. You can now sign in.</p>
+              <h2>Documents submitted</h2>
+              <p>Your documents are on file and awaiting the owner's review. You'll be notified once your account is approved.</p>
               <button type="button" className="rp-btn primary" onClick={goToLogin}>Go to Sign In</button>
             </div>
           )}

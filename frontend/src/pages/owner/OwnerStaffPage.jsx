@@ -111,6 +111,15 @@ function initialsFromName(name) {
   )
 }
 
+// Client-side stand-in for demo applicants that have no real backend account
+// to generate a password for — real hires get theirs from the approve API.
+function randomTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  let out = ''
+  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  return out
+}
+
 const DOC_LABELS = [
   { key: 'ptr', label: 'PTR license' },
   { key: 'prc', label: 'PRC license' },
@@ -273,6 +282,22 @@ function ShieldIcon() {
     </svg>
   )
 }
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+function WarningIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  )
+}
 function DocLicenseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -398,9 +423,33 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
   const [collapsed, setCollapsed] = useState(false)
   const [reviewingId, setReviewingId] = useState(null)
   const [viewingApplicantId, setViewingApplicantId] = useState(null)
+  const [confirmTarget, setConfirmTarget] = useState(null)
+  const [confirmApprove, setConfirmApprove] = useState(null)
+  const [approving, setApproving] = useState(false)
+  const [hiredResult, setHiredResult] = useState(null)
   if (applicants.length === 0) return null
   const reviewing = applicants.find((a) => a.id === reviewingId)
   const viewingApplicant = applicants.find((a) => a.id === viewingApplicantId)
+
+  const confirmReject = () => {
+    onReject(confirmTarget)
+    setConfirmTarget(null)
+    setViewingApplicantId(null)
+    setReviewingId(null)
+  }
+
+  const runApprove = async () => {
+    const applicant = confirmApprove
+    setApproving(true)
+    const result = await onApprove(applicant)
+    setApproving(false)
+    setConfirmApprove(null)
+    setViewingApplicantId(null)
+    setReviewingId(null)
+    if (result) {
+      setHiredResult({ name: applicant.name, email: applicant.email, tempPassword: result.tempPassword })
+    }
+  }
 
   return (
     <div className="os-ap-panel">
@@ -480,8 +529,8 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
 
               <div className="os-ap-detail-actions">
                 <button type="button" className="os-ap-view-btn" onClick={() => setViewingApplicantId(reviewing.id)}>View full application</button>
-                <button type="button" className="os-ap-reject" onClick={() => { onReject(reviewing); setReviewingId(null) }}>Reject</button>
-                <button type="button" className="os-ap-approve" onClick={() => { onApprove(reviewing); setReviewingId(null) }}>Approve and hire</button>
+                <button type="button" className="os-ap-reject" onClick={() => setConfirmTarget(reviewing)}>Reject</button>
+                <button type="button" className="os-ap-approve" onClick={() => setConfirmApprove(reviewing)}>Approve and hire</button>
               </div>
             </div>
           )}
@@ -492,10 +541,122 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
         <ApplicantModal
           applicant={viewingApplicant}
           onClose={() => setViewingApplicantId(null)}
-          onApprove={(a) => { onApprove(a); setViewingApplicantId(null); setReviewingId(null) }}
-          onReject={(a) => { onReject(a); setViewingApplicantId(null); setReviewingId(null) }}
+          onApprove={(a) => setConfirmApprove(a)}
+          onReject={(a) => setConfirmTarget(a)}
         />
       )}
+
+      {confirmTarget && (
+        <div className="os-modal-backdrop" onClick={() => setConfirmTarget(null)}>
+          <div className="os-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="os-modal-header">
+              <div>
+                <h3>Reject application?</h3>
+                <p>
+                  This removes <strong>{confirmTarget.name}</strong>'s application and account. This can't be undone.
+                </p>
+              </div>
+              <button className="os-modal-close" onClick={() => setConfirmTarget(null)} aria-label="Close">✕</button>
+            </div>
+            <div className="os-modal-footer">
+              <button className="os-btn-cancel" onClick={() => setConfirmTarget(null)}>Cancel</button>
+              <button className="os-ap-reject" onClick={confirmReject}>Reject</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmApprove && (
+        <div className="os-modal-backdrop" onClick={() => (approving ? null : setConfirmApprove(null))}>
+          <div className="os-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="os-modal-body" style={{ paddingTop: 24 }}>
+              <div className="os-hire-modal-top">
+                <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
+                <button
+                  className="os-modal-close"
+                  onClick={() => setConfirmApprove(null)}
+                  disabled={approving}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <h3 className="os-hire-title">Approve and hire this applicant?</h3>
+              <p className="os-hire-desc">This creates a staff account for them and generates a temporary login password.</p>
+              <div className="os-hire-card">
+                <div className="os-ap-detail-avatar">{confirmApprove.initials}</div>
+                <div>
+                  <div className="os-hire-card-name">{confirmApprove.name}</div>
+                  <div className="os-hire-card-sub">{confirmApprove.appliedFor} · {branchLabel(confirmApprove.branch)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="os-modal-footer">
+              <button className="os-btn-cancel" onClick={() => setConfirmApprove(null)} disabled={approving}>Cancel</button>
+              <button className="os-ap-approve" onClick={runApprove} disabled={approving}>
+                {approving ? 'Generating…' : 'Confirm & generate password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hiredResult && (
+        <HiredResultModal hired={hiredResult} onClose={() => setHiredResult(null)} />
+      )}
+    </div>
+  )
+}
+
+/* ── "Employee is now hired" credentials modal ─────────────── */
+function HiredResultModal({ hired, onClose }) {
+  const [copied, setCopied] = useState('')
+
+  const copy = async (label, value) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(label)
+      setTimeout(() => setCopied(''), 1500)
+    } catch {
+      // Clipboard access can be blocked (e.g. no HTTPS, permissions) — the
+      // password stays visible on screen either way, so this is non-fatal.
+    }
+  }
+
+  return (
+    <div className="os-modal-backdrop" onClick={onClose}>
+      <div className="os-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="os-modal-body" style={{ paddingTop: 24 }}>
+          <div className="os-hire-modal-top">
+            <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
+            <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          </div>
+          <h3 className="os-hire-title">{hired.name} is now hired</h3>
+          <p className="os-hire-desc">Their staff account has been created. Share this password with them securely.</p>
+
+          <div className="os-hire-info-label">Login email</div>
+          <div className="os-hire-info-box">{hired.email}</div>
+
+          <div className="os-hire-info-label">Temporary password</div>
+          <div className="os-hire-info-box os-hire-password-row">
+            <span>{hired.tempPassword}</span>
+            <button type="button" className="os-hire-copy-btn" onClick={() => copy('password', hired.tempPassword)}>
+              <CopyIcon /> {copied === 'password' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+
+          <div className="os-hire-warning">
+            <WarningIcon />
+            <p>Shown once — it can't be retrieved later. The employee will be required to reset it on first login.</p>
+          </div>
+        </div>
+        <div className="os-modal-footer">
+          <button className="os-btn-cancel" onClick={() => copy('password', hired.tempPassword)}>
+            {copied === 'password' ? 'Copied' : 'Copy password'}
+          </button>
+          <button className="os-btn-dark" onClick={onClose}>Done</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1641,11 +1802,12 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     // documents by the time they reach "For Review" — persist the owner's
     // approval so they stick in the Employees table across page reloads.
     if (applicant.mongoEmployeeId) {
+      let data
       try {
-        await apiPatch(`/api/employees/${applicant.mongoEmployeeId}/approve`)
+        data = await apiPatch(`/api/employees/${applicant.mongoEmployeeId}/approve`)
       } catch (err) {
         window.alert(err.message || 'Could not approve this employee. Please try again.')
-        return
+        return null
       }
       setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
       setStaff((prev) => [
@@ -1665,9 +1827,12 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         ...prev,
       ])
       logStaff('✅', `Approved and hired ${applicant.name} as ${applicant.appliedFor} (${branchLabel(applicant.branch)})`, applicant.mongoEmployeeId)
-      return
+      return { tempPassword: data.tempPassword }
     }
 
+    // Demo applicants (no backend record) have no real account to generate a
+    // password for — fake one client-side so the confirmation UI still has
+    // something to show, but skip the (nonexistent) hire email.
     setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
     const seed = Math.floor(Math.random() * 70) + 1
     const newId = Date.now()
@@ -1683,6 +1848,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       ...prev,
     ])
     logStaff('✅', `Approved and hired ${applicant.name} as ${applicant.appliedFor} (${branchLabel(applicant.branch)})`, newId)
+    return { tempPassword: randomTempPassword() }
   }
 
   const handleRejectApplicant = async (applicant) => {

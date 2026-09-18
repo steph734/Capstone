@@ -6,7 +6,7 @@ const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
-const { sendApplicationReceivedEmail } = require('../utils/employeeEmails');
+const { sendApplicationReceivedEmail, sendHiredEmail } = require('../utils/employeeEmails');
 
 const router = express.Router();
 
@@ -274,15 +274,34 @@ router.patch('/:id/approve', async (req, res) => {
     return res.status(400).json({ error: 'Invalid employee id.' });
   }
   try {
-    const employee = await Employee.findById(id).populate('user_id', 'is_verified');
+    const employee = await Employee.findById(id).populate('user_id', 'is_verified email full_name');
     if (!employee) return res.status(404).json({ error: 'Employee not found.' });
     if (!employee.user_id?.is_verified) {
       return res.status(400).json({ error: 'This hire has not finished uploading their documents yet.' });
     }
+
+    // Generate the real login password only now — the placeholder hash set
+    // at creation was never meant to be handed out (see POST '/' above).
+    // Only this plaintext copy exists, and only for this one response.
+    const tempPassword = crypto.randomBytes(9).toString('base64url');
+    const password_hash = await bcrypt.hash(tempPassword, 10);
+    await User.updateOne(
+      { _id: employee.user_id._id },
+      { $set: { password: password_hash, password_change_at: null } }
+    );
+
     employee.approved_at = new Date();
     if (employee.status === 'for_review') employee.status = 'active';
     await employee.save();
-    return res.json({ success: true, employee });
+
+    const name = employee.user_id.full_name || `${employee.first_name} ${employee.last_name}`.trim();
+    try {
+      await sendHiredEmail({ email: employee.user_id.email, name, tempPassword });
+    } catch (err) {
+      console.error('send hired email error:', err);
+    }
+
+    return res.json({ success: true, employee, tempPassword });
   } catch (err) {
     console.error('approve employee error:', err);
     return res.status(500).json({ error: 'Could not approve this employee.' });

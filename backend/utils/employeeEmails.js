@@ -52,4 +52,85 @@ async function sendApplicationReceivedEmail({ email, name }) {
   });
 }
 
-module.exports = { sendApplicationReceivedEmail };
+function loginUrl() {
+  const base = (process.env.PUBLIC_APP_URL || '').trim().replace(/\/$/, '');
+  return `${base || 'https://therapypro.app'}/login`;
+}
+
+function buildHiredHtml({ name, email, tempPassword }) {
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">You're hired!</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+
+        <p style="margin:0 0 16px;font-size:14px;">
+          Congratulations — your application to join ${BRAND} has been approved. Here are your login
+          details:
+        </p>
+
+        <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+          <tr>
+            <td style="padding:10px 14px;background:#f0fbf5;border:1px solid #c8eeda;border-radius:10px 10px 0 0;font-size:12px;color:#6b7c75;">Login email</td>
+          </tr>
+          <tr>
+            <td style="padding:0 14px 10px;background:#f0fbf5;border-left:1px solid #c8eeda;border-right:1px solid #c8eeda;font-size:15px;font-weight:700;color:#1a2e26;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px 0;background:#f0fbf5;border-left:1px solid #c8eeda;border-right:1px solid #c8eeda;font-size:12px;color:#6b7c75;">Temporary password</td>
+          </tr>
+          <tr>
+            <td style="padding:0 14px 14px;background:#f0fbf5;border:1px solid #c8eeda;border-top:none;border-radius:0 0 10px 10px;font-size:15px;font-weight:700;letter-spacing:1px;color:#1a2e26;">${tempPassword}</td>
+          </tr>
+        </table>
+
+        <p style="margin:0 0 20px;text-align:center;">
+          <a href="${loginUrl()}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;
+            font-weight:700;font-size:14px;padding:12px 24px;border-radius:10px;">
+            Log in to ${BRAND}
+          </a>
+        </p>
+
+        <p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:#4a6b5d;">
+          For your security, please log in with this temporary password and set your own password
+          right away from your account Settings.
+        </p>
+
+        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
+          If you weren't expecting this email, please contact your branch owner.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildHiredText({ name, email, tempPassword }) {
+  return [
+    name ? `Hi ${name},` : 'Hi,',
+    '',
+    `Congratulations — your application to join ${BRAND} has been approved.`,
+    '',
+    `Login email: ${email}`,
+    `Temporary password: ${tempPassword}`,
+    '',
+    `Log in at: ${loginUrl()}`,
+    '',
+    'For your security, please log in with this temporary password and set your own password right away from your account Settings.',
+  ].join('\n');
+}
+
+async function sendHiredEmail({ email, name, tempPassword }) {
+  return sendEmail({
+    to: email,
+    toName: name || undefined,
+    subject: `You're hired at ${BRAND} — your login details`,
+    html: buildHiredHtml({ name, email, tempPassword }),
+    plain: buildHiredText({ name, email, tempPassword }),
+  });
+}
+
+module.exports = { sendApplicationReceivedEmail, sendHiredEmail };

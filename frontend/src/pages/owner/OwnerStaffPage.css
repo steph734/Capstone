@@ -763,17 +763,16 @@
 }
 .os-btn-dark:hover { background: #1f2937; }
 
-/* ── Reject application modal (dark, deliberately distinct from the
-   rest of this light-themed page — a destructive, irreversible action) ── */
+/* ── Reject application modal ──────────────────────────────── */
 .os-reject-modal {
   width: 100%;
   max-width: 480px;
-  background: #18181b;
-  border-radius: 16px;
+  background: #fff;
+  border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
   animation: os-modal-in 0.2s ease;
-  color: #f4f4f5;
+  color: #2c4a3e;
 }
 
 .os-reject-top {
@@ -786,9 +785,9 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(220, 38, 38, 0.15);
-  border: 1px solid rgba(220, 38, 38, 0.4);
-  color: #f87171;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -801,7 +800,7 @@
   border: none;
   border-radius: 8px;
   background: none;
-  color: #9ca3af;
+  color: #9aab9f;
   font-size: 15px;
   cursor: pointer;
   display: flex;
@@ -809,39 +808,39 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.os-reject-close:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.os-reject-close:hover { background: #f1f5f3; color: #2c4a3e; }
 
 .os-reject-title {
   margin: 16px 0 14px;
   font-size: 18px;
   font-weight: 800;
-  color: #fff;
+  color: #1a2e26;
 }
 
 .os-reject-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f7f8f5;
+  border: 1px solid #ececE6;
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 16px;
 }
 
-.os-reject-card-name { font-size: 14px; font-weight: 700; color: #fff; }
-.os-reject-card-sub { font-size: 12px; color: #a1a1aa; margin-top: 2px; }
+.os-reject-card-name { font-size: 14px; font-weight: 700; color: #1a2e26; }
+.os-reject-card-sub { font-size: 12px; color: #6b7c75; margin-top: 2px; }
 
 .os-reject-field { margin-bottom: 14px; }
 .os-reject-field label {
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #e4e4e7;
+  color: #3d5a50;
   margin-bottom: 6px;
 }
-.os-reject-req { color: #f87171; }
-.os-reject-optional { color: #71717a; font-weight: 500; }
+.os-reject-req { color: #dc2626; }
+.os-reject-optional { color: #9aab9f; font-weight: 500; }
 
 .os-reject-select,
 .os-reject-textarea {
@@ -849,30 +848,30 @@
   box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f4f4f5;
+  border: 1px solid #e0e8e3;
+  background: #fff;
+  color: #2c4a3e;
   font-family: inherit;
   font-size: 13px;
   outline: none;
 }
 .os-reject-select:focus,
-.os-reject-textarea:focus { border-color: rgba(220, 38, 38, 0.5); }
+.os-reject-textarea:focus { border-color: #dc2626; }
 .os-reject-textarea { resize: vertical; min-height: 64px; }
-.os-reject-textarea::placeholder { color: #71717a; }
+.os-reject-textarea::placeholder { color: #9aab9f; }
 
 .os-reject-warning {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(220, 38, 38, 0.14);
-  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 16px;
-  color: #fca5a5;
+  color: #b91c1c;
 }
-.os-reject-warning svg { flex-shrink: 0; margin-top: 1px; color: #f87171; }
+.os-reject-warning svg { flex-shrink: 0; margin-top: 1px; color: #dc2626; }
 .os-reject-warning p { margin: 0; font-size: 13px; line-height: 1.5; }
 
 .os-reject-checkbox {
@@ -880,7 +879,7 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: #d4d4d8;
+  color: #3d5a50;
   margin-bottom: 20px;
   cursor: pointer;
 }
@@ -895,15 +894,15 @@
 .os-reject-cancel {
   padding: 10px 18px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: transparent;
-  color: #e4e4e7;
+  border: 1px solid #e0e8e3;
+  background: #fff;
+  color: #3d5a50;
   font-family: inherit;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
-.os-reject-cancel:hover { background: rgba(255, 255, 255, 0.06); }
+.os-reject-cancel:hover { background: #f8fbf9; }
 
 .os-reject-confirm {
   padding: 10px 18px;
@@ -918,7 +917,7 @@
   transition: background 0.2s, opacity 0.2s;
 }
 .os-reject-confirm:hover { background: #b91c1c; }
-.os-reject-confirm:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
+.os-reject-confirm:disabled { background: #fca5a5; color: #fff; cursor: not-allowed; }
 
 .os-ap-modal-avatar {
   width: 84px;

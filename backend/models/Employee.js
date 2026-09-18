@@ -40,6 +40,8 @@ const employeeSchema = new mongoose.Schema(
       diploma: { type: String },
       id: { type: String },
     },
+    // GridFS file id (staff_documents bucket) for the profile photo — optional.
+    photo: { type: String },
 
     // Set when the owner sends the setup invite; cleared once the hire
     // finishes self-setup (single-use). Never returned by default queries.

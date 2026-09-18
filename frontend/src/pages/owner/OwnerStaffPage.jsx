@@ -250,6 +250,21 @@ function ChevronIcon({ up }) {
     </svg>
   )
 }
+function CameraIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .86.4L17 6h1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  )
+}
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
 function ShieldIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -949,7 +964,7 @@ function ExpiryDatePicker({ value, onChange }) {
   )
 }
 
-function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
+function AddStaffModal({ onClose, onAdd, onSuccess, staffCount = 0 }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
     name: '', email: '', phoneCode: '+63', phone: '',
@@ -965,9 +980,19 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   const [branchId, setBranchId] = useState('')
   const [branchesLoading, setBranchesLoading] = useState(true)
   const [files, setFiles] = useState({ ptr: null, prc: null, diploma: null, id: null })
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+
+  // Local object URL for the profile photo preview — revoke the previous one
+  // whenever it changes (or the modal unmounts) so it doesn't leak.
+  useEffect(() => {
+    if (!photo) { setPhotoPreview(''); return }
+    const url = URL.createObjectURL(photo)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
 
   useEffect(() => {
     let cancelled = false
@@ -989,6 +1014,16 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const setFile = (key, file) => setFiles((f) => ({ ...f, [key]: file }))
   const allFilesChosen = DOC_FIELDS.every((d) => files[d.key])
+
+  const handlePhotoChange = (file) => {
+    if (!file) { setPhoto(null); return }
+    if (file.size > 2 * 1024 * 1024) {
+      setSubmitError('Profile photo must be 2MB or smaller.')
+      return
+    }
+    setSubmitError('')
+    setPhoto(file)
+  }
 
   const selectBranch = (id) => {
     setBranchId(id)
@@ -1044,6 +1079,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
       }
       Object.entries(fields).forEach(([key, val]) => formData.append(key, val ?? ''))
       DOC_FIELDS.forEach((d) => formData.append(d.key, files[d.key]))
+      if (photo) formData.append('photo', photo)
 
       const data = await apiPostForm('/api/employees', formData)
 
@@ -1070,7 +1106,8 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
         accountStatus: 'pending',
         documents: data.employee?.documents || {},
       })
-      setSubmitted(true)
+      onSuccess({ name: form.name.trim(), email: form.email.trim() })
+      onClose()
     } catch (err) {
       setSubmitError(err.message || 'Could not save this staff member.')
     } finally {
@@ -1092,24 +1129,49 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
           <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        {!submitted && (
-          <div className="os-wizard-steps">
-            {WIZARD_STEPS.map((label, i) => (
-              <Fragment key={label}>
-                {i > 0 && <div className={`os-wizard-connector ${i <= step ? 'done' : ''}`} />}
-                <div className={`os-wizard-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-                  <span className="os-wizard-step-num">{i < step ? '✓' : i + 1}</span>
-                  <span className="os-wizard-step-label">{label}</span>
-                </div>
-              </Fragment>
-            ))}
-          </div>
-        )}
+        <div className="os-wizard-steps">
+          {WIZARD_STEPS.map((label, i) => (
+            <Fragment key={label}>
+              {i > 0 && <div className={`os-wizard-connector ${i <= step ? 'done' : ''}`} />}
+              <div className={`os-wizard-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
+                <span className="os-wizard-step-num">{i < step ? '✓' : i + 1}</span>
+                <span className="os-wizard-step-label">{label}</span>
+              </div>
+            </Fragment>
+          ))}
+        </div>
 
         <div className="os-modal-body">
-          {!submitted && step === 0 && (
+          {step === 0 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Personal Information</h4>
+              <div className="os-photo-upload">
+                <div className="os-photo-circle">
+                  {photoPreview
+                    ? <img src={photoPreview} alt="Profile preview" className="os-photo-preview" />
+                    : <div className="os-photo-placeholder"><CameraIcon /></div>}
+                  <label className="os-photo-add" aria-label="Upload photo">
+                    <PlusIcon />
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      hidden
+                      onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+                <label className="os-photo-upload-btn">
+                  Upload photo
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    hidden
+                    onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <p className="os-photo-hint">JPG or PNG, max 2MB</p>
+                {submitError && <p className="os-form-error">{submitError}</p>}
+              </div>
               <div className="os-form-group">
                 <label>Full Name <span className="os-req">*</span></label>
                 <input placeholder="Enter full name" value={form.name} onChange={(e) => set('name', e.target.value)} />
@@ -1164,7 +1226,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
             </div>
           )}
 
-          {!submitted && step === 1 && (
+          {step === 1 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Professional Information</h4>
               <div className="os-form-group">
@@ -1217,7 +1279,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
             </div>
           )}
 
-          {!submitted && step === 2 && (
+          {step === 2 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Upload Documents</h4>
               <p className="os-wizard-hint">Upload {form.name || 'the new hire'}'s PTR, PRC license, diploma, and a valid ID. PDF, JPG, or PNG — up to 5MB each.</p>
@@ -1242,7 +1304,7 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
             </div>
           )}
 
-          {!submitted && step === 3 && (
+          {step === 3 && (
             <div className="os-wizard-single">
               <h4 className="os-wizard-section">Review &amp; Add</h4>
               <div className="os-detail-grid">
@@ -1261,39 +1323,51 @@ function AddStaffModal({ onClose, onAdd, staffCount = 0 }) {
               {submitError && <p className="os-form-error">{submitError}</p>}
             </div>
           )}
-
-          {submitted && (
-            <div className="os-wizard-single os-wizard-success">
-              <div className="os-success-check"><CheckCircleIcon /></div>
-              <h4 className="os-wizard-section">Staff added</h4>
-              <p>
-                <strong>{form.name}</strong>'s details and documents have been saved.
-              </p>
-              <p>
-                They now appear under <strong>For Review</strong> — check their documents there and approve to add
-                {form.name ? ` ${form.name.split(' ')[0]}` : ' them'} to your Employees list.
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="os-modal-footer os-wizard-footer">
-          {submitted ? (
-            <button className="os-btn-save" onClick={onClose}>Done</button>
-          ) : (
-            <>
-              <button className="os-btn-cancel" onClick={step === 0 ? onClose : back} disabled={submitting}>
-                {step === 0 ? 'Cancel' : 'Back'}
-              </button>
-              <button
-                className="os-btn-save"
-                disabled={!stepValid[step] || submitting}
-                onClick={() => (step === WIZARD_STEPS.length - 1 ? submit() : next())}
-              >
-                {nextLabel}
-              </button>
-            </>
-          )}
+          <button className="os-btn-cancel" onClick={step === 0 ? onClose : back} disabled={submitting}>
+            {step === 0 ? 'Cancel' : 'Back'}
+          </button>
+          <button
+            className="os-btn-save"
+            disabled={!stepValid[step] || submitting}
+            onClick={() => (step === WIZARD_STEPS.length - 1 ? submit() : next())}
+          >
+            {nextLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Add Staff Success Modal ───────────────────────────────── */
+// Shown on its own, after the wizard modal has closed, so the confirmation
+// reads as a distinct step rather than another page of the same form.
+function AddStaffSuccessModal({ name, email, onClose }) {
+  return (
+    <div className="os-modal-backdrop" onClick={onClose}>
+      <div className="os-modal os-modal-success" onClick={(e) => e.stopPropagation()}>
+        <div className="os-modal-body">
+          <div className="os-wizard-single os-wizard-success">
+            <div className="os-success-check"><CheckCircleIcon /></div>
+            <h4 className="os-wizard-section">Staff added</h4>
+            <p>
+              <strong>{name}</strong>'s details and documents have been saved.
+            </p>
+            <p>
+              They now appear under <strong>For Review</strong> — check their documents there and approve to add
+              {name ? ` ${name.split(' ')[0]}` : ' them'} to your Employees list.
+            </p>
+            <p>
+              An email has been sent to <strong>{email}</strong> letting them know their application is being
+              processed and will be reviewed within 2–3 working days.
+            </p>
+          </div>
+        </div>
+        <div className="os-modal-footer os-wizard-footer" style={{ justifyContent: 'flex-end' }}>
+          <button className="os-btn-save" onClick={onClose}>Done</button>
         </div>
       </div>
     </div>
@@ -1321,7 +1395,9 @@ function mapEmployeeDoc(emp) {
     status: REVERSE_EMPLOYEE_STATUS[emp.status] || 'On Duty',
     archived: emp.status === 'terminated',
     caseload: 0,
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=${(seed % 2 ? '159a72' : '3b82f6')}&color=fff`,
+    avatar: emp.photo
+      ? `${API_BASE}/api/employees/${emp._id}/photo`
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=${(seed % 2 ? '159a72' : '3b82f6')}&color=fff`,
     joined: emp.hired_at ? new Date(emp.hired_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—',
     attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
     phone: emp.phone?.number ? `${emp.phone.country_code || ''} ${emp.phone.number}`.trim() : '',
@@ -1396,6 +1472,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [toneFilter, setToneFilter] = useState('All')
   const [showAdd, setShowAdd] = useState(false)
+  const [addSuccess, setAddSuccess] = useState(null)
   const [viewing, setViewing] = useState(null)
   const [editing, setEditing] = useState(null)
   const [page, setPage] = useState(1)
@@ -1901,7 +1978,21 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         </div>
       )}
 
-      {showAdd && <AddStaffModal onClose={() => setShowAdd(false)} onAdd={handleAdd} staffCount={staff.length} />}
+      {showAdd && (
+        <AddStaffModal
+          onClose={() => setShowAdd(false)}
+          onAdd={handleAdd}
+          onSuccess={(info) => setAddSuccess(info)}
+          staffCount={staff.length}
+        />
+      )}
+      {addSuccess && (
+        <AddStaffSuccessModal
+          name={addSuccess.name}
+          email={addSuccess.email}
+          onClose={() => setAddSuccess(null)}
+        />
+      )}
       {viewing && <ViewModal staffMember={viewing} onClose={() => setViewing(null)} />}
       {editing && (
         <EditStaffModal staffMember={editing} onClose={() => setEditing(null)} onSave={handleEditSave} />

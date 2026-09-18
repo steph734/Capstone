@@ -6,16 +6,39 @@ const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
+const { sendApplicationReceivedEmail } = require('../utils/employeeEmails');
 
 const router = express.Router();
 
 const DOC_KEYS = ['ptr', 'prc', 'diploma', 'id'];
 const ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']);
+const PHOTO_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
-  fileFilter: (req, file, cb) => cb(null, ALLOWED_MIME.has(file.mimetype)),
+  fileFilter: (req, file, cb) => cb(null, file.fieldname === 'photo' ? PHOTO_MIME.has(file.mimetype) : ALLOWED_MIME.has(file.mimetype)),
 });
+const uploadDocFields = upload.fields([
+  ...DOC_KEYS.map((key) => ({ name: key, maxCount: 1 })),
+  { name: 'photo', maxCount: 1 },
+]);
+
+// multer's own errors (e.g. a file over the 5MB limit) surface through this
+// middleware's callback, not a thrown exception — they never reach the route
+// handler's try/catch below, so without this they'd fall through to
+// Express's default handler as a bare, unhelpful 500.
+function uploadDocs(req, res, next) {
+  uploadDocFields(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'One of your files is too large (max 5MB each).'
+        : `Upload error: ${err.message}`;
+      return res.status(400).json({ error: message });
+    }
+    if (err) return res.status(400).json({ error: 'Could not process the uploaded files.' });
+    next();
+  });
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GENDER_MAP = { Male: 'male', Female: 'female', 'Prefer not to say': 'prefer_not_to_say' };
@@ -65,7 +88,7 @@ router.get('/', async (req, res) => {
 // insert fails, so a bad request never leaves an orphaned account behind.
 router.post(
   '/',
-  upload.fields(DOC_KEYS.map((key) => ({ name: key, maxCount: 1 }))),
+  uploadDocs,
   async (req, res) => {
   try {
     const body = req.body || {};
@@ -188,6 +211,22 @@ router.post(
         documents[key] = fileId.toString();
       }
       employee.documents = documents;
+
+      // Optional — the owner may skip it, unlike the 4 required documents above.
+      const photoFile = files.photo?.[0];
+      if (photoFile) {
+        const photoFileId = new mongoose.Types.ObjectId();
+        await new Promise((resolve, reject) => {
+          const uploadStream = bucket.openUploadStreamWithId(photoFileId, photoFile.originalname, {
+            metadata: { contentType: photoFile.mimetype },
+          });
+          uploadStream.on('error', reject);
+          uploadStream.on('finish', resolve);
+          uploadStream.end(photoFile.buffer);
+        });
+        employee.photo = photoFileId.toString();
+      }
+
       await employee.save();
     } catch (err) {
       await Employee.deleteOne({ _id: employee._id }).catch(() => {});
@@ -201,6 +240,14 @@ router.post(
     // approve route uses, matching what self-setup used to signal.
     await User.updateOne({ _id: user._id }, { $set: { is_verified: true } });
     user.is_verified = true;
+
+    // Best-effort — the employee record is already saved, so a flaky email
+    // provider shouldn't turn a successful hire into a failed request.
+    try {
+      await sendApplicationReceivedEmail({ email, name: fullName });
+    } catch (err) {
+      console.error('send application received email error:', err);
+    }
 
     return res.status(201).json({ success: true, employee, user: user.toSafeJSON() });
   } catch (err) {
@@ -283,6 +330,34 @@ router.get('/:id/documents/:key/file', async (req, res) => {
   } catch (err) {
     console.error('stream employee document error:', err);
     res.status(500).json({ error: 'Could not load the document.' });
+  }
+});
+
+// GET /api/employees/:id/photo -> streams the staff member's profile photo,
+// same GridFS bucket/pattern as the documents route above.
+router.get('/:id/photo', async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ error: 'Invalid employee id.' });
+  }
+
+  try {
+    const employee = await Employee.findById(id).lean();
+    const fileId = employee?.photo;
+    if (!fileId || !mongoose.isValidObjectId(fileId)) {
+      return res.status(404).json({ error: 'No photo uploaded for this employee.' });
+    }
+
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'staff_documents' });
+    const files = await bucket.find({ _id: new mongoose.Types.ObjectId(fileId) }).toArray();
+    const file = files[0];
+    if (!file) return res.status(404).json({ error: 'Photo not found.' });
+
+    res.set('Content-Type', file.metadata?.contentType || file.contentType || 'application/octet-stream');
+    bucket.openDownloadStream(file._id).on('error', () => res.status(404).end()).pipe(res);
+  } catch (err) {
+    console.error('stream employee photo error:', err);
+    res.status(500).json({ error: 'Could not load the photo.' });
   }
 });
 

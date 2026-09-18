@@ -1354,11 +1354,9 @@ function AddStaffSuccessModal({ name, email, onClose }) {
             <div className="os-success-check"><CheckCircleIcon /></div>
             <h4 className="os-wizard-section">Staff added</h4>
             <p>
-              <strong>{name}</strong>'s details and documents have been saved.
-            </p>
-            <p>
-              They now appear under <strong>For Review</strong> — check their documents there and approve to add
-              {name ? ` ${name.split(' ')[0]}` : ' them'} to your Employees list.
+              <strong>{name}</strong>'s details and documents have been saved. They now appear under{' '}
+              <strong>For Review</strong> — mark their documents as complete and set approval to add
+              {name ? ` ${name.split(' ')[0]}` : ' them'} to your TherapyPro list.
             </p>
             <p>
               An email has been sent to <strong>{email}</strong> letting them know their application is being

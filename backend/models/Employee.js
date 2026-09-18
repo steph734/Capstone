@@ -32,7 +32,10 @@ const employeeSchema = new mongoose.Schema(
     experience: { type: Number, min: 0 },
     employment_type: { type: String, enum: ['Full-time', 'Part-time', 'Contract', 'Locum'] },
     license_expiry: { type: Date },
-    status: { type: String, enum: ['active', 'inactive', 'on_leave', 'terminated'], default: 'active' },
+    // 'for_review' is where a hire sits from creation until the owner
+    // approves them (see `approved_at` below) — the approve route flips this
+    // to 'active' once that happens.
+    status: { type: String, enum: ['for_review', 'active', 'inactive', 'on_leave', 'terminated'], default: 'active' },
 
     documents: {
       ptr: { type: String },

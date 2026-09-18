@@ -46,7 +46,6 @@ const GENDER_MAP = { Male: 'male', Female: 'female', 'Prefer not to say': 'prefe
 // values for `employment_type` — must match, not the lowercase-hyphenated
 // style used for `status`/`gender` below.
 const EMPLOYMENT_MAP = { 'Full-time': 'Full-time', 'Part-time': 'Part-time', Contract: 'Contract', Locum: 'Locum' };
-const STATUS_MAP = { 'On Duty': 'active', 'On Leave': 'on_leave' };
 
 // "Jade Ann Dela Cruz Tan" -> { first_name: 'Jade', middle_name: 'Ann Dela Cruz', last_name: 'Tan' }
 function splitName(fullName) {
@@ -147,7 +146,10 @@ router.post(
       position,
       hired_at: hiredAt,
       email,
-      status: STATUS_MAP[body.status] || 'active',
+      // A brand-new hire isn't on duty yet — they sit in "for_review" until
+      // the owner approves them (see PATCH /:id/approve below), so the duty
+      // status the wizard collects (On Duty/On Leave) doesn't apply yet.
+      status: 'for_review',
     };
 
     if (body.phoneCode && body.phone) {
@@ -278,6 +280,7 @@ router.patch('/:id/approve', async (req, res) => {
       return res.status(400).json({ error: 'This hire has not finished uploading their documents yet.' });
     }
     employee.approved_at = new Date();
+    if (employee.status === 'for_review') employee.status = 'active';
     await employee.save();
     return res.json({ success: true, employee });
   } catch (err) {

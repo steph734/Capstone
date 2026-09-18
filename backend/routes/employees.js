@@ -97,9 +97,10 @@ router.post(
     const branchId = String(body.branchId || '').trim();
     const position = String(body.position || body.specialty || '').trim();
     const hiredAt = body.hiredAt ? new Date(body.hiredAt) : null;
+    const employeeId = String(body.employeeId || '').trim();
 
-    if (!fullName || !email || !branchId || !position || !hiredAt || Number.isNaN(hiredAt.getTime())) {
-      return res.status(400).json({ error: 'Name, email, branch, position, and hire date are required.' });
+    if (!fullName || !email || !branchId || !position || !hiredAt || Number.isNaN(hiredAt.getTime()) || !employeeId) {
+      return res.status(400).json({ error: 'Name, email, branch, position, hire date, and employee ID are required.' });
     }
     if (!EMAIL_RE.test(email)) {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
@@ -163,7 +164,7 @@ router.post(
       doc.emergency_phone = `${body.emergencyCode} ${body.emergencyPhone}`;
     }
     if (body.specialty) doc.specialty = String(body.specialty).trim();
-    if (body.employeeId) doc.employee_id = String(body.employeeId).trim();
+    doc.employee_id = employeeId;
     if (body.prcNumber) doc.prc_number = String(body.prcNumber).trim();
     if (body.experience !== undefined && body.experience !== '') {
       const n = Number(body.experience);
@@ -224,7 +225,11 @@ router.post(
           uploadStream.on('finish', resolve);
           uploadStream.end(photoFile.buffer);
         });
-        employee.photo = photoFileId.toString();
+        employee.profile_picture = {
+          storage_key: photoFileId.toString(),
+          url: `/api/employees/${employee._id}/photo`,
+          uploaded_at: new Date(),
+        };
       }
 
       await employee.save();
@@ -343,7 +348,7 @@ router.get('/:id/photo', async (req, res) => {
 
   try {
     const employee = await Employee.findById(id).lean();
-    const fileId = employee?.photo;
+    const fileId = employee?.profile_picture?.storage_key;
     if (!fileId || !mongoose.isValidObjectId(fileId)) {
       return res.status(404).json({ error: 'No photo uploaded for this employee.' });
     }

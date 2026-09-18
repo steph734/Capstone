@@ -40,8 +40,14 @@ const employeeSchema = new mongoose.Schema(
       diploma: { type: String },
       id: { type: String },
     },
-    // GridFS file id (staff_documents bucket) for the profile photo — optional.
-    photo: { type: String },
+    // Profile photo, uploaded during staff onboarding. `storage_key` is the
+    // GridFS file id (staff_documents bucket); `url` is the route that
+    // streams it back.
+    profile_picture: {
+      url: { type: String },
+      storage_key: { type: String },
+      uploaded_at: { type: Date },
+    },
 
     // Set when the owner sends the setup invite; cleared once the hire
     // finishes self-setup (single-use). Never returned by default queries.

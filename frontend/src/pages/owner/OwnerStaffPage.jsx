@@ -1395,7 +1395,7 @@ function mapEmployeeDoc(emp) {
     status: REVERSE_EMPLOYEE_STATUS[emp.status] || 'On Duty',
     archived: emp.status === 'terminated',
     caseload: 0,
-    avatar: emp.photo
+    avatar: emp.profile_picture?.storage_key
       ? `${API_BASE}/api/employees/${emp._id}/photo`
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=${(seed % 2 ? '159a72' : '3b82f6')}&color=fff`,
     joined: emp.hired_at ? new Date(emp.hired_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—',

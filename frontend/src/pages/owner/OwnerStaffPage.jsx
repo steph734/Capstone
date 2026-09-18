@@ -314,6 +314,14 @@ function AlertCircleIcon() {
     </svg>
   )
 }
+function MailIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M2 7l10 7 10-7" />
+    </svg>
+  )
+}
 function DocLicenseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -468,7 +476,14 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
     setViewingApplicantId(null)
     setReviewingId(null)
     if (ok) {
-      setRejectedResult({ name: applicant.name, email: applicant.email })
+      setRejectedResult({
+        name: applicant.name,
+        email: applicant.email,
+        initials: applicant.initials,
+        appliedFor: applicant.appliedFor,
+        branch: applicant.branch,
+        reason: rejectReason,
+      })
     }
   }
 
@@ -675,34 +690,46 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
       )}
 
       {rejectedResult && (
-        <RejectedResultModal
-          name={rejectedResult.name}
-          email={rejectedResult.email}
-          onClose={() => setRejectedResult(null)}
-        />
+        <RejectedResultModal result={rejectedResult} onClose={() => setRejectedResult(null)} />
       )}
     </div>
   )
 }
 
 /* ── "Application rejected" confirmation modal ─────────────── */
-function RejectedResultModal({ name, email, onClose }) {
+function RejectedResultModal({ result, onClose }) {
+  const { name, email, initials, appliedFor, branch, reason } = result
   return (
     <div className="os-modal-backdrop" onClick={onClose}>
       <div className="os-modal" onClick={(e) => e.stopPropagation()}>
         <div className="os-modal-body" style={{ paddingTop: 24 }}>
           <div className="os-hire-modal-top">
-            <div className="os-reject-icon" style={{ margin: 0 }}><CheckCircleIcon /></div>
+            <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
             <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
           <h3 className="os-hire-title">Application rejected</h3>
           <p className="os-hire-desc">
-            <strong>{name}</strong>'s application has been officially rejected and their account removed.
-            {email && <> An email has been sent to <strong>{email}</strong> letting them know.</>}
+            <strong>{name}</strong>'s application has been removed. They're no longer listed under For Review.
           </p>
+
+          <div className="os-reject-result-card">
+            <div className="os-ap-detail-avatar">{initials}</div>
+            <div className="os-reject-result-info">
+              <div className="os-hire-card-name">{name}</div>
+              <div className="os-hire-card-sub">{appliedFor} · {branchLabel(branch)}</div>
+            </div>
+            {reason && <span className="os-reject-reason-pill">{reason}</span>}
+          </div>
+
+          {email && (
+            <div className="os-reject-notified">
+              <MailIcon />
+              <span>Notified at <strong>{email}</strong></span>
+            </div>
+          )}
         </div>
         <div className="os-modal-footer">
-          <button className="os-btn-dark" onClick={onClose}>Done</button>
+          <button className="os-btn-dark os-reject-done" onClick={onClose}>Done</button>
         </div>
       </div>
     </div>

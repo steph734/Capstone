@@ -443,6 +443,8 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
   const [rejectAck, setRejectAck] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectNote, setRejectNote] = useState('')
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectedResult, setRejectedResult] = useState(null)
   const [confirmApprove, setConfirmApprove] = useState(null)
   const [approving, setApproving] = useState(false)
   const [hiredResult, setHiredResult] = useState(null)
@@ -457,11 +459,17 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
     setConfirmTarget(applicant)
   }
 
-  const confirmReject = () => {
-    onReject(confirmTarget, { reason: rejectReason, note: rejectNote.trim() })
+  const confirmReject = async () => {
+    const applicant = confirmTarget
+    setRejecting(true)
+    const ok = await onReject(applicant, { reason: rejectReason, note: rejectNote.trim() })
+    setRejecting(false)
     setConfirmTarget(null)
     setViewingApplicantId(null)
     setReviewingId(null)
+    if (ok) {
+      setRejectedResult({ name: applicant.name, email: applicant.email })
+    }
   }
 
   const runApprove = async () => {
@@ -573,11 +581,11 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
       )}
 
       {confirmTarget && (
-        <div className="os-modal-backdrop" onClick={() => setConfirmTarget(null)}>
+        <div className="os-modal-backdrop" onClick={() => (rejecting ? null : setConfirmTarget(null))}>
           <div className="os-reject-modal" onClick={(e) => e.stopPropagation()}>
             <div className="os-reject-top">
               <div className="os-reject-icon"><AlertCircleIcon /></div>
-              <button className="os-reject-close" onClick={() => setConfirmTarget(null)} aria-label="Close">✕</button>
+              <button className="os-reject-close" onClick={() => setConfirmTarget(null)} disabled={rejecting} aria-label="Close">✕</button>
             </div>
             <h3 className="os-reject-title">Reject this application?</h3>
 
@@ -618,8 +626,10 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
             </label>
 
             <div className="os-reject-footer">
-              <button className="os-reject-cancel" onClick={() => setConfirmTarget(null)}>Cancel</button>
-              <button className="os-reject-confirm" onClick={confirmReject} disabled={!rejectAck || !rejectReason}>Reject application</button>
+              <button className="os-reject-cancel" onClick={() => setConfirmTarget(null)} disabled={rejecting}>Cancel</button>
+              <button className="os-reject-confirm" onClick={confirmReject} disabled={!rejectAck || !rejectReason || rejecting}>
+                {rejecting ? 'Rejecting…' : 'Reject application'}
+              </button>
             </div>
           </div>
         </div>
@@ -663,6 +673,38 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
       {hiredResult && (
         <HiredResultModal hired={hiredResult} onClose={() => setHiredResult(null)} />
       )}
+
+      {rejectedResult && (
+        <RejectedResultModal
+          name={rejectedResult.name}
+          email={rejectedResult.email}
+          onClose={() => setRejectedResult(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ── "Application rejected" confirmation modal ─────────────── */
+function RejectedResultModal({ name, email, onClose }) {
+  return (
+    <div className="os-modal-backdrop" onClick={onClose}>
+      <div className="os-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="os-modal-body" style={{ paddingTop: 24 }}>
+          <div className="os-hire-modal-top">
+            <div className="os-reject-icon" style={{ margin: 0 }}><CheckCircleIcon /></div>
+            <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          </div>
+          <h3 className="os-hire-title">Application rejected</h3>
+          <p className="os-hire-desc">
+            <strong>{name}</strong>'s application has been officially rejected and their account removed.
+            {email && <> An email has been sent to <strong>{email}</strong> letting them know.</>}
+          </p>
+        </div>
+        <div className="os-modal-footer">
+          <button className="os-btn-dark" onClick={onClose}>Done</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1916,7 +1958,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         await apiDelete(`/api/employees/${applicant.mongoEmployeeId}`, { reason, note })
       } catch (err) {
         window.alert(err.message || 'Could not reject this applicant. Please try again.')
-        return
+        return false
       }
     }
     setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
@@ -1931,6 +1973,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       entity: `Applicant ${applicant.id}`,
       status: 'Review',
     })
+    return true
   }
 
   return (

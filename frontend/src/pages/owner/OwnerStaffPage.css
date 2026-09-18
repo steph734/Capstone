@@ -809,6 +809,7 @@
   flex-shrink: 0;
 }
 .os-reject-close:hover { background: #f1f5f3; color: #2c4a3e; }
+.os-reject-close:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .os-reject-title {
   margin: 16px 0 14px;
@@ -883,7 +884,18 @@
   margin-bottom: 20px;
   cursor: pointer;
 }
-.os-reject-checkbox input { width: 16px; height: 16px; accent-color: #dc2626; cursor: pointer; }
+.os-reject-checkbox input {
+  /* index.css sets appearance:none globally on all inputs, which strips a
+     checkbox down to an invisible box — opt this one back into native
+     rendering so accent-color actually shows a checkmark. */
+  appearance: checkbox;
+  -webkit-appearance: checkbox;
+  width: 16px;
+  height: 16px;
+  accent-color: #dc2626;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 .os-reject-footer {
   display: flex;
@@ -903,6 +915,7 @@
   cursor: pointer;
 }
 .os-reject-cancel:hover { background: #f8fbf9; }
+.os-reject-cancel:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .os-reject-confirm {
   padding: 10px 18px;

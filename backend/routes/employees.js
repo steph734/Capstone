@@ -6,7 +6,7 @@ const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
-const { sendApplicationReceivedEmail, sendHiredEmail } = require('../utils/employeeEmails');
+const { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail } = require('../utils/employeeEmails');
 
 const router = express.Router();
 
@@ -319,6 +319,22 @@ router.delete('/:id', async (req, res) => {
   try {
     const employee = await Employee.findById(id);
     if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+    const body = req.body || {};
+    const reason = String(body.reason || '').trim();
+    const note = String(body.note || '').trim();
+    const name = `${employee.first_name} ${employee.last_name}`.trim();
+
+    // Send the notice before deleting — once the records are gone there's
+    // nothing left to read the applicant's email/name from.
+    if (employee.email && reason) {
+      try {
+        await sendRejectedEmail({ email: employee.email, name, reason, note });
+      } catch (err) {
+        console.error('send rejected email error:', err);
+      }
+    }
+
     await Employee.deleteOne({ _id: id });
     await User.deleteOne({ _id: employee.user_id }).catch(() => {});
     return res.json({ success: true });

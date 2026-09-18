@@ -133,4 +133,82 @@ async function sendHiredEmail({ email, name, tempPassword }) {
   });
 }
 
-module.exports = { sendApplicationReceivedEmail, sendHiredEmail };
+// The reason/note come from a free-text owner input, unlike the other emails
+// here — escape before dropping them into HTML.
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildRejectedHtml({ name, reason, note }) {
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">Application update</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+
+        <p style="margin:0 0 16px;font-size:14px;">
+          Thank you for your interest in joining ${BRAND}. After reviewing your application, we've
+          decided not to move forward at this time.
+        </p>
+
+        <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+          <tr>
+            <td style="padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px 10px ${note ? '0 0' : '10px 10px'};font-size:12px;color:#991b1b;">Reason</td>
+          </tr>
+          <tr>
+            <td style="padding:0 14px 14px;background:#fef2f2;border:1px solid #fecaca;border-top:none;border-radius:${note ? '0 0 0 0' : '0 0 10px 10px'};font-size:14px;font-weight:700;color:#7f1d1d;">${escapeHtml(reason)}</td>
+          </tr>
+          ${note ? `
+          <tr>
+            <td style="padding:10px 14px 0;background:#fef2f2;border-left:1px solid #fecaca;border-right:1px solid #fecaca;font-size:12px;color:#991b1b;">Additional details</td>
+          </tr>
+          <tr>
+            <td style="padding:0 14px 14px;background:#fef2f2;border:1px solid #fecaca;border-top:none;border-radius:0 0 10px 10px;font-size:13px;color:#7f1d1d;">${escapeHtml(note)}</td>
+          </tr>` : ''}
+        </table>
+
+        <p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:#4a6b5d;">
+          We appreciate the time you put into your application and encourage you to apply again in
+          the future.
+        </p>
+
+        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
+          If you weren't expecting this email, you can ignore it.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildRejectedText({ name, reason, note }) {
+  return [
+    name ? `Hi ${name},` : 'Hi,',
+    '',
+    `Thank you for your interest in joining ${BRAND}. After reviewing your application, we've decided not to move forward at this time.`,
+    '',
+    `Reason: ${reason}`,
+    note ? `Additional details: ${note}` : null,
+    '',
+    'We appreciate the time you put into your application and encourage you to apply again in the future.',
+  ].filter(Boolean).join('\n');
+}
+
+async function sendRejectedEmail({ email, name, reason, note }) {
+  return sendEmail({
+    to: email,
+    toName: name || undefined,
+    subject: `Update on your ${BRAND} application`,
+    html: buildRejectedHtml({ name, reason, note }),
+    plain: buildRejectedText({ name, reason, note }),
+  });
+}
+
+module.exports = { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail };

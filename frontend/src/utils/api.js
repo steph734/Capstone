@@ -31,8 +31,14 @@ export async function apiPatch(path, body) {
   return data
 }
 
-export async function apiDelete(path) {
-  const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' })
+export async function apiDelete(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    ...(body !== undefined && {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || `DELETE ${path} failed: ${res.status}`)
   return data

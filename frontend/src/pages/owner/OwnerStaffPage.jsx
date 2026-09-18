@@ -21,6 +21,14 @@ const STATUSES = ['On Duty', 'On Leave']
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 const COUNTRY_CODES = ['+63', '+1', '+44', '+61', '+65']
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract']
+const REJECT_REASONS = [
+  'Incomplete or invalid documents',
+  'Failed license/background verification',
+  'Does not meet role requirements',
+  'Position already filled',
+  'Duplicate application',
+  'Other',
+]
 // Demo document records for the profile "Documents" tab — a real backend
 // would store uploaded file metadata instead of these placeholders.
 const demoDocuments = (base) => ({
@@ -298,6 +306,14 @@ function WarningIcon() {
     </svg>
   )
 }
+function AlertCircleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v5M12 16h.01" />
+    </svg>
+  )
+}
 function DocLicenseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -424,6 +440,9 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
   const [reviewingId, setReviewingId] = useState(null)
   const [viewingApplicantId, setViewingApplicantId] = useState(null)
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [rejectAck, setRejectAck] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectNote, setRejectNote] = useState('')
   const [confirmApprove, setConfirmApprove] = useState(null)
   const [approving, setApproving] = useState(false)
   const [hiredResult, setHiredResult] = useState(null)
@@ -431,8 +450,15 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
   const reviewing = applicants.find((a) => a.id === reviewingId)
   const viewingApplicant = applicants.find((a) => a.id === viewingApplicantId)
 
+  const openReject = (applicant) => {
+    setRejectAck(false)
+    setRejectReason('')
+    setRejectNote('')
+    setConfirmTarget(applicant)
+  }
+
   const confirmReject = () => {
-    onReject(confirmTarget)
+    onReject(confirmTarget, { reason: rejectReason, note: rejectNote.trim() })
     setConfirmTarget(null)
     setViewingApplicantId(null)
     setReviewingId(null)
@@ -529,7 +555,7 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
 
               <div className="os-ap-detail-actions">
                 <button type="button" className="os-ap-view-btn" onClick={() => setViewingApplicantId(reviewing.id)}>View full application</button>
-                <button type="button" className="os-ap-reject" onClick={() => setConfirmTarget(reviewing)}>Reject</button>
+                <button type="button" className="os-ap-reject" onClick={() => openReject(reviewing)}>Reject</button>
                 <button type="button" className="os-ap-approve" onClick={() => setConfirmApprove(reviewing)}>Approve and hire</button>
               </div>
             </div>
@@ -542,25 +568,58 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
           applicant={viewingApplicant}
           onClose={() => setViewingApplicantId(null)}
           onApprove={(a) => setConfirmApprove(a)}
-          onReject={(a) => setConfirmTarget(a)}
+          onReject={(a) => openReject(a)}
         />
       )}
 
       {confirmTarget && (
         <div className="os-modal-backdrop" onClick={() => setConfirmTarget(null)}>
-          <div className="os-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="os-modal-header">
-              <div>
-                <h3>Reject application?</h3>
-                <p>
-                  This removes <strong>{confirmTarget.name}</strong>'s application and account. This can't be undone.
-                </p>
-              </div>
-              <button className="os-modal-close" onClick={() => setConfirmTarget(null)} aria-label="Close">✕</button>
+          <div className="os-reject-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="os-reject-top">
+              <div className="os-reject-icon"><AlertCircleIcon /></div>
+              <button className="os-reject-close" onClick={() => setConfirmTarget(null)} aria-label="Close">✕</button>
             </div>
-            <div className="os-modal-footer">
-              <button className="os-btn-cancel" onClick={() => setConfirmTarget(null)}>Cancel</button>
-              <button className="os-ap-reject" onClick={confirmReject}>Reject</button>
+            <h3 className="os-reject-title">Reject this application?</h3>
+
+            <div className="os-reject-card">
+              <div className="os-ap-detail-avatar">{confirmTarget.initials}</div>
+              <div>
+                <div className="os-reject-card-name">{confirmTarget.name}</div>
+                <div className="os-reject-card-sub">{confirmTarget.appliedFor} · {branchLabel(confirmTarget.branch)}</div>
+              </div>
+            </div>
+
+            <div className="os-reject-field">
+              <label>Reason for rejection <span className="os-reject-req">*</span></label>
+              <select className="os-reject-select" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}>
+                <option value="" disabled>Select a reason</option>
+                {REJECT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+
+            <div className="os-reject-field">
+              <label>Additional details <span className="os-reject-optional">(optional)</span></label>
+              <textarea
+                className="os-reject-textarea"
+                placeholder="Add a short note for the record"
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+              />
+            </div>
+
+            <div className="os-reject-warning">
+              <WarningIcon />
+              <p>This permanently deletes their application and account. The reason above is saved to the audit log.</p>
+            </div>
+
+            <label className="os-reject-checkbox">
+              <input type="checkbox" checked={rejectAck} onChange={(e) => setRejectAck(e.target.checked)} />
+              I understand this action is permanent
+            </label>
+
+            <div className="os-reject-footer">
+              <button className="os-reject-cancel" onClick={() => setConfirmTarget(null)}>Cancel</button>
+              <button className="os-reject-confirm" onClick={confirmReject} disabled={!rejectAck || !rejectReason}>Reject application</button>
             </div>
           </div>
         </div>
@@ -1851,10 +1910,10 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     return { tempPassword: randomTempPassword() }
   }
 
-  const handleRejectApplicant = async (applicant) => {
+  const handleRejectApplicant = async (applicant, { reason, note } = {}) => {
     if (applicant.mongoEmployeeId) {
       try {
-        await apiDelete(`/api/employees/${applicant.mongoEmployeeId}`)
+        await apiDelete(`/api/employees/${applicant.mongoEmployeeId}`, { reason, note })
       } catch (err) {
         window.alert(err.message || 'Could not reject this applicant. Please try again.')
         return
@@ -1867,7 +1926,8 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       email: user?.email || '—',
       actionIcon: '❌',
       action: 'Recruitment',
-      description: `Rejected application from ${applicant.name} for ${applicant.appliedFor}`,
+      description: `Rejected application from ${applicant.name} for ${applicant.appliedFor}`
+        + (reason ? ` — ${reason}` : '') + (note ? ` (${note})` : ''),
       entity: `Applicant ${applicant.id}`,
       status: 'Review',
     })

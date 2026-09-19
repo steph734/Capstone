@@ -2208,7 +2208,9 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Staff</th>
+                  <th>Employee ID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
                   <th>Specialty</th>
                   <th>Branch</th>
                   <th>Status</th>
@@ -2218,22 +2220,21 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
               </thead>
               <tbody>
                 {pageRows.length === 0 ? (
-                  <tr><td colSpan={6}><p className="os-empty">No staff match your search.</p></td></tr>
+                  <tr><td colSpan={8}><p className="os-empty">No staff match your search.</p></td></tr>
                 ) : pageRows.map((s) => {
                   return (
                     <tr key={s.id}>
-                      <td data-label="Staff">
+                      <td data-label="Employee ID">{s.employeeId || '—'}</td>
+                      <td data-label="Full Name">
                         <div className="os-table-person">
                           <div className="os-avatar-wrap">
                             <img src={s.avatar} alt={s.name} className="os-avatar" />
                             <span className={`os-status-dot ${s.accountStatus === 'pending' ? 'os-dot-yellow' : s.status === 'On Duty' ? 'os-dot-green' : 'os-dot-yellow'}`} />
                           </div>
-                          <div>
-                            <div className="os-table-name">{s.name}{s.archived && <span className="os-archived-pill">Archived</span>}</div>
-                            <div className="os-table-joined"><CalendarSmallIcon /> Joined {s.joined}</div>
-                          </div>
+                          <div className="os-table-name">{s.name}{s.archived && <span className="os-archived-pill">Archived</span>}</div>
                         </div>
                       </td>
+                      <td data-label="Email">{s.email || '—'}</td>
                       <td data-label="Specialty"><SpecialtyBadge specialty={s.specialty} /></td>
                       <td data-label="Branch"><span className="os-branch-badge">{s.branch}</span></td>
                       <td data-label="Status">

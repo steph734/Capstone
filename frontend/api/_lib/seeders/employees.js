@@ -1,8 +1,9 @@
 // One-off dev script (same pattern as backend/seed-*.js) that upserts a
-// handful of sample therapists into the `employees` collection, plus a
-// linked `users` account for each so they can actually log in. Safe to
-// re-run — it matches on `employee_id` and updates in place rather than
-// erroring on the unique indexes.
+// batch of sample therapists into the `employees` collection, plus a linked
+// `users` account for each so they can actually log in. Safe to re-run — it
+// matches on `email` (stable across edits, unlike employee_id) and updates
+// in place rather than erroring on the unique indexes or leaving duplicates
+// behind when a seed record's fields change.
 //
 // Usage (from the frontend/ folder, so it picks up frontend/.env):
 //   node api/_lib/seeders/employees.js
@@ -28,11 +29,14 @@ const DEFAULT_PASSWORD = 'therapist123'
 const SEED_BRANCHES = [
   { branch_name: 'Makati', address: '123 Ayala Ave, Makati City', contact_number: '+63 2 8888 1234' },
   { branch_name: 'Quezon City', address: '45 Katipunan Ave, Quezon City', contact_number: '+63 2 8888 5678' },
+  { branch_name: 'Cebu', address: '10 Gorordo Ave, Cebu City', contact_number: '+63 32 888 9012' },
 ]
 
+// `employee_id` follows the app's own scheme (see src/utils/idGenerator.js):
+// role prefix "T-" + 6 digits, e.g. "T-247550".
 const SEED_EMPLOYEES = [
   {
-    employee_id: 'EMP-0001',
+    employee_id: 'T-104822',
     first_name: 'Jade',
     middle_name: 'Ann',
     last_name: 'Santos',
@@ -55,7 +59,7 @@ const SEED_EMPLOYEES = [
     documents: { ptr: 'seed/ptr-0001.pdf', prc: 'seed/prc-0001.pdf', diploma: 'seed/diploma-0001.pdf', id: 'seed/id-0001.pdf' },
   },
   {
-    employee_id: 'EMP-0002',
+    employee_id: 'T-118204',
     first_name: 'Miguel',
     middle_name: '',
     last_name: 'Reyes',
@@ -78,7 +82,7 @@ const SEED_EMPLOYEES = [
     documents: { ptr: 'seed/ptr-0002.pdf', prc: 'seed/prc-0002.pdf', diploma: 'seed/diploma-0002.pdf', id: 'seed/id-0002.pdf' },
   },
   {
-    employee_id: 'EMP-0003',
+    employee_id: 'T-247550',
     first_name: 'Carla',
     middle_name: 'Dela Cruz',
     last_name: 'Tan',
@@ -101,7 +105,7 @@ const SEED_EMPLOYEES = [
     documents: { ptr: 'seed/ptr-0003.pdf', prc: 'seed/prc-0003.pdf', diploma: 'seed/diploma-0003.pdf', id: 'seed/id-0003.pdf' },
   },
   {
-    employee_id: 'EMP-0004',
+    employee_id: 'T-338460',
     first_name: 'Noel',
     middle_name: '',
     last_name: 'Bautista',
@@ -122,6 +126,144 @@ const SEED_EMPLOYEES = [
     status: 'inactive',
     hired_at: new Date('2019-04-22'),
     documents: { ptr: 'seed/ptr-0004.pdf', prc: 'seed/prc-0004.pdf', diploma: 'seed/diploma-0004.pdf', id: 'seed/id-0004.pdf' },
+  },
+  {
+    employee_id: 'T-451903',
+    first_name: 'Grace',
+    middle_name: '',
+    last_name: 'Uy',
+    email: 'grace.uy@therapypro.app',
+    position: 'Psychologist',
+    specialty: 'Clinical Psychology',
+    branch_name: 'Cebu',
+    phone: { country_code: '+63', number: '9231234567' },
+    dob: new Date('1990-01-09'),
+    gender: 'female',
+    address: '30 Gorordo Ave, Cebu City',
+    emergency_contact: 'Daniel Uy',
+    emergency_phone: '+63 9239876543',
+    prc_number: 'PRC-0056789',
+    experience: 9,
+    employment_type: 'Full-time',
+    license_expiry: new Date('2028-02-27'),
+    status: 'active',
+    hired_at: new Date('2020-11-15'),
+    documents: { ptr: 'seed/ptr-0005.pdf', prc: 'seed/prc-0005.pdf', diploma: 'seed/diploma-0005.pdf', id: 'seed/id-0005.pdf' },
+  },
+  {
+    employee_id: 'T-560274',
+    first_name: 'Paolo',
+    middle_name: '',
+    last_name: 'Ramos',
+    email: 'paolo.ramos@therapypro.app',
+    position: 'Developmental Therapist',
+    specialty: 'Early Childhood Development',
+    branch_name: 'Cebu',
+    phone: { country_code: '+63', number: '9241234567' },
+    dob: new Date('1993-05-27'),
+    gender: 'male',
+    address: '17 Salinas Drive, Lahug, Cebu City',
+    emergency_contact: 'Nina Ramos',
+    emergency_phone: '+63 9249876543',
+    prc_number: 'PRC-0067890',
+    experience: 6,
+    employment_type: 'Contract',
+    license_expiry: new Date('2027-12-02'),
+    status: 'active',
+    hired_at: new Date('2022-10-05'),
+    documents: { ptr: 'seed/ptr-0006.pdf', prc: 'seed/prc-0006.pdf', diploma: 'seed/diploma-0006.pdf', id: 'seed/id-0006.pdf' },
+  },
+  {
+    employee_id: 'T-673815',
+    first_name: 'Andre',
+    middle_name: '',
+    last_name: 'Lim',
+    email: 'andre.lim@therapypro.app',
+    position: 'Behavior Therapist',
+    specialty: 'Applied Behavior Analysis',
+    branch_name: 'Makati',
+    phone: { country_code: '+63', number: '9251234567' },
+    dob: new Date('1992-11-05'),
+    gender: 'male',
+    address: '14 Gil Puyat Ave, Makati City',
+    emergency_contact: 'Grace Lim',
+    emergency_phone: '+63 9259876543',
+    prc_number: 'PRC-0078901',
+    experience: 7,
+    employment_type: 'Full-time',
+    license_expiry: new Date('2028-05-20'),
+    status: 'active',
+    hired_at: new Date('2021-03-18'),
+    documents: { ptr: 'seed/ptr-0007.pdf', prc: 'seed/prc-0007.pdf', diploma: 'seed/diploma-0007.pdf', id: 'seed/id-0007.pdf' },
+  },
+  {
+    employee_id: 'T-789246',
+    first_name: 'Clara',
+    middle_name: '',
+    last_name: 'Dela Cruz',
+    email: 'clara.delacruz@therapypro.app',
+    position: 'Occupational Therapist',
+    specialty: 'Adult Rehabilitation',
+    branch_name: 'Quezon City',
+    phone: { country_code: '+63', number: '9261234567' },
+    dob: new Date('1995-02-18'),
+    gender: 'female',
+    address: '23 Aurora Blvd, Quezon City',
+    emergency_contact: 'Mark Dela Cruz',
+    emergency_phone: '+63 9269876543',
+    prc_number: 'PRC-0089012',
+    experience: 4,
+    employment_type: 'Part-time',
+    license_expiry: new Date('2027-08-09'),
+    status: 'active',
+    hired_at: new Date('2023-06-01'),
+    documents: { ptr: 'seed/ptr-0008.pdf', prc: 'seed/prc-0008.pdf', diploma: 'seed/diploma-0008.pdf', id: 'seed/id-0008.pdf' },
+  },
+  {
+    employee_id: 'T-822904',
+    first_name: 'Kevin',
+    middle_name: '',
+    last_name: 'Santos',
+    email: 'kevin.santos@therapypro.app',
+    position: 'Speech Language Pathologist',
+    specialty: 'Pediatric Speech Therapy',
+    branch_name: 'Cebu',
+    phone: { country_code: '+63', number: '9271234567' },
+    dob: new Date('1997-09-14'),
+    gender: 'male',
+    address: '5 Salazar St, Cebu City',
+    emergency_contact: 'Liza Santos',
+    emergency_phone: '+63 9279876543',
+    prc_number: 'PRC-0090123',
+    experience: 2,
+    employment_type: 'Full-time',
+    license_expiry: new Date('2029-03-15'),
+    status: 'active',
+    hired_at: new Date('2024-08-19'),
+    documents: { ptr: 'seed/ptr-0009.pdf', prc: 'seed/prc-0009.pdf', diploma: 'seed/diploma-0009.pdf', id: 'seed/id-0009.pdf' },
+  },
+  {
+    employee_id: 'T-934601',
+    first_name: 'Rica',
+    middle_name: '',
+    last_name: 'Domingo',
+    email: 'rica.domingo@therapypro.app',
+    position: 'Occupational Therapist',
+    specialty: 'Sensory Integration Therapy',
+    branch_name: 'Makati',
+    phone: { country_code: '+63', number: '9281234567' },
+    dob: new Date('1991-12-25'),
+    gender: 'female',
+    address: '40 Salcedo St, Makati City',
+    emergency_contact: 'Ana Domingo',
+    emergency_phone: '+63 9289876543',
+    prc_number: 'PRC-0101234',
+    experience: 6,
+    employment_type: 'Full-time',
+    license_expiry: new Date('2025-10-10'),
+    status: 'terminated',
+    hired_at: new Date('2019-09-01'),
+    documents: { ptr: 'seed/ptr-0010.pdf', prc: 'seed/prc-0010.pdf', diploma: 'seed/diploma-0010.pdf', id: 'seed/id-0010.pdf' },
   },
 ]
 
@@ -171,15 +313,20 @@ async function main() {
     const user = await upsertEmployeeUser(seed)
 
     const { branch_name, ...employeeFields } = seed
+    // Every seed record here is a fully hired employee (never a pending
+    // "for_review" applicant), so it always gets an approved_at — that's
+    // what puts it in the Employees table instead of "For Review".
+    // Setting it explicitly in $set (not $setOnInsert) means a rerun also
+    // fixes it on any row seeded before this was corrected.
     await Employee.findOneAndUpdate(
-      { employee_id: seed.employee_id },
+      { email: seed.email },
       {
         $set: {
           ...employeeFields,
           user_id: user._id,
           branch_id: branchId,
+          approved_at: seed.hired_at,
         },
-        $setOnInsert: { approved_at: seed.status === 'active' || seed.status === 'on_leave' ? new Date() : null },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )

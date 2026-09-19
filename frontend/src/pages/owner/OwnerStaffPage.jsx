@@ -206,6 +206,17 @@ function AlertCircleIcon() {
     </svg>
   )
 }
+function ScanIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8V6a2 2 0 0 1 2-2h2" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v2" />
+      <path d="M20 16v2a2 2 0 0 1-2 2h-2" />
+      <path d="M8 20H6a2 2 0 0 1-2-2v-2" />
+      <path d="M4 12h16" />
+    </svg>
+  )
+}
 function MailIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -264,6 +275,14 @@ function rateTone(rate) {
   if (rate >= 90) return 'good'
   if (rate >= 75) return 'warn'
   return 'critical'
+}
+
+// Maps a mapped-staff display status to a status-pill color.
+function statusPillTone(status) {
+  if (status === 'On Duty') return 'green'
+  if (status === 'Terminated') return 'red'
+  if (status === 'Inactive') return 'grey'
+  return 'yellow' // On Leave
 }
 
 function DayDots({ week }) {
@@ -874,6 +893,83 @@ function IdCardModal({ staff, onClose }) {
           <button className="os-btn-cancel" onClick={downloadPdf}>Export as PDF</button>
           <button className="os-btn-dark" onClick={onClose}>Done</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Scan ID (attendance) modal ────────────────────────────── */
+function ScanIdModal({ pool, onScan, onClose }) {
+  const [scanning, setScanning] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const runScan = () => {
+    if (scanning || pool.length === 0) return
+    setScanning(true)
+    setTimeout(() => {
+      const member = pool[Math.floor(Math.random() * pool.length)]
+      const { type } = onScan(member)
+      setResult({ staff: member, type, loggedAt: new Date() })
+      setScanning(false)
+    }, 900)
+  }
+
+  return (
+    <div className="os-modal-backdrop" onClick={onClose}>
+      <div className="os-modal os-scan-modal" onClick={(e) => e.stopPropagation()}>
+        {!result ? (
+          <div className="os-modal-body os-scan-body">
+            <div className="os-scan-top">
+              <div className="os-scan-icon-badge"><ScanIcon /></div>
+              <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
+            </div>
+            <h3 className="os-hire-title">Scan ID to log attendance</h3>
+            <p className="os-hire-desc">Hold the staff badge up to the scanner, or scan with a handheld device.</p>
+
+            <button
+              type="button"
+              className={`os-scan-zone ${scanning ? 'scanning' : ''}`}
+              onClick={runScan}
+              disabled={pool.length === 0}
+            >
+              <ScanIcon size={34} />
+              <span>{scanning ? 'Scanning…' : 'Waiting for scan…'}</span>
+            </button>
+
+            <div className="os-scan-status">
+              <span className={`os-scan-status-dot ${pool.length === 0 ? 'off' : ''}`} />
+              {pool.length === 0 ? 'No on-duty staff to scan' : 'Scanner connected and ready'}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="os-modal-body" style={{ paddingTop: 24 }}>
+              <div className="os-hire-modal-top">
+                <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
+                <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
+              </div>
+              <h3 className="os-hire-title">Attendance logged</h3>
+
+              <div className="os-hire-card">
+                <img src={result.staff.avatar} alt={result.staff.name} className="os-avatar" />
+                <div style={{ flex: 1 }}>
+                  <div className="os-hire-card-name">{result.staff.name}</div>
+                  <div className="os-hire-card-sub">{result.staff.specialty || 'Unassigned'} · {result.staff.branch}</div>
+                </div>
+                <span className={`os-pill ${result.type === 'Time In' ? 'os-pill-green' : 'os-pill-yellow'}`}>{result.type}</span>
+              </div>
+
+              <div className="os-scan-logged-time">
+                <ClockIcon />
+                Logged at {result.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, {result.loggedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+            <div className="os-modal-footer">
+              <button className="os-btn-cancel" onClick={() => setResult(null)}>Scan next</button>
+              <button className="os-btn-dark" onClick={onClose}>Done</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -1757,7 +1853,7 @@ function AddStaffSuccessModal({ name, email, onClose }) {
 // Reverses the shorthand maps `backend/routes/employees.js` uses when saving.
 // (employment_type is stored pre-capitalized to match Atlas's validator, so
 // it needs no reverse mapping — it's already display-ready.)
-const REVERSE_EMPLOYEE_STATUS = { active: 'On Duty', on_leave: 'On Leave' }
+const REVERSE_EMPLOYEE_STATUS = { active: 'On Duty', on_leave: 'On Leave', inactive: 'Inactive', terminated: 'Terminated' }
 const REVERSE_GENDER = { male: 'Male', female: 'Female', prefer_not_to_say: 'Prefer not to say' }
 
 // Maps a GET /api/employees document (+ populated branch_id/user_id) into the
@@ -1858,6 +1954,8 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [editing, setEditing] = useState(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [showScan, setShowScan] = useState(false)
+  const [scannedIn, setScannedIn] = useState({})
 
   // Real hires created through the wizard live in MongoDB. A hire shows up in
   // "For Review" as soon as they're invited (the Documents column reflects
@@ -1882,14 +1980,24 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
 
   const activeStaff = staff.filter((s) => !s.archived)
   const archivedStaff = staff.filter((s) => s.archived)
+  // "Terminated"/"Active" read the real employment status regardless of the
+  // (separate, manually-toggled) archived flag — a terminated hire starts
+  // out archived automatically, but restoring them shouldn't make them
+  // disappear from "Terminated" too.
+  const terminatedStaff = staff.filter((s) => s.status === 'Terminated')
+  const activeDutyStaff = staff.filter((s) => s.status === 'On Duty' && !s.archived)
 
-  const pool = statusFilter === 'Archived' ? archivedStaff : activeStaff
+  const STATUS_FILTER_POOLS = {
+    Archived: archivedStaff,
+    Terminated: terminatedStaff,
+    Active: activeDutyStaff,
+  }
+  const pool = STATUS_FILTER_POOLS[statusFilter] || activeStaff // 'All' / 'For Review'
   const filteredList = pool.filter((s) => {
     const q = search.toLowerCase()
     const matchSearch = s.name.toLowerCase().includes(q) || (s.specialty || '').toLowerCase().includes(q)
     const matchBranch = branchFilter === 'All' || s.branch === branchFilter
-    const matchStatus = statusFilter === 'All' || statusFilter === 'Archived' || s.status === statusFilter
-    return matchSearch && matchBranch && matchStatus
+    return matchSearch && matchBranch
   })
 
   const filteredAttendance = activeStaff.filter((s) => {
@@ -2006,6 +2114,21 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     }
   }
 
+  // Alternates Time In / Time Out per staff member across scans within this
+  // session — a real badge scanner would derive this from the day's open
+  // attendance record instead.
+  const handleScanAttendance = (member) => {
+    const isTimeIn = !scannedIn[member.id]
+    setScannedIn((prev) => ({ ...prev, [member.id]: isTimeIn }))
+    if (isTimeIn) {
+      setStaff((prev) => prev.map((s) => (
+        s.id === member.id ? { ...s, attendance: { ...s.attendance, present: s.attendance.present + 1 } } : s
+      )))
+    }
+    logStaff(isTimeIn ? '🟢' : '🔵', `${isTimeIn ? 'Timed in' : 'Timed out'} via ID scan — ${member.name}`, member.id)
+    return { type: isTimeIn ? 'Time In' : 'Time Out' }
+  }
+
   const handleApproveLeave = (req) => {
     const member = staff.find((s) => s.id === req.staffId)
     setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
@@ -2107,14 +2230,21 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
     >
       {/* Tabs */}
-      <div className="os-tabs">
-        <button type="button" className={`os-tab ${activeTab === 'list' ? 'active' : ''}`} onClick={() => setActiveTab('list')}>
-          <PeopleIcon /> Employee List
-        </button>
-        <button type="button" className={`os-tab ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>
-          <ClockIcon /> Attendance Monitoring
-          {leaveRequests.length > 0 && <span className="os-tab-badge">{leaveRequests.length}</span>}
-        </button>
+      <div className="os-tabs-row">
+        <div className="os-tabs">
+          <button type="button" className={`os-tab ${activeTab === 'list' ? 'active' : ''}`} onClick={() => setActiveTab('list')}>
+            <PeopleIcon /> Employee List
+          </button>
+          <button type="button" className={`os-tab ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>
+            <ClockIcon /> Attendance Monitoring
+            {leaveRequests.length > 0 && <span className="os-tab-badge">{leaveRequests.length}</span>}
+          </button>
+        </div>
+        {activeTab === 'attendance' && (
+          <button type="button" className="os-add-btn os-scan-btn" onClick={() => setShowScan(true)}>
+            <ScanIcon size={16} /> Scan ID
+          </button>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -2131,7 +2261,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         ))}
       </div>
 
-      {activeTab === 'list' && (
+      {activeTab === 'list' && (statusFilter === 'All' || statusFilter === 'For Review') && (
         <ApplicantsPanel
           applicants={applicants}
           onApprove={handleApproveApplicant}
@@ -2170,9 +2300,15 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         </div>
         {activeTab === 'list' ? (
           <div className="os-filter-tabs">
-            {['All', 'Archived'].map((s) => (
-              <button key={s} className={`os-filter-tab ${statusFilter === s ? 'active' : ''}`} onClick={() => setStatusFilter(s)}>
-                {s === 'Archived' ? `Archived (${archivedStaff.length})` : s}
+            {[
+              { key: 'All', label: 'All' },
+              { key: 'Active', label: `Active (${activeDutyStaff.length})` },
+              { key: 'For Review', label: `For Review (${applicants.length})` },
+              { key: 'Terminated', label: `Terminated (${terminatedStaff.length})` },
+              { key: 'Archived', label: `Archived (${archivedStaff.length})` },
+            ].map((t) => (
+              <button key={t.key} className={`os-filter-tab ${statusFilter === t.key ? 'active' : ''}`} onClick={() => setStatusFilter(t.key)}>
+                {t.label}
               </button>
             ))}
           </div>
@@ -2194,6 +2330,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
 
       {/* Staff / Attendance Table */}
       {activeTab === 'list' ? (
+        statusFilter === 'For Review' ? null : (
         <div className="admin-table-card os-staff-table-card">
           <div className="os-table-card-head">
             <h3>Employees</h3>
@@ -2241,7 +2378,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                         {s.accountStatus === 'pending' ? (
                           <span className="os-pill os-pill-yellow">Pending Setup</span>
                         ) : (
-                          <span className={`os-pill ${s.status === 'On Duty' ? 'os-pill-green' : 'os-pill-yellow'}`}>{s.status}</span>
+                          <span className={`os-pill os-pill-${statusPillTone(s.status)}`}>{s.status}</span>
                         )}
                       </td>
                       <td data-label="Caseload">{s.caseload} patients</td>
@@ -2289,6 +2426,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
             </select>
           </div>
         </div>
+        )
       ) : (
         <div className="admin-table-card os-staff-table-card">
           <div className="admin-table-scroll">
@@ -2385,6 +2523,13 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       {viewing && <ViewModal staffMember={viewing} onClose={() => setViewing(null)} />}
       {editing && (
         <EditStaffModal staffMember={editing} onClose={() => setEditing(null)} onSave={handleEditSave} />
+      )}
+      {showScan && (
+        <ScanIdModal
+          pool={activeDutyStaff}
+          onScan={handleScanAttendance}
+          onClose={() => setShowScan(false)}
+        />
       )}
     </OwnerPageShell>
   )

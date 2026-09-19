@@ -689,65 +689,22 @@
   margin-top: 2px;
 }
 
-.os-hire-info-label {
-  margin: 14px 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #9aab9f;
-}
+/* ── ID card modal ────────────────────────────────────────── */
+.os-idcard-modal { max-width: 560px; }
 
-.os-hire-info-box {
-  padding: 12px 14px;
-  background: #f7f8f5;
-  border: 1px solid #ececE6;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a2e26;
-  word-break: break-all;
-}
-
-.os-hire-password-row {
+.os-idcard-preview {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  letter-spacing: 0.5px;
+  justify-content: center;
+  padding: 8px 0 4px;
 }
 
-.os-hire-copy-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid #bcd8cd;
-  border-radius: 8px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  color: #159a72;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
+.os-idcard-canvas {
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
-.os-hire-copy-btn:hover { background: #f0fbf5; }
-
-.os-hire-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  margin-top: 16px;
-  background: #fffbeb;
-  border: 1px solid #fde9c8;
-  border-radius: 10px;
-  color: #92600e;
-}
-.os-hire-warning svg { flex-shrink: 0; margin-top: 1px; color: #d97706; }
-.os-hire-warning p { margin: 0; font-size: 12px; line-height: 1.5; }
 
 .os-btn-dark {
   padding: 10px 20px;
@@ -2058,6 +2015,69 @@ button.os-dob-input { cursor: pointer; }
 }
 
 @media (max-width: 768px) {
+  .os-modal-backdrop { padding: 0; align-items: flex-end; }
+
+  .os-modal,
+  .os-profile-modal,
+  .os-modal-wizard {
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92dvh;
+  }
+
+  .os-reject-modal { max-width: 100%; border-radius: 16px 16px 0 0; }
+
+  .os-modal-wizard {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .os-modal-header { padding: 16px 16px 12px; }
+  .os-modal-header h3 { font-size: 16px; }
+  .os-modal-header p { font-size: 12px; }
+  .os-wizard-title-icon { width: 34px; height: 34px; }
+
+  /* Scroll the step strip horizontally instead of wrapping into a cramped
+     multi-line grid — same pattern already used for .os-tabs below. */
+  .os-wizard-steps {
+    padding: 12px 16px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .os-wizard-steps::-webkit-scrollbar { display: none; }
+  .os-wizard-connector { min-width: 20px; }
+  .os-wizard-step-label { white-space: nowrap; }
+
+  .os-modal-body { padding: 16px; }
+  .os-modal-wizard .os-modal-body { max-height: none; flex: 1; }
+
+  .os-modal-footer,
+  .os-reject-footer {
+    padding: 12px 16px 16px;
+  }
+
+  .os-wizard-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .os-wizard-footer .os-btn-cancel,
+  .os-wizard-footer .os-btn-save {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .os-photo-circle,
+  .os-photo-preview,
+  .os-photo-placeholder {
+    width: 76px;
+    height: 76px;
+  }
+
+  .os-dob-popover { left: 50%; transform: translateX(-50%); }
+
+  .os-profile-body { max-height: 48vh; }
+
   .os-tabs {
     overflow-x: auto;
   }

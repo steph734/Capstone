@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
+import { jsPDF } from 'jspdf'
 import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
@@ -290,14 +291,6 @@ function ShieldIcon() {
     </svg>
   )
 }
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="12" height="12" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  )
-}
 function WarningIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -496,7 +489,14 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
     setViewingApplicantId(null)
     setReviewingId(null)
     if (result) {
-      setHiredResult({ name: applicant.name, email: applicant.email, tempPassword: result.tempPassword })
+      setHiredResult({
+        name: applicant.name,
+        initials: applicant.initials,
+        appliedFor: applicant.appliedFor,
+        branch: applicant.branch,
+        employeeId: applicant.employeeId,
+        hiredAt: applicant.hiredAt,
+      })
     }
   }
 
@@ -686,7 +686,7 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
       )}
 
       {hiredResult && (
-        <HiredResultModal hired={hiredResult} onClose={() => setHiredResult(null)} />
+        <IdCardModal staff={hiredResult} onClose={() => setHiredResult(null)} />
       )}
 
       {rejectedResult && (
@@ -736,52 +736,197 @@ function RejectedResultModal({ result, onClose }) {
   )
 }
 
-/* ── "Employee is now hired" credentials modal ─────────────── */
-function HiredResultModal({ hired, onClose }) {
-  const [copied, setCopied] = useState('')
+/* ── ID card canvas rendering ──────────────────────────────── */
+// CR80 badge ratio (85.6mm x 53.98mm) rendered at ~300dpi for crisp export.
+const ID_CARD_W = 1013
+const ID_CARD_H = 638
+const ID_CARD_LOGO_SRC = '/brickpath-logo.jpg'
 
-  const copy = async (label, value) => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(label)
-      setTimeout(() => setCopied(''), 1500)
-    } catch {
-      // Clipboard access can be blocked (e.g. no HTTPS, permissions) — the
-      // password stays visible on screen either way, so this is non-fatal.
-    }
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+// Decorative only — a deterministic bar pattern seeded off the employee ID,
+// not a real scannable barcode.
+function drawBarcode(ctx, x, y, w, h, seedStr) {
+  let seed = 0
+  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0
+  const rand = () => {
+    seed = (seed * 1103515245 + 12345) >>> 0
+    return (seed % 1000) / 1000
+  }
+  ctx.fillStyle = '#111827'
+  let cx = x
+  while (cx < x + w) {
+    const barW = 2 + Math.floor(rand() * 5)
+    if (rand() > 0.35) ctx.fillRect(cx, y, barW, h)
+    cx += barW + 2
+  }
+}
+
+function formatDMY(iso) {
+  if (!iso) return '—'
+  const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return '—'
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+}
+
+function drawIdCard(ctx, staff, logoImg) {
+  const W = ID_CARD_W, H = ID_CARD_H
+  const radius = 28
+  ctx.clearRect(0, 0, W, H)
+  ctx.save()
+  roundRectPath(ctx, 0, 0, W, H, radius)
+  ctx.clip()
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, H)
+
+  const barH = Math.round(H * 0.2)
+  const grad = ctx.createLinearGradient(0, 0, W, 0)
+  grad.addColorStop(0, '#159a72')
+  grad.addColorStop(1, '#0e7a5a')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, barH)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '700 34px Arial, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText((staff.appliedFor || 'Staff').toUpperCase(), W / 2, barH / 2)
+
+  const padding = 48
+  const photoSize = 190
+  const photoX = padding
+  const photoY = barH + 40
+  ctx.fillStyle = '#e5e7eb'
+  roundRectPath(ctx, photoX, photoY, photoSize, photoSize, 12)
+  ctx.fill()
+  ctx.strokeStyle = '#cbd5e1'
+  ctx.lineWidth = 2
+  roundRectPath(ctx, photoX, photoY, photoSize, photoSize, 12)
+  ctx.stroke()
+  ctx.fillStyle = '#94a3b8'
+  ctx.font = '700 56px Arial, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(staff.initials || '?', photoX + photoSize / 2, photoY + photoSize / 2)
+
+  const infoX = photoX + photoSize + 40
+  // Sized up from a small badge — the real logo has "Brick Path Therapy
+  // Center · Davao City" lettering baked into the artwork, so it needs to be
+  // large enough to read on its own instead of pairing it with duplicate text.
+  const logoSize = 104
+  const logoY = photoY - 4
+  if (logoImg) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(infoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
+    ctx.closePath()
+    ctx.clip()
+    ctx.drawImage(logoImg, infoX, logoY, logoSize, logoSize)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = '#159a72'
+    ctx.beginPath()
+    ctx.arc(infoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.font = '700 34px Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('BP', infoX + logoSize / 2, logoY + logoSize / 2 + 1)
+  }
+
+  const nameY = logoY + logoSize + 50
+  ctx.fillStyle = '#1a2e26'
+  ctx.font = '800 34px Arial, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText((staff.name || '').toUpperCase(), infoX, nameY)
+
+  ctx.fillStyle = '#4b5563'
+  ctx.font = '600 18px Arial, sans-serif'
+  ctx.fillText(`ID#. ${staff.employeeId || '—'}`, infoX, nameY + 34)
+  ctx.fillText(`JOINING: ${formatDMY(staff.hiredAt)}`, infoX, nameY + 60)
+
+  ctx.fillStyle = '#9aab9f'
+  ctx.font = '600 14px Arial, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText(branchLabel(staff.branch), W - padding, barH + 30)
+
+  drawBarcode(ctx, padding, H - 90, W - padding * 2, 56, String(staff.employeeId || staff.name || 'ID'))
+
+  ctx.restore()
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 2
+  roundRectPath(ctx, 1, 1, W - 2, H - 2, radius)
+  ctx.stroke()
+}
+
+/* ── "Employee is now hired" ID card modal ─────────────────── */
+function IdCardModal({ staff, onClose }) {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const canvas = canvasRef.current
+    canvas.width = ID_CARD_W
+    canvas.height = ID_CARD_H
+    const ctx = canvas.getContext('2d')
+
+    const render = (logoImg) => { if (!cancelled) drawIdCard(ctx, staff, logoImg) }
+    render(null)
+
+    const logo = new Image()
+    logo.onload = () => render(logo)
+    logo.onerror = () => {} // no logo file yet — the drawn "BP" placeholder stands in
+    logo.src = ID_CARD_LOGO_SRC
+
+    return () => { cancelled = true }
+  }, [staff])
+
+  const fileBase = () => (staff.name || 'staff').trim().replace(/\s+/g, '_')
+
+  const downloadImage = () => {
+    const url = canvasRef.current.toDataURL('image/png')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${fileBase()}_ID_Card.png`
+    a.click()
+  }
+
+  const downloadPdf = () => {
+    const imgData = canvasRef.current.toDataURL('image/png')
+    // CR80 card size in mm.
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 53.98] })
+    doc.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98)
+    doc.save(`${fileBase()}_ID_Card.pdf`)
   }
 
   return (
     <div className="os-modal-backdrop" onClick={onClose}>
-      <div className="os-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="os-modal os-idcard-modal" onClick={(e) => e.stopPropagation()}>
         <div className="os-modal-body" style={{ paddingTop: 24 }}>
           <div className="os-hire-modal-top">
             <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
             <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
-          <h3 className="os-hire-title">{hired.name} is now hired</h3>
-          <p className="os-hire-desc">Their staff account has been created. Share this password with them securely.</p>
+          <h3 className="os-hire-title">{staff.name} is now hired</h3>
+          <p className="os-hire-desc">Their staff ID card has been generated below.</p>
 
-          <div className="os-hire-info-label">Login email</div>
-          <div className="os-hire-info-box">{hired.email}</div>
-
-          <div className="os-hire-info-label">Temporary password</div>
-          <div className="os-hire-info-box os-hire-password-row">
-            <span>{hired.tempPassword}</span>
-            <button type="button" className="os-hire-copy-btn" onClick={() => copy('password', hired.tempPassword)}>
-              <CopyIcon /> {copied === 'password' ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-
-          <div className="os-hire-warning">
-            <WarningIcon />
-            <p>Shown once — it can't be retrieved later. The employee will be required to reset it on first login.</p>
+          <div className="os-idcard-preview">
+            <canvas ref={canvasRef} className="os-idcard-canvas" />
           </div>
         </div>
-        <div className="os-modal-footer">
-          <button className="os-btn-cancel" onClick={() => copy('password', hired.tempPassword)}>
-            {copied === 'password' ? 'Copied' : 'Copy password'}
-          </button>
+        <div className="os-modal-footer" style={{ flexWrap: 'wrap' }}>
+          <button className="os-btn-cancel" onClick={downloadImage}>Export as Image</button>
+          <button className="os-btn-cancel" onClick={downloadPdf}>Export as PDF</button>
           <button className="os-btn-dark" onClick={onClose}>Done</button>
         </div>
       </div>

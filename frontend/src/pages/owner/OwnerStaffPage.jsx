@@ -396,6 +396,8 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
         employeeId: applicant.employeeId,
         employment: applicant.employment,
         photoUrl: applicant.photoUrl,
+        dob: applicant.dob,
+        phone: applicant.phone,
       })
     }
   }
@@ -795,6 +797,8 @@ function drawIdCard(ctx, staff, { logoImg, photoImg }) {
   ctx.fillText(`ID#. ${idDigits}`, infoX, nameY + 34)
   ctx.fillText(`EMPLOYMENT: ${staff.employment || '—'}`, infoX, nameY + 68)
   ctx.fillText(`BRANCH: ${branchLabel(staff.branch)}`, infoX, nameY + 102)
+  ctx.fillText(`BIRTHDAY: ${formatDate(staff.dob)}`, infoX, nameY + 136)
+  ctx.fillText(`PHONE: ${staff.phone || '—'}`, infoX, nameY + 170)
 
   // A full-width barcode strip anchors the bottom of the card.
   drawBarcode(ctx, padding, contentBottom - 56, W - padding * 2, 48, String(staff.employeeId || staff.name || 'ID'))

@@ -9,6 +9,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // Default is 2 MiB; the main JS chunk (jsPDF, qrcode, etc. all bundled
+      // together) now runs slightly over that, so it needs raising rather
+      // than the build silently failing to precache it.
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       manifest: {
         name: 'My Capstone Project',
         short_name: 'Capstone',

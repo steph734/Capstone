@@ -2037,17 +2037,23 @@ button.os-dob-input { cursor: pointer; }
   .os-modal-header p { font-size: 12px; }
   .os-wizard-title-icon { width: 34px; height: 34px; }
 
-  /* Scroll the step strip horizontally instead of wrapping into a cramped
-     multi-line grid — same pattern already used for .os-tabs below. */
+  /* Full step row (4 labels + connectors) can't fit one line on a phone —
+     collapse to numbered circles with only the active step's label shown,
+     instead of wrapping into multiple lines or overflowing off-screen. */
   .os-wizard-steps {
     padding: 12px 16px;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+    gap: 0;
   }
-  .os-wizard-steps::-webkit-scrollbar { display: none; }
-  .os-wizard-connector { min-width: 20px; }
-  .os-wizard-step-label { white-space: nowrap; }
+  .os-wizard-connector { min-width: 10px; margin: 0 4px; }
+  .os-wizard-step-label { display: none; }
+  .os-wizard-step.active .os-wizard-step-label {
+    display: inline-block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11.5px;
+  }
 
   .os-modal-body { padding: 16px; }
   .os-modal-wizard .os-modal-body { max-height: none; flex: 1; }

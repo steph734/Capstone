@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { jsPDF } from 'jspdf'
+import QRCode from 'qrcode'
 import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
@@ -496,6 +497,7 @@ function ApplicantsPanel({ applicants, onApprove, onReject }) {
         branch: applicant.branch,
         employeeId: applicant.employeeId,
         hiredAt: applicant.hiredAt,
+        photoUrl: applicant.photoUrl,
       })
     }
   }
@@ -752,24 +754,6 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-// Decorative only — a deterministic bar pattern seeded off the employee ID,
-// not a real scannable barcode.
-function drawBarcode(ctx, x, y, w, h, seedStr) {
-  let seed = 0
-  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0
-  const rand = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0
-    return (seed % 1000) / 1000
-  }
-  ctx.fillStyle = '#111827'
-  let cx = x
-  while (cx < x + w) {
-    const barW = 2 + Math.floor(rand() * 5)
-    if (rand() > 0.35) ctx.fillRect(cx, y, barW, h)
-    cx += barW + 2
-  }
-}
-
 function formatDMY(iso) {
   if (!iso) return '—'
   const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`)
@@ -777,9 +761,64 @@ function formatDMY(iso) {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
 }
 
-function drawIdCard(ctx, staff, logoImg) {
+// Loads an <img> for canvas drawing; resolves to null (never rejects) so a
+// missing photo/logo/QR just falls back to a drawn placeholder instead of
+// blocking the whole card.
+function loadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) { resolve(null); return }
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
+
+// Crops+scales like CSS `object-fit: cover` into the given box.
+function drawImageCover(ctx, img, x, y, w, h) {
+  const imgRatio = img.width / img.height
+  const boxRatio = w / h
+  let sx, sy, sw, sh
+  if (imgRatio > boxRatio) {
+    sh = img.height
+    sw = sh * boxRatio
+    sx = (img.width - sw) / 2
+    sy = 0
+  } else {
+    sw = img.width
+    sh = sw / boxRatio
+    sx = 0
+    sy = (img.height - sh) / 2
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
+}
+
+async function buildIdCardQr(staff) {
+  const text = [
+    'BRICK PATH THERAPY CENTER',
+    `Name: ${staff.name || ''}`,
+    `ID#: ${staff.employeeId || ''}`,
+    `Role: ${staff.appliedFor || ''}`,
+    `Branch: ${branchLabel(staff.branch)}`,
+    `Joined: ${formatDMY(staff.hiredAt)}`,
+  ].join('\n')
+  try {
+    const dataUrl = await QRCode.toDataURL(text, { margin: 0, width: 400, color: { dark: '#111827', light: '#ffffff' } })
+    return await loadImage(dataUrl)
+  } catch {
+    return null
+  }
+}
+
+// Every region is sized to fill the card end to end (tall photo column,
+// text block flush to the logo, QR flush to the card's bottom-right) so
+// there's no leftover blank space the way a small square photo + a thin
+// barcode strip used to leave.
+function drawIdCard(ctx, staff, { logoImg, photoImg, qrImg }) {
   const W = ID_CARD_W, H = ID_CARD_H
   const radius = 28
+  const padding = 40
   ctx.clearRect(0, 0, W, H)
   ctx.save()
   roundRectPath(ctx, 0, 0, W, H, radius)
@@ -787,7 +826,7 @@ function drawIdCard(ctx, staff, logoImg) {
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, W, H)
 
-  const barH = Math.round(H * 0.2)
+  const barH = Math.round(H * 0.19)
   const grad = ctx.createLinearGradient(0, 0, W, 0)
   grad.addColorStop(0, '#159a72')
   grad.addColorStop(1, '#0e7a5a')
@@ -800,29 +839,41 @@ function drawIdCard(ctx, staff, logoImg) {
   ctx.textBaseline = 'middle'
   ctx.fillText((staff.appliedFor || 'Staff').toUpperCase(), W / 2, barH / 2)
 
-  const padding = 48
-  const photoSize = 190
+  const contentY = barH + 24
+  const contentBottom = H - 32
+  const contentH = contentBottom - contentY
+
+  // Left column: a tall portrait photo box fills the full content height
+  // instead of a small square sitting above empty space.
+  const photoW = 260
   const photoX = padding
-  const photoY = barH + 40
-  ctx.fillStyle = '#e5e7eb'
-  roundRectPath(ctx, photoX, photoY, photoSize, photoSize, 12)
-  ctx.fill()
+  const photoY = contentY
+  roundRectPath(ctx, photoX, photoY, photoW, contentH, 14)
+  if (photoImg) {
+    ctx.save()
+    ctx.clip()
+    drawImageCover(ctx, photoImg, photoX, photoY, photoW, contentH)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = '#e5e7eb'
+    ctx.fill()
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '700 64px Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(staff.initials || '?', photoX + photoW / 2, photoY + contentH / 2)
+  }
   ctx.strokeStyle = '#cbd5e1'
   ctx.lineWidth = 2
-  roundRectPath(ctx, photoX, photoY, photoSize, photoSize, 12)
+  roundRectPath(ctx, photoX, photoY, photoW, contentH, 14)
   ctx.stroke()
-  ctx.fillStyle = '#94a3b8'
-  ctx.font = '700 56px Arial, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(staff.initials || '?', photoX + photoSize / 2, photoY + photoSize / 2)
 
-  const infoX = photoX + photoSize + 40
-  // Sized up from a small badge — the real logo has "Brick Path Therapy
-  // Center · Davao City" lettering baked into the artwork, so it needs to be
-  // large enough to read on its own instead of pairing it with duplicate text.
-  const logoSize = 104
-  const logoY = photoY - 4
+  // Right column: logo, then name/ID/joining/branch, then a QR code that
+  // fills the rest of the column's height instead of leaving it blank.
+  const infoX = photoX + photoW + 32
+  const infoRight = W - padding
+  const logoSize = 84
+  const logoY = contentY
   if (logoImg) {
     ctx.save()
     ctx.beginPath()
@@ -837,30 +888,53 @@ function drawIdCard(ctx, staff, logoImg) {
     ctx.arc(infoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
     ctx.fill()
     ctx.fillStyle = '#fff'
-    ctx.font = '700 34px Arial, sans-serif'
+    ctx.font = '700 28px Arial, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText('BP', infoX + logoSize / 2, logoY + logoSize / 2 + 1)
   }
 
-  const nameY = logoY + logoSize + 50
+  const nameY = logoY + logoSize + 42
   ctx.fillStyle = '#1a2e26'
-  ctx.font = '800 34px Arial, sans-serif'
+  ctx.font = '800 36px Arial, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
   ctx.fillText((staff.name || '').toUpperCase(), infoX, nameY)
 
   ctx.fillStyle = '#4b5563'
-  ctx.font = '600 18px Arial, sans-serif'
-  ctx.fillText(`ID#. ${staff.employeeId || '—'}`, infoX, nameY + 34)
+  ctx.font = '600 19px Arial, sans-serif'
+  ctx.fillText(`ID#. ${staff.employeeId || '—'}`, infoX, nameY + 32)
   ctx.fillText(`JOINING: ${formatDMY(staff.hiredAt)}`, infoX, nameY + 60)
+  ctx.fillText(`BRANCH: ${branchLabel(staff.branch)}`, infoX, nameY + 88)
 
+  const dividerY = nameY + 110
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(infoX, dividerY)
+  ctx.lineTo(infoRight, dividerY)
+  ctx.stroke()
+
+  // QR code, bottom-right — sized to use whatever vertical room is left so
+  // the column reads as one continuous block, not text-then-gap-then-code.
+  const qrSize = Math.min(180, contentBottom - dividerY - 16, infoRight - infoX)
+  const qrX = infoRight - qrSize
+  const qrY = contentBottom - qrSize
+  if (qrImg) {
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize)
+    ctx.strokeStyle = '#e5e7eb'
+    ctx.lineWidth = 1.5
+    ctx.strokeRect(qrX, qrY, qrSize, qrSize)
+  }
+
+  ctx.fillStyle = '#159a72'
+  ctx.font = '800 15px Arial, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText('SCAN TO VERIFY', infoX, qrY + qrSize / 2 - 8)
   ctx.fillStyle = '#9aab9f'
-  ctx.font = '600 14px Arial, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.fillText(branchLabel(staff.branch), W - padding, barH + 30)
-
-  drawBarcode(ctx, padding, H - 90, W - padding * 2, 56, String(staff.employeeId || staff.name || 'ID'))
+  ctx.font = '600 13px Arial, sans-serif'
+  ctx.fillText('Staff details & role', infoX, qrY + qrSize / 2 + 14)
 
   ctx.restore()
   ctx.strokeStyle = '#e5e7eb'
@@ -880,13 +954,18 @@ function IdCardModal({ staff, onClose }) {
     canvas.height = ID_CARD_H
     const ctx = canvas.getContext('2d')
 
-    const render = (logoImg) => { if (!cancelled) drawIdCard(ctx, staff, logoImg) }
-    render(null)
+    // Draw an immediate placeholder pass so the modal never looks blank
+    // while the logo/photo/QR load, then redraw once everything's ready.
+    drawIdCard(ctx, staff, { logoImg: null, photoImg: null, qrImg: null })
 
-    const logo = new Image()
-    logo.onload = () => render(logo)
-    logo.onerror = () => {} // no logo file yet — the drawn "BP" placeholder stands in
-    logo.src = ID_CARD_LOGO_SRC
+    Promise.all([
+      loadImage(ID_CARD_LOGO_SRC),
+      loadImage(staff.photoUrl),
+      buildIdCardQr(staff),
+    ]).then(([logoImg, photoImg, qrImg]) => {
+      if (cancelled) return
+      drawIdCard(ctx, staff, { logoImg, photoImg, qrImg })
+    })
 
     return () => { cancelled = true }
   }, [staff])
@@ -1539,6 +1618,7 @@ function AddStaffModal({ onClose, onAdd, onSuccess, staffCount = 0 }) {
         mongoEmployeeId: data.employee?._id,
         accountStatus: 'pending',
         documents: data.employee?.documents || {},
+        photoUrl: data.employee?.profile_picture?.url ? `${API_BASE}${data.employee.profile_picture.url}` : '',
       })
       onSuccess({ name: form.name.trim(), email: form.email.trim() })
       onClose()
@@ -1874,6 +1954,7 @@ function mapEmployeeToApplicant(emp) {
     email: emp.email || '',
     phone: emp.phone?.number ? `${emp.phone.country_code || ''} ${emp.phone.number}`.trim() : '',
     experience: emp.experience ?? '',
+    photoUrl: emp.profile_picture?.url ? `${API_BASE}${emp.profile_picture.url}` : '',
     coverLetter: `Invited to join as ${role || 'a team member'} at ${branchName || 'the branch'}. An account setup email was sent to ${emp.email} to collect their password, PTR, PRC license, diploma, and ID.`,
     checklist,
     // Kept so "Approve and hire" can promote this record with its full profile.
@@ -2030,7 +2111,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         employeeId: form.employeeId, prcNumber: form.prcNumber,
         employment: form.employment, licenseExpiry: form.licenseExpiry,
         position: form.position, hiredAt: form.hiredAt, status: form.status,
-        documents: form.documents || {},
+        documents: form.documents || {}, photoUrl: form.photoUrl || '',
       },
       ...prev,
     ])

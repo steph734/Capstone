@@ -5,6 +5,7 @@ import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
+import { generateUniqueId } from '../../utils/idGenerator'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -46,7 +47,7 @@ const INITIAL_STAFF = [
     attendance: { present: 21, late: 1, absent: 1, week: ['present', 'present', 'present', 'late', 'present'] },
     email: 'marco.reyes@therapypro.ph', phone: '+63 917 234 5678', dob: '1994-03-12', gender: 'Male',
     address: '12 Rizal St, Quezon City', emergencyContact: 'Liza Reyes (Spouse)', emergencyPhone: '+63 917 234 5000',
-    employeeId: 'EMP-0001', prcNumber: '0123456', experience: '5', employment: 'Full-time', licenseExpiry: '2027-01-15',
+    employeeId: 'T-104822', prcNumber: '0123456', experience: '5', employment: 'Full-time', licenseExpiry: '2027-01-15',
     documents: demoDocuments('Marco_Reyes'),
   },
   {
@@ -55,7 +56,7 @@ const INITIAL_STAFF = [
     attendance: { present: 17, late: 0, absent: 3, week: ['present', 'absent', 'absent', 'present', 'present'] },
     email: 'jade.tan@therapypro.ph', phone: '+63 918 345 6789', dob: '1996-07-22', gender: 'Female',
     address: '45 Mabini Ave, Makati City', emergencyContact: 'Robert Tan (Father)', emergencyPhone: '+63 918 345 1111',
-    employeeId: 'EMP-0002', prcNumber: '0234567', experience: '3', employment: 'Full-time', licenseExpiry: '2026-11-30',
+    employeeId: 'T-227591', prcNumber: '0234567', experience: '3', employment: 'Full-time', licenseExpiry: '2026-11-30',
     documents: demoDocuments('Jade_Tan'),
   },
   {
@@ -64,7 +65,7 @@ const INITIAL_STAFF = [
     attendance: { present: 22, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
     email: 'andre.lim@therapypro.ph', phone: '+63 919 456 7890', dob: '1992-11-05', gender: 'Male',
     address: '8 Osmeña Blvd, Cebu City', emergencyContact: 'Grace Lim (Sister)', emergencyPhone: '+63 919 456 2222',
-    employeeId: 'EMP-0003', prcNumber: '0345678', experience: '7', employment: 'Full-time', licenseExpiry: '2028-05-20',
+    employeeId: 'T-338460', prcNumber: '0345678', experience: '7', employment: 'Full-time', licenseExpiry: '2028-05-20',
     documents: demoDocuments('Andre_Lim'),
   },
   {
@@ -73,7 +74,7 @@ const INITIAL_STAFF = [
     attendance: { present: 23, late: 1, absent: 0, week: ['present', 'present', 'present', 'late', 'present'] },
     email: 'clara.delacruz@therapypro.ph', phone: '+63 920 567 8901', dob: '1995-02-18', gender: 'Female',
     address: '23 Aguinaldo Hwy, Dasmariñas', emergencyContact: 'Mark Dela Cruz (Husband)', emergencyPhone: '+63 920 567 3333',
-    employeeId: 'EMP-0004', prcNumber: '0456789', experience: '4', employment: 'Part-time', licenseExpiry: '2027-08-09',
+    employeeId: 'T-451903', prcNumber: '0456789', experience: '4', employment: 'Part-time', licenseExpiry: '2027-08-09',
     documents: demoDocuments('Clara_Dela_Cruz'),
   },
   {
@@ -82,7 +83,7 @@ const INITIAL_STAFF = [
     attendance: { present: 20, late: 2, absent: 0, week: ['present', 'late', 'present', 'present', 'late'] },
     email: 'carmen.dizon@therapypro.ph', phone: '+63 921 678 9012', dob: '1998-09-30', gender: 'Female',
     address: '5 Katipunan Ave, Quezon City', emergencyContact: 'Elena Dizon (Mother)', emergencyPhone: '+63 921 678 4444',
-    employeeId: 'EMP-0005', prcNumber: '0567890', experience: '2', employment: 'Full-time', licenseExpiry: '2026-04-14',
+    employeeId: 'T-560274', prcNumber: '0567890', experience: '2', employment: 'Full-time', licenseExpiry: '2026-04-14',
     documents: demoDocuments('Carmen_Dizon'),
   },
   {
@@ -91,7 +92,7 @@ const INITIAL_STAFF = [
     attendance: { present: 19, late: 1, absent: 2, week: ['present', 'present', 'absent', 'present', 'present'] },
     email: 'paolo.ramos@therapypro.ph', phone: '+63 922 789 0123', dob: '1993-05-27', gender: 'Male',
     address: '17 Session Rd, Baguio City', emergencyContact: 'Nina Ramos (Spouse)', emergencyPhone: '+63 922 789 5555',
-    employeeId: 'EMP-0006', prcNumber: '0678901', experience: '6', employment: 'Contract', licenseExpiry: '2027-12-02',
+    employeeId: 'T-673815', prcNumber: '0678901', experience: '6', employment: 'Contract', licenseExpiry: '2027-12-02',
     documents: demoDocuments('Paolo_Ramos'),
   },
   {
@@ -100,7 +101,7 @@ const INITIAL_STAFF = [
     attendance: { present: 22, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
     email: 'grace.uy@therapypro.ph', phone: '+63 923 890 1234', dob: '1990-01-09', gender: 'Female',
     address: '30 Gorordo Ave, Cebu City', emergencyContact: 'Daniel Uy (Brother)', emergencyPhone: '+63 923 890 6666',
-    employeeId: 'EMP-0007', prcNumber: '0789012', experience: '9', employment: 'Full-time', licenseExpiry: '2028-02-27',
+    employeeId: 'T-789246', prcNumber: '0789012', experience: '9', employment: 'Full-time', licenseExpiry: '2028-02-27',
     documents: demoDocuments('Grace_Uy'),
   },
 ]
@@ -788,6 +789,8 @@ function drawImageCover(ctx, img, x, y, w, h) {
 
 // Decorative only — a deterministic bar pattern seeded off the employee ID,
 // not a real scannable barcode.
+// A real barcode alternates bar/space continuously with no blank stretches —
+// the previous version randomly skipped bars, leaving uneven gaps.
 function drawBarcode(ctx, x, y, w, h, seedStr) {
   let seed = 0
   for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0
@@ -795,12 +798,15 @@ function drawBarcode(ctx, x, y, w, h, seedStr) {
     seed = (seed * 1103515245 + 12345) >>> 0
     return (seed % 1000) / 1000
   }
+  const unit = 3
   ctx.fillStyle = '#111827'
   let cx = x
+  let isBar = true
   while (cx < x + w) {
-    const barW = 2 + Math.floor(rand() * 5)
-    if (rand() > 0.35) ctx.fillRect(cx, y, barW, h)
-    cx += barW + 2
+    const barW = unit * (1 + Math.floor(rand() * 3))
+    if (isBar) ctx.fillRect(cx, y, barW, h)
+    cx += barW
+    isBar = !isBar
   }
 }
 
@@ -1434,13 +1440,15 @@ function ExpiryDatePicker({ value, onChange }) {
   )
 }
 
-function AddStaffModal({ onClose, onAdd, onSuccess, staffCount = 0 }) {
+function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
     name: '', email: '', phoneCode: '+63', phone: '',
     dob: '', gender: '', address: '', emergencyContact: '', emergencyCode: '+63', emergencyPhone: '',
     specialty: null, branch: BRANCHES[0], status: STATUSES[0],
-    employeeId: `EMP-${String(staffCount + 1).padStart(4, '0')}`,
+    // Therapist/staff ID scheme: "T-" + 6 random digits, unique against
+    // every employeeId already in use (approved staff and pending review).
+    employeeId: generateUniqueId('T', existingIds),
     prcNumber: '', experience: '', employment: EMPLOYMENT_TYPES[0], licenseExpiry: '',
   })
   // The DB's `employees` collection needs a real branch_id (ObjectId), not the
@@ -2153,7 +2161,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         caseload: 0, avatar: `https://i.pravatar.cc/150?img=${seed}`,
         joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         archived: false, attendance: { present: 0, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
-        employeeId: `EMP-${String(prev.length + 1).padStart(4, '0')}`,
+        employeeId: generateUniqueId('T', prev.map((s) => s.employeeId).filter(Boolean)),
         documents: {},
       },
       ...prev,
@@ -2460,7 +2468,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
           onClose={() => setShowAdd(false)}
           onAdd={handleAdd}
           onSuccess={(info) => setAddSuccess(info)}
-          staffCount={staff.length}
+          existingIds={[...staff, ...applicants].map((s) => s.employeeId).filter(Boolean)}
         />
       )}
       {addSuccess && (

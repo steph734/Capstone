@@ -14,6 +14,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import VerifyResetOtp from './pages/VerifyResetOtp'
 import ResetPassword from './pages/ResetPassword'
 import StaffSetup from './pages/StaffSetup'
+import SetPassword from './pages/SetPassword'
 import Dashboard from './pages/Dashboard'
 import TherapyDetail from './pages/TherapyDetail'
 import AppointmentsPage from './pages/AppointmentsPage'
@@ -306,6 +307,11 @@ function App() {
         <Route
           path="/staff-setup"
           element={<StaffSetup />}
+        />
+
+        <Route
+          path="/set-password"
+          element={<SetPassword />}
         />
 
         <Route 

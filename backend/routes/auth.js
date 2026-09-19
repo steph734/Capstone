@@ -257,6 +257,16 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // A newly-approved hire's password is only a temp one mailed to them —
+    // block sign-in until they've used the "Set your password" link to
+    // replace it with one only they know.
+    if (user.must_set_password) {
+      return res.status(403).json({
+        error: 'Please set your password using the link we emailed you before signing in.',
+        mustSetPassword: true,
+      });
+    }
+
     // A therapist invited via Add Staff isn't a real login until the owner
     // approves their reviewed documents — even if they somehow got a
     // password set (e.g. via password reset), block sign-in until then.

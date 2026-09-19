@@ -52,55 +52,60 @@ async function sendApplicationReceivedEmail({ email, name }) {
   });
 }
 
-function loginUrl() {
+function appBase() {
   const base = (process.env.PUBLIC_APP_URL || '').trim().replace(/\/$/, '');
-  return `${base || 'https://therapypro.app'}/login`;
+  return base || 'https://therapypro.app';
 }
 
-function buildHiredHtml({ name, email, tempPassword }) {
+function loginUrl() {
+  return `${appBase()}/login`;
+}
+
+function setPasswordUrl(token) {
+  return `${appBase()}/set-password?token=${encodeURIComponent(token)}`;
+}
+
+function buildHiredHtml({ name, email, tempPassword, setupToken }) {
   const greeting = name ? `Hi ${name},` : 'Hi,';
+  const link = setPasswordUrl(setupToken);
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
-    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
-      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
-        <h1 style="margin:0 0 4px;font-size:20px;">You're hired!</h1>
-        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+  <body style="margin:0;background:#05100b;font-family:Arial,Helvetica,sans-serif;color:#e7f3ee;">
+    <div style="max-width:480px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#0d1a14;border:1px solid #1c2e26;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;color:#3ddc84;">You're hired!</h1>
+        <p style="margin:0 0 20px;color:#c9d8d1;font-size:13px;">${greeting}</p>
 
-        <p style="margin:0 0 16px;font-size:14px;">
-          Congratulations — your application to join ${BRAND} has been approved. Here are your login
-          details:
+        <p style="margin:0 0 20px;font-size:14px;font-weight:700;color:#f2faf6;">
+          Congratulations, your application to join ${BRAND} has been approved. Here's your temporary
+          login:
         </p>
 
         <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
           <tr>
-            <td style="padding:10px 14px;background:#f0fbf5;border:1px solid #c8eeda;border-radius:10px 10px 0 0;font-size:12px;color:#6b7c75;">Login email</td>
+            <td style="padding:14px 16px 0;background:#102820;border:1px solid #1f3b2e;border-radius:12px 12px 0 0;font-size:11px;color:#8fa89c;">Login email</td>
           </tr>
           <tr>
-            <td style="padding:0 14px 10px;background:#f0fbf5;border-left:1px solid #c8eeda;border-right:1px solid #c8eeda;font-size:15px;font-weight:700;color:#1a2e26;">${email}</td>
+            <td style="padding:0 16px 14px;background:#102820;border-left:1px solid #1f3b2e;border-right:1px solid #1f3b2e;font-size:15px;font-weight:700;color:#5fd8a0;">${email}</td>
           </tr>
           <tr>
-            <td style="padding:10px 14px 0;background:#f0fbf5;border-left:1px solid #c8eeda;border-right:1px solid #c8eeda;font-size:12px;color:#6b7c75;">Temporary password</td>
+            <td style="padding:0 16px;background:#102820;border-left:1px solid #1f3b2e;border-right:1px solid #1f3b2e;font-size:11px;color:#8fa89c;">Temporary password</td>
           </tr>
           <tr>
-            <td style="padding:0 14px 14px;background:#f0fbf5;border:1px solid #c8eeda;border-top:none;border-radius:0 0 10px 10px;font-size:15px;font-weight:700;letter-spacing:1px;color:#1a2e26;">${tempPassword}</td>
+            <td style="padding:0 16px 16px;background:#102820;border:1px solid #1f3b2e;border-top:none;border-radius:0 0 12px 12px;font-size:15px;font-weight:700;letter-spacing:0.5px;color:#f2faf6;">${tempPassword}</td>
           </tr>
         </table>
 
         <p style="margin:0 0 20px;text-align:center;">
-          <a href="${loginUrl()}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;
+          <a href="${link}" style="display:inline-block;background:#22c55e;color:#062412;text-decoration:none;
             font-weight:700;font-size:14px;padding:12px 24px;border-radius:10px;">
-            Log in to ${BRAND}
+            Set your password
           </a>
         </p>
 
-        <p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:#4a6b5d;">
-          For your security, please log in with this temporary password and set your own password
-          right away from your account Settings.
-        </p>
-
-        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
-          If you weren't expecting this email, please contact your branch owner.
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#8fa89c;">
+          This link takes you straight to setting a permanent password — you won't be able to use the
+          account until you do. If you weren't expecting this email, contact your branch owner.
         </p>
       </div>
     </div>
@@ -108,28 +113,29 @@ function buildHiredHtml({ name, email, tempPassword }) {
 </html>`;
 }
 
-function buildHiredText({ name, email, tempPassword }) {
+function buildHiredText({ name, email, tempPassword, setupToken }) {
   return [
     name ? `Hi ${name},` : 'Hi,',
     '',
-    `Congratulations — your application to join ${BRAND} has been approved.`,
+    `Congratulations, your application to join ${BRAND} has been approved. Here's your temporary login:`,
     '',
     `Login email: ${email}`,
     `Temporary password: ${tempPassword}`,
     '',
-    `Log in at: ${loginUrl()}`,
+    `Set your password: ${setPasswordUrl(setupToken)}`,
     '',
-    'For your security, please log in with this temporary password and set your own password right away from your account Settings.',
+    "This link takes you straight to setting a permanent password — you won't be able to use the account until you do.",
+    "If you weren't expecting this email, contact your branch owner.",
   ].join('\n');
 }
 
-async function sendHiredEmail({ email, name, tempPassword }) {
+async function sendHiredEmail({ email, name, tempPassword, setupToken }) {
   return sendEmail({
     to: email,
     toName: name || undefined,
-    subject: `You're hired at ${BRAND} — your login details`,
-    html: buildHiredHtml({ name, email, tempPassword }),
-    plain: buildHiredText({ name, email, tempPassword }),
+    subject: `You're hired at ${BRAND} — set your password`,
+    html: buildHiredHtml({ name, email, tempPassword, setupToken }),
+    plain: buildHiredText({ name, email, tempPassword, setupToken }),
   });
 }
 

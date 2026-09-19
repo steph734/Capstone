@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema(
     status:      { type: String, required: true, default: 'Active' },
     password_change_at: { type: Date, default: null },
 
+    // Set when a hire is approved with a temp password — blocks login until
+    // they use the emailed link to set their own. Cleared by POST /api/set-password.
+    must_set_password: { type: Boolean, required: true, default: false },
+    password_setup_token_hash: { type: String, select: false },
+    password_setup_expires_at: { type: Date },
+
     is_locked:   { type: Boolean, required: true, default: false },
     is_archived: { type: Boolean, required: true, default: false },
     archived_at: { type: Date, default: null },

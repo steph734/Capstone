@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
 const { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail } = require('../utils/employeeEmails');
+const { INVITE_TTL_MS, generateInviteToken, hashInviteToken } = require('../utils/staffInvite');
 
 const router = express.Router();
 
@@ -285,9 +286,21 @@ router.patch('/:id/approve', async (req, res) => {
     // Only this plaintext copy exists, and only for this one response.
     const tempPassword = crypto.randomBytes(9).toString('base64url');
     const password_hash = await bcrypt.hash(tempPassword, 10);
+    // Login stays blocked (see auth.js) until they use this emailed, single-use
+    // link to replace the temp password with one only they know.
+    const setupToken = generateInviteToken();
+    const setupTokenHash = hashInviteToken(setupToken);
     await User.updateOne(
       { _id: employee.user_id._id },
-      { $set: { password: password_hash, password_change_at: null } }
+      {
+        $set: {
+          password: password_hash,
+          password_change_at: null,
+          must_set_password: true,
+          password_setup_token_hash: setupTokenHash,
+          password_setup_expires_at: new Date(Date.now() + INVITE_TTL_MS),
+        },
+      }
     );
 
     employee.approved_at = new Date();
@@ -296,7 +309,7 @@ router.patch('/:id/approve', async (req, res) => {
 
     const name = employee.user_id.full_name || `${employee.first_name} ${employee.last_name}`.trim();
     try {
-      await sendHiredEmail({ email: employee.user_id.email, name, tempPassword });
+      await sendHiredEmail({ email: employee.user_id.email, name, tempPassword, setupToken });
     } catch (err) {
       console.error('send hired email error:', err);
     }

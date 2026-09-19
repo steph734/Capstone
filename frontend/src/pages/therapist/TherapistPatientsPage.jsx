@@ -4,6 +4,7 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
 import CallOverlay from '../../components/CallOverlay'
 import { STREAM_THERAPIST_USER } from '../../utils/streamConfig'
+import { generateUniqueId } from '../../utils/idGenerator'
 
 // Lazy-loaded: the GetStream Video SDK is large and only needed once someone
 // actually opens a real video/voice call.
@@ -17,7 +18,7 @@ function PhoneIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" /></svg>
 }
 
-const PATIENTS = [
+const RAW_PATIENTS = [
   {
     id: 0,
     name: 'Alvrin',
@@ -196,6 +197,14 @@ const PATIENTS = [
   },
 ]
 
+// Patient ID scheme: "P-" + 6 random digits, unique across the seed list.
+const seedPatientIds = new Set()
+const PATIENTS = RAW_PATIENTS.map((p) => {
+  const patientId = generateUniqueId('P', seedPatientIds)
+  seedPatientIds.add(patientId)
+  return { ...p, patientId }
+})
+
 // Patient id=0 (Alvrin) messages come from MessagesContext — not seeded here.
 const SEED_MESSAGES = {
   1:  [
@@ -285,6 +294,10 @@ function ProfileModal({ patient, onClose, onMessage }) {
         <div className="tp-profile-body">
           <h4 className="tp-section-title">Patient Details</h4>
           <div className="tp-detail-grid">
+            <div className="tp-detail-row">
+              <span className="tp-detail-lbl">Patient ID</span>
+              <span className="tp-detail-val">{patient.patientId || '—'}</span>
+            </div>
             <div className="tp-detail-row">
               <span className="tp-detail-lbl">Guardian</span>
               <span className="tp-detail-val">{patient.guardian}</span>
@@ -523,6 +536,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     const seed = Math.floor(Math.random() * 70) + 1
     const newPt = {
       id:          Date.now(),
+      patientId:   generateUniqueId('P', patients.map((p) => p.patientId).filter(Boolean)),
       name:        form.name,
       age:         Number(form.age) || 0,
       condition:   form.condition,

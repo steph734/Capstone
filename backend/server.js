@@ -30,6 +30,9 @@ app.use('/api/branches', require('./routes/branches'));
 // Public: new-hire self-setup (set password + upload documents) via emailed invite link
 app.use('/api/staff-setup', require('./routes/staffSetup'));
 
+// Public: a hire sets their permanent password via the link from the "You're hired" email
+app.use('/api/set-password', require('./routes/setPassword'));
+
 // Test endpoint — always up, reports live DB status.
 app.get('/api/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;

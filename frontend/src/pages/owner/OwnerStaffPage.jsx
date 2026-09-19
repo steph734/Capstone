@@ -31,81 +31,6 @@ const REJECT_REASONS = [
   'Duplicate application',
   'Other',
 ]
-// Demo document records for the profile "Documents" tab — a real backend
-// would store uploaded file metadata instead of these placeholders.
-const demoDocuments = (base) => ({
-  ptr: { name: `${base}_PTR_License.pdf` },
-  prc: { name: `${base}_PRC_License.pdf` },
-  diploma: { name: `${base}_Diploma.pdf` },
-  id: { name: `${base}_Valid_ID.jpg` },
-})
-
-const INITIAL_STAFF = [
-  {
-    id: 1, name: 'Marco Reyes', specialty: 'Speech Therapist', branch: 'Main', status: 'On Duty', caseload: 24,
-    avatar: 'https://i.pravatar.cc/150?img=8', joined: 'Jan 2025', archived: false,
-    attendance: { present: 21, late: 1, absent: 1, week: ['present', 'present', 'present', 'late', 'present'] },
-    email: 'marco.reyes@therapypro.ph', phone: '+63 917 234 5678', dob: '1994-03-12', gender: 'Male',
-    address: '12 Rizal St, Quezon City', emergencyContact: 'Liza Reyes (Spouse)', emergencyPhone: '+63 917 234 5000',
-    employeeId: 'T-104822', prcNumber: '0123456', experience: '5', employment: 'Full-time', licenseExpiry: '2027-01-15',
-    documents: demoDocuments('Marco_Reyes'),
-  },
-  {
-    id: 2, name: 'Jade Tan', specialty: 'Physical Therapist', branch: 'North', status: 'On Leave', caseload: 18,
-    avatar: 'https://i.pravatar.cc/150?img=9', joined: 'Mar 2025', archived: false,
-    attendance: { present: 17, late: 0, absent: 3, week: ['present', 'absent', 'absent', 'present', 'present'] },
-    email: 'jade.tan@therapypro.ph', phone: '+63 918 345 6789', dob: '1996-07-22', gender: 'Female',
-    address: '45 Mabini Ave, Makati City', emergencyContact: 'Robert Tan (Father)', emergencyPhone: '+63 918 345 1111',
-    employeeId: 'T-227591', prcNumber: '0234567', experience: '3', employment: 'Full-time', licenseExpiry: '2026-11-30',
-    documents: demoDocuments('Jade_Tan'),
-  },
-  {
-    id: 3, name: 'Andre Lim', specialty: 'Behavior Therapist', branch: 'Cebu', status: 'On Duty', caseload: 15,
-    avatar: 'https://i.pravatar.cc/150?img=52', joined: 'Jun 2025', archived: false,
-    attendance: { present: 22, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
-    email: 'andre.lim@therapypro.ph', phone: '+63 919 456 7890', dob: '1992-11-05', gender: 'Male',
-    address: '8 Osmeña Blvd, Cebu City', emergencyContact: 'Grace Lim (Sister)', emergencyPhone: '+63 919 456 2222',
-    employeeId: 'T-338460', prcNumber: '0345678', experience: '7', employment: 'Full-time', licenseExpiry: '2028-05-20',
-    documents: demoDocuments('Andre_Lim'),
-  },
-  {
-    id: 4, name: 'Clara Dela Cruz', specialty: 'Occupational Therapist', branch: 'South', status: 'On Duty', caseload: 21,
-    avatar: 'https://i.pravatar.cc/150?img=32', joined: 'Apr 2025', archived: false,
-    attendance: { present: 23, late: 1, absent: 0, week: ['present', 'present', 'present', 'late', 'present'] },
-    email: 'clara.delacruz@therapypro.ph', phone: '+63 920 567 8901', dob: '1995-02-18', gender: 'Female',
-    address: '23 Aguinaldo Hwy, Dasmariñas', emergencyContact: 'Mark Dela Cruz (Husband)', emergencyPhone: '+63 920 567 3333',
-    employeeId: 'T-451903', prcNumber: '0456789', experience: '4', employment: 'Part-time', licenseExpiry: '2027-08-09',
-    documents: demoDocuments('Clara_Dela_Cruz'),
-  },
-  {
-    id: 5, name: 'Carmen Dizon', specialty: 'Occupational Therapist', branch: 'Main', status: 'On Duty', caseload: 20,
-    avatar: 'https://i.pravatar.cc/150?img=25', joined: 'Aug 2025', archived: false,
-    attendance: { present: 20, late: 2, absent: 0, week: ['present', 'late', 'present', 'present', 'late'] },
-    email: 'carmen.dizon@therapypro.ph', phone: '+63 921 678 9012', dob: '1998-09-30', gender: 'Female',
-    address: '5 Katipunan Ave, Quezon City', emergencyContact: 'Elena Dizon (Mother)', emergencyPhone: '+63 921 678 4444',
-    employeeId: 'T-560274', prcNumber: '0567890', experience: '2', employment: 'Full-time', licenseExpiry: '2026-04-14',
-    documents: demoDocuments('Carmen_Dizon'),
-  },
-  {
-    id: 6, name: 'Paolo Ramos', specialty: 'Developmental Therapist', branch: 'North', status: 'On Duty', caseload: 16,
-    avatar: 'https://i.pravatar.cc/150?img=51', joined: 'Oct 2025', archived: false,
-    attendance: { present: 19, late: 1, absent: 2, week: ['present', 'present', 'absent', 'present', 'present'] },
-    email: 'paolo.ramos@therapypro.ph', phone: '+63 922 789 0123', dob: '1993-05-27', gender: 'Male',
-    address: '17 Session Rd, Baguio City', emergencyContact: 'Nina Ramos (Spouse)', emergencyPhone: '+63 922 789 5555',
-    employeeId: 'T-673815', prcNumber: '0678901', experience: '6', employment: 'Contract', licenseExpiry: '2027-12-02',
-    documents: demoDocuments('Paolo_Ramos'),
-  },
-  {
-    id: 7, name: 'Grace Uy', specialty: 'Psychologist', branch: 'Cebu', status: 'On Duty', caseload: 12,
-    avatar: 'https://i.pravatar.cc/150?img=28', joined: 'Nov 2025', archived: false,
-    attendance: { present: 22, late: 0, absent: 0, week: ['present', 'present', 'present', 'present', 'present'] },
-    email: 'grace.uy@therapypro.ph', phone: '+63 923 890 1234', dob: '1990-01-09', gender: 'Female',
-    address: '30 Gorordo Ave, Cebu City', emergencyContact: 'Daniel Uy (Brother)', emergencyPhone: '+63 923 890 6666',
-    employeeId: 'T-789246', prcNumber: '0789012', experience: '9', employment: 'Full-time', licenseExpiry: '2028-02-27',
-    documents: demoDocuments('Grace_Uy'),
-  },
-]
-
 const INITIAL_LEAVE_REQUESTS = [
   { id: 'lr1', staffId: 2, type: 'Vacation Leave', range: 'May 15 – May 17, 2026', days: 3, reason: 'Family vacation' },
 ]
@@ -146,33 +71,6 @@ function buildDocChecklist(documents = {}) {
     return { label, note: done ? 'uploaded' : 'awaiting upload', done }
   })
 }
-
-const INITIAL_APPLICANTS = [
-  {
-    id: 'ap1', name: 'Rica Domingo', initials: 'RD', appliedFor: 'Occupational Therapist', branch: 'Main',
-    appliedOn: '2026-09-08', missingDocs: 0,
-    email: 'rica.domingo@gmail.com', phone: '+63 917 111 2233', experience: '4',
-    coverLetter: "Passionate about helping children build fine motor and daily living skills. Looking forward to joining the Main branch team.",
-    checklist: [
-      { label: 'PRC license', note: 'verified', done: true },
-      { label: 'NBI clearance', note: 'verified', done: true },
-      { label: 'Resume', note: 'uploaded', done: true },
-      { label: 'References', note: '2 contacted', done: true },
-    ],
-  },
-  {
-    id: 'ap2', name: 'Kevin Santos', initials: 'KS', appliedFor: 'Speech Therapist', branch: 'Main',
-    appliedOn: '2026-09-10', missingDocs: 2,
-    email: 'kevin.santos@gmail.com', phone: '+63 918 222 3344', experience: '2',
-    coverLetter: 'Recent PRC board passer eager to start clinical practice in speech-language pathology.',
-    checklist: [
-      { label: 'PRC license', note: 'missing', done: false },
-      { label: 'NBI clearance', note: 'missing', done: false },
-      { label: 'Resume', note: 'uploaded', done: true },
-      { label: 'References', note: 'not yet contacted', done: false },
-    ],
-  },
-]
 
 // ── Icons ──────────────────────────────────────────────
 function PeopleIcon() {
@@ -891,11 +789,12 @@ function drawIdCard(ctx, staff, { logoImg, photoImg }) {
   ctx.textBaseline = 'alphabetic'
   ctx.fillText((staff.name || '').toUpperCase(), infoX, nameY)
 
+  const idDigits = (staff.employeeId || '').replace(/\D/g, '') || '—'
   ctx.fillStyle = '#4b5563'
-  ctx.font = '600 19px Arial, sans-serif'
-  ctx.fillText(`ID#. ${staff.employeeId || '—'}`, infoX, nameY + 32)
-  ctx.fillText(`EMPLOYMENT: ${staff.employment || '—'}`, infoX, nameY + 60)
-  ctx.fillText(`BRANCH: ${branchLabel(staff.branch)}`, infoX, nameY + 88)
+  ctx.font = '600 22px Arial, sans-serif'
+  ctx.fillText(`ID#. ${idDigits}`, infoX, nameY + 34)
+  ctx.fillText(`EMPLOYMENT: ${staff.employment || '—'}`, infoX, nameY + 68)
+  ctx.fillText(`BRANCH: ${branchLabel(staff.branch)}`, infoX, nameY + 102)
 
   // A full-width barcode strip anchors the bottom of the card.
   drawBarcode(ctx, padding, contentBottom - 56, W - padding * 2, 48, String(staff.employeeId || staff.name || 'ID'))
@@ -1941,9 +1840,9 @@ function mapEmployeeToApplicant(emp) {
 
 /* ── Main Page ─────────────────────────────────────────────── */
 export default function OwnerStaffPage({ user, onLogout, betaTier }) {
-  const [staff, setStaff] = useState(INITIAL_STAFF)
+  const [staff, setStaff] = useState([])
   const [leaveRequests, setLeaveRequests] = useState(INITIAL_LEAVE_REQUESTS)
-  const [applicants, setApplicants] = useState(INITIAL_APPLICANTS)
+  const [applicants, setApplicants] = useState([])
   const [activeTab, setActiveTab] = useState('list')
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('All')

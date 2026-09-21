@@ -11,11 +11,26 @@ function isNoBarcodeInFrame(err) {
   return err instanceof NotFoundException || err instanceof ChecksumException || err instanceof FormatException
 }
 
+// zxing's own MultiFormatReader has the identical `instanceof ReaderException`
+// bug internally (@zxing/library@0.23.0, core/MultiFormatReader.js) — when one
+// of its per-format sub-readers (e.g. the QR detector) throws its ordinary
+// NotFoundException for "not a QR code", that check also misses and the
+// library itself logs 'MultiFormatReader: non-ReaderException from reader'
+// via console.warn on nearly every frame. There's no hook to opt out of that
+// log, and it isn't a real error, so we mute just this one known-benign
+// message for as long as the scanner is mounted.
+function installMultiFormatReaderWarningFilter() {
+  const originalWarn = console.warn
+  console.warn = (...args) => {
+    if (typeof args[0] === 'string' && args[0].startsWith('MultiFormatReader: non-ReaderException')) return
+    originalWarn(...args)
+  }
+  return () => { console.warn = originalWarn }
+}
+
 // Restricting to the formats a staff badge would actually use (vs. zxing's
-// full default list of ~15) cuts out most of the internal sub-readers that
-// otherwise fire on every single video frame — with all formats enabled,
-// mismatched readers routinely throw a non-NotFoundException error internally
-// that zxing logs as a console warning on nearly every frame, flooding devtools.
+// full default list of ~15) cuts down how often that internal mismatch above
+// gets hit in the first place, since fewer sub-readers run per frame.
 const SCAN_HINTS = new Map([
   [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE]],
 ])
@@ -120,6 +135,7 @@ function ScanIdModal({ onClose, onLogged }) {
     const reader = new BrowserMultiFormatReader(SCAN_HINTS)
     const cropCanvas = document.createElement('canvas')
     const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true })
+    const uninstallWarningFilter = installMultiFormatReaderWarningFilter()
     let stream = null
     let retryTimeoutId = null
 
@@ -205,6 +221,7 @@ function ScanIdModal({ onClose, onLogged }) {
       mountedRef.current = false
       clearTimeout(retryTimeoutId)
       stopStream()
+      uninstallWarningFilter()
     }
   }, [scanKey])
 

@@ -70,6 +70,20 @@
   flex-shrink: 0;
 }
 
+.sim-live-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f0f7f4;
+  color: #2c4a3e;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 .sim-close {
   width: 32px;
   height: 32px;

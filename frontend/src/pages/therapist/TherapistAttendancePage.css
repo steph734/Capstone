@@ -6,8 +6,9 @@
   font-weight: 700;
 }
 
-.ta-status-complete { background: #dcfce7; color: #166534; }
-.ta-status-open      { background: #fef3c7; color: #92400e; }
+.ta-status-ontime { background: #dcfce7; color: #166534; }
+.ta-status-active  { background: #eff6ff; color: #3b82f6; }
+.ta-status-late    { background: #fef3c7; color: #92400e; }
 
 .ta-empty-state {
   display: flex;
@@ -29,4 +30,232 @@
   margin: 0;
   font-size: 13px;
   max-width: 360px;
+}
+
+/* Clock-in banner */
+.ta-clock-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px 26px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #6b9686, #2c4a3e);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(44, 74, 62, 0.25);
+}
+
+.ta-clock-banner-left {
+  min-width: 0;
+}
+
+.ta-clock-banner-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ta-clock-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9db8ac;
+  flex-shrink: 0;
+}
+
+.ta-clock-banner-active .ta-clock-banner-dot {
+  background: #6ee7b7;
+  box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.25);
+  animation: ta-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ta-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.ta-clock-banner-duration {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.ta-clock-banner-meta {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.ta-clock-banner-times {
+  display: flex;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+.ta-clock-banner-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.ta-clock-banner-time-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ta-clock-banner-time-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Stat tiles */
+.ta-stat-card {
+  position: relative;
+}
+
+.ta-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.ta-stat-icon-green  { background: #e8f5f0; }
+.ta-stat-icon-blue   { background: #eff6ff; }
+.ta-stat-icon-orange { background: #fef3c7; }
+.ta-stat-icon-teal   { background: #e0f2fe; }
+
+/* Calendar */
+.ta-cal-nav {
+  padding: 6px 12px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.ta-cal-month-label {
+  font-weight: 700;
+  color: #2c4a3e;
+  font-size: 13px;
+  min-width: 108px;
+  text-align: center;
+}
+
+.ta-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a9a92;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+}
+
+.ta-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ta-calendar-day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #f8fbf9;
+  color: #2c4a3e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ta-calendar-day:hover {
+  background: #eef4f1;
+}
+
+.ta-calendar-day-empty {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ta-calendar-day-today {
+  background: #2c4a3e;
+  color: #fff;
+}
+
+.ta-calendar-day-selected {
+  border-color: #4a6b5d;
+  box-shadow: 0 0 0 2px rgba(74, 107, 93, 0.2);
+}
+
+.ta-calendar-dot {
+  position: absolute;
+  bottom: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.ta-calendar-dot-ontime { background: #22c55e; }
+.ta-calendar-dot-late   { background: #f59e0b; }
+.ta-calendar-dot-active { background: #3b82f6; }
+
+.ta-calendar-legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #6b7c75;
+}
+
+.ta-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ta-calendar-legend .ta-calendar-dot {
+  position: static;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .ta-clock-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ta-clock-banner-times {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ta-clock-banner-time {
+    align-items: flex-start;
+  }
 }

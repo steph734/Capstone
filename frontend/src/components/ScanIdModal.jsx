@@ -78,6 +78,12 @@ function ScanIdModal({ onClose, onLogged }) {
   const [notFoundCode, setNotFoundCode] = useState('')
   const [result, setResult] = useState(null)
   const [scanKey, setScanKey] = useState(0)
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -162,6 +168,10 @@ function ScanIdModal({ onClose, onLogged }) {
           <div className="sim-body">
             <div className="sim-top">
               <div className="sim-icon-badge"><ScanBadgeIcon /></div>
+              <div className="sim-live-clock">
+                <ClockIcon />
+                {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+              </div>
               <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
             </div>
             <h3 className="sim-title">Scan ID to log attendance</h3>

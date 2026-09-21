@@ -1,9 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { apiGet } from '../../utils/api'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
+
+// No shift schedule exists in the data model yet, so "late" has no official
+// definition — 9:00 AM is a simple, visible stand-in cutoff used only for the
+// punctuality stat/pill/dot, not a configured business rule.
+const LATE_CUTOFF_MINUTES = 9 * 60
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function dateKeyOf(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -21,12 +35,38 @@ function hoursBetween(inIso, outIso) {
   return Math.round(((new Date(outIso) - new Date(inIso)) / 3600000) * 10) / 10
 }
 
+function formatDuration(ms) {
+  if (ms == null || ms < 0) return '—'
+  const totalMinutes = Math.floor(ms / 60000)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return `${h}h ${m}m`
+}
+
+function isLate(timeInIso) {
+  if (!timeInIso) return false
+  const d = new Date(timeInIso)
+  return d.getHours() * 60 + d.getMinutes() > LATE_CUTOFF_MINUTES
+}
+
+function dayStatus(record) {
+  if (!record || !record.timeIn) return null
+  if (!record.timeOut) return 'active'
+  return isLate(record.timeIn) ? 'late' : 'ontime'
+}
+
 export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   const [loading, setLoading] = useState(true)
   const [notLinked, setNotLinked] = useState(false)
   const [error, setError] = useState('')
-  const [summary, setSummary] = useState({ daysThisMonth: 0, hoursThisMonth: 0 })
+  const [employee, setEmployee] = useState(null)
   const [records, setRecords] = useState([])
+  const [now, setNow] = useState(() => new Date())
+  const [viewedMonth, setViewedMonth] = useState(() => {
+    const d = new Date()
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+  const [selectedDate, setSelectedDate] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -38,7 +78,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     apiGet(`/api/attendance/me?email=${encodeURIComponent(user.email)}`)
       .then((data) => {
         if (cancelled) return
-        setSummary(data.summary || { daysThisMonth: 0, hoursThisMonth: 0 })
+        setEmployee(data.employee || null)
         setRecords(data.records || [])
       })
       .catch((err) => {
@@ -50,7 +90,70 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return () => { cancelled = true }
   }, [user?.email])
 
-  const lastRecord = records.find((r) => r.timeIn) || null
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  const recordsByDate = useMemo(() => {
+    const map = new Map()
+    for (const r of records) map.set(r.date, r)
+    return map
+  }, [records])
+
+  const todayKey = dateKeyOf(now)
+  const todayRecord = recordsByDate.get(todayKey) || null
+  const clockedIn = !!(todayRecord?.timeIn && !todayRecord?.timeOut)
+  const todayDurationMs = todayRecord?.timeIn
+    ? (todayRecord.timeOut ? new Date(todayRecord.timeOut) - new Date(todayRecord.timeIn) : now - new Date(todayRecord.timeIn))
+    : null
+
+  const monthLabel = new Date(viewedMonth.year, viewedMonth.month, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const monthPrefix = `${viewedMonth.year}-${pad2(viewedMonth.month + 1)}`
+
+  const monthRecords = useMemo(
+    () => records.filter((r) => r.date.startsWith(monthPrefix)),
+    [records, monthPrefix]
+  )
+
+  const monthStats = useMemo(() => {
+    const present = monthRecords.filter((r) => r.timeIn).length
+    const late = monthRecords.filter((r) => r.timeIn && isLate(r.timeIn)).length
+    let hours = 0
+    for (const r of monthRecords) {
+      if (r.timeIn && r.timeOut) hours += (new Date(r.timeOut) - new Date(r.timeIn)) / 3600000
+    }
+    const rate = present > 0 ? Math.round(((present - late) / present) * 100) : 0
+    return { present, late, rate, hours: Math.round(hours * 10) / 10 }
+  }, [monthRecords])
+
+  const calendarCells = useMemo(() => {
+    const firstWeekday = new Date(viewedMonth.year, viewedMonth.month, 1).getDay()
+    const totalDays = new Date(viewedMonth.year, viewedMonth.month + 1, 0).getDate()
+    const cells = []
+    for (let i = 0; i < firstWeekday; i++) cells.push(null)
+    for (let day = 1; day <= totalDays; day++) {
+      const key = `${monthPrefix}-${pad2(day)}`
+      cells.push({ day, key, status: dayStatus(recordsByDate.get(key)) })
+    }
+    return cells
+  }, [viewedMonth, monthPrefix, recordsByDate])
+
+  const selectedRecord = selectedDate ? recordsByDate.get(selectedDate) : null
+
+  const dailyLog = useMemo(
+    () => [...monthRecords].sort((a, b) => b.date.localeCompare(a.date)),
+    [monthRecords]
+  )
+
+  function goToMonth(delta) {
+    setSelectedDate(null)
+    setViewedMonth(({ year, month }) => {
+      const d = new Date(year, month + delta, 1)
+      return { year: d.getFullYear(), month: d.getMonth() }
+    })
+  }
 
   return (
     <TherapistPageShell
@@ -83,24 +186,105 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
         </div>
       ) : (
         <>
-          <div className="admin-stats-grid">
-            <section className="admin-stat-card">
-              <p className="admin-stat-label">Days Logged</p>
-              <h3 className="admin-stat-value">{summary.daysThisMonth}</h3>
-              <p className="admin-stat-meta">This month</p>
-            </section>
-            <section className="admin-stat-card">
-              <p className="admin-stat-label">Hours Logged</p>
-              <h3 className="admin-stat-value">{summary.hoursThisMonth}</h3>
-              <p className="admin-stat-meta">This month</p>
-            </section>
-            <section className="admin-stat-card">
-              <p className="admin-stat-label">Last Check-in</p>
-              <h3 className="admin-stat-value" style={{ fontSize: 18 }}>
-                {lastRecord ? formatTime(lastRecord.timeIn) : '—'}
+          <div className={`ta-clock-banner ${clockedIn ? 'ta-clock-banner-active' : ''}`}>
+            <div className="ta-clock-banner-left">
+              <p className="ta-clock-banner-status">
+                <span className="ta-clock-banner-dot" />
+                {clockedIn ? 'Currently clocked in' : 'Not clocked in today'}
+              </p>
+              <h3 className="ta-clock-banner-duration">
+                {todayDurationMs != null ? `${formatDuration(todayDurationMs)} today` : 'No activity yet'}
               </h3>
-              <p className="admin-stat-meta">{lastRecord ? formatDate(lastRecord.date) : 'No records yet'}</p>
+              <p className="ta-clock-banner-meta">
+                {todayRecord?.timeIn
+                  ? `Since ${formatTime(todayRecord.timeIn)}${employee?.branch ? ` · ${employee.branch}` : ''}`
+                  : "You haven't checked in yet today."}
+              </p>
+            </div>
+            <div className="ta-clock-banner-times">
+              <div className="ta-clock-banner-time">
+                <span className="ta-clock-banner-time-label">Time In</span>
+                <span className="ta-clock-banner-time-value">{formatTime(todayRecord?.timeIn)}</span>
+              </div>
+              <div className="ta-clock-banner-time">
+                <span className="ta-clock-banner-time-label">Time Out</span>
+                <span className="ta-clock-banner-time-value">{formatTime(todayRecord?.timeOut)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-stats-grid">
+            <section className="admin-stat-card ta-stat-card">
+              <span className="ta-stat-icon ta-stat-icon-green">📈</span>
+              <p className="admin-stat-label">Rate</p>
+              <h3 className="admin-stat-value">{monthStats.rate}%</h3>
+              <p className="admin-stat-meta">On-time this month</p>
             </section>
+            <section className="admin-stat-card ta-stat-card">
+              <span className="ta-stat-icon ta-stat-icon-blue">📅</span>
+              <p className="admin-stat-label">Present</p>
+              <h3 className="admin-stat-value">{monthStats.present}</h3>
+              <p className="admin-stat-meta">Days logged</p>
+            </section>
+            <section className="admin-stat-card ta-stat-card">
+              <span className="ta-stat-icon ta-stat-icon-orange">⏰</span>
+              <p className="admin-stat-label">Late</p>
+              <h3 className="admin-stat-value">{monthStats.late}</h3>
+              <p className="admin-stat-meta">After 9:00 AM</p>
+            </section>
+            <section className="admin-stat-card ta-stat-card">
+              <span className="ta-stat-icon ta-stat-icon-teal">⌛</span>
+              <p className="admin-stat-label">Hours</p>
+              <h3 className="admin-stat-value">{monthStats.hours}</h3>
+              <p className="admin-stat-meta">Logged this month</p>
+            </section>
+          </div>
+
+          <div className="admin-panel">
+            <div className="admin-panel-header">
+              <div>
+                <h3>Attendance Calendar</h3>
+                <p>
+                  {selectedRecord
+                    ? `${formatDate(selectedRecord.date)} — In ${formatTime(selectedRecord.timeIn)} · Out ${formatTime(selectedRecord.timeOut)}`
+                    : selectedDate
+                      ? `${formatDate(selectedDate)} — no check-in recorded`
+                      : 'Tap a day to view time-in and time-out.'}
+                </p>
+              </div>
+              <div className="admin-panel-tags">
+                <button type="button" className="admin-btn-secondary ta-cal-nav" onClick={() => goToMonth(-1)} aria-label="Previous month">‹</button>
+                <span className="ta-cal-month-label">{monthLabel}</span>
+                <button type="button" className="admin-btn-secondary ta-cal-nav" onClick={() => goToMonth(1)} aria-label="Next month">›</button>
+              </div>
+            </div>
+
+            <div className="ta-calendar-weekdays">
+              {WEEKDAY_LABELS.map((w) => <span key={w}>{w}</span>)}
+            </div>
+            <div className="ta-calendar-grid">
+              {calendarCells.map((cell, i) =>
+                cell === null ? (
+                  <span key={`blank-${i}`} className="ta-calendar-day ta-calendar-day-empty" />
+                ) : (
+                  <button
+                    type="button"
+                    key={cell.key}
+                    className={`ta-calendar-day ${cell.key === todayKey ? 'ta-calendar-day-today' : ''} ${cell.key === selectedDate ? 'ta-calendar-day-selected' : ''}`}
+                    onClick={() => setSelectedDate(cell.key === selectedDate ? null : cell.key)}
+                  >
+                    {cell.day}
+                    {cell.status && <span className={`ta-calendar-dot ta-calendar-dot-${cell.status}`} />}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="ta-calendar-legend">
+              <span><i className="ta-calendar-dot ta-calendar-dot-ontime" /> On time</span>
+              <span><i className="ta-calendar-dot ta-calendar-dot-late" /> Late</span>
+              <span><i className="ta-calendar-dot ta-calendar-dot-active" /> Active now</span>
+            </div>
           </div>
 
           <div className="admin-table-card">
@@ -116,19 +300,20 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: '#6b7c75' }}>No check-ins recorded yet.</td></tr>
-                  ) : records.map((r) => {
+                  {dailyLog.length === 0 ? (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: '#6b7c75' }}>No check-ins recorded for {monthLabel}.</td></tr>
+                  ) : dailyLog.map((r) => {
                     const hrs = hoursBetween(r.timeIn, r.timeOut)
+                    const status = dayStatus(r)
                     return (
                       <tr key={r.date}>
                         <td data-label="Date">{formatDate(r.date)}</td>
                         <td data-label="Time In">{formatTime(r.timeIn)}</td>
-                        <td data-label="Time Out">{formatTime(r.timeOut)}</td>
+                        <td data-label="Time Out">{r.timeOut ? formatTime(r.timeOut) : 'In progress'}</td>
                         <td data-label="Hours">{hrs != null ? `${hrs}h` : '—'}</td>
                         <td data-label="Status">
-                          <span className={`ta-status-pill ${r.timeOut ? 'ta-status-complete' : 'ta-status-open'}`}>
-                            {r.timeOut ? 'Complete' : 'Still clocked in'}
+                          <span className={`ta-status-pill ta-status-${status}`}>
+                            {status === 'active' ? 'Active now' : status === 'late' ? 'Late' : 'On time'}
                           </span>
                         </td>
                       </tr>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
-import { apiGet } from '../../utils/api'
+import { apiGet, apiPost } from '../../utils/api'
+import AvailabilityModal from '../../components/AvailabilityModal'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
 
@@ -67,6 +68,8 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return { year: d.getFullYear(), month: d.getMonth() }
   })
   const [selectedDate, setSelectedDate] = useState(null)
+  const [showAvailability, setShowAvailability] = useState(false)
+  const [availabilityChecked, setAvailabilityChecked] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -107,6 +110,27 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   const todayDurationMs = todayRecord?.timeIn
     ? (todayRecord.timeOut ? new Date(todayRecord.timeOut) - new Date(todayRecord.timeIn) : now - new Date(todayRecord.timeIn))
     : null
+
+  // Once they've clocked in today, ask (at most once per day) which same-day
+  // slots they're open for — `slots: null` from the backend means they
+  // haven't answered yet today, as opposed to `[]` for an explicit skip.
+  useEffect(() => {
+    if (!user?.email || !todayRecord?.timeIn || availabilityChecked) return
+    let cancelled = false
+    apiGet(`/api/attendance/availability?email=${encodeURIComponent(user.email)}&date=${todayKey}`)
+      .then((data) => {
+        if (cancelled) return
+        setAvailabilityChecked(true)
+        if (data.slots === null) setShowAvailability(true)
+      })
+      .catch(() => { if (!cancelled) setAvailabilityChecked(true) })
+    return () => { cancelled = true }
+  }, [user?.email, todayRecord?.timeIn, todayKey, availabilityChecked])
+
+  const answerAvailability = (slots) => {
+    setShowAvailability(false)
+    apiPost('/api/attendance/availability', { email: user.email, date: todayKey, slots }).catch(() => {})
+  }
 
   const monthLabel = new Date(viewedMonth.year, viewedMonth.month, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -156,6 +180,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   }
 
   return (
+    <>
     <TherapistPageShell
       user={user}
       onLogout={onLogout}
@@ -331,5 +356,15 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
         </>
       )}
     </TherapistPageShell>
+    {showAvailability && (
+      <AvailabilityModal
+        firstName={(employee?.name || '').split(' ')[0] || 'there'}
+        dateLabel={now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}
+        now={now}
+        onSkip={() => answerAvailability([])}
+        onConfirm={(slots) => answerAvailability(slots)}
+      />
+    )}
+    </>
   )
 }

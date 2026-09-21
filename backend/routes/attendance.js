@@ -1,6 +1,7 @@
 const express = require('express');
 const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
+const TherapistAvailability = require('../models/TherapistAvailability');
 
 const router = express.Router();
 
@@ -148,6 +149,60 @@ router.get('/me', async (req, res) => {
   } catch (err) {
     console.error('get my attendance error:', err);
     return res.status(500).json({ error: 'Could not load your attendance.' });
+  }
+});
+
+// GET /api/attendance/availability?email=...&date=YYYY-MM-DD -> the same-day
+// slots this therapist already answered for (confirmed or explicitly
+// skipped), or `slots: null` if they haven't been asked yet today — that
+// null vs. [] distinction is what the "you're clocked in" modal uses to
+// decide whether it needs to show itself again.
+router.get('/availability', async (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  const date = String(req.query.date || '').trim() || todayStamp();
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    const record = await TherapistAvailability.findOne({ employee: employee._id, date }).lean();
+    return res.json({ date, slots: record ? record.slots : null });
+  } catch (err) {
+    console.error('get availability error:', err);
+    return res.status(500).json({ error: 'Could not load availability.' });
+  }
+});
+
+// POST /api/attendance/availability -> upserts the slots a therapist picked
+// (or an empty array, if they hit "Skip for now") for the given day.
+router.post('/availability', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const date = String(req.body?.date || '').trim() || todayStamp();
+  const slots = Array.isArray(req.body?.slots) ? req.body.slots.filter((s) => typeof s === 'string') : [];
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    await TherapistAvailability.findOneAndUpdate(
+      { employee: employee._id, date },
+      { $set: { slots } },
+      { upsert: true, new: true }
+    );
+    return res.json({ date, slots });
+  } catch (err) {
+    console.error('save availability error:', err);
+    return res.status(500).json({ error: 'Could not save availability.' });
   }
 });
 

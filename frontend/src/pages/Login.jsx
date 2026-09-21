@@ -74,7 +74,6 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
   )
   const [socialProvider, setSocialProvider] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showSuccessToast, setShowSuccessToast] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -85,12 +84,10 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     setIsSubmitting(true)
     const result = await onLogin(email, password)
 
-    if (result?.success) {
-      // Keep the button in its loading state until the wrapper navigates
-      // away — the success toast stays up for that same window.
-      setShowSuccessToast(true)
-      return
-    }
+    // On success the wrapper navigates away immediately (a global toast
+    // shows on the page the user lands on), so this component unmounts
+    // before isSubmitting would need to be reset.
+    if (result?.success) return
 
     setIsSubmitting(false)
     if (result?.requiresVerification) {
@@ -105,10 +102,7 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     if (onLogin) {
       setIsSubmitting(true)
       const result = await onLogin('patient@demo.com', 'demo1234')
-      if (result && result.success) {
-        setShowSuccessToast(true)
-        return
-      }
+      if (result && result.success) return
       setIsSubmitting(false)
     }
     navigate('/')
@@ -116,12 +110,6 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
 
   return (
     <div className="login-page">
-      {showSuccessToast && (
-        <div className="login-toast-success" role="status" aria-live="polite">
-          <span className="login-toast-icon">✓</span>
-          Login successful!
-        </div>
-      )}
       <div className="login-container">
         <div className="login-header">
           <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
@@ -190,7 +178,7 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
             {isSubmitting ? (
               <>
                 <span className="login-btn-spinner" aria-hidden="true" />
-                {showSuccessToast ? 'Success! Redirecting…' : 'Logging in…'}
+                Logging in…
               </>
             ) : (
               'Login'

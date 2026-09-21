@@ -7,6 +7,7 @@ import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessi
 import { getResetPassword } from './utils/passwordResets'
 import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/accounts'
 import { sha256Hex } from './utils/hash'
+import './GlobalToast.css'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -89,8 +90,7 @@ function LoginWrapper({ onLogin }) {
   const handleLogin = async (email, password) => {
     const result = await onLogin(email, password)
     if (result.success) {
-      // Brief delay so the success toast is visible before the page changes.
-      setTimeout(() => navigate(getHomePath(result.user?.role)), 900)
+      navigate(getHomePath(result.user?.role))
     } else if (result.requiresVerification) {
       navigate('/verify-otp', { state: { email: result.email || email } })
     }
@@ -125,10 +125,19 @@ function App() {
   const [ownerActivePlan, setOwnerActivePlan] = useState(() => localStorage.getItem('activePlan') || null)
   // ISO date string when the current plan is on a free trial, else null.
   const [ownerPlanTrialEnds, setOwnerPlanTrialEnds] = useState(() => localStorage.getItem('activePlanTrialEnds') || null)
+  // Shown as a top-right toast right after a successful login, on whichever
+  // dashboard the user lands on — cleared automatically after a few seconds.
+  const [loginToast, setLoginToast] = useState(null)
 
   useEffect(() => {
     applyAccessibilityPrefs(loadAccessibilityPrefs())
   }, [])
+
+  useEffect(() => {
+    if (!loginToast) return
+    const timer = setTimeout(() => setLoginToast(null), 3500)
+    return () => clearTimeout(timer)
+  }, [loginToast])
 
   const handleOwnerBetaActivate = (tier) => {
     setOwnerBetaTier(tier)
@@ -244,6 +253,7 @@ function App() {
       setCurrentUser(matchedUser)
       localStorage.setItem('isAuthenticated', 'true')
       localStorage.setItem('currentUser', JSON.stringify(matchedUser))
+      setLoginToast('Login successful!')
       return { success: true, user: matchedUser }
     }
     return { success: false, message: 'Invalid email or password' }
@@ -275,6 +285,12 @@ function App() {
     <ProgressProvider>
     <AnalyticsProvider>
     <Router>
+      {loginToast && (
+        <div className="global-toast-success" role="status" aria-live="polite">
+          <span className="global-toast-icon">✓</span>
+          {loginToast}
+        </div>
+      )}
       <Routes>
         <Route 
           path="/" 

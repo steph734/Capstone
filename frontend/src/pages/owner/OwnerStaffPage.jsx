@@ -6,6 +6,7 @@ import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import { generateUniqueId } from '../../utils/idGenerator'
+import ScanIdModal from '../../components/ScanIdModal'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -893,83 +894,6 @@ function IdCardModal({ staff, onClose }) {
           <button className="os-btn-cancel" onClick={downloadPdf}>Export as PDF</button>
           <button className="os-btn-dark" onClick={onClose}>Done</button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Scan ID (attendance) modal ────────────────────────────── */
-function ScanIdModal({ pool, onScan, onClose }) {
-  const [scanning, setScanning] = useState(false)
-  const [result, setResult] = useState(null)
-
-  const runScan = () => {
-    if (scanning || pool.length === 0) return
-    setScanning(true)
-    setTimeout(() => {
-      const member = pool[Math.floor(Math.random() * pool.length)]
-      const { type } = onScan(member)
-      setResult({ staff: member, type, loggedAt: new Date() })
-      setScanning(false)
-    }, 900)
-  }
-
-  return (
-    <div className="os-modal-backdrop" onClick={onClose}>
-      <div className="os-modal os-scan-modal" onClick={(e) => e.stopPropagation()}>
-        {!result ? (
-          <div className="os-modal-body os-scan-body">
-            <div className="os-scan-top">
-              <div className="os-scan-icon-badge"><ScanIcon /></div>
-              <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
-            </div>
-            <h3 className="os-hire-title">Scan ID to log attendance</h3>
-            <p className="os-hire-desc">Hold the staff badge up to the scanner, or scan with a handheld device.</p>
-
-            <button
-              type="button"
-              className={`os-scan-zone ${scanning ? 'scanning' : ''}`}
-              onClick={runScan}
-              disabled={pool.length === 0}
-            >
-              <ScanIcon size={34} />
-              <span>{scanning ? 'Scanning…' : 'Waiting for scan…'}</span>
-            </button>
-
-            <div className="os-scan-status">
-              <span className={`os-scan-status-dot ${pool.length === 0 ? 'off' : ''}`} />
-              {pool.length === 0 ? 'No on-duty staff to scan' : 'Scanner connected and ready'}
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="os-modal-body" style={{ paddingTop: 24 }}>
-              <div className="os-hire-modal-top">
-                <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
-                <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
-              </div>
-              <h3 className="os-hire-title">Attendance logged</h3>
-
-              <div className="os-hire-card">
-                <img src={result.staff.avatar} alt={result.staff.name} className="os-avatar" />
-                <div style={{ flex: 1 }}>
-                  <div className="os-hire-card-name">{result.staff.name}</div>
-                  <div className="os-hire-card-sub">{result.staff.specialty || 'Unassigned'} · {result.staff.branch}</div>
-                </div>
-                <span className={`os-pill ${result.type === 'Time In' ? 'os-pill-green' : 'os-pill-yellow'}`}>{result.type}</span>
-              </div>
-
-              <div className="os-scan-logged-time">
-                <ClockIcon />
-                Logged at {result.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, {result.loggedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </div>
-            </div>
-            <div className="os-modal-footer">
-              <button className="os-btn-cancel" onClick={() => setResult(null)}>Scan next</button>
-              <button className="os-btn-dark" onClick={onClose}>Done</button>
-            </div>
-          </>
-        )}
       </div>
     </div>
   )
@@ -1955,7 +1879,6 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showScan, setShowScan] = useState(false)
-  const [scannedIn, setScannedIn] = useState({})
 
   // Real hires created through the wizard live in MongoDB. A hire shows up in
   // "For Review" as soon as they're invited (the Documents column reflects
@@ -2114,19 +2037,10 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     }
   }
 
-  // Alternates Time In / Time Out per staff member across scans within this
-  // session — a real badge scanner would derive this from the day's open
-  // attendance record instead.
-  const handleScanAttendance = (member) => {
-    const isTimeIn = !scannedIn[member.id]
-    setScannedIn((prev) => ({ ...prev, [member.id]: isTimeIn }))
-    if (isTimeIn) {
-      setStaff((prev) => prev.map((s) => (
-        s.id === member.id ? { ...s, attendance: { ...s.attendance, present: s.attendance.present + 1 } } : s
-      )))
-    }
-    logStaff(isTimeIn ? '🟢' : '🔵', `${isTimeIn ? 'Timed in' : 'Timed out'} via ID scan — ${member.name}`, member.id)
-    return { type: isTimeIn ? 'Time In' : 'Time Out' }
+  // The webcam scan modal calls the backend itself and hands back the
+  // logged result — this just records it in the audit log.
+  const handleScanLogged = (result) => {
+    logStaff(result.type === 'Time In' ? '🟢' : '🔵', `${result.type} logged via ID scan — ${result.name}`, result.name)
   }
 
   const handleApproveLeave = (req) => {
@@ -2526,8 +2440,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       )}
       {showScan && (
         <ScanIdModal
-          pool={activeDutyStaff}
-          onScan={handleScanAttendance}
+          onLogged={handleScanLogged}
           onClose={() => setShowScan(false)}
         />
       )}

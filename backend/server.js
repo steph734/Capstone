@@ -27,6 +27,9 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/branches', require('./routes/branches'));
 
+// Attendance: POST /api/attendance/scan (webcam badge-scan check-in/out)
+app.use('/api/attendance', require('./routes/attendance'));
+
 // Public: new-hire self-setup (set password + upload documents) via emailed invite link
 app.use('/api/staff-setup', require('./routes/staffSetup'));
 

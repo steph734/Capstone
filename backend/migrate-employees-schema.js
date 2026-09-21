@@ -53,7 +53,8 @@ const employeesSchema = {
       },
       employee_id: {
         bsonType: 'string',
-        description: 'Internal employee ID / staff number, e.g. "EMP-0010" (distinct from user_id).',
+        pattern: '^T-\\d{6}$',
+        description: 'Unique staff ID, format "T-######" (6 digits), e.g. "T-247550". Auto-generated at hire time. Encoded in full in the ID card barcode; the "T-" is stripped only for on-card display text.',
       },
       prc_number: { bsonType: 'string', description: 'PRC license number.' },
       experience: { bsonType: ['int', 'double'], minimum: 0, description: 'Years of professional experience.' },

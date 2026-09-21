@@ -1862,7 +1862,6 @@ function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
                 <div className="os-detail-row"><span className="os-detail-lbl">Phone</span><span className="os-detail-val">{form.phone ? `${form.phoneCode} ${form.phone}` : '—'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Specialty</span><span className="os-detail-val">{form.specialty || 'Unassigned'}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Branch</span><span className="os-detail-val">{form.branch}</span></div>
-                <div className="os-detail-row"><span className="os-detail-lbl">Duty Status</span><span className="os-detail-val">{form.status}</span></div>
                 <div className="os-detail-row"><span className="os-detail-lbl">Employment</span><span className="os-detail-val">{form.employment}</span></div>
               </div>
               <div className="os-doc-note">

@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
-import { NotFoundException } from '@zxing/library'
+import { ReaderException, BarcodeFormat, DecodeHintType } from '@zxing/library'
+
+// Restricting to the formats a staff badge would actually use (vs. zxing's
+// full default list of ~15) cuts out most of the internal sub-readers that
+// otherwise fire on every single video frame — with all formats enabled,
+// mismatched readers routinely throw a non-NotFoundException error internally
+// that zxing logs as a console warning on nearly every frame, flooding devtools.
+const SCAN_HINTS = new Map([
+  [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE]],
+])
 import { apiPost } from '../utils/api'
 import './ScanIdModal.css'
 
@@ -77,7 +86,7 @@ function ScanIdModal({ onClose, onLogged }) {
     setNotFoundCode('')
     busyRef.current = false
 
-    const reader = new BrowserMultiFormatReader()
+    const reader = new BrowserMultiFormatReader(SCAN_HINTS)
 
     reader
       .decodeFromVideoDevice(undefined, videoRef.current, (decoded, err) => {
@@ -108,9 +117,11 @@ function ScanIdModal({ onClose, onLogged }) {
             })
           return
         }
-        // A frame with no readable barcode isn't an error worth surfacing —
-        // it's just most frames while the badge isn't lined up yet.
-        if (err && !(err instanceof NotFoundException)) {
+        // NotFoundException/ChecksumException/FormatException (all
+        // ReaderException subclasses) just mean "no valid barcode in this
+        // frame" — completely normal on every frame the badge isn't lined
+        // up in, not worth surfacing.
+        if (err && !(err instanceof ReaderException)) {
           console.error('barcode decode error:', err)
         }
       })

@@ -18,10 +18,13 @@
 .sim-modal {
   width: 100%;
   max-width: 460px;
+  max-height: 100%;
   background: #fff;
   border-radius: 20px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   animation: sim-modal-in 0.2s ease;
 }
 
@@ -33,6 +36,8 @@
 .sim-body {
   padding: 20px 24px 24px;
   text-align: center;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .sim-top {
@@ -285,8 +290,14 @@
 .sim-btn-dark:hover { background: #1f2937; }
 
 @media (max-width: 480px) {
-  .sim-backdrop { padding: 0; align-items: flex-end; }
-  .sim-modal { max-width: 100%; border-radius: 20px 20px 0 0; }
-  .sim-footer { flex-direction: column-reverse; }
+  .sim-backdrop { padding: 12px; }
+  .sim-modal { max-width: 100%; max-height: calc(100% - 24px); }
+  .sim-body { padding: 16px 18px 18px; }
+  .sim-video-wrap { max-height: 42vh; }
+  .sim-footer { flex-direction: column-reverse; padding: 14px 18px; }
   .sim-btn-secondary, .sim-btn-dark { width: 100%; justify-content: center; }
+}
+
+@media (max-height: 700px) {
+  .sim-video-wrap { max-height: 38vh; }
 }

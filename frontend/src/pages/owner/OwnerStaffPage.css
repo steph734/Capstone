@@ -17,6 +17,36 @@
   flex-shrink: 0;
 }
 
+.os-attendance-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.os-idcards-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  padding: 10px 18px;
+  background: #fff;
+  color: #3d5a50;
+  border: 1px solid #e0e8e3;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.os-idcards-btn:hover {
+  background: #f8fbf9;
+  transform: translateY(-1px);
+}
+
 .os-tab {
   display: flex;
   align-items: center;
@@ -731,6 +761,99 @@
   transition: background 0.2s;
 }
 .os-btn-dark:hover { background: #1f2937; }
+.os-btn-dark:disabled { background: #9aab9f; cursor: not-allowed; }
+
+/* ── Staff ID Cards list modal ────────────────────────────── */
+.os-idcards-modal { max-width: 480px; display: flex; flex-direction: column; max-height: 85vh; }
+
+.os-idcards-modal .os-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.os-idcards-search-wrap {
+  position: relative;
+  margin: 16px 24px 8px;
+}
+
+.os-idcards-search-wrap .os-search-icon {
+  left: 12px;
+}
+
+.os-idcards-search {
+  width: 100%;
+  padding: 10px 12px 10px 38px;
+  border: 1px solid #e0e8e3;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+  color: #333;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.os-idcards-search:focus {
+  border-color: #5a7a6d;
+  box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.1);
+}
+
+.os-idcards-list {
+  overflow-y: auto;
+  padding: 4px 12px 12px;
+  min-height: 0;
+}
+
+.os-idcards-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.os-idcards-row:hover { background: #f8fbf9; }
+.os-idcards-row.selected { background: #f0f7f4; }
+
+.os-idcards-row input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #16a34a;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.os-idcards-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.os-idcards-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.os-idcards-footer {
+  flex-direction: column;
+}
+
+.os-idcards-export {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
 
 /* ── Reject application modal ──────────────────────────────── */
 .os-reject-modal {
@@ -2106,10 +2229,20 @@ button.os-dob-input { cursor: pointer; }
     overflow-x: auto;
   }
 
+  .os-attendance-actions {
+    width: 100%;
+    flex-direction: column;
+    order: 3;
+  }
+
   .os-scan-btn {
     width: 100%;
     justify-content: center;
-    order: 3;
+  }
+
+  .os-idcards-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .os-kpi-grid {

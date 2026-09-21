@@ -207,6 +207,15 @@ function AlertCircleIcon() {
     </svg>
   )
 }
+function IdBadgeIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="20" rx="2.5" />
+      <circle cx="12" cy="10" r="3" />
+      <path d="M8 18c0-1.8 1.8-3 4-3s4 1.2 4 3" />
+    </svg>
+  )
+}
 function ScanIcon({ size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -896,6 +905,144 @@ function IdCardModal({ staff, onClose }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/* ── Staff ID Cards modal (browse, preview, export or email) ──── */
+function staffToCardModel(member) {
+  return {
+    name: member.name,
+    initials: initialsFromName(member.name),
+    appliedFor: member.specialty || member.position || 'Staff',
+    branch: member.branch,
+    employeeId: member.employeeId,
+    employment: member.employment,
+    photoUrl: member.avatar,
+    dob: member.dob,
+    phone: member.phone,
+  }
+}
+
+function StaffIdCardsModal({ staff, onClose }) {
+  const [search, setSearch] = useState('')
+  const [selectedId, setSelectedId] = useState(staff[0]?.id ?? null)
+  const [previewStaff, setPreviewStaff] = useState(null)
+  const [emailedId, setEmailedId] = useState(null)
+
+  const filtered = staff.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
+  const selected = staff.find((s) => s.id === selectedId) || filtered[0] || null
+
+  const exportCard = async (member) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = ID_CARD_W
+    canvas.height = ID_CARD_H
+    const ctx = canvas.getContext('2d')
+    const [logoImg, photoImg] = await Promise.all([
+      loadImage(ID_CARD_LOGO_SRC),
+      loadImage(member.avatar),
+    ])
+    drawIdCard(ctx, staffToCardModel(member), { logoImg, photoImg })
+    const url = canvas.toDataURL('image/png')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(member.name || 'staff').trim().replace(/\s+/g, '_')}_ID_Card.png`
+    a.click()
+  }
+
+  const emailCard = (member) => {
+    setEmailedId(member.id)
+    setTimeout(() => setEmailedId((id) => (id === member.id ? null : id)), 2200)
+  }
+
+  return (
+    <>
+      <div className="os-modal-backdrop" onClick={onClose}>
+        <div className="os-modal os-idcards-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="os-modal-header">
+            <div>
+              <h3><IdBadgeIcon size={18} /> Staff ID Cards</h3>
+              <p>Select one card to export or email</p>
+            </div>
+            <button className="os-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          </div>
+
+          <div className="os-idcards-search-wrap">
+            <svg className="os-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              className="os-idcards-search"
+              placeholder="Search by name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="os-idcards-list">
+            {filtered.length === 0 ? (
+              <p className="os-empty">No staff match your search.</p>
+            ) : filtered.map((s) => (
+              <label key={s.id} className={`os-idcards-row ${selectedId === s.id || (!selectedId && selected?.id === s.id) ? 'selected' : ''}`}>
+                <input
+                  type="radio"
+                  name="idcard-select"
+                  checked={selected?.id === s.id}
+                  onChange={() => setSelectedId(s.id)}
+                />
+                <img src={s.avatar} alt={s.name} className="os-avatar" />
+                <div className="os-idcards-info">
+                  <div className="os-table-name">{s.name}</div>
+                  <div className="os-table-joined"><CalendarSmallIcon /> Joined {s.joined}</div>
+                </div>
+                <div className="os-idcards-row-actions">
+                  <button
+                    type="button"
+                    className="os-icon-btn os-icon-view"
+                    title="Preview ID card"
+                    aria-label={`Preview ${s.name}'s ID card`}
+                    onClick={(e) => { e.preventDefault(); setPreviewStaff(s) }}
+                  >
+                    <EyeIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="os-icon-btn os-icon-edit"
+                    title="Email ID card"
+                    aria-label={`Email ${s.name}'s ID card`}
+                    onClick={(e) => { e.preventDefault(); emailCard(s) }}
+                  >
+                    <MailIcon />
+                  </button>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="os-modal-footer os-idcards-footer">
+            <button
+              type="button"
+              className="os-btn-cancel os-idcards-export"
+              disabled={!selected}
+              onClick={() => selected && exportCard(selected)}
+            >
+              Export {selected ? `${selected.name}'s` : ''} ID Card
+            </button>
+            <button
+              type="button"
+              className="os-btn-dark os-idcards-export"
+              disabled={!selected}
+              onClick={() => selected && emailCard(selected)}
+            >
+              {selected && emailedId === selected.id ? 'Emailed ✓' : `Email to ${selected ? selected.name : ''}`}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {previewStaff && (
+        <IdCardModal staff={staffToCardModel(previewStaff)} onClose={() => setPreviewStaff(null)} />
+      )}
+    </>
   )
 }
 
@@ -1879,6 +2026,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showScan, setShowScan] = useState(false)
+  const [showIdCards, setShowIdCards] = useState(false)
 
   // Real hires created through the wizard live in MongoDB. A hire shows up in
   // "For Review" as soon as they're invited (the Documents column reflects
@@ -2155,9 +2303,14 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
           </button>
         </div>
         {activeTab === 'attendance' && (
-          <button type="button" className="os-add-btn os-scan-btn" onClick={() => setShowScan(true)}>
-            <ScanIcon size={16} /> Scan ID
-          </button>
+          <div className="os-attendance-actions">
+            <button type="button" className="os-idcards-btn" onClick={() => setShowIdCards(true)}>
+              <IdBadgeIcon /> ID Cards
+            </button>
+            <button type="button" className="os-add-btn os-scan-btn" onClick={() => setShowScan(true)}>
+              <ScanIcon size={16} /> Scan ID
+            </button>
+          </div>
         )}
       </div>
 
@@ -2443,6 +2596,9 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
           onLogged={handleScanLogged}
           onClose={() => setShowScan(false)}
         />
+      )}
+      {showIdCards && (
+        <StaffIdCardsModal staff={activeStaff} onClose={() => setShowIdCards(false)} />
       )}
     </OwnerPageShell>
   )

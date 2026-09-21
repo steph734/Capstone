@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { jsPDF } from 'jspdf'
+import JsBarcode from 'jsbarcode'
 import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
@@ -717,27 +718,26 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }
 
-// Decorative only — a deterministic bar pattern seeded off the employee ID,
-// not a real scannable barcode.
-// A real barcode alternates bar/space continuously with no blank stretches —
-// the previous version randomly skipped bars, leaving uneven gaps.
-function drawBarcode(ctx, x, y, w, h, seedStr) {
-  let seed = 0
-  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0
-  const rand = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0
-    return (seed % 1000) / 1000
+// A genuine, scannable Code128 barcode encoding `value` — which must be the
+// exact same employeeId string POST /api/attendance/scan looks up, since
+// ScanIdModal hands the camera's decoded text straight to that endpoint.
+// Rendered onto its own canvas at JsBarcode's natural size, then scaled into
+// the (x, y, w, h) box on the card — safe for a 1D barcode since decoding
+// only cares about each bar's width *relative* to its neighbors, which a
+// uniform horizontal/vertical scale preserves.
+function drawBarcode(ctx, x, y, w, h, value) {
+  const barcodeCanvas = document.createElement('canvas')
+  try {
+    JsBarcode(barcodeCanvas, value, {
+      format: 'CODE128',
+      displayValue: false,
+      background: '#ffffff',
+      lineColor: '#111827',
+    })
+  } catch {
+    return // e.g. an empty value — leave the strip blank rather than crash
   }
-  const unit = 3
-  ctx.fillStyle = '#111827'
-  let cx = x
-  let isBar = true
-  while (cx < x + w) {
-    const barW = unit * (1 + Math.floor(rand() * 3))
-    if (isBar) ctx.fillRect(cx, y, barW, h)
-    cx += barW
-    isBar = !isBar
-  }
+  ctx.drawImage(barcodeCanvas, x, y, w, h)
 }
 
 function drawIdCard(ctx, staff, { logoImg, photoImg }) {

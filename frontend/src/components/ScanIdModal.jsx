@@ -13,6 +13,40 @@ const SCAN_HINTS = new Map([
 import { apiPost } from '../utils/api'
 import './ScanIdModal.css'
 
+// Keep this in sync with the `.sim-target-box` inset in ScanIdModal.css and
+// the `.sim-video` object-fit: cover in the same file — the goal is for the
+// decoder to only ever look at the exact region the green guide box shows
+// the user, so a badge has to actually be lined up in the box (not just
+// somewhere in the camera's field of view) before its barcode is read.
+const TARGET_BOX_INSET = { top: 0.16, bottom: 0.16, left: 0.12, right: 0.12 }
+const VIDEO_DISPLAY_ASPECT = 4 / 3
+const SCAN_RETRY_DELAY_MS = 120
+
+// Computes, in native video-pixel coordinates, the sub-rectangle the green
+// guide box covers — first replicating the `object-fit: cover` crop the
+// video element applies to fit its native resolution into the 4:3 display
+// box, then applying the same inset percentages as `.sim-target-box`.
+function getTargetBoxRect(videoWidth, videoHeight) {
+  if (!videoWidth || !videoHeight) return null
+  const videoAspect = videoWidth / videoHeight
+  let coverW = videoWidth
+  let coverH = videoHeight
+  let offsetX = 0
+  let offsetY = 0
+  if (videoAspect > VIDEO_DISPLAY_ASPECT) {
+    coverW = videoHeight * VIDEO_DISPLAY_ASPECT
+    offsetX = (videoWidth - coverW) / 2
+  } else {
+    coverH = videoWidth / VIDEO_DISPLAY_ASPECT
+    offsetY = (videoHeight - coverH) / 2
+  }
+  const sx = offsetX + coverW * TARGET_BOX_INSET.left
+  const sy = offsetY + coverH * TARGET_BOX_INSET.top
+  const sw = coverW * (1 - TARGET_BOX_INSET.left - TARGET_BOX_INSET.right)
+  const sh = coverH * (1 - TARGET_BOX_INSET.top - TARGET_BOX_INSET.bottom)
+  return { sx, sy, sw, sh }
+}
+
 function ScanBadgeIcon({ size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -71,7 +105,6 @@ function initialsFromName(name) {
 // 'no-camera' — no camera device is available on this machine
 function ScanIdModal({ onClose, onLogged }) {
   const videoRef = useRef(null)
-  const controlsRef = useRef(null)
   const busyRef = useRef(false)
   const mountedRef = useRef(true)
   const [phase, setPhase] = useState('starting')
@@ -93,47 +126,84 @@ function ScanIdModal({ onClose, onLogged }) {
     busyRef.current = false
 
     const reader = new BrowserMultiFormatReader(SCAN_HINTS)
+    const cropCanvas = document.createElement('canvas')
+    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true })
+    let stream = null
+    let retryTimeoutId = null
 
-    reader
-      .decodeFromVideoDevice(undefined, videoRef.current, (decoded, err) => {
-        if (!mountedRef.current || busyRef.current) return
-        if (decoded) {
-          busyRef.current = true
-          const code = decoded.getText().trim()
-          setPhase('checking')
-          apiPost('/api/attendance/scan', { employee_id: code })
-            .then((data) => {
+    const stopStream = () => {
+      stream?.getTracks().forEach((t) => t.stop())
+      stream = null
+    }
+
+    const scheduleNextAttempt = () => {
+      retryTimeoutId = setTimeout(attemptDecode, SCAN_RETRY_DELAY_MS)
+    }
+
+    const attemptDecode = () => {
+      if (!mountedRef.current) return
+      const video = videoRef.current
+      if (busyRef.current || !video || video.readyState < 2) {
+        scheduleNextAttempt()
+        return
+      }
+      const box = getTargetBoxRect(video.videoWidth, video.videoHeight)
+      if (!box) {
+        scheduleNextAttempt()
+        return
+      }
+      cropCanvas.width = box.sw
+      cropCanvas.height = box.sh
+      cropCtx.drawImage(video, box.sx, box.sy, box.sw, box.sh, 0, 0, box.sw, box.sh)
+
+      try {
+        const decoded = reader.decodeFromCanvas(cropCanvas)
+        const code = decoded.getText().trim()
+        busyRef.current = true
+        setPhase('checking')
+        apiPost('/api/attendance/scan', { employee_id: code })
+          .then((data) => {
+            if (!mountedRef.current) return
+            stopStream()
+            setResult(data)
+            setPhase('success')
+            onLogged?.(data)
+          })
+          .catch((apiErr) => {
+            if (!mountedRef.current) return
+            setNotFoundCode(apiErr.message || `No staff member matches badge "${code}".`)
+            setPhase('not-found')
+            // Give the owner a moment to read the message, then let the
+            // still-running camera try again on the next held-up badge.
+            setTimeout(() => {
               if (!mountedRef.current) return
-              controlsRef.current?.stop()
-              setResult(data)
-              setPhase('success')
-              onLogged?.(data)
-            })
-            .catch((apiErr) => {
-              if (!mountedRef.current) return
-              setNotFoundCode(apiErr.message || `No staff member matches badge "${code}".`)
-              setPhase('not-found')
-              // Give the owner a moment to read the message, then let the
-              // still-running camera try again on the next held-up badge.
-              setTimeout(() => {
-                if (!mountedRef.current) return
-                busyRef.current = false
-                setPhase('scanning')
-              }, 2200)
-            })
-          return
-        }
+              busyRef.current = false
+              setPhase('scanning')
+              scheduleNextAttempt()
+            }, 2200)
+          })
+        return
+      } catch (err) {
         // NotFoundException/ChecksumException/FormatException (all
         // ReaderException subclasses) just mean "no valid barcode in this
-        // frame" — completely normal on every frame the badge isn't lined
-        // up in, not worth surfacing.
-        if (err && !(err instanceof ReaderException)) {
+        // frame" — completely normal whenever the badge isn't lined up
+        // inside the guide box, not worth surfacing.
+        if (!(err instanceof ReaderException)) {
           console.error('barcode decode error:', err)
         }
-      })
-      .then((controls) => {
-        if (!mountedRef.current) { controls.stop(); return }
-        controlsRef.current = controls
+      }
+      scheduleNextAttempt()
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' } })
+      .then((s) => {
+        if (!mountedRef.current) { s.getTracks().forEach((t) => t.stop()); return }
+        stream = s
+        const video = videoRef.current
+        video.srcObject = s
+        video.play().catch(() => {})
+        attemptDecode()
       })
       .catch((err) => {
         if (!mountedRef.current) return
@@ -143,8 +213,8 @@ function ScanIdModal({ onClose, onLogged }) {
 
     return () => {
       mountedRef.current = false
-      controlsRef.current?.stop()
-      controlsRef.current = null
+      clearTimeout(retryTimeoutId)
+      stopStream()
     }
   }, [scanKey])
 

@@ -259,25 +259,27 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
               </div>
             </div>
 
-            <div className="ta-calendar-weekdays">
-              {WEEKDAY_LABELS.map((w) => <span key={w}>{w}</span>)}
-            </div>
-            <div className="ta-calendar-grid">
-              {calendarCells.map((cell, i) =>
-                cell === null ? (
-                  <span key={`blank-${i}`} className="ta-calendar-day ta-calendar-day-empty" />
-                ) : (
-                  <button
-                    type="button"
-                    key={cell.key}
-                    className={`ta-calendar-day ${cell.key === todayKey ? 'ta-calendar-day-today' : ''} ${cell.key === selectedDate ? 'ta-calendar-day-selected' : ''}`}
-                    onClick={() => setSelectedDate(cell.key === selectedDate ? null : cell.key)}
-                  >
-                    {cell.day}
-                    {cell.status && <span className={`ta-calendar-dot ta-calendar-dot-${cell.status}`} />}
-                  </button>
-                )
-              )}
+            <div className="ta-calendar-compact">
+              <div className="ta-calendar-weekdays">
+                {WEEKDAY_LABELS.map((w) => <span key={w}>{w}</span>)}
+              </div>
+              <div className="ta-calendar-grid">
+                {calendarCells.map((cell, i) =>
+                  cell === null ? (
+                    <span key={`blank-${i}`} className="ta-calendar-day ta-calendar-day-empty" />
+                  ) : (
+                    <button
+                      type="button"
+                      key={cell.key}
+                      className={`ta-calendar-day ${cell.key === todayKey ? 'ta-calendar-day-today' : ''} ${cell.key === selectedDate ? 'ta-calendar-day-selected' : ''}`}
+                      onClick={() => setSelectedDate(cell.key === selectedDate ? null : cell.key)}
+                    >
+                      {cell.day}
+                      {cell.status && <span className={`ta-calendar-dot ta-calendar-dot-${cell.status}`} />}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
 
             <div className="ta-calendar-legend">

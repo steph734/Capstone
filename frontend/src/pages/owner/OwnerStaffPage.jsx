@@ -7,6 +7,7 @@ import { logActivity } from '../../utils/auditLog'
 import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import { generateUniqueId } from '../../utils/idGenerator'
 import ScanIdModal from '../../components/ScanIdModal'
+import AttendanceConfirmModal from '../../components/AttendanceConfirmModal'
 import 'react-calendar/dist/Calendar.css'
 import './OwnerStaffPage.css'
 
@@ -2068,6 +2069,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showScan, setShowScan] = useState(false)
+  const [attendanceResult, setAttendanceResult] = useState(null)
   const [showIdCards, setShowIdCards] = useState(false)
 
   // Real hires created through the wizard live in MongoDB. A hire shows up in
@@ -2227,10 +2229,12 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     }
   }
 
-  // The webcam scan modal calls the backend itself and hands back the
-  // logged result — this just records it in the audit log.
+  // The webcam scan modal calls the backend itself, hands back the logged
+  // result, and closes itself — this records the audit entry and hands the
+  // result to the separate confirmation popup shown once the camera is gone.
   const handleScanLogged = (result) => {
     logStaff(result.type === 'Time In' ? '🟢' : '🔵', `${result.type} logged via ID scan — ${result.name}`, result.name)
+    setAttendanceResult(result)
   }
 
   const handleApproveLeave = (req) => {
@@ -2637,6 +2641,13 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         <ScanIdModal
           onLogged={handleScanLogged}
           onClose={() => setShowScan(false)}
+        />
+      )}
+      {attendanceResult && (
+        <AttendanceConfirmModal
+          result={attendanceResult}
+          onClose={() => setAttendanceResult(null)}
+          onScanNext={() => { setAttendanceResult(null); setShowScan(true) }}
         />
       )}
       {showIdCards && (

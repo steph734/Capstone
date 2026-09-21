@@ -58,14 +58,6 @@ function ScanBadgeIcon({ size = 20 }) {
     </svg>
   )
 }
-function CheckCircleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M8.5 12.5l2.5 2.5 4.5-5" />
-    </svg>
-  )
-}
 function ClockIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -85,31 +77,23 @@ function CameraOffIcon() {
   )
 }
 
-function initialsFromName(name) {
-  return (
-    (name || '')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0].toUpperCase())
-      .join('') || '?'
-  )
-}
-
 // 'starting'  — camera permission requested / stream not yet playing
 // 'scanning'  — live feed, decoding every frame
 // 'checking'  — a barcode was decoded, awaiting the backend lookup
-// 'success'   — attendance logged, showing the result card
 // 'not-found' — decoded fine, but no employee matches that badge
 // 'denied'    — camera permission was refused
 // 'no-camera' — no camera device is available on this machine
+//
+// On a successful scan this modal closes itself (calling onClose) right
+// after handing the result to onLogged — the "attendance logged" confirmation
+// is a separate popup (AttendanceConfirmModal) the parent shows once the
+// camera/scanner is fully torn down, not a phase rendered in here.
 function ScanIdModal({ onClose, onLogged }) {
   const videoRef = useRef(null)
   const busyRef = useRef(false)
   const mountedRef = useRef(true)
   const [phase, setPhase] = useState('starting')
   const [notFoundCode, setNotFoundCode] = useState('')
-  const [result, setResult] = useState(null)
   const [scanKey, setScanKey] = useState(0)
   const [now, setNow] = useState(() => new Date())
 
@@ -121,7 +105,6 @@ function ScanIdModal({ onClose, onLogged }) {
   useEffect(() => {
     mountedRef.current = true
     setPhase('starting')
-    setResult(null)
     setNotFoundCode('')
     busyRef.current = false
 
@@ -165,9 +148,8 @@ function ScanIdModal({ onClose, onLogged }) {
           .then((data) => {
             if (!mountedRef.current) return
             stopStream()
-            setResult(data)
-            setPhase('success')
             onLogged?.(data)
+            onClose?.()
           })
           .catch((apiErr) => {
             if (!mountedRef.current) return
@@ -218,14 +200,8 @@ function ScanIdModal({ onClose, onLogged }) {
     }
   }, [scanKey])
 
-  const scanNext = () => {
-    setResult(null)
+  const retryCamera = () => {
     setScanKey((k) => k + 1)
-  }
-
-  const formatTime = (iso) => {
-    const d = new Date(iso)
-    return `${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
   }
 
   const showCamera = phase === 'starting' || phase === 'scanning' || phase === 'checking' || phase === 'not-found'
@@ -234,89 +210,59 @@ function ScanIdModal({ onClose, onLogged }) {
   return (
     <div className="sim-backdrop" onClick={onClose}>
       <div className="sim-modal" onClick={(e) => e.stopPropagation()}>
-        {phase !== 'success' ? (
-          <div className="sim-body">
-            <div className="sim-top">
-              <div className="sim-icon-badge"><ScanBadgeIcon /></div>
-              <div className="sim-live-clock">
-                <ClockIcon />
-                {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
-              </div>
-              <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="sim-body">
+          <div className="sim-top">
+            <div className="sim-icon-badge"><ScanBadgeIcon /></div>
+            <div className="sim-live-clock">
+              <ClockIcon />
+              {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
             </div>
-            <h3 className="sim-title">Scan ID to log attendance</h3>
-            <p className="sim-sub">Point the staff badge's barcode at the camera.</p>
-
-            {showCamera && (
-              <>
-                <div className="sim-video-wrap">
-                  <video
-                    ref={videoRef}
-                    className="sim-video"
-                    muted
-                    playsInline
-                    autoPlay
-                    onPlaying={() => setPhase((p) => (p === 'starting' ? 'scanning' : p))}
-                  />
-                  {phase !== 'starting' && <div className="sim-target-box" />}
-                  {phase === 'starting' && (
-                    <div className="sim-video-overlay">Starting camera…</div>
-                  )}
-                </div>
-
-                <div className={`sim-status ${phase === 'not-found' ? 'error' : ''}`}>
-                  <span className={`sim-status-dot ${phase === 'not-found' ? 'error' : ''}`} />
-                  {phase === 'starting' && 'Connecting to camera…'}
-                  {phase === 'scanning' && 'Waiting for scan…'}
-                  {phase === 'checking' && 'Checking badge…'}
-                  {phase === 'not-found' && notFoundCode}
-                </div>
-              </>
-            )}
-
-            {showPermissionError && (
-              <>
-                <div className="sim-video-wrap sim-video-wrap-error">
-                  <CameraOffIcon />
-                </div>
-                <div className="sim-status error centered">
-                  {phase === 'denied'
-                    ? "Camera access was denied. Allow camera permissions for this site, then try again."
-                    : 'No camera was found on this device. Connect a webcam and try again.'}
-                </div>
-                <button type="button" className="sim-retry-btn" onClick={scanNext}>Try again</button>
-              </>
-            )}
+            <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
-        ) : (
-          <>
-            <div className="sim-body">
-              <div className="sim-top">
-                <div className="sim-success-check"><CheckCircleIcon /></div>
-                <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
-              </div>
-              <h3 className="sim-title">Attendance logged</h3>
+          <h3 className="sim-title">Scan ID to log attendance</h3>
+          <p className="sim-sub">Point the staff badge's barcode at the camera.</p>
 
-              <div className="sim-result-card">
-                <div className="sim-result-avatar">{result.initials || initialsFromName(result.name)}</div>
-                <div className="sim-result-info">
-                  <div className="sim-result-name">{result.name}</div>
-                  <div className="sim-result-sub">{result.specialty || 'Unassigned'} · {result.branch || '—'}</div>
-                </div>
-                <span className={`sim-pill ${result.type === 'Time In' ? 'green' : 'yellow'}`}>{result.type}</span>
+          {showCamera && (
+            <>
+              <div className="sim-video-wrap">
+                <video
+                  ref={videoRef}
+                  className="sim-video"
+                  muted
+                  playsInline
+                  autoPlay
+                  onPlaying={() => setPhase((p) => (p === 'starting' ? 'scanning' : p))}
+                />
+                {phase !== 'starting' && <div className="sim-target-box" />}
+                {phase === 'starting' && (
+                  <div className="sim-video-overlay">Starting camera…</div>
+                )}
               </div>
 
-              <div className="sim-logged-time">
-                <ClockIcon />
-                Logged at {formatTime(result.loggedAt)}
+              <div className={`sim-status ${phase === 'not-found' ? 'error' : ''}`}>
+                <span className={`sim-status-dot ${phase === 'not-found' ? 'error' : ''}`} />
+                {phase === 'starting' && 'Connecting to camera…'}
+                {phase === 'scanning' && 'Waiting for scan…'}
+                {phase === 'checking' && 'Checking badge…'}
+                {phase === 'not-found' && notFoundCode}
               </div>
-            </div>
-            <div className="sim-footer">
-              <button className="sim-btn-secondary" onClick={scanNext}>Scan next</button>
-              <button className="sim-btn-dark" onClick={onClose}>Done</button>
-            </div>
-          </>
-        )}
+            </>
+          )}
+
+          {showPermissionError && (
+            <>
+              <div className="sim-video-wrap sim-video-wrap-error">
+                <CameraOffIcon />
+              </div>
+              <div className="sim-status error centered">
+                {phase === 'denied'
+                  ? "Camera access was denied. Allow camera permissions for this site, then try again."
+                  : 'No camera was found on this device. Connect a webcam and try again.'}
+              </div>
+              <button type="button" className="sim-retry-btn" onClick={retryCamera}>Try again</button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

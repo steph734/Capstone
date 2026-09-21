@@ -28,6 +28,14 @@ function AppointmentsIcon() {
   )
 }
 
+function AttendanceIcon() {
+  return (
+    <Icon>
+      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+    </Icon>
+  )
+}
+
 function NotesIcon() {
   return (
     <Icon>
@@ -80,6 +88,7 @@ const BASE_THERAPIST_MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/therapist/dashboard' },
   { id: 'patients', label: 'My Patients', icon: <PatientsIcon />, path: '/therapist/patients' },
   { id: 'appointments', label: 'Appointments', icon: <AppointmentsIcon />, path: '/therapist/appointments' },
+  { id: 'attendance', label: 'Attendance', icon: <AttendanceIcon />, path: '/therapist/attendance' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/therapist/subscription' },
   { id: 'notes-progress', label: 'Notes & Progress', icon: <NotesIcon />, path: '/therapist/notes-progress' },
   { id: 'assign-exercises', label: 'Assign Exercises', icon: <ExercisesIcon />, path: '/therapist/assign-exercises' },

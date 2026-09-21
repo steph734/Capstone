@@ -217,4 +217,49 @@ async function sendRejectedEmail({ email, name, reason, note }) {
   });
 }
 
-module.exports = { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail };
+function buildIdCardHtml({ name }) {
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">Your staff ID card</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+
+        <p style="margin:0 0 16px;font-size:14px;">
+          Attached is a copy of your ${BRAND} staff ID card as a PDF. Keep it handy — you can print it
+          or show it on your phone to check in and out at the branch.
+        </p>
+
+        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
+          If you weren't expecting this email, contact your branch owner.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildIdCardText({ name }) {
+  return [
+    name ? `Hi ${name},` : 'Hi,',
+    '',
+    `Attached is a copy of your ${BRAND} staff ID card as a PDF.`,
+    '',
+    "If you weren't expecting this email, contact your branch owner.",
+  ].join('\n');
+}
+
+async function sendIdCardEmail({ email, name, pdfBase64, fileName }) {
+  return sendEmail({
+    to: email,
+    toName: name || undefined,
+    subject: `Your ${BRAND} staff ID card`,
+    html: buildIdCardHtml({ name }),
+    plain: buildIdCardText({ name }),
+    attachments: [{ name: fileName || 'ID_Card.pdf', content: pdfBase64 }],
+  });
+}
+
+module.exports = { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail, sendIdCardEmail };

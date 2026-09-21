@@ -1,0 +1,32 @@
+.ta-status-pill {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ta-status-complete { background: #dcfce7; color: #166534; }
+.ta-status-open      { background: #fef3c7; color: #92400e; }
+
+.ta-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 20px;
+  text-align: center;
+  color: #6b7c75;
+}
+
+.ta-empty-state h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #2c4a3e;
+}
+
+.ta-empty-state p {
+  margin: 0;
+  font-size: 13px;
+  max-width: 360px;
+}

@@ -4,9 +4,17 @@ const Attendance = require('../models/Attendance');
 
 const router = express.Router();
 
+// Local calendar-day key (matches the machine's local timezone, same as the
+// rest of this file) — used to bucket individual scan events into "days" for
+// display, since the attendance collection itself stores one row per scan,
+// not one row per day.
+function dateKeyOf(d) {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 function todayStamp() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return dateKeyOf(new Date());
 }
 
 function initialsFromName(name) {
@@ -20,11 +28,14 @@ function initialsFromName(name) {
   );
 }
 
-// POST /api/attendance/scan -> logs a Time In/Time Out for the employee whose
-// badge barcode was just decoded by the owner's webcam scanner. The scanned
-// value is the human-readable `employee_id` string on the Employee doc (e.g.
-// "T-247550"), not a Mongo _id — the Attendance record stores the real
-// employees._id reference once the employee is resolved.
+// POST /api/attendance/scan -> logs a time-in/time-out scan EVENT for the
+// employee whose badge barcode was just decoded by the owner's webcam
+// scanner. The scanned value is the human-readable `employee_id` string on
+// the Employee doc (e.g. "T-247550"), not a Mongo _id. Unlike the old
+// one-row-per-day design, each scan inserts a brand-new Attendance document
+// (matching the `attendance` collection's live schema in Atlas) — whether
+// it's a time-in or a time-out is decided by looking at this employee's most
+// recent scan today, not by mutating a shared row.
 router.post('/scan', async (req, res) => {
   const code = String(req.body?.employee_id || '').trim();
   if (!code) {
@@ -37,39 +48,106 @@ router.post('/scan', async (req, res) => {
       return res.status(404).json({ error: `No staff member matches badge "${code}".` });
     }
 
-    const date = todayStamp();
     const now = new Date();
-    let record = await Attendance.findOne({ employee: employee._id, date });
-    let type;
+    const todayKey = todayStamp();
+    const lastScan = await Attendance.findOne({ employee: employee._id, is_archived: { $ne: true } })
+      .sort({ scanned_at: -1 });
 
-    if (!record) {
-      record = await Attendance.create({ employee: employee._id, date, time_in: now });
-      type = 'Time In';
-    } else if (!record.time_out) {
-      record.time_out = now;
-      await record.save();
-      type = 'Time Out';
-    } else {
-      // Already completed a full in/out cycle today — a further scan starts
-      // a fresh one rather than silently overwriting the finished record.
-      record.time_in = now;
-      record.time_out = undefined;
-      await record.save();
-      type = 'Time In';
-    }
+    // No scan yet today -> this one starts a fresh time-in. A scan today that
+    // was itself a time-in -> this one closes it out. A scan today that was
+    // already a time-out (a completed in/out pair) -> a further scan starts a
+    // new cycle rather than silently reopening the finished one.
+    const type = (!lastScan || dateKeyOf(lastScan.scanned_at) !== todayKey || lastScan.type === 'time_out')
+      ? 'time_in'
+      : 'time_out';
 
     const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+    await Attendance.create({
+      employee: employee._id,
+      employee_name: name,
+      branch_id: employee.branch_id?._id || null,
+      branch_name: employee.branch_id?.branch_name || null,
+      scanned_at: now,
+      type,
+      source: 'webcam',
+    });
+
     return res.json({
       name,
       initials: initialsFromName(name),
       specialty: employee.specialty || employee.position || '',
       branch: employee.branch_id?.branch_name || '',
-      type,
-      loggedAt: type === 'Time In' ? record.time_in : record.time_out,
+      type: type === 'time_in' ? 'Time In' : 'Time Out',
+      loggedAt: now,
     });
   } catch (err) {
     console.error('attendance scan error:', err);
     return res.status(500).json({ error: 'Could not log attendance. Please try again.' });
+  }
+});
+
+// GET /api/attendance/me?email=... -> a therapist's own attendance log +
+// this-month summary, for the "My Attendance" tab on their dashboard.
+// Scoped by email (there's no session/JWT in this app yet) — same lookup
+// key the Employee doc itself uses. Buckets the raw scan events into one row
+// per calendar day (earliest time-in, latest time-out) for display.
+router.get('/me', async (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name');
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    const events = await Attendance.find({ employee: employee._id, is_archived: { $ne: true } })
+      .sort({ scanned_at: 1 })
+      .limit(1000)
+      .lean();
+
+    const byDay = new Map();
+    for (const ev of events) {
+      const key = dateKeyOf(ev.scanned_at);
+      if (!byDay.has(key)) byDay.set(key, { date: key, timeIn: null, timeOut: null });
+      const bucket = byDay.get(key);
+      if (ev.type === 'time_in') {
+        if (!bucket.timeIn) bucket.timeIn = ev.scanned_at;
+      } else if (ev.type === 'time_out') {
+        bucket.timeOut = ev.scanned_at;
+      }
+    }
+    const dayRecords = Array.from(byDay.values()).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 90);
+
+    const monthPrefix = todayStamp().slice(0, 7); // 'YYYY-MM'
+    let daysThisMonth = 0;
+    let hoursThisMonth = 0;
+    for (const r of dayRecords) {
+      if (!r.date.startsWith(monthPrefix)) continue;
+      daysThisMonth += 1;
+      if (r.timeIn && r.timeOut) {
+        hoursThisMonth += (new Date(r.timeOut) - new Date(r.timeIn)) / 3600000;
+      }
+    }
+
+    const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+    return res.json({
+      employee: {
+        name,
+        specialty: employee.specialty || employee.position || '',
+        branch: employee.branch_id?.branch_name || '',
+      },
+      summary: {
+        daysThisMonth,
+        hoursThisMonth: Math.round(hoursThisMonth * 10) / 10,
+      },
+      records: dayRecords,
+    });
+  } catch (err) {
+    console.error('get my attendance error:', err);
+    return res.status(500).json({ error: 'Could not load your attendance.' });
   }
 });
 

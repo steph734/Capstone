@@ -6,7 +6,7 @@ const multer = require('multer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Branch = require('../models/Branch');
-const { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail } = require('../utils/employeeEmails');
+const { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail, sendIdCardEmail } = require('../utils/employeeEmails');
 const { INVITE_TTL_MS, generateInviteToken, hashInviteToken } = require('../utils/staffInvite');
 
 const router = express.Router();
@@ -23,6 +23,26 @@ const uploadDocFields = upload.fields([
   ...DOC_KEYS.map((key) => ({ name: key, maxCount: 1 })),
   { name: 'photo', maxCount: 1 },
 ]);
+
+// Separate multer instance for the "email ID card" route below — a single
+// generated PDF, not one of the onboarding document fields above.
+const uploadIdCardPdfField = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+}).single('pdf');
+
+function uploadIdCardPdf(req, res, next) {
+  uploadIdCardPdfField(req, res, (err) => {
+    if (err) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'The ID card file is too large (max 5MB).'
+        : 'Please attach a valid PDF file.';
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}
 
 // multer's own errors (e.g. a file over the 5MB limit) surface through this
 // middleware's callback, not a thrown exception — they never reach the route
@@ -77,6 +97,33 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('list employees error:', err);
     res.status(500).json({ error: 'Could not load employees.' });
+  }
+});
+
+// POST /api/employees/send-id-card — emails a copy of a staff member's ID
+// card (rendered client-side, since the card layout lives in canvas code on
+// the owner dashboard) as a PDF attachment. Not tied to a specific employee
+// id so it also works for demo/local-only staff rows that have no Mongo doc.
+router.post('/send-id-card', uploadIdCardPdf, async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const name = String(req.body.name || '').trim();
+    if (!EMAIL_RE.test(email)) {
+      return res.status(400).json({ error: 'A valid staff email is required.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No ID card PDF was attached.' });
+    }
+    await sendIdCardEmail({
+      email,
+      name,
+      pdfBase64: req.file.buffer.toString('base64'),
+      fileName: `${(name || 'staff').replace(/\s+/g, '_')}_ID_Card.pdf`,
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('send id card email error:', err);
+    return res.status(500).json({ error: err.message || 'Could not email the ID card.' });
   }
 });
 

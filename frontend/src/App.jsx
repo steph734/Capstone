@@ -61,6 +61,7 @@ import PatientEmailPage from './pages/PatientEmailPage'
 import TherapistDashboard from './pages/therapist/TherapistDashboard'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
 import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPage'
+import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage'
 import TherapistNotesProgressPage from './pages/therapist/TherapistNotesProgressPage'
 import TherapistAssignExercisesPage from './pages/therapist/TherapistAssignExercisesPage'
 import TherapistSubscriptionPage from './pages/therapist/TherapistSubscriptionPage'
@@ -580,6 +581,21 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
                 <TherapistAppointmentsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/attendance"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistAttendancePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

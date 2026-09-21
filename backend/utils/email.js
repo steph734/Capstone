@@ -13,7 +13,7 @@ function readEnv(name) {
   return String(raw).trim().replace(/^["']|["']$/g, '').trim();
 }
 
-async function sendEmail({ to, toName, subject, html, plain }) {
+async function sendEmail({ to, toName, subject, html, plain, attachments }) {
   const apiKey = readEnv('BREVO_API_KEY');
   const fromAddress = readEnv('BREVO_FROM_ADDRESS');
 
@@ -43,6 +43,8 @@ async function sendEmail({ to, toName, subject, html, plain }) {
       subject,
       htmlContent: html,
       textContent: plain,
+      // Brevo wants base64 file content under `content`, not raw bytes.
+      ...(attachments?.length && { attachment: attachments.map((a) => ({ name: a.name, content: a.content })) }),
     }),
   });
 

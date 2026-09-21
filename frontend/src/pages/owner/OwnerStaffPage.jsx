@@ -923,11 +923,31 @@ function staffToCardModel(member) {
   }
 }
 
+// Renders the same card onto an offscreen canvas as IdCardModal, then wraps
+// it in a CR80-sized PDF page — shared by both the export and email actions
+// below so the PDF sent by email matches the one downloaded from the preview.
+async function renderIdCardPdfBlob(member) {
+  const canvas = document.createElement('canvas')
+  canvas.width = ID_CARD_W
+  canvas.height = ID_CARD_H
+  const ctx = canvas.getContext('2d')
+  const [logoImg, photoImg] = await Promise.all([
+    loadImage(ID_CARD_LOGO_SRC),
+    loadImage(member.avatar),
+  ])
+  drawIdCard(ctx, staffToCardModel(member), { logoImg, photoImg })
+  const imgData = canvas.toDataURL('image/png')
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 53.98] })
+  doc.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98)
+  return doc.output('blob')
+}
+
 function StaffIdCardsModal({ staff, onClose }) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState(staff[0]?.id ?? null)
   const [previewStaff, setPreviewStaff] = useState(null)
   const [emailedId, setEmailedId] = useState(null)
+  const [emailingId, setEmailingId] = useState(null)
 
   const filtered = staff.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
   const selected = staff.find((s) => s.id === selectedId) || filtered[0] || null
@@ -949,9 +969,27 @@ function StaffIdCardsModal({ staff, onClose }) {
     a.click()
   }
 
-  const emailCard = (member) => {
-    setEmailedId(member.id)
-    setTimeout(() => setEmailedId((id) => (id === member.id ? null : id)), 2200)
+  const emailCard = async (member) => {
+    if (!member.email) {
+      window.alert(`${member.name} doesn't have an email on file, so their ID card can't be emailed.`)
+      return
+    }
+    setEmailingId(member.id)
+    try {
+      const pdfBlob = await renderIdCardPdfBlob(member)
+      const fileName = `${(member.name || 'staff').trim().replace(/\s+/g, '_')}_ID_Card.pdf`
+      const formData = new FormData()
+      formData.append('email', member.email)
+      formData.append('name', member.name || '')
+      formData.append('pdf', pdfBlob, fileName)
+      await apiPostForm('/api/employees/send-id-card', formData)
+      setEmailedId(member.id)
+      setTimeout(() => setEmailedId((id) => (id === member.id ? null : id)), 2200)
+    } catch (err) {
+      window.alert(err.message || `Could not email ${member.name}'s ID card. Please try again.`)
+    } finally {
+      setEmailingId(null)
+    }
   }
 
   return (
@@ -1007,11 +1045,12 @@ function StaffIdCardsModal({ staff, onClose }) {
                   <button
                     type="button"
                     className="os-icon-btn os-icon-edit"
-                    title="Email ID card"
+                    title={emailedId === s.id ? 'Emailed' : 'Email ID card'}
                     aria-label={`Email ${s.name}'s ID card`}
+                    disabled={emailingId === s.id}
                     onClick={(e) => { e.preventDefault(); emailCard(s) }}
                   >
-                    <MailIcon />
+                    {emailedId === s.id ? <CheckCircleIcon /> : <MailIcon />}
                   </button>
                 </div>
               </label>
@@ -1030,10 +1069,14 @@ function StaffIdCardsModal({ staff, onClose }) {
             <button
               type="button"
               className="os-btn-dark os-idcards-export"
-              disabled={!selected}
+              disabled={!selected || emailingId === selected?.id}
               onClick={() => selected && emailCard(selected)}
             >
-              {selected && emailedId === selected.id ? 'Emailed ✓' : `Email to ${selected ? selected.name : ''}`}
+              {selected && emailingId === selected.id
+                ? 'Sending…'
+                : selected && emailedId === selected.id
+                  ? 'Emailed ✓'
+                  : `Email to ${selected ? selected.name : ''}`}
             </button>
           </div>
         </div>

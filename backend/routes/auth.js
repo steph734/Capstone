@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const UserOtp = require('../models/UserOtp');
 const Employee = require('../models/Employee');
+const AuditLog = require('../models/AuditLog');
 const {
   OTP_TTL_MS,
   OTP_MAX_ATTEMPTS,
@@ -12,6 +13,23 @@ const {
 } = require('../utils/otp');
 
 const router = express.Router();
+
+const MAX_FAILED_ATTEMPTS = 3;
+const LOCK_DURATION_MS = 5 * 60 * 1000;
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return String(forwarded).split(',')[0].trim();
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+async function logAudit(fields) {
+  try {
+    await AuditLog.create({ created_at: new Date(), ...fields });
+  } catch (err) {
+    console.error('audit log write failed:', err.message);
+  }
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // The sign-up form only offers these two; the other roles are created by admins.
@@ -225,17 +243,60 @@ router.post('/login', async (req, res) => {
     if (user.is_archived) {
       return res.status(403).json({ error: 'This account has been archived.' });
     }
-    if (user.is_locked && user.lock_until && user.lock_until > new Date()) {
-      return res.status(423).json({ error: 'Account is temporarily locked. Try again later.' });
+    const now = new Date();
+    const clientIp = getClientIp(req);
+    // Set once a lockout is triggered and never cleared until a login
+    // succeeds, so a failure arriving after `lock_until` has passed (i.e.
+    // still failing once the 5-minute lock has run out) is distinguishable
+    // from a normal first-time failure.
+    const wasLockedAndExpired = Boolean(user.is_locked && user.lock_until && user.lock_until <= now);
+
+    if (user.is_locked && user.lock_until && user.lock_until > now) {
+      return res.status(423).json({
+        error: 'Account is temporarily locked. Try again later.',
+        locked: true,
+        lockUntil: user.lock_until,
+      });
     }
 
     const ok = await bcrypt.compare(password, user.password);
-    user.last_login_attempt = new Date();
+    user.last_login_attempt = now;
 
     if (!ok) {
       user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+
+      if (wasLockedAndExpired) {
+        await logAudit({
+          user_id: user._id,
+          action: 'login_failed_after_lockout',
+          ip_address: clientIp,
+          description: `Failed login for ${user.email} after a previous 5-minute account lockout had already expired.`,
+        });
+      }
+
+      if (user.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
+        const alreadyLocked = user.is_locked;
+        user.is_locked = true;
+        user.lock_until = new Date(now.getTime() + LOCK_DURATION_MS);
+        if (!alreadyLocked) {
+          await logAudit({
+            user_id: user._id,
+            action: 'account_locked',
+            ip_address: clientIp,
+            description: `Account locked for 5 minutes after ${user.failed_login_attempts} failed login attempts.`,
+          });
+        }
+      }
+
       await user.save();
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      const locked = user.is_locked && user.lock_until > now;
+      return res.status(locked ? 423 : 401).json({
+        error: locked
+          ? 'Too many failed attempts. Account locked for 5 minutes.'
+          : 'Invalid email or password.',
+        locked,
+        lockUntil: locked ? user.lock_until : undefined,
+      });
     }
 
     // Credentials are right, but the email was never confirmed — issue a fresh
@@ -280,7 +341,9 @@ router.post('/login', async (req, res) => {
     }
 
     user.failed_login_attempts = 0;
-    user.last_login = new Date();
+    user.is_locked = false;
+    user.lock_until = null;
+    user.last_login = now;
     await user.save();
 
     return res.status(200).json({ success: true, user: user.toSafeJSON() });

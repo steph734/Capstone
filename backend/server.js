@@ -5,6 +5,10 @@ require('dotenv').config();
 
 const app = express();
 
+// So req.ip (used for audit-log entries) reflects the real client address
+// when this server runs behind a reverse proxy/load balancer.
+app.set('trust proxy', 1);
+
 // Chrome's Private Network Access check adds its own preflight requirement
 // on top of normal CORS whenever a public site (like the Vercel-hosted
 // frontend) calls a private address like localhost — it sends
@@ -35,6 +39,9 @@ app.use('/api/staff-setup', require('./routes/staffSetup'));
 
 // Public: a hire sets their permanent password via the link from the "You're hired" email
 app.use('/api/set-password', require('./routes/setPassword'));
+
+// Super Admin: GET /api/audit-logs (failed-login lockouts, etc.)
+app.use('/api/audit-logs', require('./routes/auditLogs'));
 
 // Test endpoint — always up, reports live DB status.
 app.get('/api/health', (req, res) => {

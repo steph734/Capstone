@@ -39,15 +39,6 @@ const CHILD_CONDITIONS = [
 ]
 const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other']
 
-const THERAPISTS = [
-  { id: 1, name: 'Marco Reyes',   role: 'Speech Therapist',        initials: 'MR', color: '#93c5fd', textColor: '#1e3a8a', available: true },
-  { id: 2, name: 'Jade Tan',      role: 'Physical Therapist',      initials: 'JT', color: '#c4b5fd', textColor: '#4c1d95', available: false },
-  { id: 3, name: 'Andre Lim',     role: 'Behavior Therapist',      initials: 'AL', color: '#6ee7b7', textColor: '#064e3b', available: true },
-  { id: 4, name: 'Carmen Dizon',  role: 'Occupational Therapist',  initials: 'CD', color: '#f9a8d4', textColor: '#9d174d', available: true },
-  { id: 5, name: 'Paolo Ramos',   role: 'Developmental Therapist', initials: 'PR', color: '#fde68a', textColor: '#92400e', available: true },
-  { id: 6, name: 'Grace Uy',      role: 'Psychologist',            initials: 'GU', color: '#fecdd3', textColor: '#9f1239', available: true },
-]
-
 const SESSION_MODES = [
   { id: 'in-person',  label: 'In-Person',  Icon: InPersonIcon  },
   { id: 'cognitive',  label: 'Cognitive',  Icon: CognitiveIcon },
@@ -55,7 +46,11 @@ const SESSION_MODES = [
   { id: 'behavioral', label: 'Behavioral', Icon: BehaviorIcon  },
 ]
 
-const TIME_SLOTS = [
+// Shown until a therapist is picked, and as the fallback whenever that
+// therapist hasn't confirmed same-day slots for the booked date yet (true for
+// every date besides today, since they can only answer after clocking in —
+// see AvailabilityModal / POST /api/attendance/availability).
+const DEFAULT_TIME_SLOTS = [
   '8:00 - 9:00 AM', '9:00 - 10:00 AM', '10:00 - 11:00 AM',
   '1:00 - 2:00 PM',  '2:00 - 3:00 PM',  '3:00 - 4:00 PM',
 ]
@@ -79,11 +74,29 @@ export default function BookAppointmentPage({ user }) {
   const preselectedMonth = location.state?.month        ?? new Date().getMonth()
   const preselectedYear  = location.state?.year         ?? new Date().getFullYear()
   const bookingDateLabel = `${MONTHS[preselectedMonth]} ${preselectedDate}, ${preselectedYear}`
+  // 'YYYY-MM-DD', matching the day-key format therapist_availability rows use.
+  const bookingDateKey = `${preselectedYear}-${String(preselectedMonth + 1).padStart(2, '0')}-${String(preselectedDate).padStart(2, '0')}`
 
   const [step, setStep]             = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const availableTherapists = THERAPISTS.filter(t => t.available)
   const birthdateRef = useRef(null)
+
+  /* ── Therapist roster, straight from the employees collection ── */
+  const [therapists, setTherapists] = useState([])
+  const [therapistsLoading, setTherapistsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/appointments/therapists')
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (!cancelled) setTherapists(body.therapists || [])
+      })
+      .catch((e) => console.warn('Could not load therapists:', e.message))
+      .finally(() => { if (!cancelled) setTherapistsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   /* ── Step 1: Personal Details ── */
   const [form1, setForm1] = useState({
@@ -101,6 +114,50 @@ export default function BookAppointmentPage({ user }) {
   const [sessionMode, setSessionMode]             = useState('in-person')
   const [pickedTime, setPickedTime]               = useState(null)
   const [errors2, setErrors2]                     = useState({})
+
+  // Once a therapist is picked, only offer the same-day slots they confirmed
+  // via the "You're clocked in" modal on their Attendance page — falling back
+  // to the default list when they haven't answered for the booked date yet
+  // (which is every date except today, since answering requires having
+  // clocked in that day).
+  const [slotOptions, setSlotOptions] = useState(DEFAULT_TIME_SLOTS)
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsNote, setSlotsNote] = useState('')
+
+  useEffect(() => {
+    if (!selectedTherapist) {
+      setSlotOptions(DEFAULT_TIME_SLOTS)
+      setSlotsNote('')
+      return
+    }
+    let cancelled = false
+    setSlotsLoading(true)
+    fetch(`/api/appointments/therapist-slots?employeeId=${encodeURIComponent(selectedTherapist)}&date=${bookingDateKey}`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (cancelled) return
+        if (Array.isArray(body.slots)) {
+          setSlotOptions(body.slots)
+          setSlotsNote(
+            body.slots.length
+              ? 'Showing only the slots this therapist opened up for this day.'
+              : "This therapist hasn't opened any slots for this day yet."
+          )
+        } else {
+          setSlotOptions(DEFAULT_TIME_SLOTS)
+          setSlotsNote('')
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.warn('Could not load therapist slots:', e.message)
+        setSlotOptions(DEFAULT_TIME_SLOTS)
+        setSlotsNote('')
+      })
+      .finally(() => { if (!cancelled) setSlotsLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedTherapist, bookingDateKey])
 
   /* ── Step 3: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
@@ -171,7 +228,7 @@ export default function BookAppointmentPage({ user }) {
   }
 
   /* Derived */
-  const therapistObj = THERAPISTS.find(t => t.id === selectedTherapist)
+  const therapistObj = therapists.find(t => t.id === selectedTherapist)
   const sessionModeObj = SESSION_MODES.find(m => m.id === sessionMode)
   const fullName = `${form1.firstName} ${form1.lastName}`.trim() || '—'
 
@@ -216,7 +273,7 @@ export default function BookAppointmentPage({ user }) {
           contactNumber: form1.contactNumber,
           email: form1.email,
         },
-        therapist: { name: therapistObj?.name || '', role: therapistObj?.role || '' },
+        therapist: { id: therapistObj?.id || '', name: therapistObj?.name || '', role: therapistObj?.role || '' },
         session: {
           mode: sessionMode,
           timeSlot: pickedTime || '',
@@ -555,19 +612,24 @@ export default function BookAppointmentPage({ user }) {
                   id="therapist-select"
                   value={selectedTherapist ?? ''}
                   onChange={e => {
-                    const value = e.target.value ? Number(e.target.value) : null
+                    const value = e.target.value || null
                     setSelectedTherapist(value)
-                    setErrors2(p => ({ ...p, therapist: '' }))
+                    setPickedTime(null)
+                    setErrors2(p => ({ ...p, therapist: '', time: '' }))
                   }}
                   className={errors2.therapist ? 'err' : ''}
+                  disabled={therapistsLoading}
                 >
-                  <option value="" disabled>Select your therapist</option>
-                  {availableTherapists.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} - {t.role} (Available)
-                    </option>
+                  <option value="" disabled>
+                    {therapistsLoading ? 'Loading therapists…' : 'Select your therapist'}
+                  </option>
+                  {therapists.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} - {t.role}</option>
                   ))}
                 </select>
+                {!therapistsLoading && therapists.length === 0 && (
+                  <p className="field-hint">No staff are on record yet — add employees from the owner dashboard first.</p>
+                )}
               </div>
 
               {/* ── Session Mode ── */}
@@ -598,12 +660,22 @@ export default function BookAppointmentPage({ user }) {
                     setErrors2(p => ({ ...p, time: '' }))
                   }}
                   className={errors2.time ? 'err' : ''}
+                  disabled={!selectedTherapist || slotsLoading || slotOptions.length === 0}
                 >
-                  <option value="" disabled>Select a time slot</option>
-                  {TIME_SLOTS.map(t => (
+                  <option value="" disabled>
+                    {!selectedTherapist
+                      ? 'Select a therapist first'
+                      : slotsLoading
+                        ? 'Loading time slots…'
+                        : slotOptions.length === 0
+                          ? 'No slots available'
+                          : 'Select a time slot'}
+                  </option>
+                  {slotOptions.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+                {slotsNote && <p className="field-hint">{slotsNote}</p>}
               </div>
 
               {/* Reschedule Note */}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import { savePasswordReset } from '../utils/passwordResets'
+import { sha256Hex } from '../utils/hash'
 import './ForgotPassword.css'
 import './ResetPassword.css'
 
@@ -65,12 +66,16 @@ export default function ResetPassword() {
     setSubmitting(true)
     try {
       let confirmedEmail = email
+      // Hashed client-side before it leaves the browser — matches the hashing
+      // done at login (App.jsx) and sign up (SignUp.jsx) so verify-credentials
+      // and the bcrypt compare in auth-login.js keep working against it.
+      const passwordHash = await sha256Hex(password)
 
       try {
         const res = await fetch('/api/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, password }),
+          body: JSON.stringify({ token, password: passwordHash }),
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.error || 'Could not reset your password.')

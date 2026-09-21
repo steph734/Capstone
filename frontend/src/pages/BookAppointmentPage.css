@@ -250,6 +250,12 @@
   margin-top: -2px;
 }
 
+.field-hint {
+  font-size: 11px;
+  color: #6b8a7c;
+  margin: 4px 0 0;
+}
+
 .step-error {
   background: #fee2e2;
   color: #dc2626;

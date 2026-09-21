@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
 import SocialAuthModal from '../components/SocialAuthModal'
+import { sha256Hex } from '../utils/hash'
 import './SignUp.css'
 
 function FacebookIcon() {
@@ -105,6 +106,10 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
 
     setSubmitting(true)
     try {
+      // Hashed client-side so the raw password never appears in the request
+      // payload — must match the hashing done at login (App.jsx) and reset
+      // (ResetPassword.jsx) so the server's bcrypt compare keeps working.
+      const passwordHash = await sha256Hex(password)
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,7 +118,7 @@ export default function SignUp({ onLogoClick, onLoginClick }) {
           username: username.trim(),
           email: email.trim(),
           role,
-          password,
+          password: passwordHash,
         }),
       })
       const data = await res.json().catch(() => ({}))

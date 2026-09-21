@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     const method = PAYMENT_MAP[String(payment.method || '').toLowerCase()] || null
 
     const appointmentDoc = {
-      employee_id: null, // mock therapists — no employees seeded yet
+      employee_id: asObjectId(therapist.id) || null,
       patient_id: patientId,
       payment_id: null,
       booked_by: bookedById || null,

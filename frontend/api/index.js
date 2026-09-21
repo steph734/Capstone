@@ -27,12 +27,15 @@ import tts from './_lib/routes/tts.js'
 import verifyCredentials from './_lib/routes/verify-credentials.js'
 import appointmentsCreate from './_lib/routes/appointments-create.js'
 import appointmentsAvailability from './_lib/routes/appointments-availability.js'
+import appointmentsTherapists from './_lib/routes/appointments-therapists.js'
+import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slots.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
 import authResendOtp from './_lib/routes/auth-resend-otp.js'
 import authLogin from './_lib/routes/auth-login.js'
 import sendResetOtp from './_lib/routes/send-reset-otp.js'
 import verifyResetOtp from './_lib/routes/verify-reset-otp.js'
+import auditLogs from './_lib/routes/audit-logs.js'
 
 const app = express()
 
@@ -54,12 +57,15 @@ app.all('/api/tts', tts)
 app.all('/api/verify-credentials', verifyCredentials)
 app.all('/api/appointments/create', appointmentsCreate)
 app.all('/api/appointments/availability', appointmentsAvailability)
+app.all('/api/appointments/therapists', appointmentsTherapists)
+app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)
 app.all('/api/auth/login', authLogin)
 app.all('/api/auth/send-reset-otp', sendResetOtp)
 app.all('/api/auth/verify-reset-otp', verifyResetOtp)
+app.all('/api/audit-logs', auditLogs)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

@@ -1,8 +1,33 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { getAuditLogs } from '../../utils/auditLog'
 import './AuditLogsPage.css'
+
+// Backend-recorded security events (account lockouts, etc.) use a plain
+// action string — map it to the icon/label shown on the Activity Feed.
+const SERVER_ACTION_META = {
+  account_locked: { icon: '🔒', label: 'Account Locked' },
+  login_failed_after_lockout: { icon: '🚨', label: 'Repeated Failed Login' },
+}
+
+function mapServerLog(log) {
+  const created = new Date(log.created_at)
+  const meta = SERVER_ACTION_META[log.action] || { icon: '🧾', label: log.action }
+  return {
+    id: `server-${log.id}`,
+    date: created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: created.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+    role: log.role,
+    user: log.user,
+    email: log.email,
+    actionIcon: meta.icon,
+    action: meta.label,
+    description: log.description,
+    entity: `IP ${log.ip_address}`,
+    status: 'Failed',
+  }
+}
 
 const ROLE_FILTERS = [
   { key: 'All', label: 'All', cls: 'all' },
@@ -15,12 +40,33 @@ const STATUS_CLASS = { Success: 'success', Review: 'review', Failed: 'failed' }
 const ROLE_CLASS = { Owner: 'owner', Therapist: 'therapist', Patient: 'patient', System: 'system' }
 
 export default function AuditLogsPage({ user, onLogout }) {
-  const [logs] = useState(() => getAuditLogs())
+  const [logs, setLogs] = useState(() => getAuditLogs())
   const [roleFilter, setRoleFilter] = useState('All')
   const [fromDate, setFromDate] = useState('2026-06-06')
   const [toDate, setToDate] = useState('2026-07-06')
   const [search, setSearch] = useState('')
   const [selectedLog, setSelectedLog] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/audit-logs')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.logs?.length) return
+        setLogs((existing) => {
+          const serverLogs = data.logs.map(mapServerLog)
+          const knownIds = new Set(existing.map((l) => l.id))
+          const fresh = serverLogs.filter((l) => !knownIds.has(l.id))
+          return fresh.length ? [...fresh, ...existing] : existing
+        })
+      })
+      .catch(() => {
+        // Backend unreachable (offline, or plain `npm run dev`) — keep local demo data.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const counts = useMemo(() => ({
     All: logs.length,

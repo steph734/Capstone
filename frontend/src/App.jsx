@@ -6,6 +6,7 @@ import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import { getResetPassword } from './utils/passwordResets'
 import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/accounts'
+import { sha256Hex } from './utils/hash'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -171,6 +172,12 @@ function App() {
       return resetPassword ? password === resetPassword : password === user.password
     })
 
+    // Hash before it ever hits the wire — the network payload (and any request
+    // logs) should never carry the raw password, only this digest. The server
+    // treats it as an opaque string, so it must be hashed the same way here as
+    // it was when the password was set (see SignUp.jsx and ResetPassword.jsx).
+    const passwordHash = await sha256Hex(password)
+
     // 2. Server check: a password changed on another browser/device lives only in
     //    the shared store. Ask the API to verify it and tell us which account.
     if (!matchedUser) {
@@ -178,7 +185,7 @@ function App() {
         const res = await fetch('/api/verify-credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: typedEmail, password }),
+          body: JSON.stringify({ email: typedEmail, password: passwordHash }),
         })
         if (res.ok) {
           const data = await res.json().catch(() => ({}))
@@ -201,7 +208,7 @@ function App() {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: typedEmail, password }),
+          body: JSON.stringify({ email: typedEmail, password: passwordHash }),
         })
         const data = await res.json().catch(() => ({}))
         if (res.ok && data.user) {
@@ -214,6 +221,16 @@ function App() {
             requiresVerification: true,
             email: data.email || typedEmail,
             message: data.error || 'Please verify your email to continue.',
+          }
+        } else if (res.status === 423) {
+          // 3 failed attempts in a row locks the account for 5 minutes.
+          const mins = data.lockUntil
+            ? Math.max(1, Math.ceil((new Date(data.lockUntil).getTime() - Date.now()) / 60000))
+            : 5
+          return {
+            success: false,
+            locked: true,
+            message: data.error || `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`,
           }
         }
       } catch {

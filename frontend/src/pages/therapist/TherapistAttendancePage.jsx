@@ -275,17 +275,20 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
                       onClick={() => setSelectedDate(cell.key === selectedDate ? null : cell.key)}
                     >
                       {cell.day}
-                      {cell.status && <span className={`ta-calendar-dot ta-calendar-dot-${cell.status}`} />}
+                      <span className={`ta-calendar-dot ${cell.status ? `ta-calendar-dot-${cell.status}` : 'ta-calendar-dot-none'}`} />
                     </button>
                   )
                 )}
               </div>
             </div>
 
-            <div className="ta-calendar-legend">
-              <span><i className="ta-calendar-dot ta-calendar-dot-ontime" /> On time</span>
-              <span><i className="ta-calendar-dot ta-calendar-dot-late" /> Late</span>
-              <span><i className="ta-calendar-dot ta-calendar-dot-active" /> Active now</span>
+            <div className="ta-calendar-footer">
+              <div className="ta-calendar-legend">
+                <span><i className="ta-calendar-dot ta-calendar-dot-ontime" /> On time</span>
+                <span><i className="ta-calendar-dot ta-calendar-dot-late" /> Late</span>
+                <span><i className="ta-calendar-dot ta-calendar-dot-active" /> Active now</span>
+              </div>
+              <p className="ta-calendar-total">{monthLabel} total: {monthStats.present} day{monthStats.present === 1 ? '' : 's'} logged</p>
             </div>
           </div>
 

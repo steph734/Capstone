@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
-import { ReaderException, BarcodeFormat, DecodeHintType } from '@zxing/library'
+import { NotFoundException, ChecksumException, FormatException, BarcodeFormat, DecodeHintType } from '@zxing/library'
+
+// NotFoundException/ChecksumException/FormatException each extend zxing's
+// base Exception directly (not ReaderException, despite that class's name
+// suggesting otherwise) — checking `instanceof ReaderException` here always
+// misses them, which is why every single frame without a barcode used to log
+// a "No MultiFormat Readers..." error and flood devtools.
+function isNoBarcodeInFrame(err) {
+  return err instanceof NotFoundException || err instanceof ChecksumException || err instanceof FormatException
+}
 
 // Restricting to the formats a staff badge would actually use (vs. zxing's
 // full default list of ~15) cuts out most of the internal sub-readers that
@@ -166,11 +175,10 @@ function ScanIdModal({ onClose, onLogged }) {
           })
         return
       } catch (err) {
-        // NotFoundException/ChecksumException/FormatException (all
-        // ReaderException subclasses) just mean "no valid barcode in this
-        // frame" — completely normal whenever the badge isn't lined up
-        // inside the guide box, not worth surfacing.
-        if (!(err instanceof ReaderException)) {
+        // A decode failure here just means "no valid barcode in this frame"
+        // — completely normal whenever the badge isn't lined up inside the
+        // guide box, not worth surfacing.
+        if (!isNoBarcodeInFrame(err)) {
           console.error('barcode decode error:', err)
         }
       }

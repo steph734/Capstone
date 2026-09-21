@@ -89,7 +89,8 @@ function LoginWrapper({ onLogin }) {
   const handleLogin = async (email, password) => {
     const result = await onLogin(email, password)
     if (result.success) {
-      navigate(getHomePath(result.user?.role))
+      // Brief delay so the success toast is visible before the page changes.
+      setTimeout(() => navigate(getHomePath(result.user?.role)), 900)
     } else if (result.requiresVerification) {
       navigate('/verify-otp', { state: { email: result.email || email } })
     }

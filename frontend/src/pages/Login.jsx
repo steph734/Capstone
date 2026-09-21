@@ -73,32 +73,55 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     passedNotice || (signupEmail ? 'Account created! Sign in with your new credentials.' : '')
   )
   const [socialProvider, setSocialProvider] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showSuccessToast, setShowSuccessToast] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (onLogin) {
-      setLoginError('')
-      setNotice('')
-      const result = await onLogin(email, password)
-      if (result?.success || result?.requiresVerification) {
-        // On requiresVerification the wrapper redirects to /verify-otp — no error.
-        return
-      }
-      setLoginError(result?.message || 'Login failed')
+    if (!onLogin || isSubmitting) return
+
+    setLoginError('')
+    setNotice('')
+    setIsSubmitting(true)
+    const result = await onLogin(email, password)
+
+    if (result?.success) {
+      // Keep the button in its loading state until the wrapper navigates
+      // away — the success toast stays up for that same window.
+      setShowSuccessToast(true)
+      return
     }
+
+    setIsSubmitting(false)
+    if (result?.requiresVerification) {
+      // The wrapper redirects to /verify-otp — no error to show.
+      return
+    }
+    setLoginError(result?.message || 'Login failed')
   }
 
   const handleSocialSuccess = async () => {
     setSocialProvider(null)
     if (onLogin) {
+      setIsSubmitting(true)
       const result = await onLogin('patient@demo.com', 'demo1234')
-      if (result && result.success) return
+      if (result && result.success) {
+        setShowSuccessToast(true)
+        return
+      }
+      setIsSubmitting(false)
     }
     navigate('/')
   }
 
   return (
     <div className="login-page">
+      {showSuccessToast && (
+        <div className="login-toast-success" role="status" aria-live="polite">
+          <span className="login-toast-icon">✓</span>
+          Login successful!
+        </div>
+      )}
       <div className="login-container">
         <div className="login-header">
           <LogoCircle onClick={onLogoClick} size="small" label="Back to home" />
@@ -163,7 +186,16 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
             </button>
           </div>
 
-          <button type="submit" className="login-btn">Login</button>
+          <button type="submit" className="login-btn" disabled={isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <span className="login-btn-spinner" aria-hidden="true" />
+                {showSuccessToast ? 'Success! Redirecting…' : 'Logging in…'}
+              </>
+            ) : (
+              'Login'
+            )}
+          </button>
         </form>
 
         <p className="divider-text">or continue with</p>

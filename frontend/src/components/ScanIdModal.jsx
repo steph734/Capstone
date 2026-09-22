@@ -6,6 +6,7 @@ import { BarcodeScanner } from 'react-barcode-scanner'
 // the code_128 + qr_code formats a staff badge actually uses.
 import 'react-barcode-scanner/polyfill'
 import { apiPost } from '../utils/api'
+import { formatManilaTime } from '../utils/manilaTime'
 import './ScanIdModal.css'
 
 // Restricting formats (vs. every format the detector supports) keeps the
@@ -134,7 +135,7 @@ function ScanIdModal({ onClose, onLogged }) {
             <div className="sim-icon-badge"><ScanBadgeIcon /></div>
             <div className="sim-live-clock">
               <ClockIcon />
-              {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+              {formatManilaTime(now, { second: '2-digit' })}
             </div>
             <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
           </div>

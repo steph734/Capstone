@@ -345,6 +345,24 @@
 
 .tp-action-msg:hover { background: #ddeee7; }
 
+.tp-action-email {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #f0f7f4;
+  color: #4a6b5d;
+  text-decoration: none;
+}
+
+.tp-action-email:hover { background: #ddeee7; }
+
+.tp-action-email[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ── Profile Modal ────────────────────────────────────────── */
 .tp-profile-modal {
   width: 100%;
@@ -752,6 +770,7 @@
   padding: 16px 24px 20px;
   border-top: 1px solid #f0f7f4;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .tp-btn-cancel {
@@ -768,6 +787,18 @@
 }
 
 .tp-btn-cancel:hover { background: #f8fbf9; }
+
+.tp-btn-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.tp-btn-email[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .tp-btn-add {
   padding: 10px 20px;

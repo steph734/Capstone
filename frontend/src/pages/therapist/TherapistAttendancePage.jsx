@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { apiGet, apiPost } from '../../utils/api'
-import AvailabilityModal from '../../components/AvailabilityModal'
+import { manilaDateKey, formatManilaTime, formatManilaDate, manilaMinutesOfDay } from '../../utils/manilaTime'
+import AvailabilityModal, { AVAILABILITY_SLOTS } from '../../components/AvailabilityModal'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
 
@@ -16,19 +17,14 @@ function pad2(n) {
   return String(n).padStart(2, '0')
 }
 
-function dateKeyOf(d) {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return '—'
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  return formatManilaDate(dateStr, { weekday: 'short' })
 }
 
 function formatTime(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return formatManilaTime(iso)
 }
 
 function hoursBetween(inIso, outIso) {
@@ -46,8 +42,7 @@ function formatDuration(ms) {
 
 function isLate(timeInIso) {
   if (!timeInIso) return false
-  const d = new Date(timeInIso)
-  return d.getHours() * 60 + d.getMinutes() > LATE_CUTOFF_MINUTES
+  return manilaMinutesOfDay(timeInIso) > LATE_CUTOFF_MINUTES
 }
 
 function dayStatus(record) {
@@ -70,6 +65,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   const [selectedDate, setSelectedDate] = useState(null)
   const [showAvailability, setShowAvailability] = useState(false)
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
+  const [todayAvailability, setTodayAvailability] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -104,7 +100,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return map
   }, [records])
 
-  const todayKey = dateKeyOf(now)
+  const todayKey = manilaDateKey(now)
   const todayRecord = recordsByDate.get(todayKey) || null
   const clockedIn = !!(todayRecord?.timeIn && !todayRecord?.timeOut)
   const todayDurationMs = todayRecord?.timeIn
@@ -121,6 +117,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
       .then((data) => {
         if (cancelled) return
         setAvailabilityChecked(true)
+        setTodayAvailability(data.slots)
         if (data.slots === null) setShowAvailability(true)
       })
       .catch(() => { if (!cancelled) setAvailabilityChecked(true) })
@@ -129,6 +126,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
 
   const answerAvailability = (slots) => {
     setShowAvailability(false)
+    setTodayAvailability(slots)
     apiPost('/api/attendance/availability', { email: user.email, date: todayKey, slots }).catch(() => {})
   }
 
@@ -237,6 +235,33 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
               </div>
             </div>
           </div>
+
+          {todayRecord?.timeIn && (
+            <div className="admin-panel ta-availability-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <h3>Today's Availability</h3>
+                  <p>
+                    {todayAvailability === null
+                      ? 'Loading your same-day availability…'
+                      : todayAvailability.length === 0
+                        ? "You're not marked available for same-day bookings today."
+                        : `Patients can currently book you for ${todayAvailability.length} slot${todayAvailability.length === 1 ? '' : 's'} today.`}
+                  </p>
+                </div>
+                <button type="button" className="admin-btn-secondary" onClick={() => setShowAvailability(true)}>
+                  {todayAvailability && todayAvailability.length > 0 ? 'Edit' : 'Set availability'}
+                </button>
+              </div>
+              {todayAvailability && todayAvailability.length > 0 && (
+                <div className="ta-avail-chips">
+                  {AVAILABILITY_SLOTS.filter((s) => todayAvailability.includes(s.label)).map((s) => (
+                    <span key={s.label} className="ta-avail-chip">{s.label}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="admin-stats-grid">
             <section className="admin-stat-card ta-stat-card">
@@ -359,7 +384,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     {showAvailability && (
       <AvailabilityModal
         firstName={(employee?.name || '').split(' ')[0] || 'there'}
-        dateLabel={now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}
+        dateLabel={formatManilaDate(now).toUpperCase()}
         now={now}
         onSkip={() => answerAvailability([])}
         onConfirm={(slots) => answerAvailability(slots)}

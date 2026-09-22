@@ -1,3 +1,4 @@
+import { formatManilaTime, formatManilaDate } from '../utils/manilaTime'
 import './ScanIdModal.css'
 
 function CheckCircleIcon() {
@@ -30,8 +31,9 @@ function initialsFromName(name) {
 }
 
 function formatLoggedTime(iso) {
-  const d = new Date(iso)
-  return `${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  // Philippine time, regardless of the viewing device's own timezone — this
+  // is the clinic's official attendance record, not a local convenience.
+  return `${formatManilaTime(iso)}, ${formatManilaDate(iso)}`
 }
 
 // Shown after ScanIdModal has already closed itself following a successful

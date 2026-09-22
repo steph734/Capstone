@@ -119,6 +119,29 @@
   font-weight: 700;
 }
 
+/* Today's availability panel */
+.ta-availability-panel .admin-panel-header p {
+  margin: 4px 0 0;
+}
+
+.ta-avail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ta-avail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* Stat tiles */
 .ta-stat-card {
   position: relative;

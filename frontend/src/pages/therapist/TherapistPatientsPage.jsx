@@ -17,6 +17,9 @@ function VideoIcon() {
 function PhoneIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" /></svg>
 }
+function EmailIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><path d="M22 6l-10 7L2 6" /></svg>
+}
 
 const RAW_PATIENTS = [
   {
@@ -32,6 +35,7 @@ const RAW_PATIENTS = [
     sessions: 36,
     guardian: 'Self / Parent',
     contact: '+63 912 000 0001',
+    email: 'alvrin.family@example.com',
     joined: 'Sep 1, 2025',
     notes: 'Alvrin has shown consistent improvement in managing anxiety triggers. CBT sessions have been highly productive, with notable progress in breathing techniques and cognitive reframing. Continue current treatment plan and begin exploring school reintegration strategies.',
   },
@@ -48,6 +52,7 @@ const RAW_PATIENTS = [
     sessions: 24,
     guardian: 'Maria Lopez',
     contact: '+63 912 345 6789',
+    email: 'maria.lopez@example.com',
     joined: 'Jan 15, 2026',
     notes: 'Patient shows improvement in focus and attention span. Responds well to structured activities and positive reinforcement. Recommend continuing current behavior therapy plan with increased session frequency.',
   },
@@ -64,6 +69,7 @@ const RAW_PATIENTS = [
     sessions: 31,
     guardian: 'Ana Santos',
     contact: '+63 917 234 5678',
+    email: 'ana.santos@example.com',
     joined: 'Nov 3, 2025',
     notes: 'Significant progress in articulation and vocabulary. Now forming 3-4 word sentences consistently. Guardian reports improvement in home communication. Continue speech exercises and introduce reading aloud activities.',
   },
@@ -80,6 +86,7 @@ const RAW_PATIENTS = [
     sessions: 18,
     guardian: 'Roberto Cruz',
     contact: '+63 920 876 5432',
+    email: 'roberto.cruz@example.com',
     joined: 'Feb 10, 2026',
     notes: 'Social engagement has plateaued over the last month. Sensory sensitivities remain a barrier. Recommend a team review to adjust current therapy plan and consider adding occupational therapy component.',
   },
@@ -96,6 +103,7 @@ const RAW_PATIENTS = [
     sessions: 42,
     guardian: 'Carmen Reyes',
     contact: '+63 918 654 3210',
+    email: 'carmen.reyes@example.com',
     joined: 'Sep 20, 2025',
     notes: 'Excellent progress with CBT techniques. Patient is applying coping strategies independently in school settings. Guardian reports reduced anxiety episodes. Begin gradual reduction of session frequency as per discharge plan.',
   },
@@ -112,6 +120,7 @@ const RAW_PATIENTS = [
     sessions: 20,
     guardian: 'Kevin Tan',
     contact: '+63 915 111 2233',
+    email: 'kevin.tan@example.com',
     joined: 'Dec 5, 2025',
     notes: 'Steady improvement in phonological awareness and letter recognition. School performance improving with accommodations in place. Continue multisensory reading approach and coordinate with school teacher.',
   },
@@ -128,6 +137,7 @@ const RAW_PATIENTS = [
     sessions: 15,
     guardian: 'Lisa Villanueva',
     contact: '+63 921 999 8877',
+    email: 'lisa.villanueva@example.com',
     joined: 'Mar 1, 2026',
     notes: 'Patient continues to experience flashbacks and sleep disturbances. Trauma-focused CBT has started but progress is slow. Coordinating with family for additional support. Review treatment approach with supervision team this week.',
   },
@@ -144,6 +154,7 @@ const RAW_PATIENTS = [
     sessions: 28,
     guardian: 'Pedro Mendez',
     contact: '+63 916 444 5566',
+    email: 'pedro.mendez@example.com',
     joined: 'Oct 12, 2025',
     notes: 'Good progress in adaptive skills and communication. Participating well in group activities. Fine motor skills improving with consistent OT exercises. Guardian is highly engaged and supportive of home practice.',
   },
@@ -160,6 +171,7 @@ const RAW_PATIENTS = [
     sessions: 22,
     guardian: 'Jenny Park',
     contact: '+63 919 777 6655',
+    email: 'jenny.park@example.com',
     joined: 'Jan 8, 2026',
     notes: 'Remarkable progress — now speaking in full sentences with familiar adults in therapy setting. Beginning generalization to school environment. Guardian working closely with kindergarten teacher. Continue graduated exposure plan.',
   },
@@ -176,6 +188,7 @@ const RAW_PATIENTS = [
     sessions: 19,
     guardian: 'Diana Rivera',
     contact: '+63 913 321 0987',
+    email: 'diana.rivera@example.com',
     joined: 'Feb 28, 2026',
     notes: 'Impulse control improving with behavior modification strategies. Teacher reports fewer classroom disruptions. Working on organizational skills for homework completion. Parent training sessions ongoing — family engagement is strong.',
   },
@@ -192,6 +205,7 @@ const RAW_PATIENTS = [
     sessions: 12,
     guardian: 'Rosa Torres',
     contact: '+63 922 555 4433',
+    email: 'rosa.torres@example.com',
     joined: 'Apr 14, 2026',
     notes: 'Significant regression observed over the past two weeks. Self-injurious behaviors have increased. Urgent review needed. Coordinating with pediatric psychiatrist for medication evaluation. Guardian has been notified and is in daily contact.',
   },
@@ -307,6 +321,10 @@ function ProfileModal({ patient, onClose, onMessage }) {
               <span className="tp-detail-val">{patient.contact}</span>
             </div>
             <div className="tp-detail-row">
+              <span className="tp-detail-lbl">Email</span>
+              <span className="tp-detail-val">{patient.email || '—'}</span>
+            </div>
+            <div className="tp-detail-row">
               <span className="tp-detail-lbl">Joined</span>
               <span className="tp-detail-val">{patient.joined}</span>
             </div>
@@ -331,6 +349,15 @@ function ProfileModal({ patient, onClose, onMessage }) {
         {/* Footer */}
         <div className="tp-modal-footer">
           <button className="tp-btn-cancel" onClick={onClose}>Close</button>
+          <a
+            className="tp-btn-cancel tp-btn-email"
+            href={patient.email ? `mailto:${patient.email}` : undefined}
+            aria-disabled={!patient.email}
+            onClick={(e) => { if (!patient.email) e.preventDefault() }}
+          >
+            <EmailIcon />
+            Email Guardian
+          </a>
           <button className="tp-btn-add" onClick={() => { onClose(); onMessage(patient) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -548,6 +575,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       sessions:    0,
       guardian:    'Not specified',
       contact:     'Not specified',
+      email:       'Not specified',
       joined:      new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       notes:       'No clinical notes yet.',
     }
@@ -682,6 +710,16 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                           </svg>
                           Message
                         </button>
+                        <a
+                          className="tp-action-btn tp-action-email"
+                          href={p.email ? `mailto:${p.email}` : undefined}
+                          aria-disabled={!p.email}
+                          onClick={(e) => { if (!p.email) e.preventDefault() }}
+                          title={p.email ? `Email ${p.guardian}` : 'No email on file'}
+                        >
+                          <EmailIcon />
+                          Email
+                        </a>
                       </div>
                     </td>
                   </tr>

@@ -37,6 +37,7 @@ import authChangePassword from './_lib/routes/auth-change-password.js'
 import sendResetOtp from './_lib/routes/send-reset-otp.js'
 import verifyResetOtp from './_lib/routes/verify-reset-otp.js'
 import auditLogs from './_lib/routes/audit-logs.js'
+import setPassword from './_lib/routes/set-password.js'
 
 const app = express()
 
@@ -68,6 +69,7 @@ app.all('/api/auth/change-password', authChangePassword)
 app.all('/api/auth/send-reset-otp', sendResetOtp)
 app.all('/api/auth/verify-reset-otp', verifyResetOtp)
 app.all('/api/audit-logs', auditLogs)
+app.all('/api/set-password/:token', setPassword)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

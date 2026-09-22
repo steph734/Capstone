@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import './AvailabilityModal.css'
 
-function CheckCircleIcon() {
+function CheckCircleIcon({ size = 22, className }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <circle cx="12" cy="12" r="9" />
       <path d="M8.5 12.5l2.5 2.5 4.5-5" />
     </svg>
@@ -66,6 +66,11 @@ function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
         </p>
         <p className="avm-date">TODAY · {dateLabel}</p>
 
+        <div className="avm-legend">
+          <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-available" /> Available</span>
+          <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-past" /> Past</span>
+        </div>
+
         <div className="avm-grid">
           {AVAILABILITY_SLOTS.map((slot) => {
             const past = isPast(slot)
@@ -78,6 +83,7 @@ function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
                 disabled={past}
                 onClick={() => toggle(slot)}
               >
+                {isSelected && !past && <CheckCircleIcon size={14} className="avm-slot-check" />}
                 {slot.label}
               </button>
             )

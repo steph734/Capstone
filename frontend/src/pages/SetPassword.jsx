@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { apiGet, apiPost } from '../utils/api'
 import { sha256Hex } from '../utils/hash'
 import './SetPassword.css'
+
+// Same-origin, like login/signup/reset — served by the Vercel function at
+// /api/set-password/:token (frontend/api/_lib/routes/set-password.js), not
+// the separately-hosted Express backend (which utils/api.js's apiGet/apiPost
+// would point at instead, breaking once deployed).
+async function fetchJson(path, options) {
+  const res = await fetch(path, options)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Something went wrong.')
+  return data
+}
 
 function CheckIcon() {
   return (
@@ -45,7 +55,7 @@ export default function SetPassword() {
       return
     }
     let cancelled = false
-    apiGet(`/api/set-password/${token}`)
+    fetchJson(`/api/set-password/${token}`)
       .then((data) => {
         if (cancelled) return
         setInfo(data)
@@ -88,7 +98,11 @@ export default function SetPassword() {
       // (SignUp.jsx) and reset (ResetPassword.jsx) so the server's bcrypt
       // compare at login keeps working for this account afterward.
       const passwordHash = await sha256Hex(password)
-      await apiPost(`/api/set-password/${token}`, { password: passwordHash })
+      await fetchJson(`/api/set-password/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordHash }),
+      })
       setDone(true)
     } catch (err) {
       setError(err.message || 'Could not set your password.')

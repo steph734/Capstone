@@ -12,6 +12,13 @@ const attendanceSchema = new mongoose.Schema(
     branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     branch_name: { type: String, default: null },
     scanned_at: { type: Date, required: true },
+    // Philippine calendar day this scan belongs to, plus the zone it was
+    // computed in — set from CLINIC_TIMEZONE at scan time (see
+    // routes/attendance.js) so a scan between UTC midnight and 8 AM (still
+    // "yesterday" in Manila) isn't mis-bucketed if this ever gets queried by
+    // attendance_date directly instead of re-deriving it from scanned_at.
+    attendance_date: { type: String, required: true },
+    timezone: { type: String, required: true, default: 'Asia/Manila' },
     type: { type: String, enum: ['time_in', 'time_out'], required: true },
     source: { type: String, enum: ['webcam', null], default: 'webcam' },
     is_archived: { type: Boolean, default: false },

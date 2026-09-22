@@ -84,6 +84,8 @@ router.post('/scan', async (req, res) => {
       branch_id: employee.branch_id?._id || null,
       branch_name: employee.branch_id?.branch_name || null,
       scanned_at: now,
+      attendance_date: todayKey,
+      timezone: CLINIC_TIMEZONE,
       type,
       source: 'webcam',
     });

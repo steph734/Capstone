@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
+import { AVAILABILITY_SLOTS } from '../components/AvailabilityModal'
 import { logActivity } from '../utils/auditLog'
 import './BookAppointmentPage.css'
 
@@ -46,14 +47,11 @@ const SESSION_MODES = [
   { id: 'behavioral', label: 'Behavioral', Icon: BehaviorIcon  },
 ]
 
-// Shown until a therapist is picked, and as the fallback whenever that
-// therapist hasn't confirmed same-day slots for the booked date yet (true for
-// every date besides today, since they can only answer after clocking in —
-// see AvailabilityModal / POST /api/attendance/availability).
-const DEFAULT_TIME_SLOTS = [
-  '8:00 - 9:00 AM', '9:00 - 10:00 AM', '10:00 - 11:00 AM',
-  '1:00 - 2:00 PM',  '2:00 - 3:00 PM',  '3:00 - 4:00 PM',
-]
+// The full clinic-day slot grid, 8 AM-5 PM — same list a therapist picks
+// from in AvailabilityModal. Always shown in full; individual slots are
+// marked Available/Not Available (see ALL_SLOT_LABELS.disabled below)
+// instead of being removed from the list.
+const ALL_SLOT_LABELS = AVAILABILITY_SLOTS.map((s) => s.label)
 
 const PAYMENT_METHODS = [
   { id: 'cash',   label: 'Cash',                desc: 'Pay in cash at the clinic' },
@@ -108,6 +106,11 @@ export default function BookAppointmentPage({ user }) {
   })
   const [errors1, setErrors1] = useState({})
   const setF1 = (k, v) => { setForm1(p => ({ ...p, [k]: v })); setErrors1(p => ({ ...p, [k]: '' })) }
+  // Auto-capitalizes just the first character as the guardian types — used on
+  // every step-1 text field except the dropdowns (gender/condition/relationship)
+  // and email, which shouldn't be case-mangled.
+  const capitalizeFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+  const setF1Cap = (k, v) => setF1(k, capitalizeFirst(v))
 
   /* ── Step 2: Booking Details ── */
   const [selectedTherapist, setSelectedTherapist] = useState(null)
@@ -115,18 +118,20 @@ export default function BookAppointmentPage({ user }) {
   const [pickedTime, setPickedTime]               = useState(null)
   const [errors2, setErrors2]                     = useState({})
 
-  // Once a therapist is picked, only offer the same-day slots they confirmed
-  // via the "You're clocked in" modal on their Attendance page — falling back
-  // to the default list when they haven't answered for the booked date yet
-  // (which is every date except today, since answering requires having
-  // clocked in that day).
-  const [slotOptions, setSlotOptions] = useState(DEFAULT_TIME_SLOTS)
+  // Once a therapist is picked, ask which same-day slots they confirmed via
+  // the "You're clocked in" modal on their Attendance page. The dropdown
+  // always lists all 8 clinic slots — `openSlots` only decides which of
+  // them get marked Not Available: `null` means the therapist hasn't
+  // answered for this date yet (true for every date besides today, since
+  // answering requires having clocked in that day), so every slot is left
+  // selectable; an array means they explicitly opened just those slots.
+  const [openSlots, setOpenSlots] = useState(null)
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [slotsNote, setSlotsNote] = useState('')
 
   useEffect(() => {
     if (!selectedTherapist) {
-      setSlotOptions(DEFAULT_TIME_SLOTS)
+      setOpenSlots(null)
       setSlotsNote('')
       return
     }
@@ -138,26 +143,29 @@ export default function BookAppointmentPage({ user }) {
         if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
         if (cancelled) return
         if (Array.isArray(body.slots)) {
-          setSlotOptions(body.slots)
+          setOpenSlots(body.slots)
           setSlotsNote(
             body.slots.length
-              ? 'Showing only the slots this therapist opened up for this day.'
-              : "This therapist hasn't opened any slots for this day yet."
+              ? 'Slots this therapist hasn’t opened up for this day are marked Not Available.'
+              : "This therapist hasn't opened any slots for this day yet — all marked Not Available."
           )
         } else {
-          setSlotOptions(DEFAULT_TIME_SLOTS)
+          setOpenSlots(null)
           setSlotsNote('')
         }
       })
       .catch((e) => {
         if (cancelled) return
         console.warn('Could not load therapist slots:', e.message)
-        setSlotOptions(DEFAULT_TIME_SLOTS)
+        setOpenSlots(null)
         setSlotsNote('')
       })
       .finally(() => { if (!cancelled) setSlotsLoading(false) })
     return () => { cancelled = true }
   }, [selectedTherapist, bookingDateKey])
+
+  const openSlotSet = useMemo(() => (openSlots ? new Set(openSlots) : null), [openSlots])
+  const isSlotAvailable = (label) => !openSlotSet || openSlotSet.has(label)
 
   /* ── Step 3: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
@@ -466,14 +474,14 @@ export default function BookAppointmentPage({ user }) {
                   <label>Child's First Name <span className="req">*</span></label>
                   <div className="input-icon-wrap">
                     <UserIcon />
-                    <input value={form1.firstName} onChange={e => setF1('firstName', e.target.value)}
+                    <input value={form1.firstName} onChange={e => setF1Cap('firstName', e.target.value)}
                       placeholder="Juan" className={errors1.firstName ? 'err' : ''} />
                   </div>
                   {errors1.firstName && <span className="field-err">{errors1.firstName}</span>}
                 </div>
                 <div className="book-field">
                   <label>Child's Last Name <span className="req">*</span></label>
-                  <input value={form1.lastName} onChange={e => setF1('lastName', e.target.value)}
+                  <input value={form1.lastName} onChange={e => setF1Cap('lastName', e.target.value)}
                     placeholder="Maglisang" className={errors1.lastName ? 'err' : ''} />
                   {errors1.lastName && <span className="field-err">{errors1.lastName}</span>}
                 </div>
@@ -482,7 +490,7 @@ export default function BookAppointmentPage({ user }) {
               <div className="book-row three-col">
                 <div className="book-field">
                   <label>Child's Nickname <span className="opt">(Optional)</span></label>
-                  <input value={form1.nickname} onChange={e => setF1('nickname', e.target.value)} placeholder="Berto" />
+                  <input value={form1.nickname} onChange={e => setF1Cap('nickname', e.target.value)} placeholder="Berto" />
                 </div>
                 <div className="book-field">
                   <label>Gender <span className="req">*</span></label>
@@ -517,7 +525,7 @@ export default function BookAppointmentPage({ user }) {
                   <label>Address <span className="req">*</span></label>
                   <div className="input-icon-wrap">
                     <PinIcon />
-                    <input value={form1.address} onChange={e => setF1('address', e.target.value)}
+                    <input value={form1.address} onChange={e => setF1Cap('address', e.target.value)}
                       placeholder="67 St., Davao City" className={errors1.address ? 'err' : ''} />
                   </div>
                   {errors1.address && <span className="field-err">{errors1.address}</span>}
@@ -535,13 +543,13 @@ export default function BookAppointmentPage({ user }) {
               <div className="book-row">
                 <div className="book-field">
                   <label>Parent/Guardian First Name <span className="req">*</span></label>
-                  <input value={form1.guardianFirst} onChange={e => setF1('guardianFirst', e.target.value)}
+                  <input value={form1.guardianFirst} onChange={e => setF1Cap('guardianFirst', e.target.value)}
                     placeholder="Maria" className={errors1.guardianFirst ? 'err' : ''} />
                   {errors1.guardianFirst && <span className="field-err">{errors1.guardianFirst}</span>}
                 </div>
                 <div className="book-field">
                   <label>Parent/Guardian Last Name <span className="req">*</span></label>
-                  <input value={form1.guardianLast} onChange={e => setF1('guardianLast', e.target.value)}
+                  <input value={form1.guardianLast} onChange={e => setF1Cap('guardianLast', e.target.value)}
                     placeholder="Dela Cruz" className={errors1.guardianLast ? 'err' : ''} />
                   {errors1.guardianLast && <span className="field-err">{errors1.guardianLast}</span>}
                 </div>
@@ -556,7 +564,7 @@ export default function BookAppointmentPage({ user }) {
                 </div>
                 <div className="book-field">
                   <label>Contact Number <span className="req">*</span></label>
-                  <input value={form1.contactNumber} onChange={e => setF1('contactNumber', e.target.value)}
+                  <input value={form1.contactNumber} onChange={e => setF1Cap('contactNumber', e.target.value)}
                     placeholder="0921 059 9762" className={errors1.contactNumber ? 'err' : ''} />
                   {errors1.contactNumber && <span className="field-err">{errors1.contactNumber}</span>}
                 </div>
@@ -660,20 +668,23 @@ export default function BookAppointmentPage({ user }) {
                     setErrors2(p => ({ ...p, time: '' }))
                   }}
                   className={errors2.time ? 'err' : ''}
-                  disabled={!selectedTherapist || slotsLoading || slotOptions.length === 0}
+                  disabled={!selectedTherapist || slotsLoading}
                 >
                   <option value="" disabled>
                     {!selectedTherapist
                       ? 'Select a therapist first'
                       : slotsLoading
                         ? 'Loading time slots…'
-                        : slotOptions.length === 0
-                          ? 'No slots available'
-                          : 'Select a time slot'}
+                        : 'Select a time slot'}
                   </option>
-                  {slotOptions.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+                  {ALL_SLOT_LABELS.map(label => {
+                    const available = isSlotAvailable(label)
+                    return (
+                      <option key={label} value={label} disabled={!available}>
+                        {label} {available ? '(Available)' : '(Not Available)'}
+                      </option>
+                    )
+                  })}
                 </select>
                 {slotsNote && <p className="field-hint">{slotsNote}</p>}
               </div>

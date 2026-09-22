@@ -262,4 +262,99 @@ async function sendIdCardEmail({ email, name, pdfBase64, fileName }) {
   });
 }
 
-module.exports = { sendApplicationReceivedEmail, sendHiredEmail, sendRejectedEmail, sendIdCardEmail };
+function buildTimeInReminderHtml({ name }) {
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">⏰ Time in soon</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+
+        <p style="margin:0 0 16px;font-size:14px;">
+          Your shift starts at <strong>8:00 AM</strong>. This is a reminder to scan your staff ID at
+          the branch in the next few minutes to log your time in.
+        </p>
+
+        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
+          Sent automatically by ${BRAND} — if you've already timed in, you can ignore this.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildTimeInReminderText({ name }) {
+  return [
+    name ? `Hi ${name},` : 'Hi,',
+    '',
+    'Your shift starts at 8:00 AM. This is a reminder to scan your staff ID at the branch in the next few minutes to log your time in.',
+    '',
+    "Sent automatically by " + BRAND + " — if you've already timed in, you can ignore this.",
+  ].join('\n');
+}
+
+async function sendTimeInReminderEmail({ email, name }) {
+  return sendEmail({
+    to: email,
+    toName: name || undefined,
+    subject: `Reminder: time in at 8:00 AM — ${BRAND}`,
+    html: buildTimeInReminderHtml({ name }),
+    plain: buildTimeInReminderText({ name }),
+  });
+}
+
+function buildTimeOutReminderHtml({ name }) {
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">⏰ Time out soon</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+
+        <p style="margin:0 0 16px;font-size:14px;">
+          Your shift ends at <strong>5:00 PM</strong>. This is a reminder to scan your staff ID at
+          the branch in the next few minutes to log your time out.
+        </p>
+
+        <p style="margin:18px 0 0;color:#9aab9f;font-size:11px;">
+          Sent automatically by ${BRAND} — if you've already timed out, you can ignore this.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildTimeOutReminderText({ name }) {
+  return [
+    name ? `Hi ${name},` : 'Hi,',
+    '',
+    'Your shift ends at 5:00 PM. This is a reminder to scan your staff ID at the branch in the next few minutes to log your time out.',
+    '',
+    "Sent automatically by " + BRAND + " — if you've already timed out, you can ignore this.",
+  ].join('\n');
+}
+
+async function sendTimeOutReminderEmail({ email, name }) {
+  return sendEmail({
+    to: email,
+    toName: name || undefined,
+    subject: `Reminder: time out at 5:00 PM — ${BRAND}`,
+    html: buildTimeOutReminderHtml({ name }),
+    plain: buildTimeOutReminderText({ name }),
+  });
+}
+
+module.exports = {
+  sendApplicationReceivedEmail,
+  sendHiredEmail,
+  sendRejectedEmail,
+  sendIdCardEmail,
+  sendTimeInReminderEmail,
+  sendTimeOutReminderEmail,
+};

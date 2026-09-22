@@ -43,6 +43,10 @@ app.use('/api/set-password', require('./routes/setPassword'));
 // Super Admin: GET /api/audit-logs (failed-login lockouts, etc.)
 app.use('/api/audit-logs', require('./routes/auditLogs'));
 
+// Emails staff a reminder 5 minutes before their 8 AM time-in and 5 PM
+// time-out, Mon-Fri, skipping anyone who's already scanned for that slot.
+require('./jobs/attendanceReminders').startAttendanceReminders();
+
 // Test endpoint — always up, reports live DB status.
 app.get('/api/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;

@@ -187,6 +187,85 @@ function RecordingsModal({ recordings, playingId, onPlay, onDelete, onClearAll, 
   )
 }
 
+// ─── TTS History Modal ────────────────────────────────────────────────────────
+
+function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClearAll, onClose }) {
+  const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
+
+  return (
+    <div className="rec-modal-backdrop" onClick={handleBackdrop}>
+      <div className="rec-modal">
+        <div className="rec-modal-header" style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>
+          <div className="rec-modal-title">
+            🗂️ Speech History
+            <span className="rec-count-badge">{history.length}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {history.length > 0 && (
+              <button className="rec-clear-all-btn" onClick={onClearAll}>🗑️ Clear All</button>
+            )}
+            <button className="rec-modal-close" onClick={onClose}><CloseIcon /></button>
+          </div>
+        </div>
+
+        <div className="rec-modal-body">
+          {history.length === 0 ? (
+            <div className="rec-empty">
+              <span className="rec-empty-icon">🔊</span>
+              <p>No saved speech yet!<br />Tap the speaker to save your first one.</p>
+            </div>
+          ) : (
+            <div className="rec-list">
+              {history.map((item, idx) => {
+                const isPlaying = activeId === item.id
+                return (
+                  <div key={item.id} className="rec-card">
+                    <div className="rec-card-top">
+                      <div className="rec-index-badge" style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>
+                        #{history.length - idx}
+                      </div>
+                      <div className="rec-meta">
+                        <span className="rec-date">🗓️ {formatDateTime(item.date)}</span>
+                        <span className="rec-duration">🐢 {item.rate.toFixed(1)}x · 🔊 {item.pitch.toFixed(1)}</span>
+                      </div>
+                      <button className="rec-delete-btn" onClick={() => onDelete(item.id)} title="Delete">
+                        <TrashIcon />
+                      </button>
+                    </div>
+
+                    <div className="rec-transcript">
+                      <span className="rec-transcript-label" style={{ color: '#0d9488' }}>💬 Text</span>
+                      <p className="rec-transcript-text">"{item.text}"</p>
+                    </div>
+
+                    <div className="rec-audio-row">
+                      <button
+                        className={`rec-play-btn ${isPlaying ? 'rec-play-btn-active' : ''}`}
+                        style={!isPlaying ? { background: 'linear-gradient(135deg,#059669,#0d9488)', boxShadow: '0 4px 12px rgba(5,150,105,0.25)' } : undefined}
+                        onClick={() => onPlay(item)}
+                      >
+                        {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                        <span>{isPlaying ? 'Stop' : 'Play Again'}</span>
+                      </button>
+                      <button className="rec-reuse-btn" onClick={() => onReuse(item)}>✏️ Reuse</button>
+                      {isPlaying && (
+                        <div className="rec-playing-indicator">
+                          <span className="rec-dot" /><span className="rec-dot" /><span className="rec-dot" />
+                          <span style={{ marginLeft: 6, fontSize: 12, color: '#0d9488', fontWeight: 700 }}>Speaking...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const TTS_HINTS = [
@@ -195,9 +274,13 @@ const TTS_HINTS = [
   'Write words, hear them come alive! 🌈',
 ]
 
+const TTS_HISTORY_KEY = 'csf_tts_history'
+const TTS_HISTORY_LIMIT = 50
+
 export default function SpeechFeaturesUI() {
   const [activeTab, setActiveTab] = useState('stt')
   const [showModal, setShowModal] = useState(false)
+  const [showTtsModal, setShowTtsModal] = useState(false)
 
   // ── STT state ──
   const [isListening, setIsListening] = useState(false)
@@ -222,6 +305,25 @@ export default function SpeechFeaturesUI() {
   const [pitch, setPitch] = useState(1.2)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [ttsError, setTtsError] = useState('')
+  const [ttsHistory, setTtsHistory] = useState([])
+  const [ttsActiveId, setTtsActiveId] = useState(null)
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(TTS_HISTORY_KEY) || '[]')
+      setTtsHistory(saved.map(item => ({ ...item, date: new Date(item.date) })))
+    } catch {
+      // ignore corrupted storage
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TTS_HISTORY_KEY, JSON.stringify(ttsHistory))
+    } catch {
+      // storage unavailable (e.g. private browsing quota) — skip persisting
+    }
+  }, [ttsHistory])
 
   useEffect(() => { transcriptRef.current = transcript }, [transcript])
 
@@ -316,18 +418,46 @@ export default function SpeechFeaturesUI() {
   }
 
   // ── TTS ──
-  const handleSpeak = () => {
-    if (!ttsText.trim()) return
+  const speak = (text, speakRate, speakPitch, { onStop } = {}) => {
+    if (!text.trim()) return
     if (!window.speechSynthesis) { setTtsError('🔇 Not supported. Use Chrome!'); return }
     window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(ttsText)
-    u.rate = rate; u.pitch = pitch
-    u.onstart = () => setIsSpeaking(true); u.onend = () => setIsSpeaking(false)
-    u.onerror = () => { setIsSpeaking(false); setTtsError('Something went wrong! 😅') }
+    const u = new SpeechSynthesisUtterance(text)
+    u.rate = speakRate; u.pitch = speakPitch
+    u.onstart = () => setIsSpeaking(true)
+    u.onend = () => { setIsSpeaking(false); setTtsActiveId(null); onStop?.() }
+    u.onerror = () => { setIsSpeaking(false); setTtsActiveId(null); setTtsError('Something went wrong! 😅'); onStop?.() }
     window.speechSynthesis.speak(u); setTtsError('')
   }
 
-  const stopSpeaking = () => { window.speechSynthesis?.cancel(); setIsSpeaking(false) }
+  const handleSpeak = () => {
+    if (!ttsText.trim()) return
+    setTtsActiveId(null)
+    setTtsHistory(prev => [
+      { id: Date.now(), date: new Date(), text: ttsText.trim(), rate, pitch },
+      ...prev,
+    ].slice(0, TTS_HISTORY_LIMIT))
+    speak(ttsText, rate, pitch)
+  }
+
+  const stopSpeaking = () => { window.speechSynthesis?.cancel(); setIsSpeaking(false); setTtsActiveId(null) }
+
+  const handleHistoryPlay = (item) => {
+    if (ttsActiveId === item.id) { stopSpeaking(); return }
+    setTtsActiveId(item.id)
+    speak(item.text, item.rate, item.pitch)
+  }
+
+  const handleHistoryReuse = (item) => {
+    setTtsText(item.text); setRate(item.rate); setPitch(item.pitch); setShowTtsModal(false)
+  }
+
+  const handleHistoryDelete = (id) => {
+    if (ttsActiveId === id) stopSpeaking()
+    setTtsHistory(prev => prev.filter(x => x.id !== id))
+  }
+
+  const clearTtsHistory = () => { stopSpeaking(); setTtsHistory([]) }
 
   return (
     <div className="csf-root">
@@ -402,7 +532,17 @@ export default function SpeechFeaturesUI() {
 
       {/* ══════════ TEXT TO SPEECH ══════════ */}
       {activeTab === 'tts' && (
-        <div className="csf-card">
+        <div className="csf-card" style={{ position: 'relative' }}>
+
+          {/* History button — top right */}
+          <button className="rec-trigger-btn" onClick={() => setShowTtsModal(true)}>
+            <FolderIcon />
+            <span>History</span>
+            {ttsHistory.length > 0 && (
+              <span className="rec-trigger-badge">{ttsHistory.length}</span>
+            )}
+          </button>
+
           <div className="csf-hero csf-hero-speaker">
             <div className="csf-hero-stars">
               <span className="csf-star s1">🎵</span><span className="csf-star s2">🎶</span>
@@ -464,6 +604,19 @@ export default function SpeechFeaturesUI() {
           onDelete={handleDelete}
           onClearAll={clearAll}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {/* ══════════ TTS HISTORY MODAL ══════════ */}
+      {showTtsModal && (
+        <TtsHistoryModal
+          history={ttsHistory}
+          activeId={ttsActiveId}
+          onPlay={handleHistoryPlay}
+          onReuse={handleHistoryReuse}
+          onDelete={handleHistoryDelete}
+          onClearAll={clearTtsHistory}
+          onClose={() => setShowTtsModal(false)}
         />
       )}
 
@@ -600,6 +753,8 @@ export default function SpeechFeaturesUI() {
         .rec-play-btn { display:flex; align-items:center; gap:7px; padding:9px 18px; border-radius:12px; border:none; cursor:pointer; font-size:13px; font-weight:700; background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; box-shadow:0 4px 12px rgba(124,58,237,0.25); transition:transform 0.15s; }
         .rec-play-btn:hover { transform:scale(1.04); }
         .rec-play-btn-active { background:linear-gradient(135deg,#f59e0b,#f97316); box-shadow:0 4px 12px rgba(245,158,11,0.25); }
+        .rec-reuse-btn { display:flex; align-items:center; gap:6px; padding:9px 16px; border-radius:12px; border:1.5px solid #a7f3d0; cursor:pointer; font-size:13px; font-weight:700; background:#ecfdf5; color:#0d9488; transition:transform 0.15s; }
+        .rec-reuse-btn:hover { transform:scale(1.04); background:#d1fae5; }
         .rec-playing-indicator { display:flex; align-items:center; }
         .rec-dot { width:6px; height:6px; background:#f59e0b; border-radius:50%; margin-right:3px; animation:csfBounce 0.6s ease-in-out infinite; }
         .rec-dot:nth-child(2){animation-delay:0.15s} .rec-dot:nth-child(3){animation-delay:0.3s}

@@ -187,36 +187,78 @@ router.get('/availability', async (req, res) => {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
     }
 
-    const record = await TherapistAvailability.findOne({ employee: employee._id, date }).lean();
-    return res.json({ date, slots: record ? record.slots : null });
+    const record = await TherapistAvailability.findOne({
+      therapist: employee._id,
+      date,
+      is_archived: { $ne: true },
+    }).lean();
+    return res.json({
+      date,
+      status: record ? record.status : null,
+      slots: record ? record.slots : null,
+    });
   } catch (err) {
     console.error('get availability error:', err);
     return res.status(500).json({ error: 'Could not load availability.' });
   }
 });
 
-// POST /api/attendance/availability -> upserts the slots a therapist picked
-// (or an empty array, if they hit "Skip for now") for the given day.
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// POST /api/attendance/availability -> upserts the slots a therapist opened
+// up (status: 'confirmed'), or clears them (status: 'skipped', if they hit
+// "Skip for now") for the given day. Each slot the client sends is a plain
+// { start, end } pair (24-hour 'HH:mm', PH time) — stored with
+// status: 'available' and no appointment yet, matching the
+// therapist_availability collection's slot shape.
 router.post('/availability', async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   const date = String(req.body?.date || '').trim() || todayStamp();
-  const slots = Array.isArray(req.body?.slots) ? req.body.slots.filter((s) => typeof s === 'string') : [];
+  const status = req.body?.status === 'skipped' ? 'skipped' : 'confirmed';
+  const rawSlots = Array.isArray(req.body?.slots) ? req.body.slots : [];
   if (!email) {
     return res.status(400).json({ error: 'Missing email.' });
   }
 
+  const slots = status === 'skipped'
+    ? []
+    : rawSlots
+        .filter((s) => s && HHMM_RE.test(s.start) && HHMM_RE.test(s.end))
+        .map((s) => ({ start: s.start, end: s.end, status: 'available', appointment: null }));
+
   try {
-    const employee = await Employee.findOne({ email });
+    const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name');
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
     }
 
-    await TherapistAvailability.findOneAndUpdate(
-      { employee: employee._id, date },
-      { $set: { slots } },
-      { upsert: true, new: true }
+    // The time-in scan that prompted this same-day availability answer, if any.
+    const timeIn = await Attendance.findOne({
+      employee: employee._id,
+      type: 'time_in',
+      is_archived: { $ne: true },
+    }).sort({ scanned_at: -1 });
+
+    const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+
+    const record = await TherapistAvailability.findOneAndUpdate(
+      { therapist: employee._id, date },
+      {
+        $set: {
+          therapist_name: name,
+          branch_id: employee.branch_id?._id || null,
+          branch_name: employee.branch_id?.branch_name || null,
+          timezone: CLINIC_TIMEZONE,
+          attendance: timeIn?._id || null,
+          slots,
+          status,
+          confirmed_at: status === 'confirmed' ? new Date() : null,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    return res.json({ date, slots });
+
+    return res.json({ date, status: record.status, slots: record.slots });
   } catch (err) {
     console.error('save availability error:', err);
     return res.status(500).json({ error: 'Could not save availability.' });

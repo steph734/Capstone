@@ -26,9 +26,12 @@ export default async function handler(req, res) {
   try {
     const db = await getDb()
     const record = await db.collection('therapist_availability').findOne({
-      employee: new mongoose.Types.ObjectId(employeeId),
+      therapist: new mongoose.Types.ObjectId(employeeId),
       date,
+      is_archived: { $ne: true },
     })
+    // `slots` is an array of { start, end, status, appointment } — the
+    // booking page treats an entry as open only while status is 'available'.
     return res.status(200).json({ date, slots: record ? record.slots : null })
   } catch (err) {
     console.error('appointments/therapist-slots error:', err)

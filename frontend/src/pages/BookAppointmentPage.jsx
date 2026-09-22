@@ -47,11 +47,6 @@ const SESSION_MODES = [
   { id: 'behavioral', label: 'Behavioral', Icon: BehaviorIcon  },
 ]
 
-// The full clinic-day slot grid, 8 AM-5 PM — same list a therapist picks
-// from in AvailabilityModal. Always shown in full; individual slots are
-// marked Available/Not Available (see ALL_SLOT_LABELS.disabled below)
-// instead of being removed from the list.
-const ALL_SLOT_LABELS = AVAILABILITY_SLOTS.map((s) => s.label)
 
 const PAYMENT_METHODS = [
   { id: 'cash',   label: 'Cash',                desc: 'Pay in cash at the clinic' },
@@ -164,8 +159,14 @@ export default function BookAppointmentPage({ user }) {
     return () => { cancelled = true }
   }, [selectedTherapist, bookingDateKey])
 
-  const openSlotSet = useMemo(() => (openSlots ? new Set(openSlots) : null), [openSlots])
-  const isSlotAvailable = (label) => !openSlotSet || openSlotSet.has(label)
+  // `openSlots` (when the therapist has answered) is an array of
+  // { start, end, status, appointment } — a slot is bookable only while it's
+  // still 'available' (not already 'booked' or explicitly 'blocked').
+  const openSlotSet = useMemo(() => {
+    if (!openSlots) return null
+    return new Set(openSlots.filter((s) => s.status === 'available').map((s) => s.start))
+  }, [openSlots])
+  const isSlotAvailable = (slotDef) => !openSlotSet || openSlotSet.has(slotDef.start)
 
   /* ── Step 3: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
@@ -677,11 +678,11 @@ export default function BookAppointmentPage({ user }) {
                         ? 'Loading time slots…'
                         : 'Select a time slot'}
                   </option>
-                  {ALL_SLOT_LABELS.map(label => {
-                    const available = isSlotAvailable(label)
+                  {AVAILABILITY_SLOTS.map(slot => {
+                    const available = isSlotAvailable(slot)
                     return (
-                      <option key={label} value={label} disabled={!available}>
-                        {label} {available ? '(Available)' : '(Not Available)'}
+                      <option key={slot.label} value={slot.label} disabled={!available}>
+                        {slot.label} {available ? '(Available)' : '(Not Available)'}
                       </option>
                     )
                   })}

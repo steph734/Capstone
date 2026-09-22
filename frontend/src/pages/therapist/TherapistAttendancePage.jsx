@@ -124,10 +124,10 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return () => { cancelled = true }
   }, [user?.email, todayRecord?.timeIn, todayKey, availabilityChecked])
 
-  const answerAvailability = (slots) => {
+  const answerAvailability = ({ status, slots }) => {
     setShowAvailability(false)
     setTodayAvailability(slots)
-    apiPost('/api/attendance/availability', { email: user.email, date: todayKey, slots }).catch(() => {})
+    apiPost('/api/attendance/availability', { email: user.email, date: todayKey, status, slots }).catch(() => {})
   }
 
   const monthLabel = new Date(viewedMonth.year, viewedMonth.month, 1)
@@ -255,7 +255,9 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
               </div>
               {todayAvailability && todayAvailability.length > 0 && (
                 <div className="ta-avail-chips">
-                  {AVAILABILITY_SLOTS.filter((s) => todayAvailability.includes(s.label)).map((s) => (
+                  {AVAILABILITY_SLOTS.filter((s) =>
+                    todayAvailability.some((slot) => slot.start === s.start && slot.status === 'available')
+                  ).map((s) => (
                     <span key={s.label} className="ta-avail-chip">{s.label}</span>
                   ))}
                 </div>
@@ -386,8 +388,8 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
         firstName={(employee?.name || '').split(' ')[0] || 'there'}
         dateLabel={formatManilaDate(now).toUpperCase()}
         now={now}
-        onSkip={() => answerAvailability([])}
-        onConfirm={(slots) => answerAvailability(slots)}
+        onSkip={() => answerAvailability({ status: 'skipped', slots: [] })}
+        onConfirm={(slots) => answerAvailability({ status: 'confirmed', slots })}
       />
     )}
     </>

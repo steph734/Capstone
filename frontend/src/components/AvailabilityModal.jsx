@@ -19,24 +19,26 @@ function InfoIcon() {
   )
 }
 
-// Same-day slot grid a patient could book into once wired up — kept in one
-// place here since nothing outside this modal reads it yet.
+// Same-day slot grid a patient can book into (see BookAppointmentPage.jsx) —
+// kept in one place here since it's the therapist's own picker. `start`/`end`
+// are 24-hour 'HH:mm' in Philippine time, matching the `slots[].start/end`
+// shape stored in the `therapist_availability` collection.
 export const AVAILABILITY_SLOTS = [
-  { label: '8:00 - 9:00 AM', endHour: 9 },
-  { label: '9:00 - 10:00 AM', endHour: 10 },
-  { label: '10:00 - 11:00 AM', endHour: 11 },
-  { label: '11:00 - 12:00 PM', endHour: 12 },
-  { label: '1:00 - 2:00 PM', endHour: 14 },
-  { label: '2:00 - 3:00 PM', endHour: 15 },
-  { label: '3:00 - 4:00 PM', endHour: 16 },
-  { label: '4:00 - 5:00 PM', endHour: 17 },
+  { label: '8:00 - 9:00 AM',   start: '08:00', end: '09:00', endHour: 9 },
+  { label: '9:00 - 10:00 AM',  start: '09:00', end: '10:00', endHour: 10 },
+  { label: '10:00 - 11:00 AM', start: '10:00', end: '11:00', endHour: 11 },
+  { label: '11:00 - 12:00 PM', start: '11:00', end: '12:00', endHour: 12 },
+  { label: '1:00 - 2:00 PM',   start: '13:00', end: '14:00', endHour: 14 },
+  { label: '2:00 - 3:00 PM',   start: '14:00', end: '15:00', endHour: 15 },
+  { label: '3:00 - 4:00 PM',   start: '15:00', end: '16:00', endHour: 16 },
+  { label: '4:00 - 5:00 PM',   start: '16:00', end: '17:00', endHour: 17 },
 ]
 
 // Shown right after a therapist's own Attendance page notices they've timed
-// in and haven't answered for today yet. Selecting slots here is UI-only for
-// now — see AVAILABILITY_SLOTS above — it just records what they picked so
-// the modal doesn't reappear every visit; nothing yet filters patient
-// booking by it.
+// in and haven't answered for today yet. onConfirm hands back the full slot
+// objects (not just labels) for the selected AVAILABILITY_SLOTS entries — the
+// parent persists them to the `therapist_availability` collection, which is
+// what the patient-facing booking page reads to gray out unavailable slots.
 function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
   const [selected, setSelected] = useState(
     () => new Set(AVAILABILITY_SLOTS.filter((s) => now.getHours() < s.endHour).map((s) => s.label))
@@ -99,7 +101,11 @@ function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
 
         <div className="avm-footer">
           <button type="button" className="avm-btn-skip" onClick={onSkip}>Skip for now</button>
-          <button type="button" className="avm-btn-confirm" onClick={() => onConfirm([...selected])}>
+          <button
+            type="button"
+            className="avm-btn-confirm"
+            onClick={() => onConfirm(AVAILABILITY_SLOTS.filter((s) => selected.has(s.label)))}
+          >
             Confirm Availability
           </button>
         </div>

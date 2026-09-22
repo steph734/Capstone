@@ -100,8 +100,35 @@ const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities',
 
 export const therapistMenuItems = BASE_THERAPIST_MENU_ITEMS
 
-export function getTherapistMenuItems(betaTier) {
-  if (betaTier === 'gold') return [...BASE_THERAPIST_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
-  if (betaTier === 'silver') return [...BASE_THERAPIST_MENU_ITEMS, SPEECH_ITEM]
+const TIER_RANK = { silver: 1, gold: 2 }
+
+function readLS(key) {
+  return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
+}
+
+function pickHighestTier(...tiers) {
+  const candidates = tiers.filter((t) => TIER_RANK[t])
+  if (!candidates.length) return null
+  return candidates.reduce((best, t) => (TIER_RANK[t] > TIER_RANK[best] ? t : best))
+}
+
+// Resolve which tier's features are unlocked and whether they're on a live trial.
+// The clinic owner's paid `activePlan` (or the persisted fallback) unlocks features
+// for the therapist too, since the subscription is per-clinic; `betaTier` is the
+// preview flag. Mirrors ownerSidebarConfig.jsx's resolveUnlock.
+function resolveUnlock(betaTier, activePlan) {
+  const paid = activePlan ?? readLS('activePlan')
+  const trialEnds = readLS('activePlanTrialEnds')
+  const trialExpired = !!trialEnds && new Date(trialEnds).getTime() <= Date.now()
+  const trialing = !!trialEnds && !trialExpired
+  const tier = pickHighestTier(betaTier, trialExpired ? null : paid)
+  return { tier, trialing }
+}
+
+export function getTherapistMenuItems(betaTier, activePlan) {
+  const { tier, trialing } = resolveUnlock(betaTier, activePlan)
+  const mark = (items) => (trialing ? items.map((it) => ({ ...it, trial: true })) : items)
+  if (tier === 'gold') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM])]
+  if (tier === 'silver') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM])]
   return BASE_THERAPIST_MENU_ITEMS
 }

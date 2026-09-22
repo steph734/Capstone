@@ -33,6 +33,7 @@ import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
 import authResendOtp from './_lib/routes/auth-resend-otp.js'
 import authLogin from './_lib/routes/auth-login.js'
+import authChangePassword from './_lib/routes/auth-change-password.js'
 import sendResetOtp from './_lib/routes/send-reset-otp.js'
 import verifyResetOtp from './_lib/routes/verify-reset-otp.js'
 import auditLogs from './_lib/routes/audit-logs.js'
@@ -63,6 +64,7 @@ app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)
 app.all('/api/auth/login', authLogin)
+app.all('/api/auth/change-password', authChangePassword)
 app.all('/api/auth/send-reset-otp', sendResetOtp)
 app.all('/api/auth/verify-reset-otp', verifyResetOtp)
 app.all('/api/audit-logs', auditLogs)

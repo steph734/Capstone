@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiGet, apiPost } from '../utils/api'
+import { sha256Hex } from '../utils/hash'
 import './SetPassword.css'
 
 function CheckIcon() {
@@ -82,7 +83,12 @@ export default function SetPassword() {
 
     setSubmitting(true)
     try {
-      await apiPost(`/api/set-password/${token}`, { password })
+      // Hashed client-side so the raw password never appears in the request
+      // payload — must match the hashing done at login (App.jsx), sign up
+      // (SignUp.jsx) and reset (ResetPassword.jsx) so the server's bcrypt
+      // compare at login keeps working for this account afterward.
+      const passwordHash = await sha256Hex(password)
+      await apiPost(`/api/set-password/${token}`, { password: passwordHash })
       setDone(true)
     } catch (err) {
       setError(err.message || 'Could not set your password.')

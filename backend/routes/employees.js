@@ -166,8 +166,12 @@ router.post(
     try {
       const username = await uniqueUsername(email.split('@')[0]);
       // Staff sign in later via an invite/reset flow — this hash is never handed out.
+      // Hashed with SHA-256 before bcrypt, same as every password a browser
+      // sends us (login/signup/reset all pre-hash client-side) — see the
+      // matching comment at the real temp password below.
       const tempPassword = crypto.randomBytes(12).toString('base64url');
-      const password_hash = await bcrypt.hash(tempPassword, 10);
+      const tempPasswordDigest = crypto.createHash('sha256').update(tempPassword).digest('hex');
+      const password_hash = await bcrypt.hash(tempPasswordDigest, 10);
       user = await User.create({
         full_name: fullName,
         username,
@@ -331,8 +335,15 @@ router.patch('/:id/approve', async (req, res) => {
     // Generate the real login password only now — the placeholder hash set
     // at creation was never meant to be handed out (see POST '/' above).
     // Only this plaintext copy exists, and only for this one response.
+    // Bcrypt-hash its SHA-256 digest, not the raw string — every password a
+    // browser ever sends us (login, signup, reset, and the "set password"
+    // link this gets emailed with) is pre-hashed with SHA-256 client-side
+    // before it hits bcrypt, so this stored hash must follow the same shape
+    // or the employee's first real login (and the "must differ from the
+    // temp password" check in setPassword.js) would never match.
     const tempPassword = crypto.randomBytes(9).toString('base64url');
-    const password_hash = await bcrypt.hash(tempPassword, 10);
+    const tempPasswordDigest = crypto.createHash('sha256').update(tempPassword).digest('hex');
+    const password_hash = await bcrypt.hash(tempPasswordDigest, 10);
     // Login stays blocked (see auth.js) until they use this emailed, single-use
     // link to replace the temp password with one only they know.
     const setupToken = generateInviteToken();

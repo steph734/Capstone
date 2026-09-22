@@ -2,6 +2,8 @@
 // changed through the "forgot password" flow can't be written back to a server.
 // Instead we keep an { email: newPassword } map in localStorage; the login
 // check consults it alongside the built-in passwords.
+import { TEMP_USERS } from './accounts'
+
 const STORAGE_KEY = 'passwordResets'
 
 function normalizeEmail(email) {
@@ -30,4 +32,13 @@ export function savePasswordReset(email, newPassword) {
 
 export function getResetPassword(email) {
   return loadPasswordResets()[normalizeEmail(email)] || null
+}
+
+// The current password for a TEMP_USER (demo) account with no MongoDB
+// record — a local reset override if one was ever set, else the built-in
+// password. Used to verify "current password" before accepting a change,
+// the same way login's local check (App.jsx step 1) resolves it.
+export function getLocalPassword(user) {
+  if (!user) return null
+  return getResetPassword(user.email) || TEMP_USERS.find((t) => t.role === user.role)?.password || null
 }

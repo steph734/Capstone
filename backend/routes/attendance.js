@@ -5,13 +5,28 @@ const TherapistAvailability = require('../models/TherapistAvailability');
 
 const router = express.Router();
 
-// Local calendar-day key (matches the machine's local timezone, same as the
-// rest of this file) — used to bucket individual scan events into "days" for
-// display, since the attendance collection itself stores one row per scan,
-// not one row per day.
+// Calendar-day key, fixed to Philippine local time (the clinic's only
+// timezone, which never observes DST) rather than whatever timezone the
+// Node process itself happens to run in. That distinction matters once this
+// backend is hosted somewhere other than a developer's own PHT machine —
+// most cloud hosts default their containers to UTC, and without pinning the
+// zone here, any scan between local midnight and 8 AM would get bucketed
+// under the wrong calendar day (UTC would still say "yesterday"), splitting
+// a single time-in/time-out pair across two days or misreading a fresh
+// time-in as a same-day time-out. Used to bucket individual scan events into
+// "days" for display, since the attendance collection itself stores one row
+// per scan, not one row per day.
+const CLINIC_TIMEZONE = 'Asia/Manila';
+const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: CLINIC_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 function dateKeyOf(d) {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  // en-CA formats as YYYY-MM-DD, the same key format used everywhere else here.
+  return dayKeyFormatter.format(new Date(d));
 }
 
 function todayStamp() {

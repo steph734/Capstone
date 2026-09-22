@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import { loadAccessibilityPrefs, saveAccessibilityPrefs, applyAccessibilityPrefs } from '../utils/accessibilityPrefs'
 import { logActivity } from '../utils/auditLog'
+import { getLocalPassword, savePasswordReset } from '../utils/passwordResets'
+import { sha256Hex } from '../utils/hash'
 import './PageWithSidebar.css'
 import './SettingsPage.css'
 
@@ -119,6 +121,7 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
 
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [passwordError, setPasswordError] = useState('')
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -174,24 +177,75 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
     if (key) logSettingsChange('♿', 'Accessibility', `Updated ${humanize(key)} to ${value}`)
   }
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault()
     setPasswordError('')
     if (!passwordForm.current.trim()) {
       setPasswordError('Please enter your current password.')
       return
     }
-    if (passwordForm.next.length < 6) {
-      setPasswordError('New password must be at least 6 characters.')
+    if (passwordForm.next.length < 8) {
+      setPasswordError('New password must be at least 8 characters.')
       return
     }
     if (passwordForm.next !== passwordForm.confirm) {
       setPasswordError('New passwords do not match.')
       return
     }
-    setPasswordForm({ current: '', next: '', confirm: '' })
-    showToast('Password updated')
-    logSettingsChange('🔑', 'Security', 'Changed account password')
+    if (passwordForm.current === passwordForm.next) {
+      setPasswordError('New password must be different from your current password.')
+      return
+    }
+
+    setPasswordSubmitting(true)
+    try {
+      // Hashed client-side — must match the hashing used at login (App.jsx)
+      // so the backend's bcrypt compare/re-hash keeps working afterward.
+      const currentHash = await sha256Hex(passwordForm.current)
+      const nextHash = await sha256Hex(passwordForm.next)
+      let verifiedByServer = false
+
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user?.email, currentPassword: currentHash, newPassword: nextHash }),
+        })
+        if (res.status === 401) {
+          setPasswordError('Current password is incorrect.')
+          return
+        }
+        if (res.ok) {
+          verifiedByServer = true
+        } else if (res.status !== 404) {
+          const data = await res.json().catch(() => ({}))
+          setPasswordError(data.error || 'Could not update your password.')
+          return
+        }
+        // 404 means this email has no MongoDB account — fall back to the
+        // local (demo account) check below.
+      } catch {
+        // API unreachable (offline, or plain `npm run dev`) — fall back too.
+      }
+
+      if (!verifiedByServer) {
+        const localCurrent = getLocalPassword(user)
+        if (!localCurrent || passwordForm.current !== localCurrent) {
+          setPasswordError('Current password is incorrect.')
+          return
+        }
+      }
+
+      // Keep this device's local login check in sync too — harmless for a
+      // real account (the DB is now the source of truth either way) and
+      // required for a demo account (which has no DB record at all).
+      savePasswordReset(user?.email, passwordForm.next)
+      setPasswordForm({ current: '', next: '', confirm: '' })
+      showToast('Password updated')
+      logSettingsChange('🔑', 'Security', 'Changed account password')
+    } finally {
+      setPasswordSubmitting(false)
+    }
   }
 
   return (
@@ -338,8 +392,8 @@ export default function SettingsPage({ user, onLogout, betaTier }) {
                 </label>
               </div>
               {passwordError && <p className="password-form-error">{passwordError}</p>}
-              <button type="submit" className="password-submit-btn">
-                <CheckIcon /> Update Password
+              <button type="submit" className="password-submit-btn" disabled={passwordSubmitting}>
+                <CheckIcon /> {passwordSubmitting ? 'Updating…' : 'Update Password'}
               </button>
             </form>
           </SettingsSection>

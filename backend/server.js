@@ -79,4 +79,19 @@ mongoose.connection.on('reconnected', () => console.log('✅ MongoDB reconnected
 
 // Start the HTTP server regardless, so /api/health is reachable while you sort
 // out the DB connection.
-app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+const httpServer = app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+
+// Without this, a second `node server.js` left running from an earlier
+// terminal (common on Windows, where closing a terminal doesn't always kill
+// the child process) causes EADDRINUSE here — and since nothing was
+// listening for the server's 'error' event, Node re-throws it as an
+// unhandled exception whose message is easy to miss in a busy terminal,
+// leaving two processes both claiming the port and serving requests
+// unpredictably (intermittent 500s that don't reproduce from the code alone).
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use — another server.js is likely still running. Stop it (check Task Manager for node.exe) before starting a new one.`);
+    process.exit(1);
+  }
+  throw err;
+});

@@ -4,6 +4,7 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { apiGet, apiPost } from '../../utils/api'
 import { manilaDateKey, formatManilaTime, formatManilaDate, manilaMinutesOfDay } from '../../utils/manilaTime'
 import AvailabilityModal, { AVAILABILITY_SLOTS } from '../../components/AvailabilityModal'
+import LeaveRequestModal from '../../components/LeaveRequestModal'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
 
@@ -45,6 +46,8 @@ function isLate(timeInIso) {
   return manilaMinutesOfDay(timeInIso) > LATE_CUTOFF_MINUTES
 }
 
+// Status for a single row in the Daily Log table — on-time/late/active, kept
+// separate from the calendar's own dot status below.
 function dayStatus(record) {
   if (!record || !record.timeIn) return null
   if (!record.timeOut) return 'active'
@@ -63,9 +66,25 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return { year: d.getFullYear(), month: d.getMonth() }
   })
   const [selectedDate, setSelectedDate] = useState(null)
-  const [showAvailability, setShowAvailability] = useState(false)
+
+  // Which date the "Set/Edit availability" modal is open for, or null if closed.
+  const [availabilityModalDate, setAvailabilityModalDate] = useState(null)
+  // Whether we've already asked (at most once per page load) if they haven't
+  // answered for today yet, right after clocking in.
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
-  const [todayAvailability, setTodayAvailability] = useState(null)
+
+  // Which date the "Availability" panel is currently showing — null means today.
+  const [availabilityViewDate, setAvailabilityViewDate] = useState(null)
+  const [viewedAvailability, setViewedAvailability] = useState(null) // { status, slots } | null
+  const [viewedAvailabilityLoading, setViewedAvailabilityLoading] = useState(true)
+
+  // date -> { status, slots }, for the visible month — feeds the calendar's
+  // "Planned" dots.
+  const [monthAvailability, setMonthAvailability] = useState(new Map())
+
+  const [leaveRequests, setLeaveRequests] = useState([])
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [leaveNote, setLeaveNote] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -94,6 +113,15 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return () => clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    if (!user?.email) return
+    let cancelled = false
+    apiGet(`/api/attendance/leave-requests?email=${encodeURIComponent(user.email)}`)
+      .then((data) => { if (!cancelled) setLeaveRequests(data.requests || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user?.email])
+
   const recordsByDate = useMemo(() => {
     const map = new Map()
     for (const r of records) map.set(r.date, r)
@@ -117,22 +145,73 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
       .then((data) => {
         if (cancelled) return
         setAvailabilityChecked(true)
-        setTodayAvailability(data.slots)
-        if (data.slots === null) setShowAvailability(true)
+        if (data.slots === null) {
+          setAvailabilityViewDate(null)
+          setAvailabilityModalDate(todayKey)
+        }
       })
       .catch(() => { if (!cancelled) setAvailabilityChecked(true) })
     return () => { cancelled = true }
   }, [user?.email, todayRecord?.timeIn, todayKey, availabilityChecked])
 
+  // Whichever date the Availability panel is showing right now.
+  const viewDate = availabilityViewDate || todayKey
+
+  useEffect(() => {
+    if (!user?.email) return
+    let cancelled = false
+    setViewedAvailabilityLoading(true)
+    apiGet(`/api/attendance/availability?email=${encodeURIComponent(user.email)}&date=${viewDate}`)
+      .then((data) => { if (!cancelled) setViewedAvailability({ status: data.status, slots: data.slots }) })
+      .catch(() => { if (!cancelled) setViewedAvailability({ status: null, slots: null }) })
+      .finally(() => { if (!cancelled) setViewedAvailabilityLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.email, viewDate])
+
+  const monthPrefix = `${viewedMonth.year}-${pad2(viewedMonth.month + 1)}`
+
+  useEffect(() => {
+    if (!user?.email) return
+    let cancelled = false
+    apiGet(`/api/attendance/availability-month?email=${encodeURIComponent(user.email)}&month=${monthPrefix}`)
+      .then((data) => {
+        if (cancelled) return
+        const map = new Map()
+        for (const r of data.records || []) map.set(r.date, { status: r.status, slots: r.slots })
+        setMonthAvailability(map)
+      })
+      .catch(() => { if (!cancelled) setMonthAvailability(new Map()) })
+    return () => { cancelled = true }
+  }, [user?.email, monthPrefix])
+
   const answerAvailability = ({ status, slots }) => {
-    setShowAvailability(false)
-    setTodayAvailability(slots)
-    apiPost('/api/attendance/availability', { email: user.email, date: todayKey, status, slots }).catch(() => {})
+    const date = availabilityModalDate || viewDate
+    setAvailabilityModalDate(null)
+    setViewedAvailability({ status, slots })
+    setMonthAvailability((prev) => {
+      const next = new Map(prev)
+      next.set(date, { status, slots })
+      return next
+    })
+    apiPost('/api/attendance/availability', { email: user.email, date, status, slots }).catch(() => {})
+  }
+
+  const submitLeaveRequest = async ({ leaveType, startDate, endDate, reason }) => {
+    const created = await apiPost('/api/attendance/leave-requests', {
+      email: user.email,
+      leaveType,
+      startDate,
+      endDate,
+      reason,
+    })
+    setLeaveRequests((prev) => [created, ...prev])
+    setShowLeaveModal(false)
+    setLeaveNote(`Leave request submitted — awaiting the owner's approval.`)
+    setTimeout(() => setLeaveNote(''), 6000)
   }
 
   const monthLabel = new Date(viewedMonth.year, viewedMonth.month, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const monthPrefix = `${viewedMonth.year}-${pad2(viewedMonth.month + 1)}`
 
   const monthRecords = useMemo(
     () => records.filter((r) => r.date.startsWith(monthPrefix)),
@@ -150,6 +229,21 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     return { present, late, rate, hours: Math.round(hours * 10) / 10 }
   }, [monthRecords])
 
+  // Every day a currently-approved leave request covers, as 'YYYY-MM-DD' keys.
+  const approvedLeaveDates = useMemo(() => {
+    const set = new Set()
+    for (const r of leaveRequests) {
+      if (r.status !== 'approved') continue
+      let d = new Date(`${r.startDate}T00:00:00Z`)
+      const end = new Date(`${r.endDate}T00:00:00Z`)
+      while (d <= end) {
+        set.add(d.toISOString().slice(0, 10))
+        d = new Date(d.getTime() + 86400000)
+      }
+    }
+    return set
+  }, [leaveRequests])
+
   const calendarCells = useMemo(() => {
     const firstWeekday = new Date(viewedMonth.year, viewedMonth.month, 1).getDay()
     const totalDays = new Date(viewedMonth.year, viewedMonth.month + 1, 0).getDate()
@@ -157,10 +251,18 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     for (let i = 0; i < firstWeekday; i++) cells.push(null)
     for (let day = 1; day <= totalDays; day++) {
       const key = `${monthPrefix}-${pad2(day)}`
-      cells.push({ day, key, status: dayStatus(recordsByDate.get(key)) })
+      const record = recordsByDate.get(key)
+      let dotStatus = null
+      if (record?.timeIn) dotStatus = 'checkedin'
+      else if (approvedLeaveDates.has(key)) dotStatus = 'leave'
+      else {
+        const avail = monthAvailability.get(key)
+        if (avail?.status === 'confirmed' && (avail.slots?.length || 0) > 0) dotStatus = 'planned'
+      }
+      cells.push({ day, key, dotStatus })
     }
     return cells
-  }, [viewedMonth, monthPrefix, recordsByDate])
+  }, [viewedMonth, monthPrefix, recordsByDate, monthAvailability, approvedLeaveDates])
 
   const selectedRecord = selectedDate ? recordsByDate.get(selectedDate) : null
 
@@ -176,6 +278,37 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
       return { year: d.getFullYear(), month: d.getMonth() }
     })
   }
+
+  function handleDayClick(key) {
+    if (key === selectedDate) {
+      setSelectedDate(null)
+      setAvailabilityViewDate(null)
+    } else {
+      setSelectedDate(key)
+      setAvailabilityViewDate(key === todayKey ? null : key)
+    }
+  }
+
+  function backToToday() {
+    setSelectedDate(null)
+    setAvailabilityViewDate(null)
+  }
+
+  const plannedSlots = useMemo(
+    () => (viewedAvailability?.slots || []).filter((s) => s.status === 'available' || s.status === 'booked'),
+    [viewedAvailability]
+  )
+  const bookedStarts = useMemo(
+    () => plannedSlots.filter((s) => s.status === 'booked').map((s) => s.start),
+    [plannedSlots]
+  )
+
+  const isViewingToday = viewDate === todayKey
+  const calendarSubtitle = selectedRecord
+    ? `${formatDate(selectedRecord.date)} — In ${formatTime(selectedRecord.timeIn)} · Out ${formatTime(selectedRecord.timeOut)}`
+    : selectedDate
+      ? `${formatDate(selectedDate)} — no check-in recorded`
+      : `${formatDate(todayKey)} — ${todayRecord?.timeIn ? 'checked in' : 'no check-in recorded'}`
 
   return (
     <>
@@ -236,34 +369,48 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
             </div>
           </div>
 
-          {todayRecord?.timeIn && (
-            <div className="admin-panel ta-availability-panel">
-              <div className="admin-panel-header">
-                <div>
-                  <h3>Today's Availability</h3>
-                  <p>
-                    {todayAvailability === null
-                      ? 'Loading your same-day availability…'
-                      : todayAvailability.length === 0
-                        ? "You're not marked available for same-day bookings today."
-                        : `Patients can currently book you for ${todayAvailability.length} slot${todayAvailability.length === 1 ? '' : 's'} today.`}
-                  </p>
-                </div>
-                <button type="button" className="admin-btn-secondary" onClick={() => setShowAvailability(true)}>
-                  {todayAvailability && todayAvailability.length > 0 ? 'Edit' : 'Set availability'}
+          <div className="admin-panel ta-availability-panel">
+            <div className="admin-panel-header">
+              <div>
+                <h3>{isViewingToday ? "Today's availability" : `Availability · ${formatDate(viewDate)}`}</h3>
+                {!isViewingToday && (
+                  <button type="button" className="ta-back-today" onClick={backToToday}>← Back to today</button>
+                )}
+              </div>
+              <div className="ta-availability-actions">
+                <button type="button" className="ta-btn-leave" onClick={() => setShowLeaveModal(true)}>
+                  🏖 Request leave
+                </button>
+                <button type="button" className="admin-btn-secondary" onClick={() => setAvailabilityModalDate(viewDate)}>
+                  {plannedSlots.length > 0 ? 'Edit availability' : 'Set availability'}
                 </button>
               </div>
-              {todayAvailability && todayAvailability.length > 0 && (
-                <div className="ta-avail-chips">
-                  {AVAILABILITY_SLOTS.filter((s) =>
-                    todayAvailability.some((slot) => slot.start === s.start && slot.status === 'available')
-                  ).map((s) => (
-                    <span key={s.label} className="ta-avail-chip">{s.label}</span>
-                  ))}
-                </div>
-              )}
             </div>
-          )}
+
+            {leaveNote && <p className="ta-leave-note">✓ {leaveNote}</p>}
+
+            {viewedAvailabilityLoading ? (
+              <p className="ta-avail-empty-note">Loading…</p>
+            ) : plannedSlots.length > 0 ? (
+              <div className="ta-avail-pills">
+                {plannedSlots.map((s) => {
+                  const def = AVAILABILITY_SLOTS.find((a) => a.start === s.start)
+                  const booked = s.status === 'booked'
+                  return (
+                    <span key={s.start} className={`ta-avail-pill ${booked ? 'ta-avail-pill-booked' : ''}`}>
+                      {def?.label || `${s.start} – ${s.end}`}{booked ? ' · Booked' : ''}
+                    </span>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="ta-avail-empty-note">
+                {isViewingToday
+                  ? "You're not marked available for same-day bookings today."
+                  : "You haven't planned this day yet."}
+              </p>
+            )}
+          </div>
 
           <div className="admin-stats-grid">
             <section className="admin-stat-card ta-stat-card">
@@ -295,14 +442,8 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
           <div className="admin-panel">
             <div className="admin-panel-header">
               <div>
-                <h3>Attendance Calendar</h3>
-                <p>
-                  {selectedRecord
-                    ? `${formatDate(selectedRecord.date)} — In ${formatTime(selectedRecord.timeIn)} · Out ${formatTime(selectedRecord.timeOut)}`
-                    : selectedDate
-                      ? `${formatDate(selectedDate)} — no check-in recorded`
-                      : 'Tap a day to view time-in and time-out.'}
-                </p>
+                <h3>Attendance calendar</h3>
+                <p>{calendarSubtitle}</p>
               </div>
               <div className="admin-panel-tags">
                 <button type="button" className="admin-btn-secondary ta-cal-nav" onClick={() => goToMonth(-1)} aria-label="Previous month">‹</button>
@@ -324,10 +465,10 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
                       type="button"
                       key={cell.key}
                       className={`ta-calendar-day ${cell.key === todayKey ? 'ta-calendar-day-today' : ''} ${cell.key === selectedDate ? 'ta-calendar-day-selected' : ''}`}
-                      onClick={() => setSelectedDate(cell.key === selectedDate ? null : cell.key)}
+                      onClick={() => handleDayClick(cell.key)}
                     >
                       {cell.day}
-                      <span className={`ta-calendar-dot ${cell.status ? `ta-calendar-dot-${cell.status}` : 'ta-calendar-dot-none'}`} />
+                      <span className={`ta-calendar-dot ${cell.dotStatus ? `ta-calendar-dot-${cell.dotStatus}` : 'ta-calendar-dot-none'}`} />
                     </button>
                   )
                 )}
@@ -336,9 +477,9 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
 
             <div className="ta-calendar-footer">
               <div className="ta-calendar-legend">
-                <span><i className="ta-calendar-dot ta-calendar-dot-ontime" /> On time</span>
-                <span><i className="ta-calendar-dot ta-calendar-dot-late" /> Late</span>
-                <span><i className="ta-calendar-dot ta-calendar-dot-active" /> Active now</span>
+                <span><i className="ta-calendar-dot ta-calendar-dot-checkedin" /> Checked in</span>
+                <span><i className="ta-calendar-dot ta-calendar-dot-planned" /> Planned</span>
+                <span><i className="ta-calendar-dot ta-calendar-dot-leave" /> On leave</span>
               </div>
               <p className="ta-calendar-total">{monthLabel} total: {monthStats.present} day{monthStats.present === 1 ? '' : 's'} logged</p>
             </div>
@@ -383,13 +524,28 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
         </>
       )}
     </TherapistPageShell>
-    {showAvailability && (
+    {availabilityModalDate && (
       <AvailabilityModal
         firstName={(employee?.name || '').split(' ')[0] || 'there'}
-        dateLabel={formatManilaDate(now).toUpperCase()}
+        dateLabel={availabilityModalDate === todayKey ? formatManilaDate(now).toUpperCase() : formatDate(availabilityModalDate)}
         now={now}
+        isToday={availabilityModalDate === todayKey}
+        initialSlots={
+          availabilityModalDate === viewDate && viewedAvailability?.slots
+            ? viewedAvailability.slots.filter((s) => s.status === 'available' || s.status === 'booked').map((s) => s.start)
+            : undefined
+        }
+        bookedStarts={availabilityModalDate === viewDate ? bookedStarts : undefined}
         onSkip={() => answerAvailability({ status: 'skipped', slots: [] })}
         onConfirm={(slots) => answerAvailability({ status: 'confirmed', slots })}
+      />
+    )}
+    {showLeaveModal && (
+      <LeaveRequestModal
+        minDate={todayKey}
+        defaultFrom={viewDate > todayKey ? viewDate : todayKey}
+        onClose={() => setShowLeaveModal(false)}
+        onSubmit={submitLeaveRequest}
       />
     )}
     </>

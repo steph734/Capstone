@@ -174,6 +174,25 @@ export default async function handler(req, res) {
     const apptRes = await db.collection('appointments').insertOne(appointmentDoc)
     const appointmentId = apptRes.insertedId
 
+    // 3b. Best-effort: flip the matching therapist_availability slot (if the
+    // therapist opened one up for this day) from 'available' to 'booked' and
+    // link this appointment to it. Without this, the slot stays 'available'
+    // forever as far as that collection is concerned — a second patient could
+    // book the same slot, and the therapist's own attendance page would never
+    // show it as taken.
+    const employeeId = asObjectId(therapist.id)
+    if (employeeId && start && Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      try {
+        await db.collection('therapist_availability').updateOne(
+          { therapist: employeeId, date: dateKey, slots: { $elemMatch: { start, status: 'available' } } },
+          { $set: { 'slots.$.status': 'booked', 'slots.$.appointment': appointmentId, updated_at: new Date() } }
+        )
+      } catch (err) {
+        console.error('appointments/create: failed to mark the availability slot booked:', err)
+      }
+    }
+
     // 4. Best-effort payment row. `method` here is the raw one constrained to
     // the appointments enum (Cash/Stripe); paymentMethod is the specific
     // method the payments collection actually records (cash/card/gcash/paymaya).

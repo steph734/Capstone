@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './AvailabilityModal.css'
 
 function CheckCircleIcon({ size = 22, className }) {
@@ -39,16 +39,36 @@ export const AVAILABILITY_SLOTS = [
 // objects (not just labels) for the selected AVAILABILITY_SLOTS entries — the
 // parent persists them to the `therapist_availability` collection, which is
 // what the patient-facing booking page reads to gray out unavailable slots.
-function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
-  const [selected, setSelected] = useState(
-    () => new Set(AVAILABILITY_SLOTS.filter((s) => now.getHours() < s.endHour).map((s) => s.label))
-  )
+//
+// Also reused to set/edit availability for a date other than today (from the
+// attendance calendar) — pass `isToday={false}` to drop the "already passed"
+// graying-out (nothing on a future day is "past" yet) and `initialSlots`
+// (an array of already-open 'HH:mm' start times) to preselect whatever that
+// day was last saved with, instead of the today-only "everything from now on"
+// default. `bookedStarts` (start times a patient has already booked) are
+// always shown selected and can't be unchecked — the backend preserves them
+// regardless of what gets submitted, but locking them here too means the
+// therapist never sees their own edit silently drop a real appointment.
+function AvailabilityModal({ firstName, dateLabel, now, isToday = true, initialSlots, bookedStarts, onSkip, onConfirm }) {
+  const bookedSet = useMemo(() => new Set(bookedStarts || []), [bookedStarts])
 
-  const isPast = (slot) => now.getHours() >= slot.endHour
-  const hasPast = AVAILABILITY_SLOTS.some(isPast)
+  const [selected, setSelected] = useState(() => {
+    const base = initialSlots
+      ? new Set(AVAILABILITY_SLOTS.filter((s) => initialSlots.includes(s.start)).map((s) => s.label))
+      : isToday
+        ? new Set(AVAILABILITY_SLOTS.filter((s) => now.getHours() < s.endHour).map((s) => s.label))
+        : new Set()
+    AVAILABILITY_SLOTS.forEach((s) => { if (bookedSet.has(s.start)) base.add(s.label) })
+    return base
+  })
+
+  const isBooked = (slot) => bookedSet.has(slot.start)
+  const isPast = (slot) => isToday && now.getHours() >= slot.endHour
+  const isLocked = (slot) => isBooked(slot) || isPast(slot)
+  const hasPast = isToday && AVAILABILITY_SLOTS.some(isPast)
 
   const toggle = (slot) => {
-    if (isPast(slot)) return
+    if (isLocked(slot)) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(slot.label)) next.delete(slot.label)
@@ -62,35 +82,48 @@ function AvailabilityModal({ firstName, dateLabel, now, onSkip, onConfirm }) {
       <div className="avm-modal" onClick={(e) => e.stopPropagation()}>
         <button className="avm-close" onClick={onSkip} aria-label="Close">✕</button>
         <div className="avm-check"><CheckCircleIcon /></div>
-        <h3 className="avm-title">You're clocked in, {firstName}</h3>
+        <h3 className="avm-title">{isToday ? `You're clocked in, ${firstName}` : 'Set your availability'}</h3>
         <p className="avm-sub">
-          Select which time slots you're open for today. Patients booking same-day sessions will only see these.
+          {isToday
+            ? "Select which time slots you're open for today. Patients booking same-day sessions will only see these."
+            : `Select which time slots patients can book on ${dateLabel}.`}
         </p>
-        <p className="avm-date">TODAY · {dateLabel}</p>
+        <p className="avm-date">{isToday ? `TODAY · ${dateLabel}` : dateLabel.toUpperCase()}</p>
 
-        <div className="avm-legend">
-          <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-available" /> Available</span>
-          <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-past" /> Past</span>
-        </div>
+        {isToday && (
+          <div className="avm-legend">
+            <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-available" /> Available</span>
+            <span className="avm-legend-item"><i className="avm-legend-dot avm-legend-dot-past" /> Past</span>
+          </div>
+        )}
 
         <div className="avm-grid">
           {AVAILABILITY_SLOTS.map((slot) => {
+            const booked = isBooked(slot)
             const past = isPast(slot)
             const isSelected = selected.has(slot.label)
             return (
               <button
                 key={slot.label}
                 type="button"
-                className={`avm-slot ${isSelected ? 'selected' : ''} ${past ? 'past' : ''}`}
-                disabled={past}
+                className={`avm-slot ${isSelected ? 'selected' : ''} ${past ? 'past' : ''} ${booked ? 'booked' : ''}`}
+                disabled={isLocked(slot)}
                 onClick={() => toggle(slot)}
               >
-                {isSelected && !past && <CheckCircleIcon size={14} className="avm-slot-check" />}
+                {isSelected && !past && !booked && <CheckCircleIcon size={14} className="avm-slot-check" />}
                 {slot.label}
+                {booked && <span className="avm-slot-booked-tag">Booked</span>}
               </button>
             )
           })}
         </div>
+
+        {bookedSet.size > 0 && (
+          <div className="avm-info avm-info-booked">
+            <InfoIcon />
+            <span>Slots marked Booked already have a patient scheduled — they can't be removed here.</span>
+          </div>
+        )}
 
         {hasPast && (
           <div className="avm-info">

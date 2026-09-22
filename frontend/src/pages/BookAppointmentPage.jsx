@@ -4,6 +4,7 @@ import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
 import { AVAILABILITY_SLOTS } from '../components/AvailabilityModal'
 import { logActivity } from '../utils/auditLog'
+import { manilaDateKey } from '../utils/manilaTime'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -69,6 +70,13 @@ export default function BookAppointmentPage({ user }) {
   const bookingDateLabel = `${MONTHS[preselectedMonth]} ${preselectedDate}, ${preselectedYear}`
   // 'YYYY-MM-DD', matching the day-key format therapist_availability rows use.
   const bookingDateKey = `${preselectedYear}-${String(preselectedMonth + 1).padStart(2, '0')}-${String(preselectedDate).padStart(2, '0')}`
+  // A therapist can only confirm slots for *today*, right after clocking in —
+  // there's no such thing as a therapist_availability record for a date that
+  // hasn't happened yet. So unlike today (where "no record" just means they
+  // haven't answered yet this morning), a future date with no record means
+  // it's simply too early to know — treated as not-yet-available rather than
+  // wide open.
+  const isFutureBookingDate = bookingDateKey > manilaDateKey()
 
   const [step, setStep]             = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -146,7 +154,11 @@ export default function BookAppointmentPage({ user }) {
           )
         } else {
           setOpenSlots(null)
-          setSlotsNote('')
+          setSlotsNote(
+            isFutureBookingDate
+              ? "This therapist hasn't confirmed their availability for this day yet — slots open up once they clock in that morning. All marked Not Available for now."
+              : ''
+          )
         }
       })
       .catch((e) => {
@@ -157,7 +169,7 @@ export default function BookAppointmentPage({ user }) {
       })
       .finally(() => { if (!cancelled) setSlotsLoading(false) })
     return () => { cancelled = true }
-  }, [selectedTherapist, bookingDateKey])
+  }, [selectedTherapist, bookingDateKey, isFutureBookingDate])
 
   // `openSlots` (when the therapist has answered) is an array of
   // { start, end, status, appointment } — a slot is bookable only while it's
@@ -166,7 +178,13 @@ export default function BookAppointmentPage({ user }) {
     if (!openSlots) return null
     return new Set(openSlots.filter((s) => s.status === 'available').map((s) => s.start))
   }, [openSlots])
-  const isSlotAvailable = (slotDef) => !openSlotSet || openSlotSet.has(slotDef.start)
+  // No record for this day -> today defaults every slot open (the therapist
+  // just hasn't answered yet this morning); a future date defaults every
+  // slot closed (there's nothing to answer yet).
+  const isSlotAvailable = (slotDef) => {
+    if (openSlotSet) return openSlotSet.has(slotDef.start)
+    return !isFutureBookingDate
+  }
 
   /* ── Step 3: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)

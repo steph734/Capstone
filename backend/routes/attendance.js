@@ -2,6 +2,7 @@ const express = require('express');
 const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 const TherapistAvailability = require('../models/TherapistAvailability');
+const LeaveRequest = require('../models/LeaveRequest');
 
 const router = express.Router();
 
@@ -203,7 +204,139 @@ router.get('/availability', async (req, res) => {
   }
 });
 
+// GET /api/attendance/availability-month?email=...&month=YYYY-MM -> every
+// therapist_availability record this therapist has for the given month —
+// used to mark "Planned" days on the attendance calendar (a day they've
+// opened slots for ahead of time, distinct from a day they've actually
+// clocked in for).
+router.get('/availability-month', async (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  const month = String(req.query.month || '').trim();
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'Invalid month.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    const records = await TherapistAvailability.find({
+      therapist: employee._id,
+      date: { $gte: `${month}-01`, $lte: `${month}-31` },
+      is_archived: { $ne: true },
+    })
+      .select('date status slots')
+      .lean();
+
+    return res.json({ records: records.map((r) => ({ date: r.date, status: r.status, slots: r.slots })) });
+  } catch (err) {
+    console.error('get availability-month error:', err);
+    return res.status(500).json({ error: 'Could not load this month’s availability.' });
+  }
+});
+
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LEAVE_TYPES = ['Sick Leave', 'Vacation Leave', 'Emergency Leave', 'Other'];
+
+// POST /api/attendance/leave-requests -> a therapist asks the owner for time
+// off over a date range. Always created as 'pending' — the owner side that
+// reviews/approves these is a separate piece of work, not wired up yet.
+router.post('/leave-requests', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const leaveType = String(req.body?.leaveType || '').trim();
+  const startDate = String(req.body?.startDate || '').trim();
+  const endDate = String(req.body?.endDate || '').trim();
+  const reason = req.body?.reason != null ? String(req.body.reason).trim() : '';
+
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+  if (!LEAVE_TYPES.includes(leaveType)) {
+    return res.status(400).json({ error: 'Invalid leave type.' });
+  }
+  if (!DATE_RE.test(startDate) || !DATE_RE.test(endDate)) {
+    return res.status(400).json({ error: 'Invalid date range.' });
+  }
+  if (endDate < startDate) {
+    return res.status(400).json({ error: 'End date must be on or after the start date.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name');
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+    const doc = await LeaveRequest.create({
+      employee: employee._id,
+      employee_name: name,
+      branch_id: employee.branch_id?._id || null,
+      leave_type: leaveType,
+      start_date: new Date(`${startDate}T00:00:00.000Z`),
+      end_date: new Date(`${endDate}T00:00:00.000Z`),
+      reason: reason || null,
+      status: 'pending',
+      requested_at: new Date(),
+    });
+
+    return res.status(201).json({
+      id: doc._id,
+      leaveType: doc.leave_type,
+      startDate,
+      endDate,
+      reason: doc.reason,
+      status: doc.status,
+      requestedAt: doc.requested_at,
+    });
+  } catch (err) {
+    console.error('create leave request error:', err);
+    return res.status(500).json({ error: 'Could not submit your leave request.' });
+  }
+});
+
+// GET /api/attendance/leave-requests?email=... -> this therapist's own leave
+// requests (any status), most recent first — the attendance calendar uses an
+// *approved* request's date range to mark those days "On leave".
+router.get('/leave-requests', async (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email.' });
+  }
+
+  try {
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+      return res.status(404).json({ error: 'No staff record is linked to this account yet.' });
+    }
+
+    const requests = await LeaveRequest.find({ employee: employee._id, is_archived: { $ne: true } })
+      .sort({ requested_at: -1 })
+      .limit(100)
+      .lean();
+
+    return res.json({
+      requests: requests.map((r) => ({
+        id: r._id,
+        leaveType: r.leave_type,
+        startDate: dateKeyOf(r.start_date),
+        endDate: dateKeyOf(r.end_date),
+        reason: r.reason,
+        status: r.status,
+        requestedAt: r.requested_at,
+      })),
+    });
+  } catch (err) {
+    console.error('list leave requests error:', err);
+    return res.status(500).json({ error: 'Could not load your leave requests.' });
+  }
+});
 
 // POST /api/attendance/availability -> upserts the slots a therapist opened
 // up (status: 'confirmed'), or clears them (status: 'skipped', if they hit
@@ -220,7 +353,7 @@ router.post('/availability', async (req, res) => {
     return res.status(400).json({ error: 'Missing email.' });
   }
 
-  const slots = status === 'skipped'
+  const submittedSlots = status === 'skipped'
     ? []
     : rawSlots
         .filter((s) => s && HHMM_RE.test(s.start) && HHMM_RE.test(s.end))
@@ -238,6 +371,15 @@ router.post('/availability', async (req, res) => {
       type: 'time_in',
       is_archived: { $ne: true },
     }).sort({ scanned_at: -1 });
+
+    // A slot a patient has already booked must survive this edit even if the
+    // therapist's re-submitted selection dropped it (or they hit "Skip") —
+    // otherwise saving new availability (or clearing it) would silently
+    // un-book an existing appointment as far as this collection is concerned.
+    const existing = await TherapistAvailability.findOne({ therapist: employee._id, date });
+    const bookedSlots = (existing?.slots || []).filter((s) => s.status === 'booked');
+    const bookedStarts = new Set(bookedSlots.map((s) => s.start));
+    const slots = [...bookedSlots, ...submittedSlots.filter((s) => !bookedStarts.has(s.start))];
 
     const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
 

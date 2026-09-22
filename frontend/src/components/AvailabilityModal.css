@@ -162,6 +162,30 @@
   box-shadow: none;
 }
 
+.avm-slot.booked {
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.avm-slot-booked-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #f59e0b;
+}
+
+.avm-info-booked {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #fcd34d;
+}
+
 .avm-info {
   display: flex;
   align-items: flex-start;

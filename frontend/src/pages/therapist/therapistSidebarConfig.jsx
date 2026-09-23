@@ -96,7 +96,16 @@ const BASE_THERAPIST_MENU_ITEMS = [
 ]
 
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/therapist/speech-features' }
-const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/therapist/gamified-activities' }
+const GAMIFIED_ITEM = {
+  id: 'gamified-activities',
+  label: 'Gamified Activities',
+  icon: <GamepadIcon />,
+  path: '/therapist/gamified-activities',
+  children: [
+    { id: 'ga-games', label: 'Games', path: '/therapist/gamified-activities/games' },
+    { id: 'ga-stats', label: 'Stats', path: '/therapist/gamified-activities' },
+  ],
+}
 
 export const therapistMenuItems = BASE_THERAPIST_MENU_ITEMS
 

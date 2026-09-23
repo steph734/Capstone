@@ -31,6 +31,7 @@ const BADGES = {
   'Big Brain':      { emoji:'🧠', color:'#8b5cf6', how:'Reach Level 10' },
   'Marathoner':     { emoji:'🏃', color:'#10b981', how:'Play 10 games total' },
   'Helping Hand':   { emoji:'🤝', color:'#14b8a6', how:'Complete an assigned exercise' },
+  'Basket Sorter':  { emoji:'🧺', color:'#f59e0b', how:'Finish Sort the Basket' },
 }
 
 // ─── Outfit categories ────────────────────────────────────────────────────────

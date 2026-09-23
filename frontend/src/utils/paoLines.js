@@ -305,6 +305,55 @@ export const RED_RIDING_HOOD_LINES = {
   },
 }
 
+// ─── SortTheBasketGame ────────────────────────────────────────────────────────
+
+export const SORT_BASKET_LINES = {
+  prompt: {
+    en: `Which basket does this belong in?`,
+    tl: `Saang basket ito dapat ilagay?`,
+    ceb: `Asa nga basket kini angay ibutang?`,
+  },
+  correctFor: (itemLabel, article, categoryLabel) => ({
+    en: `Yes! ${article === 'an' ? 'An' : 'A'} ${itemLabel} is ${categoryLabel}!`,
+    tl: `Oo! Ang ${itemLabel} ay ${categoryLabel}!`,
+    ceb: `Oo! Ang ${itemLabel} kay ${categoryLabel}!`,
+  }),
+  wrongTry: [
+    { en: `Hmm, let's look again.`, tl: `Hmm, tignan natin ulit.`, ceb: `Hmm, tan-awon nato pag-usab.` },
+    { en: `Not quite! Let's think about it.`, tl: `Hindi pa iyan! Isipin natin ulit.`, ceb: `Dili pa na! Hunahunaon nato pag-usab.` },
+  ],
+  assistFor: (categoryLabel) => ({
+    en: `Let's try the ${categoryLabel} basket!`,
+    tl: `Subukan natin ang basket na ${categoryLabel}!`,
+    ceb: `Sulayan nato ang basket nga ${categoryLabel}!`,
+  }),
+  finishStars3: {
+    en: `Amazing sorting! You know exactly where everything belongs!`,
+    tl: `Ang galing mong mag-ayos! Alam mo talaga kung saan dapat ilagay ang lahat!`,
+    ceb: `Nindot kaayo nga pag-sort! Kabalo gyud ka kung asa angay ibutang ang tanan!`,
+  },
+  finishStars2: {
+    en: `Great job sorting! You are really getting the hang of it!`,
+    tl: `Magaling mag-ayos! Talagang gumagaling ka na dito!`,
+    ceb: `Maayo kaayo nga pag-sort! Kusog na kaayo ka ani!`,
+  },
+  finishStars1: {
+    en: `Good try sorting today! Keep practicing and it will get easier!`,
+    tl: `Magandang pagsisikap sa pag-aayos ngayon! Ituloy mo lang at magiging mas madali ito!`,
+    ceb: `Maayong paningkamot sa pag-sort karon! Padayon lang ug mas mosayon kini!`,
+  },
+  scoreLine: (score, total) => ({
+    en: `You sorted ${score} out of ${total} all by yourself!`,
+    tl: `Naisaayos mo ang ${score} sa ${total} nang mag-isa!`,
+    ceb: `Na-sort nimo ang ${score} sa ${total} nga imong kaugalingon!`,
+  }),
+  badgeScript: {
+    en: `Heehee! Congratulations! You just earned the BASKET SORTER badge! Yay! That basket is all yours now! And guess what? This badge unlocks brand new items you can use to customize ME! Go to the Customize page and try them on! Teehee!`,
+    tl: `Heehee! Congratulations! Nakuha mo ang BASKET SORTER badge! Yehey! Ang basket na iyan ay iyo na ngayon! At alam mo ba? Ang badge na ito ay nag-a-unlock ng mga bagong item na magagamit mo para i-customize ako! Pumunta sa Customize page at subukan mo sila! Teehee!`,
+    ceb: `Heehee! Congratulations! Nakuha nimo ang BASKET SORTER badge! Yehey! Kanang basket imo na karon! Ug guess what? Kining badge nag-unlock og bag-ong mga item nga imong magamit para i-customize ko! Adto sa Customize page ug sulayi sila! Teehee!`,
+  },
+}
+
 // ─── PaoCustomizePage ────────────────────────────────────────────────────────
 
 export const CUSTOMIZE_LINES = {

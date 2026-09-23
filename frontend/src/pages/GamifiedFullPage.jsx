@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import PictureWordGame from './games/PictureWordGame'
 import SlowMotionEchoGame from './games/SlowMotionEchoGame'
 import PuzzlePiecesGame from './games/PuzzlePiecesGame'
+import SortTheBasketGame from './games/SortTheBasketGame'
 import StoryBuilderGame from './games/StoryBuilderGame'
 import LittleRedRidingHoodGame from './games/LittleRedRidingHoodGame'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
@@ -25,21 +26,32 @@ const INTRO_STAGES = [
 
 const GAMES = [
   { id: 'puzzle-pieces', title: 'Puzzle Pals',        emoji: '🐾', desc: 'Place each piece where it belongs!', color: '#34d399', requiredLevel: 1,  category: 'cognitive',    difficulty: 'easy',
-    instructions: 'Drag each puzzle piece onto its matching outline. Fit every piece to complete the picture and win!', badge: 'Puzzle Pro',    badgeEmoji: '🧩', xp: 100 },
+    instructions: 'Drag each puzzle piece onto its matching outline. Fit every piece to complete the picture and win!', badge: 'Puzzle Pro',    badgeEmoji: '🧩', xp: 100,
+    benefits: 'Builds spatial awareness and positional vocabulary (on top, under, next to), strengthens visual matching and problem-solving, and supports fine motor coordination through drag-and-place actions.' },
   { id: 'picture-word', title: 'Picture-Word Matching', emoji: '🖼️', desc: 'Match a picture to the right word!', color: '#f59e0b', requiredLevel: 1,  category: 'speech',       difficulty: 'easy',
-    instructions: 'Look at the picture, then tap the word that matches it. Get it right to move on to the next one!', badge: 'Word Wizard',   badgeEmoji: '🧙', xp: 100 },
+    instructions: 'Look at the picture, then tap the word that matches it. Get it right to move on to the next one!', badge: 'Word Wizard',   badgeEmoji: '🧙', xp: 100,
+    benefits: 'Grows expressive and receptive vocabulary, reinforces picture-word association, and builds focus and quick decision-making with instant, encouraging feedback.' },
   { id: 'echo',         title: 'Slow-Motion Echo',      emoji: '🐢', desc: 'Say each syllable, nice and slow!', color: '#14b8a6', requiredLevel: 2,  category: 'speech',       difficulty: 'easy',
-    instructions: 'Listen to Pao say a word slowly, syllable by syllable, then repeat each syllable out loud, nice and slow!', badge: 'Echo Master',   badgeEmoji: '📣', xp: 100 },
+    instructions: 'Listen to Pao say a word slowly, syllable by syllable, then repeat each syllable out loud, nice and slow!', badge: 'Echo Master',   badgeEmoji: '📣', xp: 100,
+    benefits: 'Improves articulation and syllable segmentation, strengthens auditory discrimination, and builds speaking confidence at a self-paced, pressure-free speed — great for kids working through speech delays.' },
   { id: 'sound-hunt',   title: 'Sound Hunt',            emoji: '🔍', desc: 'Find words with the same sound!',   color: '#10b981', requiredLevel: 3,  category: 'speech',       difficulty: 'easy',
-    instructions: 'Listen carefully, then find and tap every picture whose word starts with the same sound!', badge: 'Sound Hunter',  badgeEmoji: '🔎', xp: 100 },
+    instructions: 'Listen carefully, then find and tap every picture whose word starts with the same sound!', badge: 'Sound Hunter',  badgeEmoji: '🔎', xp: 100,
+    benefits: 'Sharpens phonological awareness by isolating beginning sounds, trains auditory discrimination, and lays an early-literacy foundation for reading.' },
   { id: 'sentence',     title: 'Sentence Builder',      emoji: '🧩', desc: 'Build sentences like a wizard!',    color: '#6366f1', requiredLevel: 5,  category: 'cognitive',    difficulty: 'medium',
-    instructions: 'Put the scrambled words in the right order to build a complete, correct sentence!', badge: 'Sentence Star', badgeEmoji: '✍️', xp: 100 },
+    instructions: 'Put the scrambled words in the right order to build a complete, correct sentence!', badge: 'Sentence Star', badgeEmoji: '✍️', xp: 100,
+    benefits: 'Strengthens grammar and sentence structure, builds sequencing and working-memory skills, and supports expressive language development.' },
   { id: 'rhyme',        title: 'Rhyme Time',            emoji: '🎵', desc: 'Find words that rhyme!',            color: '#ec4899', requiredLevel: 7,  category: 'speech',       difficulty: 'easy',
-    instructions: 'Listen to the word, then pick the picture whose name rhymes with it!', badge: 'Rhyme Master',  badgeEmoji: '🎵', xp: 100 },
+    instructions: 'Listen to the word, then pick the picture whose name rhymes with it!', badge: 'Rhyme Master',  badgeEmoji: '🎵', xp: 100,
+    benefits: 'Builds phonological awareness through rhyme detection, strengthens auditory memory and pattern recognition, and supports pre-reading skills.' },
   { id: 'story',        title: 'Story Builder',         emoji: '📖', desc: 'Create your own short story!',      color: '#8b5cf6', requiredLevel: 1,  category: 'cognitive',    difficulty: 'hard',
-    instructions: 'Pick a story, then choose what happens next at each step to tell your own version!', badge: 'Story Builder', badgeEmoji: '📖', xp: 100 },
+    instructions: 'Pick a story, then choose what happens next at each step to tell your own version!', badge: 'Story Builder', badgeEmoji: '📖', xp: 100,
+    benefits: 'Builds narrative sequencing and comprehension, encourages decision-making and cause-and-effect reasoning, and supports social-emotional learning through story choices.' },
   { id: 'alphabet',     title: 'Alphabet Blast',        emoji: '🚀', desc: 'Zoom through the alphabet!',        color: '#ef4444', requiredLevel: 12, category: 'speech',       difficulty: 'medium',
-    instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100 },
+    instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100,
+    benefits: 'Reinforces letter recognition and alphabet sequencing, builds processing speed, and strengthens an early-literacy foundation for reading and writing.' },
+  { id: 'sort-basket',  title: 'Sort the Basket',       emoji: '🧺', desc: 'Sort each item into the right basket!', color: '#f59e0b', requiredLevel: 1,  category: 'cognitive',    difficulty: 'easy',
+    instructions: 'One item appears at a time. Tap or drag it into the basket it belongs in — Food, Clothes, or Toys!', badge: 'Basket Sorter', badgeEmoji: '🧺', xp: 100,
+    benefits: 'Teaches categorisation — grouping things that belong together even when they look nothing alike — which underlies vocabulary growth, word retrieval, and everyday tasks like packing a bag. Uses errorless learning, so a wrong guess is never far off and confidence stays protected.' },
 ]
 
 const GAME_CATEGORIES = [
@@ -194,7 +206,7 @@ function GameInstructionsModal({ game, onStart, onClose }) {
         <h2 style={{ color:'#3a2e6b', fontSize:22, fontWeight:800, margin:'0 0 10px', textAlign:'center' }}>{game.title}</h2>
         <p style={{ color:'rgba(58,46,107,.75)', fontSize:14, lineHeight:1.5, margin:'0 0 20px', textAlign:'center' }}>{game.instructions || game.desc}</p>
 
-        <div style={{ display:'flex', gap:10, marginBottom:22 }}>
+        <div style={{ display:'flex', gap:10, marginBottom:16 }}>
           <div style={{ flex:1, background:`${game.color}1a`, border:`1.5px solid ${game.color}55`, borderRadius:16, padding:'12px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
             <span style={{ fontSize:26 }}>{game.badgeEmoji}</span>
             <span style={{ fontSize:11, color:'rgba(58,46,107,.55)', fontWeight:700 }}>Badge</span>
@@ -206,6 +218,16 @@ function GameInstructionsModal({ game, onStart, onClose }) {
             <span style={{ fontSize:12.5, color:'#3a2e6b', fontWeight:800 }}>+{game.xp} XP</span>
           </div>
         </div>
+
+        {game.benefits && (
+          <div style={{ background:'rgba(16,185,129,.08)', border:'1.5px solid rgba(16,185,129,.3)', borderRadius:16, padding:'14px 16px', marginBottom:22, display:'flex', gap:10, alignItems:'flex-start' }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>🌱</span>
+            <div>
+              <div style={{ fontSize:11, color:'#0d9488', fontWeight:800, letterSpacing:.4, textTransform:'uppercase', marginBottom:4 }}>Why this helps</div>
+              <p style={{ margin:0, fontSize:12.5, lineHeight:1.55, color:'rgba(58,46,107,.85)' }}>{game.benefits}</p>
+            </div>
+          </div>
+        )}
 
         <button onClick={() => onStart(game)} style={{ width:'100%', background:game.color, border:'none', color:'#fff', borderRadius:14, padding:'13px', cursor:'pointer', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:15, fontWeight:800, boxShadow:`0 6px 16px ${game.color}55`, marginBottom:10 }}>
           Start Game 🎮
@@ -483,6 +505,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
     setPreviewGame(null)
     if (game.id === 'echo') { stopPaoVoice(); setPhase('echo') }
     else if (game.id === 'puzzle-pieces') { stopPaoVoice(); setPhase('puzzle-pieces') }
+    else if (game.id === 'sort-basket') { stopPaoVoice(); setPhase('sort-basket') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else setShowCatModal(true)
   }
@@ -522,6 +545,10 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
 
   if (phase === 'puzzle-pieces') {
     return <PuzzlePiecesGame patientId={patientId} lang={lang} onExit={backToGames}/>
+  }
+
+  if (phase === 'sort-basket') {
+    return <SortTheBasketGame patientId={patientId} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'story-select') {

@@ -3,14 +3,18 @@
 // connection every call — that exhausts the Atlas connection limit fast.
 import mongoose from 'mongoose'
 
-const MONGO_URI = process.env.MONGO_URI
-
 let cached = global.__therapyproMongoose
 if (!cached) {
   cached = global.__therapyproMongoose = { conn: null, promise: null }
 }
 
 export async function getMongo() {
+  // Read lazily rather than into a module-level const at import time: ES
+  // module imports are hoisted above the rest of a file's top-level code, so
+  // a seeder script's own `process.loadEnvFile?.()` call (which runs after
+  // its `import { getMongo } from '../mongo.js'`) would otherwise always be
+  // too late — this file would already have captured `undefined`.
+  const MONGO_URI = process.env.MONGO_URI
   if (!MONGO_URI) {
     throw new Error('MONGO_URI is not set. Add it in Vercel > Settings > Environment Variables (and frontend/.env for `vercel dev`).')
   }

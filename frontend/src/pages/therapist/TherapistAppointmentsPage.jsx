@@ -4,48 +4,6 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import './TherapistAppointmentsPage.css'
 
-/* ── Data ─────────────────────────────────────────────────── */
-const PATIENTS = [
-  { id: 0,  name: 'Alvrin',        avatar: 'https://i.pravatar.cc/150?img=33', condition: 'Anxiety Disorder'  },
-  { id: 1,  name: 'Aira Lopez',    avatar: 'https://i.pravatar.cc/150?img=1',  condition: 'Cerebral Palsy'    },
-  { id: 2,  name: 'Mika Santos',   avatar: 'https://i.pravatar.cc/150?img=2',  condition: 'ADHD'              },
-  { id: 3,  name: 'Noah Cruz',     avatar: 'https://i.pravatar.cc/150?img=3',  condition: 'Autism Spectrum'   },
-  { id: 4,  name: 'Lea Reyes',     avatar: 'https://i.pravatar.cc/150?img=4',  condition: 'Dyslexia'          },
-  { id: 5,  name: 'Sam Torres',    avatar: 'https://i.pravatar.cc/150?img=5',  condition: 'Down Syndrome'     },
-  { id: 6,  name: 'Kim Flores',    avatar: 'https://i.pravatar.cc/150?img=6',  condition: 'Sensory Processing'},
-  { id: 7,  name: 'Pat Ramos',     avatar: 'https://i.pravatar.cc/150?img=7',  condition: 'Motor Delay'       },
-  { id: 8,  name: 'Jan Garcia',    avatar: 'https://i.pravatar.cc/150?img=8',  condition: 'Speech Delay'      },
-  { id: 9,  name: 'Drew Bautista', avatar: 'https://i.pravatar.cc/150?img=9',  condition: 'Social Anxiety'    },
-  { id: 10, name: 'Blake Mendoza', avatar: 'https://i.pravatar.cc/150?img=10', condition: 'Selective Mutism'  },
-]
-
-const SEED = [
-  { id: 1,  patientId: 1,  date: '2026-07-04', time: '09:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: 'Continue motor exercises'   },
-  { id: 2,  patientId: 2,  date: '2026-07-04', time: '10:30', type: 'Assessment', duration: '90 min',  status: 'Pending',   notes: 'Monthly progress check'    },
-  { id: 3,  patientId: 3,  date: '2026-07-04', time: '13:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: ''                          },
-  { id: 4,  patientId: 0,  date: '2026-07-05', time: '09:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: 'Breathing exercises review' },
-  { id: 5,  patientId: 4,  date: '2026-07-05', time: '11:00', type: 'Initial',    duration: '120 min', status: 'Confirmed', notes: 'First session – intake'     },
-  { id: 6,  patientId: 5,  date: '2026-07-07', time: '09:00', type: 'Follow-up',  duration: '60 min',  status: 'Pending',   notes: ''                          },
-  { id: 7,  patientId: 6,  date: '2026-07-07', time: '14:00', type: 'Group',      duration: '90 min',  status: 'Confirmed', notes: 'Group sensory session'      },
-  { id: 8,  patientId: 7,  date: '2026-07-08', time: '10:00', type: 'Assessment', duration: '90 min',  status: 'Confirmed', notes: 'Quarterly motor assessment' },
-  { id: 9,  patientId: 8,  date: '2026-07-09', time: '09:30', type: 'Follow-up',  duration: '60 min',  status: 'Cancelled', notes: 'Patient unavailable'        },
-  { id: 10, patientId: 9,  date: '2026-07-10', time: '15:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: ''                          },
-  { id: 11, patientId: 10, date: '2026-07-11', time: '11:00', type: 'Follow-up',  duration: '60 min',  status: 'Pending',   notes: ''                          },
-  { id: 12, patientId: 1,  date: '2026-07-12', time: '09:00', type: 'Follow-up',  duration: '60 min',  status: 'Confirmed', notes: ''                          },
-]
-
-const INITIAL_REQUESTS = [
-  { id: 'req-1', name: 'Liam Garcia', avatar: 'https://i.pravatar.cc/150?img=12', condition: 'Down Syndrome', age: '8 years old', evalType: 'OT Evaluation',
-    date: '2026-05-22', start: '09:00', end: '10:00', location: 'Main Clinic',
-    requestedAt: 'May 19, 2026 - 2:30 PM', note: 'First time consultation for occupational therapy.' },
-  { id: 'req-2', name: 'Sophia Reyes', avatar: 'https://i.pravatar.cc/150?img=45', condition: 'Down Syndrome', age: '7 years old', evalType: 'Fine Motor Therapy',
-    date: '2026-05-22', start: '11:00', end: '12:00', location: 'Main Clinic',
-    requestedAt: 'May 19, 2026 - 4:10 PM', note: 'Follow-up session for fine motor skills improvement.' },
-  { id: 'req-3', name: 'Noah Dela Cruz', avatar: 'https://i.pravatar.cc/150?img=15', condition: 'Down Syndrome', age: '9 years old', evalType: 'ADL Training',
-    date: '2026-05-24', start: '13:30', end: '14:30', location: 'Main Clinic',
-    requestedAt: 'May 20, 2026 - 9:15 AM', note: 'Requesting ADL skills training session.' },
-]
-
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 /* ── Helpers ──────────────────────────────────────────────── */
@@ -88,6 +46,15 @@ function statusClass(s) {
 function dotClass(n) {
   return n > 0 ? 'tapp-dot-mid' : 'tapp-dot-few'
 }
+// A stable placeholder avatar for a given id — appointment ids are Mongo
+// ObjectId strings (not the small sequential ints a `% N` trick expects), so
+// this hashes the string down to a pravatar image index instead.
+function avatarFor(id) {
+  const s = String(id)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
+}
 
 /* ── Icons ────────────────────────────────────────────────── */
 const PlusIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -108,7 +75,7 @@ const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="
 
 /* ── Full Calendar ────────────────────────────────────────── */
 function FullCalendar({ appointments, selectedDate, onSelectDate }) {
-  const [calMonth, setCalMonth] = useState(new Date(2026, 6))
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth()) })
 
   const year  = calMonth.getFullYear()
   const month = calMonth.getMonth()
@@ -295,7 +262,7 @@ function RestoreConfirmModal({ appt, patient, appointments, onConfirm, onRebook,
     a.status !== 'Archived' &&
     a.status !== 'Cancelled'
   )
-  const conflictPatient = conflict ? PATIENTS.find(p => p.id === conflict.patientId) : null
+  const conflictPatientName = conflict?.patientName || 'Another patient'
 
   return (
     <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -305,7 +272,7 @@ function RestoreConfirmModal({ appt, patient, appointments, onConfirm, onRebook,
             <div className="tapp-confirm-icon">⚠️</div>
             <h3 className="tapp-confirm-title">Schedule Conflict</h3>
             <p className="tapp-confirm-msg">
-              <strong>{conflictPatient?.name || 'Another patient'}</strong> already has an appointment
+              <strong>{conflictPatientName}</strong> already has an appointment
               on <strong>{fmtDate(appt.date)}</strong> at <strong>{fmt12(appt.time)}</strong>.
               <br /><br />
               You cannot restore to this slot. Please rebook to a different schedule.
@@ -515,13 +482,9 @@ function RequestDetailsModal({ req, onClose, onAccept, onDecline }) {
 
 /* ── Main Page ────────────────────────────────────────────── */
 export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) {
-  const [appointments, setAppointments] = useState(() => {
-    try {
-      const saved = localStorage.getItem('therapist_appointments')
-      if (saved) return JSON.parse(saved)
-    } catch {}
-    return SEED
-  })
+  const [appointments, setAppointments] = useState([])
+  const [loading,       setLoading]     = useState(true)
+  const [loadError,     setLoadError]   = useState('')
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [selectedDate, setSelectedDate] = useState(null)
@@ -534,9 +497,29 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [viewRequest,  setViewRequest]  = useState(null)
   const [toast,        setToast]        = useState('')
 
+  // Every appointment patients have actually booked with this therapist,
+  // straight from the `appointments` collection (see
+  // api/_lib/routes/appointments-therapist-list.js) — Add/Edit/Archive/
+  // Restore below still only mutate this in-memory list; they aren't wired
+  // to the backend yet, so those particular changes won't survive a reload.
   useEffect(() => {
-    localStorage.setItem('therapist_appointments', JSON.stringify(appointments))
-  }, [appointments])
+    let cancelled = false
+    if (!user?.email) {
+      setLoading(false)
+      setLoadError('Your account isn’t linked to a staff record yet.')
+      return
+    }
+    setLoading(true)
+    fetch(`/api/appointments/therapist-list?email=${encodeURIComponent(user.email)}`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (!cancelled) setAppointments(body.appointments || [])
+      })
+      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load appointments.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.email])
 
   const today = new Date().toISOString().slice(0,10)
 
@@ -567,7 +550,28 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   }, [filtered])
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800) }
-  const patient   = (a)   => PATIENTS.find(p => p.id === a.patientId) || { name: a.patientName || 'Unknown', avatar: `https://i.pravatar.cc/150?img=${(a.id % 70) + 1}`, condition: '' }
+  const patient   = (a)   => ({ name: a.patientName || 'Unknown', avatar: a.avatar || avatarFor(a.id), condition: a.condition || '' })
+
+  // Real bookings arrive as status 'Pending' until someone acts on them —
+  // this is what used to be a separate static demo list.
+  const incomingRequests = useMemo(() => appointments
+    .filter(a => a.status === 'Pending' && !a.isArchived)
+    .map(a => ({
+      id: a.id,
+      name: a.patientName || 'Unknown',
+      avatar: avatarFor(a.id),
+      condition: a.condition || 'No condition on file',
+      age: a.age != null ? `${a.age} years old` : '—',
+      evalType: a.type,
+      date: a.date,
+      start: a.time,
+      end: a.endTime,
+      location: 'Main Clinic',
+      requestedAt: a.createdAt
+        ? new Date(a.createdAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+        : '—',
+      note: a.guardianName ? `Guardian: ${a.guardianName}` : 'No additional notes provided.',
+    })), [appointments])
 
   const logAppt = (actionIcon, description, appt, status = 'Success') => {
     logActivity({
@@ -605,8 +609,9 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
   }
 
-  // Incoming requests are a static, read-only demo list — Accept/Decline give
-  // feedback only and never mutate the list, so it stays identical across reloads.
+  // Accept/Decline give feedback only for now — they don't yet write the
+  // status change back to MongoDB, so a reload still shows the request as
+  // Pending until that's wired up.
   const handleAcceptRequest = (req) => showToast(`Accepted ${req.name}'s request`)
   const handleDeclineRequest = (req) => showToast(`Declined ${req.name}'s request`)
 
@@ -636,6 +641,15 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       icon="🗓️"
       menuItems={getTherapistMenuItems(betaTier)}
     >
+      {loading ? (
+        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your appointments…</p>
+      ) : loadError ? (
+        <div className="tapp-empty">
+          <div className="tapp-empty-icon">🗓️</div>
+          <p className="tapp-empty-title">Couldn't load your appointments</p>
+          <p className="tapp-empty-sub">{loadError}</p>
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* KPI strip */}
@@ -677,7 +691,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onSelectDate={setSelectedDate}
         />
 
-        {/* Incoming Appointment Requests (static demo list) */}
+        {/* Incoming Appointment Requests — every real booking still Pending */}
         <section className="tapp-requests">
           <div className="tapp-requests-head">
             <div className="tapp-requests-heading">
@@ -687,8 +701,11 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
             <button type="button" className="tapp-filter-btn"><FilterIcon /> Filter</button>
           </div>
 
+          {incomingRequests.length === 0 ? (
+            <p className="tapp-today-empty">No pending requests right now.</p>
+          ) : (
           <div className="tapp-requests-list">
-            {INITIAL_REQUESTS.map(req => (
+            {incomingRequests.map(req => (
                 <div key={req.id} className="tapp-request-card">
                   <div className="tapp-request-patient">
                     <img className="tapp-request-avatar" src={req.avatar} alt={req.name} />
@@ -723,6 +740,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
               </div>
             ))}
           </div>
+          )}
         </section>
 
         {/* Today's Schedule */}
@@ -870,6 +888,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
         )}
 
       </div>
+      )}
 
       {showAdd  && <FormModal onClose={() => setShowAdd(false)} onSave={handleAdd} appointments={appointments} />}
       {viewAppt && <ViewModal appt={viewAppt} patient={patient(viewAppt)} onClose={() => setViewAppt(null)} onEdit={a => setEditAppt(a)} onRestoreClick={a => { setViewAppt(null); setConfirmRestoreAppt(a) }} />}

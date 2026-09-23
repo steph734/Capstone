@@ -1,3 +1,4 @@
+import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 
 // GET /api/appointments/therapists -> the roster a patient can pick from when
@@ -11,6 +12,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Without this, a query issued before the connection is established just
+    // buffers and times out after 10s rather than actually running — see the
+    // same fix in appointments-therapist-list.js for how this was found.
+    await getMongo()
     const employees = await Employee.find({ status: 'active' })
       .select('first_name middle_name last_name position specialty')
       .sort({ first_name: 1 })

@@ -1,4 +1,4 @@
-// Pao's voice — realistic, human-like speech via the ElevenLabs TTS proxy
+// Pao's voice — realistic, human-like speech via the Voice.ai TTS proxy
 // (/api/tts, key stays server-side). Falls back to the browser's built-in
 // speechSynthesis if the API is unreachable (e.g. offline, quota hit, or
 // running the frontend without `vercel dev` locally) so Pao never goes silent.
@@ -74,7 +74,7 @@ export async function speakPao(text, { onStart, onEnd, onWord, pitch, rate } = {
     audio.onerror = () => { onEnd?.(); if (currentAudio === audio) currentAudio = null }
 
     if (onWord) {
-      // ElevenLabs doesn't give us word-boundary events, so approximate the
+      // Voice.ai doesn't give us word-boundary events, so approximate the
       // word-by-word reveal by pacing it across the audio's real duration.
       const words = text.split(/\s+/)
       audio.ontimeupdate = () => {
@@ -86,7 +86,7 @@ export async function speakPao(text, { onStart, onEnd, onWord, pitch, rate } = {
 
     await audio.play()
   } catch (err) {
-    console.warn('[paoVoice] ElevenLabs unavailable, falling back to browser voice:', err.message)
+    console.warn('[paoVoice] Voice.ai unavailable, falling back to browser voice:', err.message)
     speakWithBrowserVoice(text, { pitch, rate, onStart, onEnd, onWord })
   }
 }

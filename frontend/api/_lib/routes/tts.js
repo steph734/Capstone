@@ -1,4 +1,4 @@
-import { synthesizeSpeech } from '../elevenLabsTts.js'
+import { synthesizeSpeech } from '../voiceAiTts.js'
 
 const MAX_TEXT_LENGTH = 600
 

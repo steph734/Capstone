@@ -24,7 +24,7 @@ export function setPaoLanguage(lang) {
 
 // Picks the best-matching browser speechSynthesis voice for a Pao language —
 // used only by the couple of game screens that speak via the browser's
-// built-in TTS instead of the ElevenLabs proxy (which handles language
+// built-in TTS instead of the Voice.ai proxy (which handles language
 // switching itself from the text alone).
 export function pickBrowserVoiceForLang(voices, lang) {
   const hints = (PAO_LANGUAGES.find(l => l.id === lang) || PAO_LANGUAGES[0]).voiceHints

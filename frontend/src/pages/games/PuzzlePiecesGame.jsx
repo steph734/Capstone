@@ -3,6 +3,7 @@ import PandaMascot from './PandaMascot'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
+import { PUZZLE_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 
 // ─── Puzzle Pals ───────────────────────────────────────────────────────────────
 //
@@ -25,39 +26,8 @@ const ANIMAL_POOL = [
 // 'nextTo' — so every placement teaches a real spatial relationship to the
 // piece placed right before it.
 const STEP_ORDER = ['top', 'under', 'nextTo']
-const POSITION_WORD = { top: 'on top', under: 'under', nextTo: 'next to' }
 
-const NUDGE_LINES = [
-  'Hmm, not quite! Let us look again!',
-  'Almost! Try another piece!',
-  'That is a different friend! Keep looking together!',
-  'Good try! Let us find the right one!',
-]
-
-const FINISH_LINE = `Wow, you finished the whole puzzle! You are such a great problem solver! High five!`
-
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)] }
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5) }
-
-function praiseFor(animal, stepKey) {
-  const word = POSITION_WORD[stepKey]
-  return pick([
-    `Yay! ${animal.colorName} ${animal.name}! Right ${word}!`,
-    `Ta-da! You found the ${animal.colorName} square piece! It goes ${word}!`,
-    `Amazing teamwork! That piece fits right ${word}!`,
-    `Yes! ${animal.name} piece, ${animal.colorName} and square, right ${word}!`,
-  ])
-}
-
-function promptFor(stepKey, animal, refAnimal) {
-  if (stepKey === 'top') {
-    return `Let's find this one together! Look for the ${animal.colorName} ${animal.name} piece — it goes right ON TOP!`
-  }
-  if (stepKey === 'under') {
-    return `Now let's find the ${animal.colorName} ${animal.name}! This piece goes right UNDER the ${refAnimal.name}!`
-  }
-  return `Last piece! Find the ${animal.colorName} ${animal.name} — it goes right NEXT TO the ${refAnimal.name}!`
-}
 
 // ─── Puzzle slot — the dashed outline a piece snaps into ──────────────────────
 
@@ -126,7 +96,7 @@ function PuzzleBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ onReplay, onExit }) {
+function FinishScreen({ onReplay, onExit, lang = 'en' }) {
   const [talking, setTalking]     = useState(false)
   const [mouthOpen, setMouthOpen] = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -147,10 +117,10 @@ function FinishScreen({ onReplay, onExit }) {
     } catch {}
     const t = setTimeout(() => {
       setBadgeShown(true)
-      speakPao(FINISH_LINE, { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
+      speakPao(pickLine(PUZZLE_LINES.finishLine, lang), { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
     }, 500)
     return () => { clearTimeout(t); stopPaoVoice() }
-  }, [])
+  }, []) // eslint-disable-line
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, overflow: 'hidden' }}>
@@ -182,7 +152,7 @@ function FinishScreen({ onReplay, onExit }) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exerciseId = 'puzzle-pieces', domain = 'Cognitive' }) {
+export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exerciseId = 'puzzle-pieces', domain = 'Cognitive', lang = 'en' }) {
   const buildRound = () => {
     const picks = shuffle(ANIMAL_POOL).slice(0, 3)
     return STEP_ORDER.reduce((acc, step, i) => ({ ...acc, [step]: picks[i] }), {})
@@ -243,7 +213,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
     const stepKey = STEP_ORDER[0]
     promptShownAtRef.current = Date.now()
     loggerRef.current.log('prompt_shown', {})
-    const t = setTimeout(() => speak(promptFor(stepKey, round[stepKey])), 500)
+    const t = setTimeout(() => speak(pickLine(PUZZLE_LINES.promptFor, lang, stepKey, round[stepKey])), 500)
     return () => clearTimeout(t)
   }, [round]) // eslint-disable-line
 
@@ -260,7 +230,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
       setShakeId(animal.id)
       clearTimeout(shakeTimerRef.current)
       shakeTimerRef.current = setTimeout(() => setShakeId(null), 450)
-      speak(pick(NUDGE_LINES))
+      speak(pickRandomLine(PUZZLE_LINES.nudges, lang))
       return
     }
 
@@ -269,7 +239,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
     setPlaced(prev => [...prev, currentStepKey])
     setJustFilled(currentStepKey)
     setLocked(true)
-    speak(praiseFor(animal, currentStepKey))
+    speak(pickLine(PUZZLE_LINES.praiseFor, lang, animal, currentStepKey))
     loggerRef.current.log('praise_shown', {})
 
     const nextIndex = stepIndex + 1
@@ -285,7 +255,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
       const refKey  = nextKey === 'under' ? 'top' : 'under'
       promptShownAtRef.current = Date.now()
       loggerRef.current.log('prompt_shown', {})
-      speak(promptFor(nextKey, round[nextKey], round[refKey]))
+      speak(pickLine(PUZZLE_LINES.promptFor, lang, nextKey, round[nextKey], round[refKey]))
     }, 1600)
   }
 
@@ -304,7 +274,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
     onExit()
   }
 
-  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit}/>
+  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang}/>
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

@@ -3,6 +3,7 @@ import PandaMascot from './PandaMascot'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
+import { RED_RIDING_HOOD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 
 // ─── Little Red Riding Hood — an interactive branching story ─────────────────
 //
@@ -29,27 +30,18 @@ const OBSTACLE_TAPS_NEEDED = 3
 const WOLF_OPTIONS = [
   {
     id: 'truth', icon: '💬', label: 'Open', line: `"I'm going to Grandma's house through the woods!"`,
-    feedback: `That was honest! But now the Wolf knows exactly where Grandma lives. Being open is kind — just remember to think about who you share plans with.`,
+    feedbackKey: 'truth',
   },
   {
     id: 'silent', icon: '🛡️', label: 'Cautious', line: `Say nothing and walk away.`,
-    feedback: `Smart thinking! Walking away keeps your plans private and keeps you safe around strangers.`,
+    feedbackKey: 'silent',
   },
   {
     id: 'question', icon: '🤔', label: 'Curious', line: `"Why do you want to know?"`,
-    feedback: `Good instinct! Asking a question back helps you understand why someone wants to know something.`,
+    feedbackKey: 'question',
   },
 ]
 
-const INTRO_LINE  = `Let's help Little Red Riding Hood get to Grandma's house! First, let's pack her basket with the right things!`
-const PATH_LINE   = `Yay! The basket is all packed! Time to head into the woods! Oh look, the path splits in two — which way should Red go?`
-const WOLF_LINE   = `A big Wolf steps out from behind a tree! "Well hello there, Little Red! Where are you off to today?" the Wolf asks with a sly smile.`
-const FINISH_LINE = `Wonderful! You helped Little Red Riding Hood all the way through the woods! You thought carefully about every single choice — what a great story explorer!`
-
-const BASKET_CHEERS = [`Yes! That belongs in Grandma's basket!`, `Perfect pick!`, `Great choice for Grandma!`]
-const BASKET_NUDGES = [`Hmm, Grandma probably does not need that!`, `Let's find something else for the basket!`, `That one does not quite fit — try another!`]
-
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)] }
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5) }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
@@ -70,7 +62,7 @@ function StoryBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ onReplay, onExit }) {
+function FinishScreen({ onReplay, onExit, lang = 'en' }) {
   const [talking, setTalking]       = useState(false)
   const [mouthOpen, setMouthOpen]   = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -91,10 +83,10 @@ function FinishScreen({ onReplay, onExit }) {
     } catch {}
     const t = setTimeout(() => {
       setBadgeShown(true)
-      speakPao(FINISH_LINE, { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
+      speakPao(pickLine(RED_RIDING_HOOD_LINES.finish, lang), { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
     }, 500)
     return () => { clearTimeout(t); stopPaoVoice() }
-  }, [])
+  }, []) // eslint-disable-line
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, overflow: 'hidden' }}>
@@ -126,7 +118,7 @@ function FinishScreen({ onReplay, onExit }) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', exerciseId = 'story-red-riding-hood', domain = 'Cognitive' }) {
+export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', exerciseId = 'story-red-riding-hood', domain = 'Cognitive', lang = 'en' }) {
   // intro | basket | path | obstacle | safewalk | wolf | wolfFeedback
   const [scene, setScene]               = useState('intro')
   const [basketTray, setBasketTray]     = useState(() => shuffle(BASKET_ITEMS))
@@ -184,7 +176,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
 
   // Intro line on mount
   useEffect(() => {
-    const t  = setTimeout(() => showPrompt(INTRO_LINE), 500)
+    const t  = setTimeout(() => showPrompt(pickLine(RED_RIDING_HOOD_LINES.intro, lang)), 500)
     const t2 = setTimeout(() => setScene('basket'), 600)
     return () => { clearTimeout(t); clearTimeout(t2) }
   }, []) // eslint-disable-line
@@ -198,18 +190,18 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
       setShakeId(item.id)
       clearTimeout(shakeTimerRef.current)
       shakeTimerRef.current = setTimeout(() => setShakeId(null), 450)
-      speak(pick(BASKET_NUDGES))
+      speak(pickRandomLine(RED_RIDING_HOOD_LINES.basketNudges, lang))
       return
     }
 
     setBasketTray(prev => prev.filter(i => i.id !== item.id))
-    speak(pick(BASKET_CHEERS))
+    speak(pickRandomLine(RED_RIDING_HOOD_LINES.basketCheers, lang))
     loggerRef.current.log('praise_shown', {})
 
     setBasketPacked(prev => {
       const next = [...prev, item]
       if (next.length >= BASKET_TARGET) {
-        setTimeout(() => { showPrompt(PATH_LINE); setScene('path') }, 1500)
+        setTimeout(() => { showPrompt(pickLine(RED_RIDING_HOOD_LINES.path, lang)); setScene('path') }, 1500)
       }
       return next
     })
@@ -222,10 +214,10 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
 
     if (choiceId === 'fastest') {
       setScene('obstacle')
-      showPrompt(`Red takes the fast path! But uh oh — a fallen branch is blocking the way. Tap it a few times to clear it!`)
+      showPrompt(pickLine(RED_RIDING_HOOD_LINES.fastPathObstacle, lang))
     } else {
       setScene('safewalk')
-      showPrompt(`Red takes the safe path. It is a longer walk, but calm and clear the whole way.`)
+      showPrompt(pickLine(RED_RIDING_HOOD_LINES.safePathWalk, lang))
       setTimeout(proceedToWolf, 2600)
     }
   }
@@ -236,7 +228,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
     setObstacleTaps(prev => {
       const next = prev + 1
       if (next >= OBSTACLE_TAPS_NEEDED) {
-        showPrompt(`Great job! You cleared the path — that was fast thinking!`)
+        showPrompt(pickLine(RED_RIDING_HOOD_LINES.obstacleCleared, lang))
         setTimeout(proceedToWolf, 1600)
       }
       return next
@@ -245,7 +237,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
 
   function proceedToWolf() {
     setScene('wolf')
-    showPrompt(WOLF_LINE)
+    showPrompt(pickLine(RED_RIDING_HOOD_LINES.wolf, lang))
   }
 
   // ── 3. The Wolf's Question — social-emotional learning ────────────────────
@@ -254,7 +246,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
     loggerRef.current.log('response_given', { responseTimeMs, isCorrect: null, inputMethod: 'tap', touchPressure: getPointerPressure(e) })
     setWolfChoice(option)
     setScene('wolfFeedback')
-    showPrompt(option.feedback)
+    showPrompt(pickLine(RED_RIDING_HOOD_LINES.wolfFeedback[option.feedbackKey], lang))
     setTimeout(() => {
       logExitOnce()
       setTimeout(() => setDone(true), 400)
@@ -269,7 +261,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
     setBasketTray(shuffle(BASKET_ITEMS)); setBasketPacked([]); setShakeId(null)
     setObstacleTaps(0); setWolfChoice(null); setDone(false)
     setScene('intro')
-    setTimeout(() => showPrompt(INTRO_LINE), 500)
+    setTimeout(() => showPrompt(pickLine(RED_RIDING_HOOD_LINES.intro, lang)), 500)
     setTimeout(() => setScene('basket'), 600)
   }
 
@@ -279,7 +271,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
     onExit()
   }
 
-  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit}/>
+  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang}/>
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

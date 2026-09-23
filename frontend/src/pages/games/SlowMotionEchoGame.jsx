@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import PandaMascot from './PandaMascot'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
+import { ECHO_GAME_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
+import { pickBrowserVoiceForLang } from '../../utils/paoLanguage'
 
 // ─── Word bank, grouped by in-game level ──────────────────────────────────────
 
@@ -44,10 +46,6 @@ const PACE_PRESETS = [
 
 const SYLLABLE_COLORS = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6']
 
-const CHEERS_FULL  = ['Wow! You said it perfectly! Yay!', 'Amazing! That was just right!', 'Super! You got every sound!', 'Fantastic job, speech star!']
-const CHEERS_CLOSE = ['Nice try! Let us hear it once more!', 'So close! Listen again and try!', 'Good effort! One more time!']
-const CHEERS_NONE  = ['That is okay! Let us try again together!', 'No worries! Listen closely and try!', 'Let us give it another go!']
-
 const WORDS_PER_SESSION = 5
 
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5) }
@@ -77,7 +75,7 @@ function matchTier(transcript, target) {
   return 'none'
 }
 
-function pgSpeak(text, { rate = 1, pitch = 1.6, onStart, onEnd, onWord } = {}) {
+function pgSpeak(text, { rate = 1, pitch = 1.6, lang = 'en', onStart, onEnd, onWord } = {}) {
   if (!window.speechSynthesis) { onEnd?.(); return }
   window.speechSynthesis.cancel()
   const utt = new SpeechSynthesisUtterance(text)
@@ -87,11 +85,10 @@ function pgSpeak(text, { rate = 1, pitch = 1.6, onStart, onEnd, onWord } = {}) {
   utt.onerror = () => onEnd?.()
   if (onWord) utt.onboundary = (e) => { if (e.name === 'word') onWord(text.substring(0, e.charIndex + e.charLength)) }
   const go = () => {
-    const voices = window.speechSynthesis.getVoices()
-    const v = voices.find(v => v.lang.startsWith('en') && /zira/i.test(v.name)) ||
-              voices.find(v => v.lang.startsWith('en') && /samantha/i.test(v.name)) ||
-              voices.find(v => v.lang === 'en-US') ||
-              voices.find(v => v.lang.startsWith('en')) || voices[0]
+    // The practice words themselves are always spoken as English (they're the
+    // literal exercise content) — only Pao's coaching lines use `lang` to pick
+    // a matching voice, when the language picker chose something other than English.
+    const v = pickBrowserVoiceForLang(window.speechSynthesis.getVoices(), lang)
     if (v) utt.voice = v
     window.speechSynthesis.speak(utt)
   }
@@ -223,9 +220,7 @@ function EchoMasterBadge({ size = 120, animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-const BADGE_SCRIPT = `Wow! You just earned the ECHO MASTER badge! Every single syllable, nice and clear, across every level! That Echo Scarf is all yours now! Go to the Customize page and try it on! Teehee!`
-
-function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMastered, totalLevels }) {
+function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMastered, totalLevels, lang = 'en' }) {
   const pct = total ? tally.full / total : 0
   const stars = pct >= 0.7 ? 3 : pct >= 0.4 ? 2 : 1
   const msg = stars === 3 ? 'Amazing echoing! Your sounds are getting so clear!'
@@ -254,8 +249,8 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
   useEffect(() => {
     if (phase !== 'badge') return
     const t = setTimeout(() => {
-      pgSpeak(BADGE_SCRIPT, {
-        rate: 1.05, pitch: 1.6,
+      pgSpeak(pickLine(ECHO_GAME_LINES.badgeScript, lang), {
+        rate: 1.05, pitch: 1.6, lang,
         onStart: () => setTalking(true),
         onEnd: () => setTalking(false),
         onWord: (p) => setDisplayText(p),
@@ -336,7 +331,7 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerciseId = 'slow-motion-echo', domain = 'Speech' }) {
+export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerciseId = 'slow-motion-echo', domain = 'Speech', lang = 'en' }) {
   const [settings, setSettings] = useState(null) // { levelId, paceId, scaffold }
   const [words, setWords]       = useState([])
   const [current, setCurrent]   = useState(0)
@@ -390,10 +385,12 @@ export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerc
     logExitOnce()
   }, []) // eslint-disable-line
 
-  const speak = (text, { rate = 1.1, onEnd } = {}) => {
+  // `speak` defaults to English — that's what narrates the practice words and
+  // syllables themselves. Coaching lines (cheers, badge) opt into `lang`.
+  const speak = (text, { rate = 1.1, onEnd, lang: speakLang = 'en' } = {}) => {
     setDisplayText('')
     pgSpeak(text, {
-      rate, pitch: 1.6,
+      rate, pitch: 1.6, lang: speakLang,
       onStart: () => setTalking(true),
       onEnd:   () => { setTalking(false); onEnd?.() },
       onWord:  (partial) => setDisplayText(partial),
@@ -496,10 +493,10 @@ export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerc
       setFeedback({ tier, transcript })
       setStage('feedback')
 
-      const line = tier === 'full' ? CHEERS_FULL[Math.floor(Math.random() * CHEERS_FULL.length)]
-        : tier === 'close' ? CHEERS_CLOSE[Math.floor(Math.random() * CHEERS_CLOSE.length)]
-        : CHEERS_NONE[Math.floor(Math.random() * CHEERS_NONE.length)]
-      speak(line, { rate: 1.05 })
+      const cheerLines = tier === 'full' ? ECHO_GAME_LINES.cheersFull
+        : tier === 'close' ? ECHO_GAME_LINES.cheersClose
+        : ECHO_GAME_LINES.cheersNone
+      speak(pickRandomLine(cheerLines, lang), { rate: 1.05, lang })
     })
   }
 
@@ -512,7 +509,7 @@ export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerc
     loggerRef.current.log('response_given', { responseTimeMs, isCorrect: worked, inputMethod: 'voice' })
     setFeedback({ tier, transcript: '' })
     setStage('feedback')
-    speak(worked ? CHEERS_FULL[0] : CHEERS_NONE[0], { rate: 1.05 })
+    speak(pickLine(worked ? ECHO_GAME_LINES.cheersFull[0] : ECHO_GAME_LINES.cheersNone[0], lang), { rate: 1.05, lang })
   }
 
   const nextWord = () => {
@@ -633,7 +630,7 @@ export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', exerc
       {settings && done && (
         <FinishScreen
           tally={tallyRef.current} total={words.length} onReplay={handleReplaySession} onExit={handleExit}
-          badgeEarned={badgeEarned} levelsMastered={levelsMastered} totalLevels={WORD_LEVELS.length}
+          badgeEarned={badgeEarned} levelsMastered={levelsMastered} totalLevels={WORD_LEVELS.length} lang={lang}
         />
       )}
 

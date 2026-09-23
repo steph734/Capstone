@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import PandaMascot from './PandaMascot'
 import { OutfitThumbnail } from './PaoOutfits'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
-
-const INTRO_SCRIPT = `Heehee! Welcome to my very own wardrobe! This is where you can dress me up! Every time you earn a badge from finishing a game, you unlock brand new items! Right now most things are locked, but as you play more games and earn badges, you will get cool hairstyles, awesome clothes, stylish pants, and cute shoes just for me! I cannot wait to see my new look! Teehee!`
+import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
 
 // ─── Badge definitions ────────────────────────────────────────────────────────
 
@@ -264,7 +263,7 @@ function Boat({ size = 46 }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function PaoCustomizePage({ onDone }) {
+export default function PaoCustomizePage({ onDone, lang = 'en' }) {
   const [activeTab,     setActiveTab]     = useState('hair')
   const [equipped,      setEquipped]      = useState({ hair:'none', clothes:'none', pants:'none', shoes:'none' })
   const [talking,       setTalking]       = useState(false)
@@ -287,14 +286,14 @@ export default function PaoCustomizePage({ onDone }) {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      tts(INTRO_SCRIPT, {
+      tts(pickLine(CUSTOMIZE_LINES.intro, lang), {
         onStart: () => setTalking(true),
         onEnd:   () => { setTalking(false); setMouthOpen(false) },
         onWord:  (p) => setDisplayText(p),
       })
     }, 350)
     return () => { clearTimeout(t); stopPaoVoice() }
-  }, [])
+  }, []) // eslint-disable-line
 
   useEffect(() => {
     if (talking) { mouthRef.current = setInterval(() => setMouthOpen(p => !p), 155) }
@@ -310,7 +309,7 @@ export default function PaoCustomizePage({ onDone }) {
   const equip = (catId, item) => {
     if (!isUnlocked(item)) return
     setEquipped(e => ({ ...e, [catId]: item.id }))
-    tts(item.id === 'none' ? 'Back to natural!' : `Ooh I love the ${item.name}!`, {})
+    tts(item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : pickLine(CUSTOMIZE_LINES.loveTheItem, lang, item.name), {})
   }
 
   const activeCategory = CATEGORIES.find(c => c.id === activeTab)

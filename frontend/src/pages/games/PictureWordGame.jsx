@@ -3,6 +3,7 @@ import PandaMascot from './PandaMascot'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
+import { PICTURE_WORD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 
 // ─── Questions by category ────────────────────────────────────────────────────
 
@@ -59,14 +60,6 @@ export const QUESTIONS_BY_CATEGORY = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const CHEERS_CORRECT = [
-  'Yay! That is right!', 'Amazing! You got it!', 'Brilliant! Well done!',
-  'Super! You are so smart!', 'Wow! Perfect match!', 'Awesome job!',
-]
-const CHEERS_WRONG = [
-  'Good try! Let us keep going!', 'Almost there! Next one!',
-  'Keep going, you are doing great!', 'That is okay! Try the next one!',
-]
 const CATEGORY_LABELS = { fruits:'🍎 Fruits', vegetables:'🥕 Vegetables', animals:'🐾 Animals', things:'🎒 Things' }
 
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5) }
@@ -125,12 +118,13 @@ function WordWizardBadge({ size = 120, animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ score, total, onReplay, onExit }) {
+function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
   const pct        = score / total
   const stars      = pct >= 0.85 ? 3 : pct >= 0.55 ? 2 : 1
-  const scoreMsg   = stars === 3 ? 'Perfect score! You are absolutely amazing!'
-    : stars === 2  ? 'Great job! You are getting really good at this!'
-    : 'Good effort! Practice makes perfect, keep going!'
+  const scoreMsg   = pickLine(
+    stars === 3 ? PICTURE_WORD_LINES.finishStars3 : stars === 2 ? PICTURE_WORD_LINES.finishStars2 : PICTURE_WORD_LINES.finishStars1,
+    lang,
+  )
 
   const [phase,       setPhase]       = useState('score')   // 'score' | 'badge'
   const [talking,     setTalking]     = useState(false)
@@ -138,7 +132,7 @@ function FinishScreen({ score, total, onReplay, onExit }) {
   const [displayText, setDisplayText] = useState('')
   const mouthRef = useRef(null)
 
-  const BADGE_SCRIPT = `Heehee! Congratulations! You just earned the WORD WIZARD badge! Yay! That wizard hat is all yours now! And guess what? This badge unlocks brand new items you can use to customize ME! Go to the Customize page and try them on! I cannot wait to wear something cool! Teehee!`
+  const BADGE_SCRIPT = pickLine(PICTURE_WORD_LINES.badgeScript, lang)
 
   useEffect(() => {
     if (talking) { mouthRef.current = setInterval(() => setMouthOpen(p => !p), 155) }
@@ -162,7 +156,7 @@ function FinishScreen({ score, total, onReplay, onExit }) {
   useEffect(() => {
     // Stage 1: score speech
     setTimeout(() => {
-      speakWithDisplay(`You got ${score} out of ${total}! ${scoreMsg}`, () => {
+      speakWithDisplay(`${pickLine(PICTURE_WORD_LINES.scoreLine, lang, score, total)} ${scoreMsg}`, () => {
         // After score speech, wait then show badge
         setTimeout(() => setPhase('badge'), 900)
       })
@@ -263,7 +257,7 @@ function pgSpeak(text, { onStart, onEnd, onWord } = {}) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function PictureWordGame({ onExit, category = 'fruits', patientId = 'alvrin', exerciseId = 'picture-word', domain = 'Cognitive' }) {
+export default function PictureWordGame({ onExit, category = 'fruits', patientId = 'alvrin', exerciseId = 'picture-word', domain = 'Cognitive', lang = 'en' }) {
   const pool = QUESTIONS_BY_CATEGORY[category] || QUESTIONS_BY_CATEGORY.fruits
 
   const [questions]    = useState(() => shuffle(pool).slice(0, 6))
@@ -330,7 +324,7 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
     if (!q) return
     setOptions(shuffle(q.options))
     setSelected(null); setResult(null); setPicAnim('pgBounce')
-    setTimeout(() => speak('Look at the picture! Which word matches?'), 350)
+    setTimeout(() => speak(pickLine(PICTURE_WORD_LINES.prompt, lang)), 350)
     promptShownAtRef.current = Date.now()
     loggerRef.current.log('prompt_shown', {})
   }, [current, questions]) // eslint-disable-line
@@ -347,10 +341,10 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
     if (isCorrect) {
       setScore(s => s + 1)
       setPicAnim('pgCorrectPic')
-      speak(CHEERS_CORRECT[Math.floor(Math.random() * CHEERS_CORRECT.length)])
+      speak(pickRandomLine(PICTURE_WORD_LINES.cheersCorrect, lang))
       loggerRef.current.log('praise_shown', {})
     } else {
-      speak(CHEERS_WRONG[Math.floor(Math.random() * CHEERS_WRONG.length)])
+      speak(pickRandomLine(PICTURE_WORD_LINES.cheersWrong, lang))
     }
     timerRef.current = setTimeout(() => {
       if (current + 1 >= questions.length) { setDone(true); logExitOnce() }
@@ -374,7 +368,7 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
     onExit()
   }
 
-  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={handleExit}/>
+  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={handleExit} lang={lang}/>
 
   const q = questions[current]
 

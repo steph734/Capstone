@@ -481,8 +481,8 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   // ── Intro enter — waits for a language to be chosen first ────────────────────
   useEffect(() => {
     if (showLangModal) return
-    const t2 = setTimeout(() => { setShowUI(true); speakStage(0) }, 800)
-    return () => clearTimeout(t2)
+    setShowUI(true)
+    speakStage(0)
   }, [showLangModal]) // eslint-disable-line
 
   // ── Pao click → gentle reaction + friendly line ──────────────────────────────

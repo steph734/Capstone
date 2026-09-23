@@ -22,6 +22,10 @@ export async function synthesizeSpeech(text) {
       model: modelId,
       language: 'en',
       audio_format: 'mp3',
+      // Pao is a cheerful kid-friendly mascot — pushed up from the API
+      // defaults (1 / 0.8) for a livelier, more animated, less flat delivery.
+      temperature: 1.35,
+      top_p: 0.92,
       ...(voiceId ? { voice_id: voiceId } : {}),
     }),
   })

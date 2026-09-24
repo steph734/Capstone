@@ -32,6 +32,10 @@ import SuperAdminDashboard from './pages/admin/SuperAdminDashboard'
 import BranchesPage from './pages/admin/BranchesPage'
 import AdminSubscriptionPage from './pages/admin/AdminSubscriptionPage'
 import GamesLibraryPage from './pages/admin/GamesLibraryPage'
+import GamifiedLibraryDashboardPage from './pages/admin/GamifiedLibraryDashboardPage'
+import GamifiedBadgesPage from './pages/admin/GamifiedBadgesPage'
+import GamifiedStatsPage from './pages/admin/GamifiedStatsPage'
+import GamifiedPointSystemPage from './pages/admin/GamifiedPointSystemPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerAppointmentsPage from './pages/owner/OwnerAppointmentsPage'
@@ -1005,7 +1009,67 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Super Admin' ? (
+                <GamifiedLibraryDashboardPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/games"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
                 <GamesLibraryPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/badges"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <GamifiedBadgesPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/stats"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <GamifiedStatsPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/points"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <GamifiedPointSystemPage user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

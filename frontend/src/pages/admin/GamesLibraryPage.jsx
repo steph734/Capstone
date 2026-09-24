@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-
-const initialGames = [
-  { id: 1, name: 'Memory Match', type: 'Cognitive', level: 'Easy', status: 'Published', description: 'Card matching for memory recall.' },
-  { id: 2, name: 'Sound Builder', type: 'Speech', level: 'Medium', status: 'Draft', description: 'Drag sounds to build words.' },
-  { id: 3, name: 'Balance Quest', type: 'Physical', level: 'Hard', status: 'Published', description: 'Movement game with timed balance tasks.' },
-]
+import { initialGames } from './gamifiedLibraryData'
 
 const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', description: '' }
 
@@ -89,7 +84,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
     <AdminPageShell
       user={user}
       onLogout={onLogout}
-      title="Games Library"
+      title="Games"
       subtitle="Add, edit, or delete gamified exercises"
       icon="🎮"
       menuItems={adminMenuItems}

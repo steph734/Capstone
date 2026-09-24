@@ -48,6 +48,18 @@ export const adminMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
   { id: 'branches', label: 'Branches', icon: <BranchesIcon />, path: '/admin/branches' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/admin/subscription' },
-  { id: 'games-library', label: 'Games Library', icon: <GamesIcon />, path: '/admin/games-library' },
+  {
+    id: 'gamified-library',
+    label: 'Gamified Library',
+    icon: <GamesIcon />,
+    path: '/admin/games-library',
+    children: [
+      { id: 'gl-dashboard', label: 'Dashboard', path: '/admin/games-library' },
+      { id: 'gl-games', label: 'Games', path: '/admin/games-library/games' },
+      { id: 'gl-badges', label: 'Badges', path: '/admin/games-library/badges' },
+      { id: 'gl-stats', label: 'Stats', path: '/admin/games-library/stats' },
+      { id: 'gl-points', label: 'Point System', path: '/admin/games-library/points' },
+    ],
+  },
   { id: 'audit-logs', label: 'Audit Logs', icon: <AuditIcon />, path: '/admin/audit-logs' },
 ]

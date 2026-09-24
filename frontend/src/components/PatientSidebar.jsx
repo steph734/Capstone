@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import './PatientSidebar.css'
 
@@ -99,6 +99,14 @@ function ProgressIcon() {
   )
 }
 
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
 const DEFAULT_MENU_ITEMS = [
   { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/dashboard' },
   { id: 'progress', label: 'My Progress', icon: <ProgressIcon />, path: '/patient/progress' },
@@ -149,6 +157,7 @@ export default function PatientSidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const sidebarRef = useRef(null)
+  const [expandedGroups, setExpandedGroups] = useState({})
 
   useEffect(() => {
     if (isOpen && sidebarRef.current) {
@@ -211,19 +220,34 @@ export default function PatientSidebar({
               (itemActive ||
                 location.pathname.startsWith(item.path + '/') ||
                 item.children.some(c => location.pathname === c.path))
+            const isExpanded = expandedGroups[item.id] ?? sectionActive
+
+            const handleParentClick = () => {
+              if (hasChildren) {
+                setExpandedGroups(prev => ({ ...prev, [item.id]: !isExpanded }))
+              } else {
+                handleNavigation(item.path)
+              }
+            }
 
             return (
               <div key={item.id} className="nav-group">
                 <button
                   className={`nav-item ${itemActive ? 'active' : ''}`}
-                  onClick={() => handleNavigation(item.path)}
+                  onClick={handleParentClick}
+                  aria-expanded={hasChildren ? isExpanded : undefined}
                 >
                   <span className="nav-icon">{item.icon}</span>
                   <span className="nav-label">{item.label}</span>
                   {item.trial && <span className="nav-trial-tag">Trial</span>}
+                  {hasChildren && (
+                    <span className={`nav-chevron ${isExpanded ? 'open' : ''}`}>
+                      <ChevronIcon />
+                    </span>
+                  )}
                 </button>
 
-                {sectionActive && (
+                {hasChildren && isExpanded && (
                   <div className="nav-subnav">
                     {item.children.map(child => (
                       <button

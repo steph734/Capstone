@@ -7,8 +7,7 @@ import { initialGames, initialBadges, defaultPointRules } from './gamifiedLibrar
 const QUICK_LINKS = [
   { path: '/admin/games-library/games', icon: '🎮', label: 'Games', description: 'Add, edit, or publish gamified exercises' },
   { path: '/admin/games-library/badges', icon: '🏅', label: 'Badges', description: 'Manage badges patients can unlock' },
-  { path: '/admin/games-library/stats', icon: '📊', label: 'Stats', description: 'See engagement across all games' },
-  { path: '/admin/games-library/points', icon: '⭐', label: 'Point System', description: 'Configure how points are earned' },
+  { path: '/admin/games-library/stats', icon: '📊', label: 'Stats & Points', description: 'See engagement and configure how points are earned' },
 ]
 
 export default function GamifiedLibraryDashboardPage({ user, onLogout }) {

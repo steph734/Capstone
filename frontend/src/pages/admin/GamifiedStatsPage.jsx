@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialGames, initialBadges } from './gamifiedLibraryData'
+import { initialGames, initialBadges, defaultPointRules } from './gamifiedLibraryData'
 
 const GAME_STATS = [
   { name: 'Memory Match', plays: 482, completionRate: 88, avgScore: 76, avgMinutes: 6 },
@@ -17,6 +17,9 @@ const BADGE_STATS = [
 ]
 
 export default function GamifiedStatsPage({ user, onLogout }) {
+  const [rules, setRules] = useState(defaultPointRules)
+  const [savedAt, setSavedAt] = useState(null)
+
   const overview = useMemo(() => {
     const totalPlays = GAME_STATS.reduce((sum, g) => sum + g.plays, 0)
     const avgCompletion = Math.round(GAME_STATS.reduce((sum, g) => sum + g.completionRate, 0) / GAME_STATS.length)
@@ -25,12 +28,30 @@ export default function GamifiedStatsPage({ user, onLogout }) {
     return { totalPlays, avgCompletion, totalBadgesEarned, topGame }
   }, [])
 
+  const totalPoints = useMemo(() => rules.reduce((sum, rule) => sum + Number(rule.points || 0), 0), [rules])
+
+  const updatePoints = (id, value) => {
+    setSavedAt(null)
+    setRules((current) => current.map((rule) => (rule.id === id ? { ...rule, points: value } : rule)))
+  }
+
+  const handleSave = (event) => {
+    event.preventDefault()
+    setRules((current) => current.map((rule) => ({ ...rule, points: Number(rule.points) || 0 })))
+    setSavedAt(new Date())
+  }
+
+  const handleReset = () => {
+    setRules(defaultPointRules)
+    setSavedAt(null)
+  }
+
   return (
     <AdminPageShell
       user={user}
       onLogout={onLogout}
-      title="Stats"
-      subtitle="Engagement across games and badges, all branches"
+      title="Stats & Points"
+      subtitle="Engagement across games and badges, plus how points are earned"
       icon="📊"
       menuItems={adminMenuItems}
     >
@@ -115,6 +136,42 @@ export default function GamifiedStatsPage({ user, onLogout }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="admin-panel">
+        <div className="admin-panel-header">
+          <div>
+            <h3>Point Rules</h3>
+            <p>Set how many points each action rewards ({rules.length} rules, {totalPoints} pts combined)</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave}>
+          <div className="admin-list">
+            {rules.map((rule) => (
+              <div key={rule.id} className="admin-list-item">
+                <div>
+                  <h4>{rule.label}</h4>
+                </div>
+                <label className="admin-field" style={{ width: '120px' }}>
+                  <span>Points</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rule.points}
+                    onChange={(event) => updatePoints(rule.id, event.target.value)}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-button-row" style={{ marginTop: '16px' }}>
+            <button className="admin-btn" type="submit">Save Point System</button>
+            <button className="admin-btn-secondary" type="button" onClick={handleReset}>Reset to Defaults</button>
+            {savedAt && <span className="admin-pill green">Saved at {savedAt.toLocaleTimeString()}</span>}
+          </div>
+        </form>
       </div>
     </AdminPageShell>
   )

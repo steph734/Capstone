@@ -35,7 +35,6 @@ import GamesLibraryPage from './pages/admin/GamesLibraryPage'
 import GamifiedLibraryDashboardPage from './pages/admin/GamifiedLibraryDashboardPage'
 import GamifiedBadgesPage from './pages/admin/GamifiedBadgesPage'
 import GamifiedStatsPage from './pages/admin/GamifiedStatsPage'
-import GamifiedPointSystemPage from './pages/admin/GamifiedPointSystemPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerAppointmentsPage from './pages/owner/OwnerAppointmentsPage'
@@ -1064,20 +1063,7 @@ function App() {
           }
         />
 
-        <Route
-          path="/admin/games-library/points"
-          element={
-            isAuthenticated ? (
-              currentUser?.role === 'Super Admin' ? (
-                <GamifiedPointSystemPage user={currentUser} onLogout={handleLogout} />
-              ) : (
-                <Navigate to={getHomePath(currentUser?.role)} replace />
-              )
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+        <Route path="/admin/games-library/points" element={<Navigate to="/admin/games-library/stats" replace />} />
 
         <Route
           path="/admin/audit-logs"

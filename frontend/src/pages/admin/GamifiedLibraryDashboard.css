@@ -1,0 +1,370 @@
+.gl-hero h2 {
+  margin: 0;
+  color: #2c4a3e;
+  font-size: 22px;
+}
+
+.gl-hero p {
+  margin: 6px 0 0;
+  color: #6b7c75;
+  font-size: 14px;
+}
+
+.gl-stat-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.gl-stat-icon.teal { background: #e6f5f2; }
+.gl-stat-icon.orange { background: #fdecd8; }
+.gl-stat-icon.purple { background: #efe6fb; }
+.gl-stat-icon.blue { background: #e2edfd; }
+
+/* ── Requests banner ─────────────────────────────────────── */
+.gl-banner {
+  background: linear-gradient(135deg, #1c3229 0%, #142219 100%);
+  border-radius: 20px;
+  padding: 22px 24px;
+  color: #fff;
+}
+
+.gl-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.gl-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gl-banner-title h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.gl-pending-pill {
+  background: #f6c453;
+  color: #4a3300;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.gl-tab-row {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px;
+  border-radius: 999px;
+  flex-wrap: wrap;
+}
+
+.gl-tab {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gl-tab:hover {
+  color: #fff;
+}
+
+.gl-tab.active {
+  background: #fff;
+  color: #1c3229;
+}
+
+.gl-request-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.gl-request-empty {
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 14px;
+  padding: 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.gl-request-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  color: #24352d;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-request-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gl-request-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gl-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gl-request-who p {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #2c4a3e;
+}
+
+.gl-request-who span {
+  font-size: 12px;
+  color: #8a9a92;
+}
+
+.gl-request-body h4 {
+  margin: 0;
+  color: #2c4a3e;
+  font-size: 15px;
+}
+
+.gl-request-body p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7c75;
+}
+
+.gl-request-link {
+  border: none;
+  background: none;
+  color: #4a6b5d;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.gl-request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.gl-request-actions button {
+  flex: 1;
+}
+
+.gl-status-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.gl-status-pill.Pending { background: #fef3c7; color: #92400e; }
+.gl-status-pill.Approved { background: #dcfce7; color: #166534; }
+.gl-status-pill.Declined { background: #fee2e2; color: #b91c1c; }
+
+/* ── Bottom summary row ──────────────────────────────────── */
+.gl-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gl-summary-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.gl-summary-tile {
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+}
+
+.gl-summary-tile.pending { background: #fef3c7; }
+.gl-summary-tile.approved { background: #dcfce7; }
+.gl-summary-tile.declined { background: #fee2e2; }
+
+.gl-summary-tile strong {
+  display: block;
+  font-size: 22px;
+  color: #2c4a3e;
+}
+
+.gl-summary-tile span {
+  font-size: 12px;
+  color: #6b7c75;
+  font-weight: 600;
+}
+
+.gl-summary-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: #6b7c75;
+  line-height: 1.6;
+}
+
+.gl-bar-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.gl-bar-row-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4a3e;
+  margin-bottom: 6px;
+}
+
+.gl-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2f0;
+  overflow: hidden;
+}
+
+.gl-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* ── Bottom action bar ───────────────────────────────────── */
+.gl-actions-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 14px;
+}
+
+.gl-action-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 18px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.gl-action-card h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.gl-action-card p {
+  margin: 3px 0 0;
+  font-size: 12px;
+}
+
+.gl-action-primary {
+  background: #234438;
+  color: #fff;
+}
+
+.gl-action-primary p {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.gl-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.gl-action-secondary {
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  color: #2c4a3e;
+}
+
+.gl-action-secondary p {
+  color: #6b7c75;
+}
+
+.gl-action-secondary .gl-action-icon {
+  background: #f0f7f4;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .gl-request-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-actions-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .gl-request-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-summary-tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-banner-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

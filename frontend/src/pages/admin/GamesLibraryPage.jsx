@@ -2,27 +2,9 @@ import { useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
+import { GameControllerIcon, PencilIcon, TrashIcon } from './gamifiedIcons'
 
 const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', description: '' }
-
-function PencilIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6h14z" />
-      <path d="M10 11v6M14 11v6" />
-    </svg>
-  )
-}
 
 export default function GamesLibraryPage({ user, onLogout }) {
   const [games, setGames] = useState(initialGames)
@@ -86,7 +68,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
       onLogout={onLogout}
       title="Games"
       subtitle="Add, edit, or delete gamified exercises"
-      icon="🎮"
+      icon={<GameControllerIcon />}
       menuItems={adminMenuItems}
     >
       <div className="admin-stats-grid">
@@ -176,7 +158,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
           <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
             <div className="admin-modal-header">
               <div className="admin-modal-title">
-                <span className="admin-modal-icon">🎮</span>
+                <span className="admin-modal-icon"><GameControllerIcon /></span>
                 <div>
                   <h3>{editingGame ? 'Edit Game' : 'Add Game'}</h3>
                   <p>{editingGame ? 'Update the gamified exercise details' : 'New games are published automatically'}</p>
@@ -238,7 +220,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
       {deleteTarget && (
         <div className="admin-modal-backdrop" onClick={() => setDeleteTarget(null)}>
           <div className="admin-confirm-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="admin-confirm-icon">🗑️</div>
+            <div className="admin-confirm-icon" style={{ color: '#b45309' }}><TrashIcon size={32} /></div>
             <h3 className="admin-confirm-title">Delete Game?</h3>
             <p className="admin-confirm-msg">
               This will permanently remove <strong>{deleteTarget.name}</strong> from the games library. This cannot be undone.

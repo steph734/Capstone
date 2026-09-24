@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames, initialBadges, defaultPointRules } from './gamifiedLibraryData'
+import { ChartIcon } from './gamifiedIcons'
 
 const GAME_STATS = [
   { name: 'Memory Match', plays: 482, completionRate: 88, avgScore: 76, avgMinutes: 6 },
@@ -52,7 +53,7 @@ export default function GamifiedStatsPage({ user, onLogout }) {
       onLogout={onLogout}
       title="Stats & Points"
       subtitle="Engagement across games and badges, plus how points are earned"
-      icon="📊"
+      icon={<ChartIcon />}
       menuItems={adminMenuItems}
     >
       <div className="admin-stats-grid">

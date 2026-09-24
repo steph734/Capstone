@@ -17,14 +17,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
   margin-bottom: 10px;
 }
 
-.gl-stat-icon.teal { background: #e6f5f2; }
-.gl-stat-icon.orange { background: #fdecd8; }
-.gl-stat-icon.purple { background: #efe6fb; }
-.gl-stat-icon.blue { background: #e2edfd; }
+.gl-stat-icon.teal { background: #e6f5f2; color: #0d9488; }
+.gl-stat-icon.orange { background: #fdecd8; color: #d97706; }
+.gl-stat-icon.purple { background: #efe6fb; color: #7c3aed; }
+.gl-stat-icon.blue { background: #e2edfd; color: #2563eb; }
 
 /* ── Requests banner ─────────────────────────────────────── */
 .gl-banner {

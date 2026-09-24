@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames, initialBadges, defaultPointRules } from './gamifiedLibraryData'
+import { GameControllerIcon, InboxIcon, MedalIcon, StarIcon, PlusIcon } from './gamifiedIcons'
 import './GamifiedLibraryDashboard.css'
 
 const initialRequests = [
@@ -108,7 +109,7 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
       onLogout={onLogout}
       title="Gamified Library"
       subtitle="Games, badges, and points that keep patients motivated"
-      icon="🎮"
+      icon={<GameControllerIcon />}
       menuItems={adminMenuItems}
     >
       <div className="gl-hero">
@@ -118,25 +119,25 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
 
       <div className="admin-stats-grid">
         <section className="admin-stat-card">
-          <div className="gl-stat-icon teal" aria-hidden="true">🎮</div>
+          <div className="gl-stat-icon teal" aria-hidden="true"><GameControllerIcon /></div>
           <p className="admin-stat-label">Total games</p>
           <h3 className="admin-stat-value">{stats.totalGames}</h3>
           <p className="admin-stat-meta">{stats.live} live · {stats.draft} draft</p>
         </section>
         <section className="admin-stat-card">
-          <div className="gl-stat-icon orange" aria-hidden="true">📥</div>
+          <div className="gl-stat-icon orange" aria-hidden="true"><InboxIcon /></div>
           <p className="admin-stat-label">Pending requests</p>
           <h3 className="admin-stat-value">{stats.pending}</h3>
           <p className="admin-stat-meta">From clinic owners</p>
         </section>
         <section className="admin-stat-card">
-          <div className="gl-stat-icon purple" aria-hidden="true">🏅</div>
+          <div className="gl-stat-icon purple" aria-hidden="true"><MedalIcon /></div>
           <p className="admin-stat-label">Active badges</p>
           <h3 className="admin-stat-value">{stats.activeBadges}</h3>
           <p className="admin-stat-meta">Visible to patients</p>
         </section>
         <section className="admin-stat-card">
-          <div className="gl-stat-icon blue" aria-hidden="true">⭐</div>
+          <div className="gl-stat-icon blue" aria-hidden="true"><StarIcon /></div>
           <p className="admin-stat-label">Point rules</p>
           <h3 className="admin-stat-value">{stats.pointRules}</h3>
           <p className="admin-stat-meta">Configured actions</p>
@@ -272,21 +273,21 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
 
       <div className="gl-actions-row">
         <button type="button" className="gl-action-card gl-action-primary" onClick={() => navigate('/admin/games-library/games')}>
-          <span className="gl-action-icon" aria-hidden="true">➕</span>
+          <span className="gl-action-icon" aria-hidden="true"><PlusIcon /></span>
           <div>
             <h4>Build a new game</h4>
             <p>Open the creation workspace</p>
           </div>
         </button>
         <button type="button" className="gl-action-card gl-action-secondary" onClick={() => navigate('/admin/games-library/badges')}>
-          <span className="gl-action-icon" aria-hidden="true">🏅</span>
+          <span className="gl-action-icon" aria-hidden="true"><MedalIcon /></span>
           <div>
             <h4>Manage badges</h4>
             <p>Create or edit rewards</p>
           </div>
         </button>
         <button type="button" className="gl-action-card gl-action-secondary" onClick={() => navigate('/admin/games-library/stats')}>
-          <span className="gl-action-icon" aria-hidden="true">⭐</span>
+          <span className="gl-action-icon" aria-hidden="true"><StarIcon /></span>
           <div>
             <h4>Tune point rules</h4>
             <p>Rewards, multipliers, levels</p>

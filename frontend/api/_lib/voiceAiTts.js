@@ -32,7 +32,11 @@ export async function synthesizeSpeech(text) {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '')
-    throw new Error(`Voice.ai TTS failed (${response.status}): ${detail.slice(0, 300)}`)
+    const err = new Error(`Voice.ai TTS failed (${response.status}): ${detail.slice(0, 300)}`)
+    // Surfaced by the route handler so callers see the real cause (e.g. 402
+    // insufficient credits, 404 unknown voice_id) instead of a blanket 502.
+    err.status = response.status
+    throw err
   }
 
   return Buffer.from(await response.arrayBuffer())

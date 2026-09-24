@@ -22,6 +22,9 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store')
     return res.status(200).send(audio)
   } catch (err) {
-    return res.status(502).json({ error: err.message })
+    // Pass through the upstream Voice.ai status (e.g. 402 insufficient
+    // credits, 404 unknown voice_id) when we have one; only fall back to a
+    // generic 502 for setup/network failures that have no real status.
+    return res.status(err.status || 502).json({ error: err.message })
   }
 }

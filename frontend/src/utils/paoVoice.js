@@ -59,7 +59,10 @@ export async function speakPao(text, { onStart, onEnd, onWord, pitch, rate } = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) throw new Error(`tts request failed: ${res.status}`)
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null)
+        throw new Error(`tts request failed: ${res.status}${detail?.error ? ` — ${detail.error}` : ''}`)
+      }
       const blob = await res.blob()
       if (!blob.type.startsWith('audio')) throw new Error('tts returned a non-audio response')
       blobUrl = URL.createObjectURL(blob)

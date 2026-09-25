@@ -192,7 +192,7 @@
 .tp-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 900px;
 }
 
 .tp-table th,
@@ -276,20 +276,45 @@
   color: #9aab9f;
 }
 
-/* ── Row Actions: Profile link + kebab menu ──────────────────── */
-.tp-link-btn {
-  border: none;
-  background: none;
-  padding: 0;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a6b5d;
-  cursor: pointer;
-  white-space: nowrap;
+/* ── Row Actions: View/Archive/Delete + kebab menu ────────────── */
+.tp-table-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
-.tp-link-btn:hover { color: #2c4a3e; text-decoration: underline; }
+.tp-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tp-action-view {
+  background: #4a6b5d;
+  color: #fff;
+}
+.tp-action-view:hover { background: #3d5a50; }
+
+.tp-action-archive {
+  background: #f0f7f4;
+  color: #4a6b5d;
+}
+.tp-action-archive:hover { background: #ddeee7; }
+
+.tp-action-delete {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.tp-action-delete:hover { background: #fee2e2; }
 
 .tp-menu-cell {
   position: relative;
@@ -358,15 +383,6 @@
   cursor: not-allowed;
   pointer-events: none;
 }
-
-.tp-row-menu-sep {
-  height: 1px;
-  background: #eef4f1;
-  margin: 4px 2px;
-}
-
-.tp-row-menu-danger { color: #dc2626; }
-.tp-row-menu-danger:hover { background: #fee2e2; }
 
 /* ── Status Pills ─────────────────────────────────────────── */
 .tp-pill {

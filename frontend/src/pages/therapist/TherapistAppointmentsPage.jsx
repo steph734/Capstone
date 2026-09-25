@@ -4,6 +4,8 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import './TherapistAppointmentsPage.css'
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
 /* ── Helpers ──────────────────────────────────────────────── */
 function fmt12(t) {
   const [h, m] = t.split(':').map(Number)
@@ -38,6 +40,12 @@ function typeClass(t) {
 }
 function statusClass(s) {
   return ({Confirmed:'tapp-status-confirmed',Pending:'tapp-status-pending',Cancelled:'tapp-status-cancelled',Completed:'tapp-status-completed',Archived:'tapp-status-archived'})[s]||''
+}
+/* Matches the patient calendar's meaning: green = nothing booked yet,
+   yellow = the day already has sessions on it. "Closed" stays defined in
+   the legend/CSS for clinic-closed dates, same as the patient calendar. */
+function dotClass(n) {
+  return n > 0 ? 'tapp-dot-mid' : 'tapp-dot-few'
 }
 // Initials for the avatar circle, e.g. "Alvrine Santiago" -> "AS".
 function initials(name) {
@@ -76,6 +84,104 @@ const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="
 const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
 const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 const RefreshIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L14 11h7V4l-3.35 2.35z"/></svg>
+
+/* ── Full Calendar ────────────────────────────────────────── */
+function FullCalendar({ appointments, selectedDate, onSelectDate }) {
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth()) })
+
+  const year  = calMonth.getFullYear()
+  const month = calMonth.getMonth()
+  const today = new Date().toISOString().slice(0,10)
+
+  const firstDay    = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month+1, 0).getDate()
+
+  const cells = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i+1),
+  ]
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const iso = (d) => d ? `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}` : null
+
+  const countForDay = (d) => {
+    const s = iso(d)
+    return s ? appointments.filter(a => a.date === s && a.status !== 'Archived').length : 0
+  }
+
+  const monthTotal = appointments.filter(a => {
+    return a.date.startsWith(`${year}-${String(month+1).padStart(2,'0')}`) && a.status !== 'Archived'
+  }).length
+
+  return (
+    <div className="tapp-cal-card">
+      {/* Header */}
+      <div className="tapp-cal-header">
+        <div className="tapp-cal-heading">
+          <h3 className="tapp-cal-title">Session Calendar</h3>
+          <p className="tapp-cal-sub">Tap a day to view appointments</p>
+        </div>
+      </div>
+
+      {/* Centered month navigation */}
+      <div className="tapp-cal-nav-center">
+        <button className="tapp-cal-nav" onClick={() => setCalMonth(new Date(year, month-1))}>‹</button>
+        <span className="tapp-cal-month">{MONTHS[month]} {year}</span>
+        <button className="tapp-cal-nav" onClick={() => setCalMonth(new Date(year, month+1))}>›</button>
+      </div>
+
+      {/* Day-of-week header */}
+      <div className="tapp-cal-dow">
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <span key={d}>{d}</span>)}
+      </div>
+
+      {/* Grid */}
+      <div className="tapp-cal-grid">
+        {cells.map((d, i) => {
+          const s      = iso(d)
+          const count  = countForDay(d)
+          const isToday= s === today
+          const isSel  = s === selectedDate
+          return (
+            <button
+              key={i}
+              disabled={!d}
+              className={`tapp-cal-cell${isToday ? ' tapp-cal-today' : ''}${isSel ? ' tapp-cal-selected' : ''}`}
+              onClick={() => d && onSelectDate(isSel ? null : s)}
+            >
+              {d && (
+                <>
+                  <span className="tapp-cal-day-num">{d}</span>
+                  <div className="tapp-cal-dots">
+                    <span className={`tapp-cal-dot ${dotClass(count)}`} />
+                  </div>
+                </>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="tapp-cal-footer">
+        <div className="tapp-cal-legend">
+          <div className="tapp-legend-item">
+            <span className="tapp-legend-dot tapp-dot-few" /> Available
+          </div>
+          <div className="tapp-legend-item">
+            <span className="tapp-legend-dot tapp-dot-mid" /> Booked
+          </div>
+          <div className="tapp-legend-item">
+            <span className="tapp-legend-dot tapp-dot-many" /> Closed
+          </div>
+        </div>
+        <span className="tapp-cal-total">
+          {MONTHS[month]} total: {monthTotal} session{monthTotal !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 /* ── Avatar ───────────────────────────────────────────────── */
 function Avatar({ name, id, className = '' }) {
@@ -445,6 +551,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [editAppt,     setEditAppt]     = useState(null)
   const [confirmArchId,    setConfirmArchId]    = useState(null)
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
+  const [selectedDate, setSelectedDate] = useState(null)
   const [toast,        setToast]        = useState('')
 
   // Every appointment patients have actually booked with this therapist,
@@ -472,7 +579,10 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   }, [user?.email])
 
   const today = new Date().toISOString().slice(0,10)
-  const archCount = appointments.filter(a => a.status === 'Archived').length
+  const todayCount = appointments.filter(a => a.date === today && a.status !== 'Archived').length
+  const schedCount = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled').length
+  const pendCount  = appointments.filter(a => a.status === 'Pending').length
+  const archCount  = appointments.filter(a => a.status === 'Archived').length
 
   const filtered = useMemo(() => {
     return appointments
@@ -480,11 +590,12 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
         if (viewMode === 'archived') return a.status === 'Archived'
         if (a.status === 'Archived') return false
         if (statusFilter !== 'All' && a.status !== statusFilter) return false
+        if (selectedDate && a.date !== selectedDate) return false
         if (search && !(a.patientName || '').toLowerCase().includes(search.toLowerCase())) return false
         return true
       })
       .sort((a,b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.time.localeCompare(b.time))
-  }, [appointments, search, statusFilter, viewMode])
+  }, [appointments, search, statusFilter, selectedDate, viewMode])
 
   const groups = useMemo(() => {
     const map = {}
@@ -591,10 +702,54 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           </section>
         )}
 
+        {/* KPI strip */}
+        <div className="tapp-stats">
+          <div className="tapp-stat">
+            <div className="tapp-stat-icon tapp-stat-green">📅</div>
+            <div className="tapp-stat-body">
+              <span className="tapp-stat-num">{todayCount}</span>
+              <span className="tapp-stat-lbl">Today</span>
+            </div>
+          </div>
+          <div className="tapp-stat">
+            <div className="tapp-stat-icon tapp-stat-blue">📋</div>
+            <div className="tapp-stat-body">
+              <span className="tapp-stat-num">{schedCount}</span>
+              <span className="tapp-stat-lbl">Scheduled</span>
+            </div>
+          </div>
+          <div className="tapp-stat">
+            <div className="tapp-stat-icon tapp-stat-amber">⏳</div>
+            <div className="tapp-stat-body">
+              <span className="tapp-stat-num">{pendCount}</span>
+              <span className="tapp-stat-lbl">Pending</span>
+            </div>
+          </div>
+          <div className="tapp-stat">
+            <div className="tapp-stat-icon tapp-stat-red" style={{ fontSize: 16 }}>📦</div>
+            <div className="tapp-stat-body">
+              <span className="tapp-stat-num">{archCount}</span>
+              <span className="tapp-stat-lbl">Archived</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Full-width Calendar */}
+        <FullCalendar
+          appointments={appointments}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+
         {/* Header */}
         <div className="tapp2-header">
           <h2 className="tapp2-title">Appointments</h2>
-          <p className="tapp2-subdate">{fmtDateLong(today)}</p>
+          <p className="tapp2-subdate">
+            {selectedDate ? `Showing ${fmtDate(selectedDate)}` : fmtDateLong(today)}
+            {selectedDate && (
+              <button type="button" className="tapp2-clear-date" onClick={() => setSelectedDate(null)}>Clear</button>
+            )}
+          </p>
         </div>
 
         {/* Toolbar */}

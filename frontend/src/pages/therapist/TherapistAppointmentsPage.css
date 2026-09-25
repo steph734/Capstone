@@ -1197,7 +1197,18 @@
 /* Header */
 .tapp2-header { display: flex; flex-direction: column; gap: 2px; }
 .tapp2-title   { margin: 0; font-size: 20px; font-weight: 800; color: #2c4a3e; }
-.tapp2-subdate { margin: 0; font-size: 13px; color: #9aab9f; }
+.tapp2-subdate { margin: 0; font-size: 13px; color: #9aab9f; display: flex; align-items: center; gap: 8px; }
+.tapp2-clear-date {
+  border: none;
+  background: none;
+  color: #4a6b5d;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
 
 /* Toolbar */
 .tapp2-toolbar {

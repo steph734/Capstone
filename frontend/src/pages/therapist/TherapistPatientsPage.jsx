@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
@@ -49,6 +48,15 @@ function AlertIcon() {
 }
 function KebabIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
+}
+function EyeIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+}
+function ArchiveIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>
+}
+function TrashIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /></svg>
 }
 
 const STATUS_CONFIG = {
@@ -318,7 +326,6 @@ function AddPatientModal({ onClose, onAdd }) {
 
 /* ── Main Page ──────────────────────────────────────────── */
 export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
-  const navigate = useNavigate()
   const [search, setSearch]       = useState('')
   const [filter, setFilter]       = useState('All')
   const [sortBy, setSortBy]       = useState('name')
@@ -388,15 +395,15 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     return threads[patientId] || []
   }
 
-  const toggleActive = (id) => {
-    setPatients(prev => prev.map(p => (
-      p.id === id ? { ...p, status: p.status === 'Active' ? 'Inactive' : 'Active' } : p
-    )))
+  const archivePatient = (id) => {
+    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: true } : p)))
     setOpenMenuId(null)
   }
 
-  const archivePatient = (id) => {
-    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: true } : p)))
+  const deletePatient = (id) => {
+    const p = patients.find(pt => pt.id === id)
+    if (p && !window.confirm(`Delete ${p.name} from your patient list? This can't be undone.`)) return
+    setPatients(prev => prev.filter(pt => pt.id !== id))
     setOpenMenuId(null)
   }
 
@@ -590,7 +597,17 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                     <td>{p.nextSessionDate ? p.nextSession : 'None'}</td>
                     <td>{p.sessions}</td>
                     <td>
-                      <button className="tp-link-btn" onClick={() => setProfilePt(p)}>Profile</button>
+                      <div className="tp-table-actions">
+                        <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
+                          <EyeIcon /> View
+                        </button>
+                        <button className="tp-action-btn tp-action-archive" onClick={() => archivePatient(p.id)}>
+                          <ArchiveIcon /> Archive
+                        </button>
+                        <button className="tp-action-btn tp-action-delete" onClick={() => deletePatient(p.id)}>
+                          <TrashIcon /> Delete
+                        </button>
+                      </div>
                     </td>
                     <td className="tp-menu-cell">
                       <button
@@ -615,20 +632,9 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                             <EmailIcon />
                             Send email
                           </a>
-                          <button onClick={() => { navigate('/therapist/appointments'); setOpenMenuId(null) }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                            Schedule session
-                          </button>
                           <button onClick={() => { setProfilePt(p); setOpenMenuId(null) }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
                             View notes
-                          </button>
-                          <div className="tp-row-menu-sep" />
-                          <button onClick={() => toggleActive(p.id)}>
-                            {p.status === 'Active' ? 'Mark inactive' : 'Mark active'}
-                          </button>
-                          <button className="tp-row-menu-danger" onClick={() => archivePatient(p.id)}>
-                            Archive patient
                           </button>
                         </div>
                       )}

@@ -1,10 +1,25 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
 import CallOverlay from '../../components/CallOverlay'
 import { STREAM_THERAPIST_USER } from '../../utils/streamConfig'
 import { generateUniqueId } from '../../utils/idGenerator'
+
+function fmtDate(iso) {
+  if (!iso) return null
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+// A stable placeholder avatar for a given id — real patient ids are Mongo
+// ObjectId strings (not the small sequential ints a `% N` trick expects), so
+// this hashes the string down to a pravatar image index instead.
+function avatarFor(id) {
+  const s = String(id)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
+}
 
 // Lazy-loaded: the GetStream Video SDK is large and only needed once someone
 // actually opens a real video/voice call.
@@ -20,272 +35,54 @@ function PhoneIcon() {
 function EmailIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><path d="M22 6l-10 7L2 6" /></svg>
 }
-
-const RAW_PATIENTS = [
-  {
-    id: 0,
-    name: 'Alvrin',
-    age: 14,
-    condition: 'Anxiety Disorder',
-    progress: 68,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=33',
-    lastSession: 'Jul 3, 2026',
-    nextSession: 'Jul 10, 2026',
-    sessions: 36,
-    guardian: 'Self / Parent',
-    contact: '+63 912 000 0001',
-    email: 'alvrin.family@example.com',
-    joined: 'Sep 1, 2025',
-    notes: 'Alvrin has shown consistent improvement in managing anxiety triggers. CBT sessions have been highly productive, with notable progress in breathing techniques and cognitive reframing. Continue current treatment plan and begin exploring school reintegration strategies.',
-  },
-  {
-    id: 1,
-    name: 'Aira Lopez',
-    age: 8,
-    condition: 'ADHD',
-    progress: 62,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=47',
-    lastSession: 'Jul 2, 2026',
-    nextSession: 'Jul 9, 2026',
-    sessions: 24,
-    guardian: 'Maria Lopez',
-    contact: '+63 912 345 6789',
-    email: 'maria.lopez@example.com',
-    joined: 'Jan 15, 2026',
-    notes: 'Patient shows improvement in focus and attention span. Responds well to structured activities and positive reinforcement. Recommend continuing current behavior therapy plan with increased session frequency.',
-  },
-  {
-    id: 2,
-    name: 'Mika Santos',
-    age: 6,
-    condition: 'Speech Delay',
-    progress: 74,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=45',
-    lastSession: 'Jul 1, 2026',
-    nextSession: 'Jul 8, 2026',
-    sessions: 31,
-    guardian: 'Ana Santos',
-    contact: '+63 917 234 5678',
-    email: 'ana.santos@example.com',
-    joined: 'Nov 3, 2025',
-    notes: 'Significant progress in articulation and vocabulary. Now forming 3-4 word sentences consistently. Guardian reports improvement in home communication. Continue speech exercises and introduce reading aloud activities.',
-  },
-  {
-    id: 3,
-    name: 'Noah Cruz',
-    age: 10,
-    condition: 'Autism Spectrum Disorder',
-    progress: 48,
-    status: 'Needs Review',
-    avatar: 'https://i.pravatar.cc/150?img=11',
-    lastSession: 'Jun 28, 2026',
-    nextSession: 'Jul 5, 2026',
-    sessions: 18,
-    guardian: 'Roberto Cruz',
-    contact: '+63 920 876 5432',
-    email: 'roberto.cruz@example.com',
-    joined: 'Feb 10, 2026',
-    notes: 'Social engagement has plateaued over the last month. Sensory sensitivities remain a barrier. Recommend a team review to adjust current therapy plan and consider adding occupational therapy component.',
-  },
-  {
-    id: 4,
-    name: 'Sofia Reyes',
-    age: 12,
-    condition: 'Anxiety Disorder',
-    progress: 81,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=49',
-    lastSession: 'Jul 3, 2026',
-    nextSession: 'Jul 10, 2026',
-    sessions: 42,
-    guardian: 'Carmen Reyes',
-    contact: '+63 918 654 3210',
-    email: 'carmen.reyes@example.com',
-    joined: 'Sep 20, 2025',
-    notes: 'Excellent progress with CBT techniques. Patient is applying coping strategies independently in school settings. Guardian reports reduced anxiety episodes. Begin gradual reduction of session frequency as per discharge plan.',
-  },
-  {
-    id: 5,
-    name: 'Liam Tan',
-    age: 7,
-    condition: 'Dyslexia',
-    progress: 55,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=15',
-    lastSession: 'Jun 30, 2026',
-    nextSession: 'Jul 7, 2026',
-    sessions: 20,
-    guardian: 'Kevin Tan',
-    contact: '+63 915 111 2233',
-    email: 'kevin.tan@example.com',
-    joined: 'Dec 5, 2025',
-    notes: 'Steady improvement in phonological awareness and letter recognition. School performance improving with accommodations in place. Continue multisensory reading approach and coordinate with school teacher.',
-  },
-  {
-    id: 6,
-    name: 'Emma Villanueva',
-    age: 9,
-    condition: 'PTSD',
-    progress: 38,
-    status: 'Needs Review',
-    avatar: 'https://i.pravatar.cc/150?img=44',
-    lastSession: 'Jun 25, 2026',
-    nextSession: 'Jul 5, 2026',
-    sessions: 15,
-    guardian: 'Lisa Villanueva',
-    contact: '+63 921 999 8877',
-    email: 'lisa.villanueva@example.com',
-    joined: 'Mar 1, 2026',
-    notes: 'Patient continues to experience flashbacks and sleep disturbances. Trauma-focused CBT has started but progress is slow. Coordinating with family for additional support. Review treatment approach with supervision team this week.',
-  },
-  {
-    id: 7,
-    name: 'Carlos Mendez',
-    age: 11,
-    condition: 'Down Syndrome',
-    progress: 67,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=13',
-    lastSession: 'Jul 2, 2026',
-    nextSession: 'Jul 9, 2026',
-    sessions: 28,
-    guardian: 'Pedro Mendez',
-    contact: '+63 916 444 5566',
-    email: 'pedro.mendez@example.com',
-    joined: 'Oct 12, 2025',
-    notes: 'Good progress in adaptive skills and communication. Participating well in group activities. Fine motor skills improving with consistent OT exercises. Guardian is highly engaged and supportive of home practice.',
-  },
-  {
-    id: 8,
-    name: 'Isabella Park',
-    age: 5,
-    condition: 'Selective Mutism',
-    progress: 72,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=48',
-    lastSession: 'Jun 29, 2026',
-    nextSession: 'Jul 6, 2026',
-    sessions: 22,
-    guardian: 'Jenny Park',
-    contact: '+63 919 777 6655',
-    email: 'jenny.park@example.com',
-    joined: 'Jan 8, 2026',
-    notes: 'Remarkable progress — now speaking in full sentences with familiar adults in therapy setting. Beginning generalization to school environment. Guardian working closely with kindergarten teacher. Continue graduated exposure plan.',
-  },
-  {
-    id: 9,
-    name: 'Jake Rivera',
-    age: 8,
-    condition: 'ADHD',
-    progress: 59,
-    status: 'Active',
-    avatar: 'https://i.pravatar.cc/150?img=12',
-    lastSession: 'Jul 1, 2026',
-    nextSession: 'Jul 8, 2026',
-    sessions: 19,
-    guardian: 'Diana Rivera',
-    contact: '+63 913 321 0987',
-    email: 'diana.rivera@example.com',
-    joined: 'Feb 28, 2026',
-    notes: 'Impulse control improving with behavior modification strategies. Teacher reports fewer classroom disruptions. Working on organizational skills for homework completion. Parent training sessions ongoing — family engagement is strong.',
-  },
-  {
-    id: 10,
-    name: 'Maya Torres',
-    age: 7,
-    condition: 'Autism Spectrum Disorder',
-    progress: 43,
-    status: 'Critical',
-    avatar: 'https://i.pravatar.cc/150?img=46',
-    lastSession: 'Jun 20, 2026',
-    nextSession: 'Jul 5, 2026',
-    sessions: 12,
-    guardian: 'Rosa Torres',
-    contact: '+63 922 555 4433',
-    email: 'rosa.torres@example.com',
-    joined: 'Apr 14, 2026',
-    notes: 'Significant regression observed over the past two weeks. Self-injurious behaviors have increased. Urgent review needed. Coordinating with pediatric psychiatrist for medication evaluation. Guardian has been notified and is in daily contact.',
-  },
-]
-
-// Patient ID scheme: "P-" + 6 random digits, unique across the seed list.
-const seedPatientIds = new Set()
-const PATIENTS = RAW_PATIENTS.map((p) => {
-  const patientId = generateUniqueId('P', seedPatientIds)
-  seedPatientIds.add(patientId)
-  return { ...p, patientId }
-})
-
-// Patient id=0 (Alvrin) messages come from MessagesContext — not seeded here.
-const SEED_MESSAGES = {
-  1:  [
-    { from: 'them', text: 'Good morning! How is Aira doing this week?', time: 'Jun 30, 8:45 AM' },
-    { from: 'me',   text: 'Good morning! She had a great session yesterday — her focus has improved noticeably.', time: 'Jun 30, 9:02 AM' },
-    { from: 'them', text: 'That is wonderful to hear! She has been more settled at home too.', time: 'Jun 30, 9:10 AM' },
-    { from: 'me',   text: 'That is great to know. Keep encouraging her morning routine — consistency really helps.', time: 'Jun 30, 9:15 AM' },
-  ],
-  2:  [
-    { from: 'them', text: 'Hi, Mika said three new words at dinner last night!', time: 'Jul 1, 7:30 AM' },
-    { from: 'me',   text: 'That is fantastic progress! Which words were they?', time: 'Jul 1, 8:00 AM' },
-    { from: 'them', text: '"More", "please", and "mama". We were so happy!', time: 'Jul 1, 8:05 AM' },
-    { from: 'me',   text: 'Amazing! Those are key functional words. Keep encouraging her at mealtimes.', time: 'Jul 1, 8:20 AM' },
-  ],
-  3:  [
-    { from: 'them', text: 'Noah had a meltdown at school again this morning. I am worried.', time: 'Jun 27, 10:00 AM' },
-    { from: 'me',   text: 'I understand. Can you tell me what triggered it?', time: 'Jun 27, 10:15 AM' },
-    { from: 'them', text: 'The noise in the cafeteria seemed to overwhelm him.', time: 'Jun 27, 10:20 AM' },
-    { from: 'me',   text: 'We will address sensory regulation in our next session. I will also contact his teacher.', time: 'Jun 27, 10:35 AM' },
-  ],
-  4:  [
-    { from: 'them', text: 'Sofia presented in front of her class today and did not have a panic attack!', time: 'Jul 3, 3:15 PM' },
-    { from: 'me',   text: 'That is a huge milestone! She worked so hard for that. Please tell her I am proud of her.', time: 'Jul 3, 3:30 PM' },
-    { from: 'them', text: 'She is very proud of herself too. Thank you for everything.', time: 'Jul 3, 3:35 PM' },
-  ],
-  5:  [
-    { from: 'them', text: 'Liam finished his reading worksheet without any help today!', time: 'Jun 30, 5:00 PM' },
-    { from: 'me',   text: 'That is wonderful! The multisensory approach is clearly working for him.', time: 'Jun 30, 5:10 PM' },
-    { from: 'them', text: 'He even asked to do an extra page. I could not believe it!', time: 'Jun 30, 5:12 PM' },
-    { from: 'me',   text: 'Intrinsic motivation is the best sign. Keep that momentum going!', time: 'Jun 30, 5:20 PM' },
-  ],
-  6:  [
-    { from: 'them', text: 'Emma had nightmares again last night. Should I bring her session forward?', time: 'Jun 25, 7:00 AM' },
-    { from: 'me',   text: 'Yes, let us move her session to this Thursday. I will send a new calendar invite.', time: 'Jun 25, 7:30 AM' },
-    { from: 'them', text: 'Thank you. She also refuses to go to school today.', time: 'Jun 25, 7:35 AM' },
-    { from: 'me',   text: 'That is okay for today. Rest is important. We will work on school re-entry gradually.', time: 'Jun 25, 7:50 AM' },
-  ],
-  7:  [
-    { from: 'them', text: 'Carlos tied his shoes by himself this morning! First time ever!', time: 'Jul 2, 9:00 AM' },
-    { from: 'me',   text: 'What a milestone! All those fine motor exercises are paying off.', time: 'Jul 2, 9:10 AM' },
-    { from: 'them', text: 'He was so proud. He made us watch five times!', time: 'Jul 2, 9:12 AM' },
-    { from: 'me',   text: 'That is the best! Celebrate those wins — they matter so much to his confidence.', time: 'Jul 2, 9:20 AM' },
-  ],
-  8:  [
-    { from: 'them', text: 'Isabella spoke to her teacher today without being prompted!', time: 'Jun 29, 2:00 PM' },
-    { from: 'me',   text: 'That is incredible! Spontaneous speech with a new adult is a major breakthrough.', time: 'Jun 29, 2:15 PM' },
-    { from: 'them', text: 'Her teacher was amazed. She even smiled after!', time: 'Jun 29, 2:18 PM' },
-    { from: 'me',   text: 'Wonderful. Let us keep the exposure plan gradual and celebrate every step.', time: 'Jun 29, 2:30 PM' },
-  ],
-  9:  [
-    { from: 'them', text: 'Jake completed all his homework this week without a single reminder!', time: 'Jul 1, 6:00 PM' },
-    { from: 'me',   text: 'That is a big deal! The checklist system you set up at home is working perfectly.', time: 'Jul 1, 6:15 PM' },
-    { from: 'them', text: 'He even organized his backpack on his own. I am shocked in the best way.', time: 'Jul 1, 6:20 PM' },
-    { from: 'me',   text: 'Keep reinforcing it positively! We will build on this in our next session.', time: 'Jul 1, 6:30 PM' },
-  ],
-  10: [
-    { from: 'them', text: 'Maya hurt herself again this morning. I am scared. What do I do?', time: 'Jun 20, 8:00 AM' },
-    { from: 'me',   text: 'I am so sorry. Please keep her safe and stay calm with her. I am calling you now.', time: 'Jun 20, 8:05 AM' },
-    { from: 'them', text: 'Thank you for calling. She has calmed down but I am still shaking.', time: 'Jun 20, 9:30 AM' },
-    { from: 'me',   text: 'You are doing the right things. I have escalated her case and we will meet this week urgently.', time: 'Jun 20, 9:40 AM' },
-  ],
+function PeopleIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+}
+function PersonCheckIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="m17 11 2 2 4-4" /></svg>
+}
+function CalendarCheckIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="m9 16 2 2 4-4" /></svg>
+}
+function AlertIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+}
+function KebabIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
 }
 
 const STATUS_CONFIG = {
-  Active:          { cls: 'tp-pill-green',  dot: 'dot-green'  },
-  'Needs Review':  { cls: 'tp-pill-yellow', dot: 'dot-yellow' },
-  Critical:        { cls: 'tp-pill-red',    dot: 'dot-red'    },
+  Active:   { cls: 'tp-pill-green' },
+  Inactive: { cls: 'tp-pill-gray'  },
+}
+
+// Deterministic initials + a matching pastel color, so a patient without a
+// real profile photo still gets a stable, recognizable avatar circle.
+const AVATAR_PALETTE = [
+  { bg: '#dbeafe', fg: '#1d4ed8' },
+  { bg: '#dcfce7', fg: '#15803d' },
+  { bg: '#fef3c7', fg: '#b45309' },
+  { bg: '#fce7f3', fg: '#be185d' },
+  { bg: '#ede9fe', fg: '#6d28d9' },
+  { bg: '#ffe4e6', fg: '#be123c' },
+  { bg: '#e0f2fe', fg: '#0369a1' },
+  { bg: '#fef9c3', fg: '#854d0e' },
+]
+function paletteFor(id) {
+  const s = String(id)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length]
+}
+function initialsFor(name) {
+  return (
+    (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('') || '?'
+  )
 }
 
 /* ── Profile Modal ──────────────────────────────────────── */
@@ -505,8 +302,7 @@ function AddPatientModal({ onClose, onAdd }) {
               <label>Status</label>
               <select value={form.status} onChange={e => set('status', e.target.value)}>
                 <option>Active</option>
-                <option>Needs Review</option>
-                <option>Critical</option>
+                <option>Inactive</option>
               </select>
             </div>
           </div>
@@ -522,15 +318,62 @@ function AddPatientModal({ onClose, onAdd }) {
 
 /* ── Main Page ──────────────────────────────────────────── */
 export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
+  const navigate = useNavigate()
   const [search, setSearch]       = useState('')
   const [filter, setFilter]       = useState('All')
-  const [patients, setPatients]   = useState(PATIENTS)
+  const [sortBy, setSortBy]       = useState('name')
+  const [patients, setPatients]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [showAdd, setShowAdd]     = useState(false)
   const [profilePt, setProfilePt] = useState(null)
   const [messagePt, setMessagePt] = useState(null)
-  const [threads, setThreads]     = useState(SEED_MESSAGES)
+  const [threads, setThreads]     = useState({})
+  const [openMenuId, setOpenMenuId] = useState(null)
 
   const { thread, sendAsTherapist } = useSharedMessages()
+
+  // Every patient who has actually booked with this therapist, derived from
+  // the `appointments` collection (see api/_lib/routes/patients-therapist-list.js)
+  // — there's no direct "assigned therapist" field on a patient record, so
+  // having an appointment with this therapist IS what it means to have
+  // chosen them. Add/Mark inactive/Archive below only mutate this in-memory
+  // list; none of it is wired to the backend yet, so changes here won't
+  // survive a reload.
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.email) {
+      setLoading(false)
+      setLoadError('Your account isn’t linked to a staff record yet.')
+      return
+    }
+    setLoading(true)
+    fetch(`/api/patients/therapist-list?email=${encodeURIComponent(user.email)}`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        const list = (body.patients || []).map((p) => ({
+          ...p,
+          archived:    false,
+          avatar:      avatarFor(p.id),
+          lastSession: fmtDate(p.lastSessionDate) || 'Not yet',
+          nextSession: fmtDate(p.nextSessionDate) || 'TBD',
+          joined:      fmtDate(p.joinedDate) || '—',
+        }))
+        if (!cancelled) setPatients(list)
+      })
+      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load patients.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.email])
+
+  // Close the row action menu on an outside click.
+  useEffect(() => {
+    if (openMenuId == null) return
+    const onDocClick = (e) => { if (!e.target.closest('.tp-menu-cell')) setOpenMenuId(null) }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [openMenuId])
 
   // Build the message list for a given patient.
   // Patient id=0 (Alvrin) is the demo patient — use the shared context thread.
@@ -545,33 +388,59 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     return threads[patientId] || []
   }
 
-  const filtered = patients.filter(p => {
+  const toggleActive = (id) => {
+    setPatients(prev => prev.map(p => (
+      p.id === id ? { ...p, status: p.status === 'Active' ? 'Inactive' : 'Active' } : p
+    )))
+    setOpenMenuId(null)
+  }
+
+  const archivePatient = (id) => {
+    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: true } : p)))
+    setOpenMenuId(null)
+  }
+
+  // Archived patients drop out of the roster entirely — counts, filters and
+  // the table below all work off this list, never the raw `patients` state.
+  const roster = patients.filter(p => !p.archived)
+
+  const filtered = roster.filter(p => {
     const q = search.toLowerCase()
     const matchSearch = p.name.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q)
     const matchFilter = filter === 'All' || p.status === filter
     return matchSearch && matchFilter
   })
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'next') return (a.nextSessionDate || '9999-99-99').localeCompare(b.nextSessionDate || '9999-99-99')
+    if (sortBy === 'last') return (b.lastSessionDate || '').localeCompare(a.lastSessionDate || '')
+    if (sortBy === 'sessions') return b.sessions - a.sessions
+    return a.name.localeCompare(b.name)
+  })
+
   const counts = {
-    total:    patients.length,
-    active:   patients.filter(p => p.status === 'Active').length,
-    review:   patients.filter(p => p.status === 'Needs Review').length,
-    critical: patients.filter(p => p.status === 'Critical').length,
+    total:          roster.length,
+    active:         roster.filter(p => p.status === 'Active').length,
+    inactive:       roster.filter(p => p.status === 'Inactive').length,
+    upcomingBooked: roster.filter(p => p.nextSessionDate).length,
+    noUpcoming:     roster.filter(p => !p.nextSessionDate).length,
   }
 
   const handleAdd = (form) => {
-    const seed = Math.floor(Math.random() * 70) + 1
+    const id = Date.now()
     const newPt = {
-      id:          Date.now(),
+      id,
       patientId:   generateUniqueId('P', patients.map((p) => p.patientId).filter(Boolean)),
       name:        form.name,
       age:         Number(form.age) || 0,
       condition:   form.condition,
-      progress:    0,
       status:      form.status,
-      avatar:      `https://i.pravatar.cc/150?img=${seed}`,
+      archived:    false,
+      avatar:      avatarFor(id),
       lastSession: 'Not yet',
       nextSession: 'TBD',
+      nextSessionDate: null,
+      lastSessionDate: null,
       sessions:    0,
       guardian:    'Not specified',
       contact:     'Not specified',
@@ -607,26 +476,41 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       icon="👨‍👩‍👧"
       menuItems={getTherapistMenuItems(betaTier)}
     >
-      {/* Stats Strip */}
-      <div className="tp-stats-strip">
-        <div className="tp-stat-item tp-stat-total">
-          <span className="tp-stat-num">{counts.total}</span>
-          <span className="tp-stat-lbl">Total Patients</span>
+      {loading ? (
+        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your patients…</p>
+      ) : loadError ? (
+        <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
+      ) : (
+      <>
+      {/* KPI Cards */}
+      <div className="tp-kpi-grid">
+        <div className="tp-kpi-card">
+          <span className="tp-kpi-icon tp-kpi-icon-total"><PeopleIcon /></span>
+          <div className="tp-kpi-text">
+            <span className="tp-kpi-num">{counts.total}</span>
+            <span className="tp-kpi-lbl">Total patients</span>
+          </div>
         </div>
-        <div className="tp-stat-sep" />
-        <div className="tp-stat-item tp-stat-active">
-          <span className="tp-stat-num">{counts.active}</span>
-          <span className="tp-stat-lbl">Active</span>
+        <div className="tp-kpi-card">
+          <span className="tp-kpi-icon tp-kpi-icon-active"><PersonCheckIcon /></span>
+          <div className="tp-kpi-text">
+            <span className="tp-kpi-num">{counts.active}</span>
+            <span className="tp-kpi-lbl">Active</span>
+          </div>
         </div>
-        <div className="tp-stat-sep" />
-        <div className="tp-stat-item tp-stat-review">
-          <span className="tp-stat-num">{counts.review}</span>
-          <span className="tp-stat-lbl">Needs Review</span>
+        <div className="tp-kpi-card">
+          <span className="tp-kpi-icon tp-kpi-icon-booked"><CalendarCheckIcon /></span>
+          <div className="tp-kpi-text">
+            <span className="tp-kpi-num">{counts.upcomingBooked}</span>
+            <span className="tp-kpi-lbl">Upcoming booked</span>
+          </div>
         </div>
-        <div className="tp-stat-sep" />
-        <div className="tp-stat-item tp-stat-critical">
-          <span className="tp-stat-num">{counts.critical}</span>
-          <span className="tp-stat-lbl">Critical</span>
+        <div className="tp-kpi-card">
+          <span className="tp-kpi-icon tp-kpi-icon-alert"><AlertIcon /></span>
+          <div className="tp-kpi-text">
+            <span className="tp-kpi-num">{counts.noUpcoming}</span>
+            <span className="tp-kpi-lbl">No upcoming session</span>
+          </div>
         </div>
       </div>
 
@@ -644,12 +528,18 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           />
         </div>
         <div className="tp-filter-tabs">
-          {['All', 'Active', 'Needs Review', 'Critical'].map(f => (
+          {[['All', counts.total], ['Active', counts.active], ['Inactive', counts.inactive]].map(([f, n]) => (
             <button key={f} className={`tp-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-              {f}
+              {f} <span className="tp-filter-count">{n}</span>
             </button>
           ))}
         </div>
+        <select className="tp-sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
+          <option value="name">Sort by name</option>
+          <option value="next">Sort by next session</option>
+          <option value="last">Sort by last session</option>
+          <option value="sessions">Sort by sessions</option>
+        </select>
         <button className="tp-add-btn" onClick={() => setShowAdd(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 5v14M5 12h14" />
@@ -665,62 +555,83 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
             <thead>
               <tr>
                 <th>Patient</th>
-                <th>Condition</th>
-                <th>Status</th>
-                <th>Last Session</th>
-                <th>Next Session</th>
+                <th>Last</th>
+                <th>Next</th>
                 <th>Sessions</th>
+                <th></th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="tp-table-empty">No patients match your search.</td>
+                  <td colSpan={6} className="tp-table-empty">No patients match your search.</td>
                 </tr>
-              ) : filtered.map(p => {
+              ) : sorted.map(p => {
                 const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG['Active']
+                const pal = paletteFor(p.id)
                 return (
                   <tr key={p.id}>
                     <td>
                       <div className="tp-table-patient">
-                        <div className="tp-avatar-wrap">
-                          <img src={p.avatar} alt={p.name} className="tp-avatar tp-avatar-sm" />
-                          <span className={`tp-status-dot ${sc.dot}`} />
-                        </div>
+                        <span className="tp-avatar-initials" style={{ background: pal.bg, color: pal.fg }}>
+                          {initialsFor(p.name)}
+                        </span>
                         <div className="tp-card-info">
-                          <h3 className="tp-patient-name">{p.name}</h3>
-                          <span className="tp-patient-age">Age {p.age}</span>
+                          <div className="tp-name-row">
+                            <h3 className="tp-patient-name">{p.name}</h3>
+                            <span className={`tp-pill ${sc.cls}`}>{p.status}</span>
+                          </div>
+                          <span className="tp-patient-age">Age {p.age ?? '—'} · {p.condition || '—'}</span>
                         </div>
                       </div>
                     </td>
-                    <td><span className="tp-condition-badge">{p.condition}</span></td>
-                    <td><span className={`tp-pill ${sc.cls}`}>{p.status}</span></td>
                     <td>{p.lastSession}</td>
-                    <td>{p.nextSession}</td>
+                    <td>{p.nextSessionDate ? p.nextSession : 'None'}</td>
                     <td>{p.sessions}</td>
                     <td>
-                      <div className="tp-table-actions">
-                        <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
-                          View Profile
-                        </button>
-                        <button className="tp-action-btn tp-action-msg" onClick={() => setMessagePt(p)}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          Message
-                        </button>
-                        <a
-                          className="tp-action-btn tp-action-email"
-                          href={p.email ? `mailto:${p.email}` : undefined}
-                          aria-disabled={!p.email}
-                          onClick={(e) => { if (!p.email) e.preventDefault() }}
-                          title={p.email ? `Email ${p.guardian}` : 'No email on file'}
-                        >
-                          <EmailIcon />
-                          Email
-                        </a>
-                      </div>
+                      <button className="tp-link-btn" onClick={() => setProfilePt(p)}>Profile</button>
+                    </td>
+                    <td className="tp-menu-cell">
+                      <button
+                        className="tp-kebab-btn"
+                        onClick={() => setOpenMenuId(id => (id === p.id ? null : p.id))}
+                        aria-label="Patient actions"
+                        aria-expanded={openMenuId === p.id}
+                      >
+                        <KebabIcon />
+                      </button>
+                      {openMenuId === p.id && (
+                        <div className="tp-row-menu">
+                          <button onClick={() => { setMessagePt(p); setOpenMenuId(null) }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                            Send message
+                          </button>
+                          <a
+                            href={p.email ? `mailto:${p.email}` : undefined}
+                            aria-disabled={!p.email}
+                            onClick={(e) => { if (!p.email) e.preventDefault(); setOpenMenuId(null) }}
+                          >
+                            <EmailIcon />
+                            Send email
+                          </a>
+                          <button onClick={() => { navigate('/therapist/appointments'); setOpenMenuId(null) }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                            Schedule session
+                          </button>
+                          <button onClick={() => { setProfilePt(p); setOpenMenuId(null) }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
+                            View notes
+                          </button>
+                          <div className="tp-row-menu-sep" />
+                          <button onClick={() => toggleActive(p.id)}>
+                            {p.status === 'Active' ? 'Mark inactive' : 'Mark active'}
+                          </button>
+                          <button className="tp-row-menu-danger" onClick={() => archivePatient(p.id)}>
+                            Archive patient
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )
@@ -729,6 +640,8 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {showAdd && (
         <AddPatientModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />

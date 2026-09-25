@@ -1,46 +1,56 @@
-/* ── Stats Strip ──────────────────────────────────────────── */
-.tp-stats-strip {
+/* ── KPI Cards ────────────────────────────────────────────── */
+.tp-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.tp-kpi-card {
   display: flex;
   align-items: center;
+  gap: 12px;
   background: #fff;
   border: 1px solid #e8f5f0;
-  border-radius: 18px;
-  padding: 18px 28px;
+  border-radius: 16px;
+  padding: 16px 18px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.tp-stat-sep {
-  width: 1px;
-  height: 40px;
-  background: #e8f5f0;
-  margin: 0 28px;
+.tp-kpi-icon {
   flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.tp-stat-item {
+.tp-kpi-icon-total  { background: #eef2ff; color: #4338ca; }
+.tp-kpi-icon-active { background: #dcfce7; color: #15803d; }
+.tp-kpi-icon-booked { background: #e0f2fe; color: #0369a1; }
+.tp-kpi-icon-alert  { background: #fef3c7; color: #b45309; }
+
+.tp-kpi-text {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
+  gap: 2px;
+  min-width: 0;
 }
 
-.tp-stat-num {
-  font-size: 28px;
+.tp-kpi-num {
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
+  color: #2c4a3e;
 }
 
-.tp-stat-lbl {
+.tp-kpi-lbl {
   font-size: 12px;
   color: #6b7c75;
   font-weight: 500;
+  white-space: nowrap;
 }
-
-.tp-stat-total .tp-stat-num  { color: #2c4a3e; }
-.tp-stat-active .tp-stat-num  { color: #22a05a; }
-.tp-stat-review .tp-stat-num  { color: #d97706; }
-.tp-stat-critical .tp-stat-num { color: #ef4444; }
 
 /* ── Toolbar ──────────────────────────────────────────────── */
 .tp-toolbar {
@@ -112,6 +122,34 @@
   color: #2c4a3e;
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tp-filter-count {
+  color: #9aab9f;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.tp-filter-tab.active .tp-filter-count { color: #6b9c8c; }
+
+.tp-sort-select {
+  padding: 9px 32px 9px 12px;
+  border: 1px solid #e0e8e3;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a6b5d;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tp-sort-select:focus {
+  border-color: #5a7a6d;
+  box-shadow: 0 0 0 3px rgba(90, 122, 109, 0.1);
 }
 
 .tp-add-btn {
@@ -190,22 +228,6 @@
   min-width: 160px;
 }
 
-.tp-avatar-sm {
-  width: 40px;
-  height: 40px;
-}
-
-.tp-table-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-}
-
-.tp-table-actions .tp-action-btn {
-  flex: none;
-  white-space: nowrap;
-}
-
 .tp-table-empty {
   text-align: center;
   padding: 48px 20px;
@@ -213,42 +235,33 @@
   font-size: 14px;
 }
 
-.tp-avatar-wrap {
-  position: relative;
+.tp-avatar-initials {
   flex-shrink: 0;
-}
-
-.tp-avatar {
-  width: 54px;
-  height: 54px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2.5px solid #e8f5f0;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
 }
-
-.tp-status-dot {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-}
-
-.dot-green  { background: #22c55e; }
-.dot-yellow { background: #f59e0b; }
-.dot-red    { background: #ef4444; }
 
 .tp-card-info {
   flex: 1;
   min-width: 0;
 }
 
+.tp-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .tp-patient-name {
-  margin: 2px 0 3px;
-  font-size: 15px;
+  margin: 0;
+  font-size: 14px;
   font-weight: 700;
   color: #2c4a3e;
   white-space: nowrap;
@@ -257,34 +270,116 @@
 }
 
 .tp-patient-age {
+  display: block;
+  margin-top: 3px;
   font-size: 12px;
   color: #9aab9f;
 }
 
+/* ── Row Actions: Profile link + kebab menu ──────────────────── */
+.tp-link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a6b5d;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tp-link-btn:hover { color: #2c4a3e; text-decoration: underline; }
+
+.tp-menu-cell {
+  position: relative;
+  text-align: right;
+}
+
+.tp-kebab-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #6b7c75;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tp-kebab-btn:hover { background: #f0f7f4; color: #2c4a3e; }
+
+.tp-row-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 190px;
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: tp-modal-in 0.15s ease;
+}
+
+.tp-row-menu button,
+.tp-row-menu a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3d5a50;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.tp-row-menu button:hover,
+.tp-row-menu a:hover { background: #f0f7f4; }
+
+.tp-row-menu a[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.tp-row-menu-sep {
+  height: 1px;
+  background: #eef4f1;
+  margin: 4px 2px;
+}
+
+.tp-row-menu-danger { color: #dc2626; }
+.tp-row-menu-danger:hover { background: #fee2e2; }
+
 /* ── Status Pills ─────────────────────────────────────────── */
 .tp-pill {
   flex-shrink: 0;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.tp-pill-green  { background: #dcfce7; color: #166534; }
-.tp-pill-yellow { background: #fef3c7; color: #92400e; }
-.tp-pill-red    { background: #fee2e2; color: #b91c1c; }
-
-/* ── Condition Badge ──────────────────────────────────────── */
-.tp-condition-badge {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 5px 12px;
-  background: #f0f7f4;
-  color: #4a6b5d;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-}
+.tp-pill-green { background: #dcfce7; color: #166534; }
+.tp-pill-gray  { background: #eef2f0; color: #5a6b64; }
 
 /* ── Progress ─────────────────────────────────────────────── */
 .tp-progress-section {
@@ -313,54 +408,6 @@
   height: 100%;
   border-radius: 999px;
   transition: width 0.4s ease;
-}
-
-.tp-action-btn {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: none;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.tp-action-view {
-  background: #4a6b5d;
-  color: #fff;
-}
-
-.tp-action-view:hover { background: #3d5a50; }
-
-.tp-action-msg {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  background: #f0f7f4;
-  color: #4a6b5d;
-}
-
-.tp-action-msg:hover { background: #ddeee7; }
-
-.tp-action-email {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  background: #f0f7f4;
-  color: #4a6b5d;
-  text-decoration: none;
-}
-
-.tp-action-email:hover { background: #ddeee7; }
-
-.tp-action-email[aria-disabled="true"] {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 
 /* ── Profile Modal ────────────────────────────────────────── */
@@ -817,15 +864,13 @@
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .tp-stats-strip {
-    padding: 14px 16px;
-    flex-wrap: wrap;
-    gap: 8px;
+  .tp-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
-  .tp-stat-sep { display: none; }
-  .tp-stat-item { flex: 1 1 40%; padding: 6px 0; }
-  .tp-stat-num  { font-size: 22px; }
+  .tp-kpi-card { padding: 12px 14px; }
+  .tp-kpi-num  { font-size: 19px; }
 
   .tp-toolbar {
     flex-direction: column;
@@ -838,6 +883,8 @@
     overflow-x: auto;
     width: 100%;
   }
+
+  .tp-sort-select { width: 100%; }
 
   .tp-add-btn {
     width: 100%;

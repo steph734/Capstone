@@ -30,6 +30,7 @@ import appointmentsAvailability from './_lib/routes/appointments-availability.js
 import appointmentsTherapists from './_lib/routes/appointments-therapists.js'
 import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slots.js'
 import appointmentsTherapistList from './_lib/routes/appointments-therapist-list.js'
+import patientsTherapistList from './_lib/routes/patients-therapist-list.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
 import authResendOtp from './_lib/routes/auth-resend-otp.js'
@@ -68,6 +69,7 @@ app.all('/api/appointments/availability', appointmentsAvailability)
 app.all('/api/appointments/therapists', appointmentsTherapists)
 app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)
 app.all('/api/appointments/therapist-list', appointmentsTherapistList)
+app.all('/api/patients/therapist-list', patientsTherapistList)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)

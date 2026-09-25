@@ -1,10 +1,8 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import './TherapistAppointmentsPage.css'
-
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function fmt12(t) {
@@ -14,18 +12,14 @@ function fmt12(t) {
 function fmtDate(iso) {
   return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
-function fmtDay(iso) {
-  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' })
+function fmtDateLong(iso) {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
-function weekdayLong(iso) {
-  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'long' })
+function fmtDateShort(iso) {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
-function addMinutes(t, mins) {
-  const [h, m] = t.split(':').map(Number)
-  const total = h * 60 + m + (mins || 0)
-  const nh = Math.floor(total / 60) % 24
-  const nm = total % 60
-  return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
+function fmtShort(iso) {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 function groupLabel(iso) {
   const today    = new Date().toISOString().slice(0,10)
@@ -34,26 +28,38 @@ function groupLabel(iso) {
   if (iso === tomorrow) return 'Tomorrow'
   return new Date(iso+'T00:00').toLocaleDateString('en-US',{weekday:'long'})
 }
+// "TODAY" for today, "TOMORROW · SEP 26" / "THURSDAY · OCT 1" otherwise.
+function groupHeader(iso) {
+  const label = groupLabel(iso)
+  return label === 'Today' ? 'TODAY' : `${label.toUpperCase()} · ${fmtShort(iso).toUpperCase()}`
+}
 function typeClass(t) {
   return ({Initial:'tapp-type-initial','Follow-up':'tapp-type-followup',Assessment:'tapp-type-assessment',Group:'tapp-type-group'})[t]||'tapp-type-followup'
 }
 function statusClass(s) {
   return ({Confirmed:'tapp-status-confirmed',Pending:'tapp-status-pending',Cancelled:'tapp-status-cancelled',Completed:'tapp-status-completed',Archived:'tapp-status-archived'})[s]||''
 }
-/* Matches the patient calendar's meaning: green = nothing booked yet,
-   yellow = the day already has sessions on it. "Closed" stays defined in
-   the legend/CSS for clinic-closed dates, same as the patient calendar. */
-function dotClass(n) {
-  return n > 0 ? 'tapp-dot-mid' : 'tapp-dot-few'
+// Initials for the avatar circle, e.g. "Alvrine Santiago" -> "AS".
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
 }
-// A stable placeholder avatar for a given id — appointment ids are Mongo
-// ObjectId strings (not the small sequential ints a `% N` trick expects), so
-// this hashes the string down to a pravatar image index instead.
-function avatarFor(id) {
+// A stable avatar color for a given id — appointment ids are Mongo ObjectId
+// strings, so this hashes the string down to a palette index.
+const AVATAR_PALETTE = [
+  { bg: '#e8f5f0', fg: '#2c4a3e' },
+  { bg: '#e0f0ff', fg: '#1565c0' },
+  { bg: '#fde8f3', fg: '#a3175c' },
+  { bg: '#fef3c7', fg: '#92400e' },
+  { bg: '#f3e8ff', fg: '#7b1fa2' },
+  { bg: '#e0fbf5', fg: '#0f766e' },
+]
+function avatarColorFor(id) {
   const s = String(id)
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length]
 }
 
 /* ── Icons ────────────────────────────────────────────────── */
@@ -65,108 +71,18 @@ const EyeIcon       = () => <svg width="13" height="13" viewBox="0 0 24 24" fill
 const PencilIcon    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 const ArchiveIcon   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
 const UnarchiveIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 6.5l5.5 5.5H14v2h-4v-2H6.5L12 6.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
-const FilterIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
-const MiniUserIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-const PinIcon     = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
 const ClinicIcon  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="tapp-card-meta-icon"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14h-2v-3H8v-2h3V9h2v3h3v2h-3v3z"/></svg>
 const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
 const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
 const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+const RefreshIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L14 11h7V4l-3.35 2.35z"/></svg>
 
-/* ── Full Calendar ────────────────────────────────────────── */
-function FullCalendar({ appointments, selectedDate, onSelectDate }) {
-  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth()) })
-
-  const year  = calMonth.getFullYear()
-  const month = calMonth.getMonth()
-  const today = new Date().toISOString().slice(0,10)
-
-  const firstDay    = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month+1, 0).getDate()
-
-  const cells = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i+1),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-
-  const iso = (d) => d ? `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}` : null
-
-  const countForDay = (d) => {
-    const s = iso(d)
-    return s ? appointments.filter(a => a.date === s && a.status !== 'Archived').length : 0
-  }
-
-  const monthTotal = appointments.filter(a => {
-    return a.date.startsWith(`${year}-${String(month+1).padStart(2,'0')}`) && a.status !== 'Archived'
-  }).length
-
+/* ── Avatar ───────────────────────────────────────────────── */
+function Avatar({ name, id, className = '' }) {
+  const c = avatarColorFor(id)
   return (
-    <div className="tapp-cal-card">
-      {/* Header */}
-      <div className="tapp-cal-header">
-        <div className="tapp-cal-heading">
-          <h3 className="tapp-cal-title">Session Calendar</h3>
-          <p className="tapp-cal-sub">Tap a day to view appointments</p>
-        </div>
-      </div>
-
-      {/* Centered month navigation */}
-      <div className="tapp-cal-nav-center">
-        <button className="tapp-cal-nav" onClick={() => setCalMonth(new Date(year, month-1))}>‹</button>
-        <span className="tapp-cal-month">{MONTHS[month]} {year}</span>
-        <button className="tapp-cal-nav" onClick={() => setCalMonth(new Date(year, month+1))}>›</button>
-      </div>
-
-      {/* Day-of-week header */}
-      <div className="tapp-cal-dow">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <span key={d}>{d}</span>)}
-      </div>
-
-      {/* Grid */}
-      <div className="tapp-cal-grid">
-        {cells.map((d, i) => {
-          const s      = iso(d)
-          const count  = countForDay(d)
-          const isToday= s === today
-          const isSel  = s === selectedDate
-          return (
-            <button
-              key={i}
-              disabled={!d}
-              className={`tapp-cal-cell${isToday ? ' tapp-cal-today' : ''}${isSel ? ' tapp-cal-selected' : ''}`}
-              onClick={() => d && onSelectDate(isSel ? null : s)}
-            >
-              {d && (
-                <>
-                  <span className="tapp-cal-day-num">{d}</span>
-                  <div className="tapp-cal-dots">
-                    <span className={`tapp-cal-dot ${dotClass(count)}`} />
-                  </div>
-                </>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Footer */}
-      <div className="tapp-cal-footer">
-        <div className="tapp-cal-legend">
-          <div className="tapp-legend-item">
-            <span className="tapp-legend-dot tapp-dot-few" /> Available
-          </div>
-          <div className="tapp-legend-item">
-            <span className="tapp-legend-dot tapp-dot-mid" /> Booked
-          </div>
-          <div className="tapp-legend-item">
-            <span className="tapp-legend-dot tapp-dot-many" /> Closed
-          </div>
-        </div>
-        <span className="tapp-cal-total">
-          {MONTHS[month]} total: {monthTotal} session{monthTotal !== 1 ? 's' : ''}
-        </span>
-      </div>
+    <div className={`tapp2-avatar ${className}`} style={{ background: c.bg, color: c.fg }}>
+      {initials(name)}
     </div>
   )
 }
@@ -182,7 +98,7 @@ function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick }) {
         </div>
         <div className="tapp-modal-body">
           <div className="tapp-view-hero">
-            <img className="tapp-view-avatar" src={patient.avatar} alt={patient.name} />
+            <Avatar name={patient.name} id={appt.id} className="tapp-view-avatar" />
             <div>
               <p className="tapp-view-patient-name">{patient.name}</p>
               <p className="tapp-view-patient-cond">{patient.condition}</p>
@@ -427,55 +343,91 @@ function FormModal({ initial, onClose, onSave, appointments = [] }) {
   )
 }
 
-/* ── Request Details Modal ────────────────────────────────── */
-function RequestDetailsModal({ req, onClose, onAccept, onDecline }) {
+/* ── Pending request card ──────────────────────────────────── */
+function RequestCard({ req, onAccept, onDecline }) {
   return (
-    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="tapp-modal">
-        <div className="tapp-modal-header">
-          <h2 className="tapp-modal-title">Appointment Request</h2>
-          <button className="tapp-modal-close" onClick={onClose}>×</button>
+    <div className="tapp2-req-card">
+      <div className="tapp2-req-top">
+        <Avatar name={req.name} id={req.id} />
+        <div className="tapp2-req-info">
+          <span className="tapp2-req-name">{req.name}</span>
+          <span className="tapp2-req-sub">{req.age} · {req.condition}</span>
         </div>
-        <div className="tapp-modal-body">
-          <div className="tapp-view-hero">
-            <img className="tapp-view-avatar" src={req.avatar} alt={req.name} />
-            <div>
-              <p className="tapp-view-patient-name">{req.name}</p>
-              <p className="tapp-view-patient-cond">{req.condition} · {req.age}</p>
-            </div>
+        <div className="tapp2-req-actions">
+          <span className="tapp2-req-requested">Requested {req.requestedAt}</span>
+          <div className="tapp2-req-btns">
+            <button className="tapp2-btn-accept" onClick={() => onAccept(req)}><CheckIcon /> Accept</button>
+            <button className="tapp2-btn-decline" onClick={() => onDecline(req)}><XIcon /> Decline</button>
           </div>
-          <div className="tapp-view-details">
-            <div className="tapp-view-field">
-              <span className="tapp-view-field-lbl">Date</span>
-              <span className="tapp-view-field-val">{fmtDate(req.date)} ({weekdayLong(req.date)})</span>
-            </div>
-            <div className="tapp-view-field">
-              <span className="tapp-view-field-lbl">Time</span>
-              <span className="tapp-view-field-val">{fmt12(req.start)} - {fmt12(req.end)}</span>
-            </div>
-            <div className="tapp-view-field">
-              <span className="tapp-view-field-lbl">Session</span>
-              <span className="tapp-view-field-val">{req.evalType}</span>
-            </div>
-            <div className="tapp-view-field">
-              <span className="tapp-view-field-lbl">Location</span>
-              <span className="tapp-view-field-val">{req.location}</span>
-            </div>
-            <div className="tapp-view-field">
-              <span className="tapp-view-field-lbl">Requested On</span>
-              <span className="tapp-view-field-val">{req.requestedAt}</span>
-            </div>
-          </div>
-          <div className="tapp-view-notes">
-            <span className="tapp-view-notes-lbl">Note from Patient/Parent</span>
-            <p className="tapp-view-notes-text">{req.note}</p>
-          </div>
-        </div>
-        <div className="tapp-modal-footer">
-          <button className="tapp-request-decline" onClick={() => { onDecline(req); onClose() }}><XIcon /> Decline</button>
-          <button className="tapp-request-accept" onClick={() => { onAccept(req); onClose() }}><CheckIcon /> Accept</button>
         </div>
       </div>
+      <div className="tapp2-req-meta">
+        <span><CalIcon /> {fmtDateShort(req.date)}</span>
+        <span><ClockIcon /> {fmt12(req.start)} – {fmt12(req.end)}</span>
+        <span><ClinicIcon /> {req.location}</span>
+      </div>
+      <span className={`tapp-type-badge ${typeClass(req.evalType)}`}>{req.evalType}</span>
+      <p className="tapp2-req-note">{req.note}</p>
+    </div>
+  )
+}
+
+/* ── Appointment row (with kebab menu) ────────────────────── */
+function AppointmentRow({ appt, name, isToday, viewMode, onView, onEdit, onArchive, onRestoreClick, onStart }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenuOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
+
+  const showStart = isToday && appt.status === 'Confirmed'
+
+  return (
+    <div className="tapp2-row">
+      <span className="tapp2-row-time">{fmt12(appt.time)}</span>
+      <Avatar name={name} id={appt.id} />
+      <div className="tapp2-row-info">
+        <span className="tapp2-row-name">{name}</span>
+        <span className="tapp2-row-sub">{appt.type} session · {appt.duration}</span>
+      </div>
+      <span className={`tapp-status-badge ${statusClass(appt.status)}`}>{appt.status}</span>
+      {showStart ? (
+        <button className="tapp2-btn-start" onClick={onStart}>Start session</button>
+      ) : (
+        <>
+          <button className="tapp2-btn-view" onClick={onView}><EyeIcon /> View</button>
+          <div className="tapp2-kebab-wrap" ref={wrapRef}>
+            <button className="tapp2-kebab" onClick={() => setMenuOpen(o => !o)} aria-label="More options">
+              <DotsIcon />
+            </button>
+            {menuOpen && (
+              <div className="tapp2-menu">
+                {viewMode === 'archived' ? (
+                  <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onRestoreClick() }}>
+                    <UnarchiveIcon /> Restore
+                  </button>
+                ) : (
+                  <>
+                    <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
+                      <PencilIcon /> Edit
+                    </button>
+                    <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
+                      <RefreshIcon /> Reschedule
+                    </button>
+                    <button className="tapp2-menu-item tapp2-menu-danger" onClick={() => { setMenuOpen(false); onArchive() }}>
+                      <ArchiveIcon /> Archive
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -487,14 +439,12 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [loadError,     setLoadError]   = useState('')
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [selectedDate, setSelectedDate] = useState(null)
   const [viewMode,     setViewMode]     = useState('active')
   const [showAdd,      setShowAdd]      = useState(false)
   const [viewAppt,     setViewAppt]     = useState(null)
   const [editAppt,     setEditAppt]     = useState(null)
   const [confirmArchId,    setConfirmArchId]    = useState(null)
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
-  const [viewRequest,  setViewRequest]  = useState(null)
   const [toast,        setToast]        = useState('')
 
   // Every appointment patients have actually booked with this therapist,
@@ -522,11 +472,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   }, [user?.email])
 
   const today = new Date().toISOString().slice(0,10)
-
-  const todayCount = appointments.filter(a => a.date === today && a.status !== 'Archived').length
-  const schedCount = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled').length
-  const pendCount  = appointments.filter(a => a.status === 'Pending').length
-  const archCount  = appointments.filter(a => a.status === 'Archived').length
+  const archCount = appointments.filter(a => a.status === 'Archived').length
 
   const filtered = useMemo(() => {
     return appointments
@@ -534,14 +480,11 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
         if (viewMode === 'archived') return a.status === 'Archived'
         if (a.status === 'Archived') return false
         if (statusFilter !== 'All' && a.status !== statusFilter) return false
-        if (search) {
-          const p = PATIENTS.find(p => p.id === a.patientId)
-          if (!p?.name.toLowerCase().includes(search.toLowerCase())) return false
-        }
+        if (search && !(a.patientName || '').toLowerCase().includes(search.toLowerCase())) return false
         return true
       })
       .sort((a,b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.time.localeCompare(b.time))
-  }, [appointments, search, statusFilter, selectedDate, viewMode])
+  }, [appointments, search, statusFilter, viewMode])
 
   const groups = useMemo(() => {
     const map = {}
@@ -550,7 +493,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   }, [filtered])
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800) }
-  const patient   = (a)   => ({ name: a.patientName || 'Unknown', avatar: a.avatar || avatarFor(a.id), condition: a.condition || '' })
+  const patient   = (a)   => ({ name: a.patientName || 'Unknown', condition: a.condition || '' })
 
   // Real bookings arrive as status 'Pending' until someone acts on them —
   // this is what used to be a separate static demo list.
@@ -559,7 +502,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     .map(a => ({
       id: a.id,
       name: a.patientName || 'Unknown',
-      avatar: avatarFor(a.id),
       condition: a.condition || 'No condition on file',
       age: a.age != null ? `${a.age} years old` : '—',
       evalType: a.type,
@@ -570,7 +512,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       requestedAt: a.createdAt
         ? new Date(a.createdAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
         : '—',
-      note: a.guardianName ? `Guardian: ${a.guardianName}` : 'No additional notes provided.',
+      note: a.guardianName ? `Guardian note: ${a.guardianName}` : 'No additional notes provided.',
     })), [appointments])
 
   const logAppt = (actionIcon, description, appt, status = 'Success') => {
@@ -614,23 +556,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   // Pending until that's wired up.
   const handleAcceptRequest = (req) => showToast(`Accepted ${req.name}'s request`)
   const handleDeclineRequest = (req) => showToast(`Declined ${req.name}'s request`)
-
-  const scheduleForToday = useMemo(() => {
-    const active = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled')
-    let d = today
-    if (!active.some(a => a.date === d)) {
-      const upcoming = active.map(a => a.date).filter(x => x >= today).sort()
-      d = upcoming[0] || active.map(a => a.date).sort()[0] || today
-    }
-    return {
-      date: d,
-      items: active.filter(a => a.date === d).sort((x, y) => x.time.localeCompare(y.time)),
-    }
-  }, [appointments, today])
-
-  const scrollToAllAppointments = () => {
-    document.getElementById('tapp-all-appointments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  const handleStartSession = (name) => showToast(`Starting session with ${name}…`)
 
   return (
     <TherapistPageShell
@@ -650,191 +576,67 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           <p className="tapp-empty-sub">{loadError}</p>
         </div>
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="tapp2-wrap">
 
-        {/* KPI strip */}
-        <div className="tapp-stats">
-          <div className="tapp-stat">
-            <div className="tapp-stat-icon tapp-stat-green">📅</div>
-            <div className="tapp-stat-body">
-              <span className="tapp-stat-num">{todayCount}</span>
-              <span className="tapp-stat-lbl">Today</span>
+        {/* Incoming appointment requests — every real booking still Pending */}
+        {incomingRequests.length > 0 && (
+          <section className="tapp2-requests">
+            <div className="tapp2-requests-banner">
+              <ClockIcon />
+              <span>{incomingRequests.length} request{incomingRequests.length !== 1 ? 's' : ''} need{incomingRequests.length === 1 ? 's' : ''} your response</span>
             </div>
-          </div>
-          <div className="tapp-stat">
-            <div className="tapp-stat-icon tapp-stat-blue">📋</div>
-            <div className="tapp-stat-body">
-              <span className="tapp-stat-num">{schedCount}</span>
-              <span className="tapp-stat-lbl">Scheduled</span>
-            </div>
-          </div>
-          <div className="tapp-stat">
-            <div className="tapp-stat-icon tapp-stat-amber">⏳</div>
-            <div className="tapp-stat-body">
-              <span className="tapp-stat-num">{pendCount}</span>
-              <span className="tapp-stat-lbl">Pending</span>
-            </div>
-          </div>
-          <div className="tapp-stat">
-            <div className="tapp-stat-icon tapp-stat-red" style={{ fontSize: 16 }}>📦</div>
-            <div className="tapp-stat-body">
-              <span className="tapp-stat-num">{archCount}</span>
-              <span className="tapp-stat-lbl">Archived</span>
-            </div>
-          </div>
+            {incomingRequests.map(req => (
+              <RequestCard key={req.id} req={req} onAccept={handleAcceptRequest} onDecline={handleDeclineRequest} />
+            ))}
+          </section>
+        )}
+
+        {/* Header */}
+        <div className="tapp2-header">
+          <h2 className="tapp2-title">Appointments</h2>
+          <p className="tapp2-subdate">{fmtDateLong(today)}</p>
         </div>
 
-        {/* Full-width Calendar */}
-        <FullCalendar
-          appointments={appointments}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-        />
-
-        {/* Incoming Appointment Requests — every real booking still Pending */}
-        <section className="tapp-requests">
-          <div className="tapp-requests-head">
-            <div className="tapp-requests-heading">
-              <h3 className="tapp-section-title">Incoming Appointment Requests</h3>
-              <p className="tapp-section-sub">Review and respond to patients' appointment requests.</p>
-            </div>
-            <button type="button" className="tapp-filter-btn"><FilterIcon /> Filter</button>
-          </div>
-
-          {incomingRequests.length === 0 ? (
-            <p className="tapp-today-empty">No pending requests right now.</p>
-          ) : (
-          <div className="tapp-requests-list">
-            {incomingRequests.map(req => (
-                <div key={req.id} className="tapp-request-card">
-                  <div className="tapp-request-patient">
-                    <img className="tapp-request-avatar" src={req.avatar} alt={req.name} />
-                    <div className="tapp-request-patient-info">
-                      <span className="tapp-request-name">{req.name}</span>
-                      <span className="tapp-request-cond">{req.condition}</span>
-                      <div className="tapp-request-tags">
-                        <span className="tapp-request-tag"><MiniUserIcon /> {req.age}</span>
-                        <span className="tapp-request-tag"><PinIcon /> {req.evalType}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="tapp-request-when">
-                    <div className="tapp-request-when-row"><CalIcon /> {fmtDate(req.date)} ({weekdayLong(req.date)})</div>
-                    <div className="tapp-request-when-row"><ClockIcon /> {fmt12(req.start)} - {fmt12(req.end)}</div>
-                    <div className="tapp-request-when-row"><ClinicIcon /> {req.location}</div>
-                  </div>
-
-                  <div className="tapp-request-note">
-                    <span className="tapp-request-note-lbl">Request Date</span>
-                    <span className="tapp-request-note-date">{req.requestedAt}</span>
-                    <span className="tapp-request-note-lbl">Note from Patient/Parent</span>
-                    <p className="tapp-request-note-text">&ldquo;{req.note}&rdquo;</p>
-                  </div>
-
-                <div className="tapp-request-actions">
-                  <button className="tapp-request-accept" onClick={() => handleAcceptRequest(req)}><CheckIcon /> Accept</button>
-                  <button className="tapp-request-decline" onClick={() => handleDeclineRequest(req)}><XIcon /> Decline</button>
-                  <button className="tapp-request-details" onClick={() => setViewRequest(req)}>View Details</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
-        </section>
-
-        {/* Today's Schedule */}
-        <section className="tapp-today">
-          <div className="tapp-today-head">
-            <h3 className="tapp-section-title">Today's Schedule</h3>
-            <span className="tapp-today-date">{fmtDate(scheduleForToday.date)}</span>
-          </div>
-
-          {scheduleForToday.items.length === 0 ? (
-            <p className="tapp-today-empty">No sessions scheduled.</p>
-          ) : (
-            <div className="tapp-today-list">
-              {scheduleForToday.items.map(a => {
-                const p = patient(a)
-                return (
-                  <div key={a.id} className="tapp-today-row">
-                    <div className="tapp-today-time">
-                      <span>{fmt12(a.time)}</span>
-                      <span className="tapp-today-time-sep">–</span>
-                      <span>{fmt12(addMinutes(a.time, parseInt(a.duration, 10)))}</span>
-                    </div>
-                    <img className="tapp-today-avatar" src={p.avatar} alt={p.name} />
-                    <div className="tapp-today-patient">
-                      <span className="tapp-today-name">{p.name}</span>
-                      <span className="tapp-today-cond">{p.condition}</span>
-                    </div>
-                    <span className={`tapp-type-badge ${typeClass(a.type)}`}>{a.type}</span>
-                    <span className="tapp-today-desc">{a.notes || `${a.type} session`}</span>
-                    <span className={`tapp-status-badge ${statusClass(a.status)}`}>{a.status}</span>
-                    <button className="tapp-btn tapp-btn-view" onClick={() => setViewAppt(a)}><EyeIcon /> View</button>
-                    <button className="tapp-today-kebab" onClick={() => setEditAppt(a)} aria-label="More options"><DotsIcon /></button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <button type="button" className="tapp-today-viewall" onClick={scrollToAllAppointments}>
-            <CalIcon /> View All Appointments
-          </button>
-        </section>
-
-        {/* View mode tabs + toolbar */}
-        <div className="tapp-tabs-row" id="tapp-all-appointments">
-          <div className="tapp-tabs">
+        {/* Toolbar */}
+        <div className="tapp2-toolbar">
+          <div className="tapp2-seg">
             <button
-              className={`tapp-tab${viewMode === 'active' ? ' tapp-tab-active' : ''}`}
+              className={`tapp2-seg-btn${viewMode === 'active' ? ' active' : ''}`}
               onClick={() => setViewMode('active')}
             >
-              Active Appointments
+              Active
             </button>
             <button
-              className={`tapp-tab${viewMode === 'archived' ? ' tapp-tab-active' : ''}`}
+              className={`tapp2-seg-btn${viewMode === 'archived' ? ' active' : ''}`}
               onClick={() => setViewMode('archived')}
             >
-              📦 Archived{archCount > 0 && <span className="tapp-tab-badge">{archCount}</span>}
+              Archived{archCount > 0 && <span className="tapp2-seg-badge">{archCount}</span>}
             </button>
           </div>
-          {viewMode === 'active' && (
-            <button className="tapp-add-btn" onClick={() => setShowAdd(true)}>
-              <PlusIcon /> Add Appointment
-            </button>
-          )}
-        </div>
-
-        <div className="tapp-toolbar">
-          <div className="tapp-search-wrap">
-            <span className="tapp-search-icon"><SearchIcon /></span>
+          <div className="tapp2-search-wrap">
+            <span className="tapp2-search-icon"><SearchIcon /></span>
             <input
-              className="tapp-search"
+              className="tapp2-search"
               placeholder="Search patient…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
           {viewMode === 'active' && (
-            <select className="tapp-filter" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option>All</option>
+            <select className="tapp2-status-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="All">All statuses</option>
               <option>Confirmed</option>
               <option>Pending</option>
               <option>Cancelled</option>
               <option>Completed</option>
             </select>
           )}
+          {viewMode === 'active' && (
+            <button className="tapp2-add-btn" onClick={() => setShowAdd(true)}>
+              <PlusIcon /> Add appointment
+            </button>
+          )}
         </div>
-
-        {/* Selected day banner */}
-        {selectedDate && (
-          <div className="tapp-day-banner">
-            <span className="tapp-day-banner-date">{fmtDate(selectedDate)}</span>
-            {selectedDate === today && <span className="tapp-day-banner-today">Today</span>}
-          </div>
-        )}
 
         {/* Appointment list */}
         {groups.length === 0 ? (
@@ -847,42 +649,27 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           </div>
         ) : (
           groups.map(([date, appts]) => (
-            <div key={date} className="tapp-group">
-              <div className="tapp-group-header">
-                <span className="tapp-group-label">{groupLabel(date)}</span>
-                <span className="tapp-group-date">{fmtDate(date)}</span>
-                <div className="tapp-group-divider" />
+            <div key={date} className="tapp2-group">
+              <div className="tapp2-group-label">{groupHeader(date)}</div>
+              <div className="tapp2-rows">
+                {appts.map(a => {
+                  const p = patient(a)
+                  return (
+                    <AppointmentRow
+                      key={a.id}
+                      appt={a}
+                      name={p.name}
+                      isToday={a.date === today}
+                      viewMode={viewMode}
+                      onView={() => setViewAppt(a)}
+                      onEdit={() => setEditAppt(a)}
+                      onArchive={() => setConfirmArchId(a.id)}
+                      onRestoreClick={() => setConfirmRestoreAppt(a)}
+                      onStart={() => handleStartSession(p.name)}
+                    />
+                  )
+                })}
               </div>
-
-              {appts.map(a => {
-                const p = patient(a)
-                return (
-                  <div key={a.id} className={`tapp-card${a.status==='Archived'?' archived':''}`}>
-                    <img className="tapp-card-avatar" src={p.avatar} alt={p.name} />
-                    <div className="tapp-card-patient">
-                      <span className="tapp-card-name">{p.name}</span>
-                      <span className="tapp-card-condition">{p.condition}</span>
-                    </div>
-                    <div className="tapp-card-divider" />
-                    <div className="tapp-card-meta">
-                      <div className="tapp-card-meta-row"><CalIcon />{fmtDate(a.date)} · {fmtDay(a.date)}</div>
-                      <div className="tapp-card-meta-row"><ClockIcon />{fmt12(a.time)} · {a.duration}</div>
-                    </div>
-                    <div className="tapp-card-divider" />
-                    <span className={`tapp-type-badge ${typeClass(a.type)}`}>{a.type}</span>
-                    <span className={`tapp-status-badge ${statusClass(a.status)}`}>{a.status}</span>
-                    <div className="tapp-card-actions">
-                      <button className="tapp-btn tapp-btn-view" onClick={() => setViewAppt(a)}><EyeIcon /> View</button>
-                      {viewMode === 'active' && (
-                        <button className="tapp-btn tapp-btn-edit" onClick={() => setEditAppt(a)}><PencilIcon /> Edit</button>
-                      )}
-                      {viewMode === 'active' && (
-                        <button className="tapp-btn tapp-btn-archive" onClick={() => setConfirmArchId(a.id)}><ArchiveIcon /> Archive</button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           ))
         )}
@@ -918,14 +705,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onConfirm={id => { handleUnarchive(id); setConfirmRestoreAppt(null) }}
           onRebook={a => { setEditAppt(a); setConfirmRestoreAppt(null) }}
           onClose={() => setConfirmRestoreAppt(null)}
-        />
-      )}
-      {viewRequest && (
-        <RequestDetailsModal
-          req={viewRequest}
-          onClose={() => setViewRequest(null)}
-          onAccept={handleAcceptRequest}
-          onDecline={handleDeclineRequest}
         />
       )}
       {toast    && <div className="tapp-toast">{toast}</div>}

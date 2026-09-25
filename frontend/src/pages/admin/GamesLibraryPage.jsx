@@ -1,27 +1,31 @@
 import { useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialGames } from './gamifiedLibraryData'
+import { initialGames, initialGameRequests } from './gamifiedLibraryData'
 import { GameControllerIcon, PencilIcon, TrashIcon } from './gamifiedIcons'
 
-const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', description: '' }
+const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', description: '', points: 10 }
+
+const TYPE_ICON = { Cognitive: '🧩', Speech: '🎤', Physical: '🏃', Occupational: '✋' }
+
+const AVATAR_COLORS = ['#4a6b5d', '#e46a4b', '#3b82f6', '#8b5cf6', '#d97706']
+
+function avatarColorFor(id) {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length]
+}
 
 export default function GamesLibraryPage({ user, onLogout }) {
   const [games, setGames] = useState(initialGames)
+  const [requests, setRequests] = useState(initialGameRequests)
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [declineTarget, setDeclineTarget] = useState(null)
+  const [viewRequest, setViewRequest] = useState(null)
   const [form, setForm] = useState(emptyForm)
 
   const editingGame = useMemo(() => games.find((game) => game.id === editingId) || null, [games, editingId])
-
-  const stats = useMemo(() => {
-    const published = games.filter((game) => game.status === 'Published')
-    const draft = games.filter((game) => game.status === 'Draft')
-    const categories = new Set(games.map((game) => game.type)).size
-    return { total: games.length, published: published.length, draft: draft.length, categories }
-  }, [games])
 
   const visibleGames = useMemo(() => {
     if (statusFilter === 'All') return games
@@ -36,16 +40,16 @@ export default function GamesLibraryPage({ user, onLogout }) {
 
   const openEdit = (game) => {
     setEditingId(game.id)
-    setForm({ name: game.name, type: game.type, level: game.level, description: game.description })
+    setForm({ name: game.name, type: game.type, level: game.level, description: game.description, points: game.points ?? 10 })
     setShowEditor(true)
   }
 
   const saveGame = (event) => {
     event.preventDefault()
     if (editingGame) {
-      setGames((currentGames) => currentGames.map((game) => (game.id === editingGame.id ? { ...game, ...form } : game)))
+      setGames((currentGames) => currentGames.map((game) => (game.id === editingGame.id ? { ...game, ...form, points: Number(form.points) || 0 } : game)))
     } else {
-      setGames((currentGames) => [...currentGames, { id: Date.now(), ...form, status: 'Published' }])
+      setGames((currentGames) => [...currentGames, { id: Date.now(), ...form, points: Number(form.points) || 0, status: 'Draft' }])
     }
     setShowEditor(false)
   }
@@ -54,6 +58,21 @@ export default function GamesLibraryPage({ user, onLogout }) {
     if (!deleteTarget) return
     setGames((currentGames) => currentGames.filter((game) => game.id !== deleteTarget.id))
     setDeleteTarget(null)
+  }
+
+  // Approving opens the creation workspace (the Add/Edit Game form) prefilled
+  // with what the owner asked for, and clears the request from the pending list.
+  const approveRequest = (request) => {
+    setRequests((current) => current.filter((r) => r.id !== request.id))
+    setEditingId(null)
+    setForm({ name: request.name, type: request.type, level: request.level, description: request.description, points: 10 })
+    setShowEditor(true)
+  }
+
+  const confirmDecline = () => {
+    if (!declineTarget) return
+    setRequests((current) => current.filter((r) => r.id !== declineTarget.id))
+    setDeclineTarget(null)
   }
 
   const filters = [
@@ -67,37 +86,60 @@ export default function GamesLibraryPage({ user, onLogout }) {
       user={user}
       onLogout={onLogout}
       title="Games"
-      subtitle="Add, edit, or delete gamified exercises"
+      subtitle="Review owner requests and manage every therapy game"
       icon={<GameControllerIcon />}
       menuItems={adminMenuItems}
     >
-      <div className="admin-stats-grid">
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Total Games</p>
-          <h3 className="admin-stat-value">{stats.total}</h3>
-          <p className="admin-stat-meta">In the library</p>
+      {requests.length > 0 && (
+        <section className="grq-panel">
+          <div className="grq-panel-header">
+            <div className="grq-panel-title-row">
+              <h3>Requests from owners</h3>
+              <span className="grq-pending-badge">{requests.length} pending</span>
+            </div>
+            <p className="grq-panel-hint">Approve to open the request in the creation workspace</p>
+          </div>
+
+          <div className="grq-grid">
+            {requests.map((request, i) => (
+              <div key={request.id} className="grq-card">
+                <div className="grq-card-top">
+                  <span className="grq-avatar" style={{ background: avatarColorFor(i) }}>
+                    {request.ownerName.charAt(0)}
+                  </span>
+                  <div className="grq-card-who">
+                    <span className="grq-owner-name">{request.ownerName}</span>
+                    <span className="grq-owner-meta">({request.branch}) · {request.submitted}</span>
+                  </div>
+                  <span className="grq-pending-pill">Pending</span>
+                </div>
+
+                <h4 className="grq-card-title">{request.name}</h4>
+                <p className="grq-card-desc">{request.description}</p>
+
+                <div className="admin-button-row" style={{ marginTop: '4px' }}>
+                  <span className="admin-pill gray">{request.type}</span>
+                  <span className="admin-pill yellow">{request.level}</span>
+                </div>
+
+                <button type="button" className="grq-view-link" onClick={() => setViewRequest(request)}>
+                  View full request →
+                </button>
+
+                <div className="grq-actions">
+                  <button type="button" className="grq-decline-btn" onClick={() => setDeclineTarget(request)}>Decline</button>
+                  <button type="button" className="grq-approve-btn" onClick={() => approveRequest(request)}>Approve &amp; Build</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Published</p>
-          <h3 className="admin-stat-value">{stats.published}</h3>
-          <p className="admin-stat-meta">Live for patients</p>
-        </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Draft</p>
-          <h3 className="admin-stat-value">{stats.draft}</h3>
-          <p className="admin-stat-meta">Not yet visible</p>
-        </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Categories Covered</p>
-          <h3 className="admin-stat-value">{stats.categories}</h3>
-          <p className="admin-stat-meta">Across therapy types</p>
-        </section>
-      </div>
+      )}
 
       <div className="admin-panel">
         <div className="admin-panel-header">
           <div>
-            <h3>Gamified Exercises</h3>
+            <h3>All games</h3>
             <p>Manage interactive therapy games from one place</p>
           </div>
           <button className="admin-btn" onClick={openCreate}>Add Game</button>
@@ -128,18 +170,23 @@ export default function GamesLibraryPage({ user, onLogout }) {
             </div>
           )}
           {visibleGames.map((game) => (
-            <div key={game.id} className="game-card">
-              <div className="game-card-main">
+            <div key={game.id} className="aga-row">
+              <span className="aga-icon">{TYPE_ICON[game.type] || '🎮'}</span>
+
+              <div className="aga-main">
                 <div className="branch-card-title-row">
                   <h4>{game.name}</h4>
                   <span className={`admin-pill ${game.status === 'Published' ? 'green' : 'yellow'}`}>{game.status}</span>
                 </div>
                 <p>{game.description}</p>
-                <div className="admin-button-row" style={{ marginTop: '10px' }}>
+                <div className="admin-button-row" style={{ marginTop: '8px' }}>
                   <span className="admin-pill gray">{game.type}</span>
                   <span className="admin-pill yellow">{game.level}</span>
                 </div>
               </div>
+
+              <div className="aga-points">+{game.points ?? 0}<span>points per play</span></div>
+
               <div className="admin-item-actions">
                 <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(game)} title="Edit" aria-label={`Edit ${game.name}`}>
                   <PencilIcon />
@@ -161,7 +208,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
                 <span className="admin-modal-icon"><GameControllerIcon /></span>
                 <div>
                   <h3>{editingGame ? 'Edit Game' : 'Add Game'}</h3>
-                  <p>{editingGame ? 'Update the gamified exercise details' : 'New games are published automatically'}</p>
+                  <p>{editingGame ? 'Update the gamified exercise details' : 'New games start as a draft until you publish them'}</p>
                 </div>
               </div>
               <button className="admin-modal-close" onClick={() => setShowEditor(false)} aria-label="Close">✕</button>
@@ -199,6 +246,18 @@ export default function GamesLibraryPage({ user, onLogout }) {
               </div>
 
               <label className="admin-field">
+                <span>Points per Play</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.points}
+                  onChange={(event) => setForm((current) => ({ ...current, points: event.target.value }))}
+                  placeholder="e.g. 10"
+                  required
+                />
+              </label>
+
+              <label className="admin-field">
                 <span>Description</span>
                 <textarea
                   value={form.description}
@@ -213,6 +272,68 @@ export default function GamesLibraryPage({ user, onLogout }) {
                 <button className="admin-btn-secondary" type="button" onClick={() => setShowEditor(false)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {viewRequest && (
+        <div className="admin-modal-backdrop" onClick={() => setViewRequest(null)}>
+          <div className="admin-modal admin-view-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="admin-modal-title">
+                <span className="admin-modal-icon"><GameControllerIcon /></span>
+                <div>
+                  <h3>{viewRequest.name}</h3>
+                  <p>Requested by {viewRequest.ownerName} ({viewRequest.branch})</p>
+                </div>
+              </div>
+              <button className="admin-modal-close" onClick={() => setViewRequest(null)} aria-label="Close">✕</button>
+            </div>
+
+            <div className="branch-view-grid">
+              <div className="branch-view-field">
+                <span className="branch-view-label">Therapy Type</span>
+                <p>{viewRequest.type}</p>
+              </div>
+              <div className="branch-view-field">
+                <span className="branch-view-label">Difficulty</span>
+                <p>{viewRequest.level}</p>
+              </div>
+              <div className="branch-view-field">
+                <span className="branch-view-label">Submitted</span>
+                <p>{viewRequest.submitted}</p>
+              </div>
+              <div className="branch-view-field">
+                <span className="branch-view-label">Status</span>
+                <p>Pending</p>
+              </div>
+            </div>
+
+            <div className="admin-field" style={{ marginTop: '16px' }}>
+              <span>Description</span>
+              <p style={{ margin: 0, color: '#4a5b53', fontSize: '14px', lineHeight: 1.6 }}>{viewRequest.description}</p>
+            </div>
+
+            <div className="admin-button-row admin-view-modal-footer">
+              <button className="admin-btn-secondary" type="button" onClick={() => { setViewRequest(null); setDeclineTarget(viewRequest) }}>Decline</button>
+              <button className="admin-btn" type="button" onClick={() => { setViewRequest(null); approveRequest(viewRequest) }}>Approve &amp; Build</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {declineTarget && (
+        <div className="admin-modal-backdrop" onClick={() => setDeclineTarget(null)}>
+          <div className="admin-confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-confirm-icon" style={{ color: '#b45309' }}><TrashIcon size={32} /></div>
+            <h3 className="admin-confirm-title">Decline Request?</h3>
+            <p className="admin-confirm-msg">
+              <strong>{declineTarget.ownerName}</strong>&apos;s request for <strong>{declineTarget.name}</strong> will be removed from the pending list.
+            </p>
+            <div className="admin-confirm-actions">
+              <button className="admin-confirm-cancel" onClick={() => setDeclineTarget(null)}>Cancel</button>
+              <button className="admin-confirm-ok" onClick={confirmDecline}>Yes, Decline</button>
+            </div>
           </div>
         </div>
       )}

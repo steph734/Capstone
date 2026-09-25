@@ -64,6 +64,30 @@ export function TrashIcon(props) {
   )
 }
 
+export function CloseIcon(props) {
+  return (
+    <svg width={props?.size || 16} height={props?.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
+    </IconBase>
+  )
+}
+
+export function FileIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5z" />
+    </IconBase>
+  )
+}
+
 export function PencilIcon(props) {
   return (
     <svg width={props?.size || 15} height={props?.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

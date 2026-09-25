@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames, initialBadges, defaultPointRules } from './gamifiedLibraryData'
-import { GameControllerIcon, InboxIcon, MedalIcon, StarIcon, PlusIcon } from './gamifiedIcons'
+import { GameControllerIcon, InboxIcon, MedalIcon, StarIcon, PlusIcon, CloseIcon, CheckIcon, FileIcon } from './gamifiedIcons'
 import './GamifiedLibraryDashboard.css'
 
 const initialRequests = [
   {
     id: 1,
+    refId: 'R-0012',
     initial: 'A',
     color: '#3b82f6',
     owner: '[Owner name]',
@@ -19,9 +20,21 @@ const initialRequests = [
     description: 'Sort objects by color to build visual discrimination in younger patients.',
     type: 'Cognitive',
     level: 'Easy',
+    forPatients: 'Children with Down syndrome',
+    ageRange: '4-7 yrs',
+    suggestedGameType: 'Sort & Place',
+    neededBy: 'Within 1 month',
+    ownerDescription: 'Sort objects by color to build visual discrimination in younger patients. Our therapists currently use printed color cards; a digital version would let patients practice at home between sessions.',
+    therapyGoals: ['Recognize and name 4 basic colors', 'Improve pincer grasp when dragging', 'Follow a one-step instruction'],
+    attachments: ['color-cards-reference.pdf', 'therapist-notes.docx'],
+    requestedBy: { role: 'Clinic owner', email: '[owner email]', phone: '[phone]' },
+    conversation: [
+      { author: '[Owner name]', date: 'Sep 22', text: 'Request submitted. Happy to share more examples from our sessions if needed.' },
+    ],
   },
   {
     id: 2,
+    refId: 'R-0013',
     initial: 'B',
     color: '#f59e0b',
     owner: '[Owner name]',
@@ -32,9 +45,21 @@ const initialRequests = [
     description: 'Blow into the mic to inflate a balloon for breath-control practice.',
     type: 'Speech',
     level: 'Medium',
+    forPatients: 'Children with speech-language delays',
+    ageRange: '5-9 yrs',
+    suggestedGameType: 'Breath & Blow',
+    neededBy: 'Within 2 months',
+    ownerDescription: 'Blow into the mic to inflate a balloon for breath-control practice. We currently use physical pinwheels; a digital game would help us track progress across sessions.',
+    therapyGoals: ['Sustain breath for 3+ seconds', 'Control exhale strength', 'Track progress session over session'],
+    attachments: ['breath-exercise-notes.docx'],
+    requestedBy: { role: 'Clinic owner', email: '[owner email]', phone: '[phone]' },
+    conversation: [
+      { author: '[Owner name]', date: 'Sep 21', text: 'Request submitted. Let me know if you need audio samples.' },
+    ],
   },
   {
     id: 3,
+    refId: 'R-0014',
     initial: 'C',
     color: '#8b5cf6',
     owner: '[Owner name]',
@@ -45,6 +70,17 @@ const initialRequests = [
     description: 'Drag small items into slots to train fine-motor precision.',
     type: 'Occupational',
     level: 'Medium',
+    forPatients: 'Children working on fine-motor precision',
+    ageRange: '3-6 yrs',
+    suggestedGameType: 'Drag & Drop',
+    neededBy: 'Within 6 weeks',
+    ownerDescription: 'Drag small items into slots to train fine-motor precision. Our OTs currently use physical pegboards; a digital version would let patients warm up before sessions.',
+    therapyGoals: ['Improve pincer grasp accuracy', 'Build hand-eye coordination', 'Complete the task within a time goal'],
+    attachments: ['pegboard-reference.pdf'],
+    requestedBy: { role: 'Clinic owner', email: '[owner email]', phone: '[phone]' },
+    conversation: [
+      { author: '[Owner name]', date: 'Sep 19', text: 'Request submitted. Happy to hop on a call if useful.' },
+    ],
   },
 ]
 
@@ -61,6 +97,8 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
   const navigate = useNavigate()
   const [requests, setRequests] = useState(initialRequests)
   const [activeTab, setActiveTab] = useState('Pending')
+  const [selectedRequestId, setSelectedRequestId] = useState(null)
+  const [questionDraft, setQuestionDraft] = useState('')
 
   const stats = useMemo(() => {
     const live = initialGames.filter((game) => game.status === 'Published').length
@@ -99,8 +137,29 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
     return counted.map((t) => ({ ...t, percent: Math.round((t.count / max) * 100) }))
   }, [])
 
+  const selectedRequest = useMemo(
+    () => requests.find((request) => request.id === selectedRequestId) || null,
+    [requests, selectedRequestId],
+  )
+
   const updateStatus = (id, status) => {
     setRequests((current) => current.map((request) => (request.id === id ? { ...request, status } : request)))
+  }
+
+  const closeRequestModal = () => {
+    setSelectedRequestId(null)
+    setQuestionDraft('')
+  }
+
+  const sendQuestion = () => {
+    const text = questionDraft.trim()
+    if (!text || !selectedRequest) return
+    setRequests((current) => current.map((request) => (
+      request.id === selectedRequest.id
+        ? { ...request, conversation: [...request.conversation, { author: 'You (Super Admin)', date: 'Just now', text }] }
+        : request
+    )))
+    setQuestionDraft('')
   }
 
   return (
@@ -191,7 +250,7 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
                 <span className="admin-pill yellow">{request.level}</span>
               </div>
 
-              <button type="button" className="gl-request-link" onClick={() => navigate('/admin/games-library/games')}>
+              <button type="button" className="gl-request-link" onClick={() => setSelectedRequestId(request.id)}>
                 View full request ›
               </button>
 
@@ -294,6 +353,135 @@ export default function GamifiedLibraryDashboardPage({ user, onLogout }) {
           </div>
         </button>
       </div>
+
+      {selectedRequest && (
+        <div className="admin-modal-backdrop" onClick={closeRequestModal}>
+          <div className="gl-req-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="gl-req-modal-topbar">
+              <div className="gl-req-modal-eyebrow">
+                <span className="gl-avatar-sm" style={{ background: selectedRequest.color }}>{selectedRequest.initial}</span>
+                <span className="gl-req-eyebrow-text">REQUEST #{selectedRequest.refId}</span>
+                <span className={`gl-status-pill ${selectedRequest.status}`}>{selectedRequest.status}</span>
+              </div>
+              <button className="gl-req-modal-close" onClick={closeRequestModal} aria-label="Close">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <h2 className="gl-req-modal-title">{selectedRequest.title}</h2>
+            <div className="admin-button-row gl-req-modal-tags">
+              <span className="admin-pill gray">{selectedRequest.type}</span>
+              <span className="admin-pill yellow">{selectedRequest.level}</span>
+              <span className="admin-pill gray">Submitted {selectedRequest.date}</span>
+            </div>
+
+            <div className="gl-req-info-grid">
+              <div className="gl-req-info-tile">
+                <span>For patients</span>
+                <p>{selectedRequest.forPatients}</p>
+              </div>
+              <div className="gl-req-info-tile">
+                <span>Age range</span>
+                <p>{selectedRequest.ageRange}</p>
+              </div>
+              <div className="gl-req-info-tile">
+                <span>Suggested game type</span>
+                <p>{selectedRequest.suggestedGameType}</p>
+              </div>
+              <div className="gl-req-info-tile">
+                <span>Needed by</span>
+                <p>{selectedRequest.neededBy}</p>
+              </div>
+            </div>
+
+            <div className="gl-req-columns">
+              <div>
+                <div className="gl-req-section">
+                  <h4>Owner's description</h4>
+                  <p>{selectedRequest.ownerDescription}</p>
+                </div>
+
+                <div className="gl-req-section">
+                  <h4>Therapy goals</h4>
+                  <ul className="gl-req-goals">
+                    {selectedRequest.therapyGoals.map((goal) => (
+                      <li key={goal}>
+                        <CheckIcon size={16} />
+                        <span>{goal}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="gl-req-section">
+                  <h4>Attachments</h4>
+                  <div className="gl-req-attachments">
+                    {selectedRequest.attachments.map((file) => (
+                      <span key={file} className="gl-req-attachment-chip">
+                        <FileIcon size={14} />
+                        {file}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="gl-req-section">
+                  <h4>Requested by</h4>
+                  <p className="gl-req-owner-name">{selectedRequest.owner}</p>
+                  <p className="gl-req-owner-meta">{selectedRequest.requestedBy.role} · {selectedRequest.branch}</p>
+                  <p className="gl-req-owner-meta">{selectedRequest.requestedBy.email} · {selectedRequest.requestedBy.phone}</p>
+                </div>
+
+                <div className="gl-req-section">
+                  <h4>Conversation</h4>
+                  <div className="gl-req-conversation">
+                    {selectedRequest.conversation.map((message, index) => (
+                      <div key={index} className="gl-req-message">
+                        <p className="gl-req-message-meta"><strong>{message.author}</strong> · {message.date}</p>
+                        <p>{message.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="gl-req-section gl-req-ask">
+                  <h4>Ask the owner a question</h4>
+                  <textarea
+                    value={questionDraft}
+                    onChange={(event) => setQuestionDraft(event.target.value)}
+                    placeholder="e.g. Which colors do your patients already know?"
+                  />
+                  <button className="admin-btn" type="button" onClick={sendQuestion}>Send</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="gl-req-footer">
+              <button className="admin-btn-secondary" type="button" onClick={closeRequestModal}>Close</button>
+              {selectedRequest.status === 'Pending' && (
+                <div className="gl-req-footer-actions">
+                  <button
+                    className="admin-btn-danger"
+                    type="button"
+                    onClick={() => { updateStatus(selectedRequest.id, 'Declined'); closeRequestModal() }}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    className="admin-btn"
+                    type="button"
+                    onClick={() => { updateStatus(selectedRequest.id, 'Approved'); closeRequestModal() }}
+                  >
+                    Approve & Build
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </AdminPageShell>
   )
 }

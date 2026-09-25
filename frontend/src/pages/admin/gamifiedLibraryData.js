@@ -1,7 +1,43 @@
 export const initialGames = [
-  { id: 1, name: 'Memory Match', type: 'Cognitive', level: 'Easy', status: 'Published', description: 'Card matching for memory recall.' },
-  { id: 2, name: 'Sound Builder', type: 'Speech', level: 'Medium', status: 'Draft', description: 'Drag sounds to build words.' },
-  { id: 3, name: 'Balance Quest', type: 'Physical', level: 'Hard', status: 'Published', description: 'Movement game with timed balance tasks.' },
+  { id: 1, name: 'Memory Match', type: 'Cognitive', level: 'Easy', status: 'Published', description: 'Card matching for memory recall.', points: 10 },
+  { id: 2, name: 'Sound Builder', type: 'Speech', level: 'Medium', status: 'Draft', description: 'Drag sounds to build words.', points: 15 },
+  { id: 3, name: 'Balance Quest', type: 'Physical', level: 'Hard', status: 'Published', description: 'Movement game with timed balance tasks.', points: 20 },
+]
+
+// Games a branch owner has requested the Super Admin build — surfaced at the
+// top of the Games library so a request can be approved straight into the
+// creation workspace (prefilling the Add Game form) or declined.
+export const initialGameRequests = [
+  {
+    id: 101,
+    name: 'Color Sorting',
+    ownerName: 'Liza Fernandez',
+    branch: 'Branch A',
+    submitted: 'Sep 22',
+    type: 'Cognitive',
+    level: 'Easy',
+    description: 'Sort objects by color to build visual discrimination in younger patients.',
+  },
+  {
+    id: 102,
+    name: 'Breath Balloon',
+    ownerName: 'Marco Dela Cruz',
+    branch: 'Branch B',
+    submitted: 'Sep 21',
+    type: 'Speech',
+    level: 'Medium',
+    description: 'Blow into the mic to inflate a balloon for breath-control practice.',
+  },
+  {
+    id: 103,
+    name: 'Pinch & Place',
+    ownerName: 'Angela Reyes',
+    branch: 'Branch C',
+    submitted: 'Sep 19',
+    type: 'Occupational',
+    level: 'Medium',
+    description: 'Drag small items into slots to train fine-motor precision.',
+  },
 ]
 
 export const initialBadges = [

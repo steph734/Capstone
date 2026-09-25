@@ -280,6 +280,66 @@
   line-height: 1;
 }
 
+/* ── Booking Selection ── */
+.booking-select-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.appt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.appt-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c4a3e;
+}
+
+.appt-field .req { color: #ef4444; }
+
+.appt-field select {
+  width: 100%;
+  padding: 10px 34px 10px 12px;
+  border: 1.5px solid #d8eae0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #2c4a3e;
+  background-color: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #7a9a8e 50%), linear-gradient(135deg, #7a9a8e 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.appt-field select:focus {
+  border-color: #4a9e6b;
+  box-shadow: 0 0 0 3px rgba(74,158,107,.1);
+}
+
+.appt-field select:disabled { color: #9aaea5; }
+
+.appt-field-hint {
+  font-size: 11px;
+  color: #6b8a7c;
+  margin: 2px 0 0;
+}
+
+@media (max-width: 640px) {
+  .booking-select-row { grid-template-columns: 1fr; }
+}
+
 /* ── Schedule Bar ── */
 .schedule-bar {
   display: flex;

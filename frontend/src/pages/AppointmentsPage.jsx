@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import { buildAvailability, fetchBookedDates } from '../utils/appointmentBookings'
+import { AVAILABILITY_SLOTS } from '../components/AvailabilityModal'
+import { SESSION_MODES } from '../data/sessionModes'
+import { manilaDateKey } from '../utils/manilaTime'
 import './AppointmentsPage.css'
 
 /* ── Icons ── */
@@ -105,6 +108,91 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   )
   const [showConfirm, setShowConfirm]   = useState(false)
 
+  /* ── Therapist roster, straight from the employees collection ── */
+  const [therapists, setTherapists] = useState([])
+  const [therapistsLoading, setTherapistsLoading] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/appointments/therapists')
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (!cancelled) setTherapists(body.therapists || [])
+      })
+      .catch((e) => console.warn('Could not load therapists:', e.message))
+      .finally(() => { if (!cancelled) setTherapistsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  /* ── Therapist / session mode / time slot picked for the selected date ── */
+  const [selectedTherapist, setSelectedTherapist] = useState(null)
+  const [sessionMode, setSessionMode]             = useState('in-person')
+  const [pickedTime, setPickedTime]               = useState(null)
+
+  // A previously picked time slot may not apply once the selected date
+  // changes, so clear it (the therapist choice can carry over).
+  useEffect(() => { setPickedTime(null) }, [selectedDate, viewMonth, viewYear])
+
+  const bookingDateKey = selectedDate
+    ? `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
+    : null
+  const isFutureBookingDate = bookingDateKey ? bookingDateKey > manilaDateKey() : false
+
+  // Once a therapist is picked, ask which same-day slots they confirmed via
+  // the "You're clocked in" modal on their Attendance page. See
+  // BookAppointmentPage.jsx for the fuller explanation of `openSlots`.
+  const [openSlots, setOpenSlots] = useState(null)
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsNote, setSlotsNote] = useState('')
+
+  useEffect(() => {
+    if (!selectedTherapist || !bookingDateKey) {
+      setOpenSlots(null)
+      setSlotsNote('')
+      return
+    }
+    let cancelled = false
+    setSlotsLoading(true)
+    fetch(`/api/appointments/therapist-slots?employeeId=${encodeURIComponent(selectedTherapist)}&date=${bookingDateKey}`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (cancelled) return
+        if (Array.isArray(body.slots)) {
+          setOpenSlots(body.slots)
+          setSlotsNote(
+            body.slots.length
+              ? 'Slots this therapist hasn’t opened up for this day are marked Not Available.'
+              : "This therapist hasn't opened any slots for this day yet — all marked Not Available."
+          )
+        } else {
+          setOpenSlots(null)
+          setSlotsNote(
+            isFutureBookingDate
+              ? "This therapist hasn't confirmed their availability for this day yet — slots open up once they clock in that morning. All marked Not Available for now."
+              : ''
+          )
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.warn('Could not load therapist slots:', e.message)
+        setOpenSlots(null)
+        setSlotsNote('')
+      })
+      .finally(() => { if (!cancelled) setSlotsLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedTherapist, bookingDateKey, isFutureBookingDate])
+
+  const openSlotSet = useMemo(() => {
+    if (!openSlots) return null
+    return new Set(openSlots.filter((s) => s.status === 'available').map((s) => s.start))
+  }, [openSlots])
+  const isSlotAvailable = (slotDef) => {
+    if (openSlotSet) return openSlotSet.has(slotDef.start)
+    return !isFutureBookingDate
+  }
+
   /* ── Calendar navigation ── */
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
@@ -135,11 +223,20 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const selectedStatus = selectedDate ? dotStatus(selectedDate) : null
   const selectedIsPast = selectedDate ? isPast(selectedDate) : false
   const canSchedule = selectedStatus === 'available' && !selectedIsPast
+    && !!selectedTherapist && !!pickedTime
 
   const handleSchedule = () => {
     if (!canSchedule) return
+    const therapistObj = therapists.find(t => t.id === selectedTherapist)
     navigate('/appointments/book', {
-      state: { selectedDate, month: viewMonth, year: viewYear }
+      state: {
+        selectedDate, month: viewMonth, year: viewYear,
+        therapist: therapistObj
+          ? { id: therapistObj.id, name: therapistObj.name, role: therapistObj.role }
+          : null,
+        sessionMode,
+        pickedTime,
+      }
     })
   }
 
@@ -236,6 +333,72 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                     </button>
                   )
                 })}
+              </div>
+            </div>
+
+            {/* ── Booking Selection ── */}
+            <div className="booking-select-row">
+              <div className="appt-field">
+                <label htmlFor="therapist-select">Therapist <span className="req">*</span></label>
+                <select
+                  id="therapist-select"
+                  value={selectedTherapist ?? ''}
+                  onChange={e => {
+                    setSelectedTherapist(e.target.value || null)
+                    setPickedTime(null)
+                  }}
+                  disabled={therapistsLoading}
+                >
+                  <option value="" disabled>
+                    {therapistsLoading ? 'Loading therapists…' : 'Select your therapist'}
+                  </option>
+                  {therapists.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} - {t.role}</option>
+                  ))}
+                </select>
+                {!therapistsLoading && therapists.length === 0 && (
+                  <p className="appt-field-hint">No staff are on record yet — add employees from the owner dashboard first.</p>
+                )}
+              </div>
+
+              <div className="appt-field">
+                <label htmlFor="session-mode-select">Session Mode</label>
+                <select
+                  id="session-mode-select"
+                  value={sessionMode}
+                  onChange={e => setSessionMode(e.target.value)}
+                >
+                  {SESSION_MODES.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="appt-field">
+                <label htmlFor="time-slot-select">Time Slot <span className="req">*</span></label>
+                <select
+                  id="time-slot-select"
+                  value={pickedTime ?? ''}
+                  onChange={e => setPickedTime(e.target.value)}
+                  disabled={!selectedTherapist || slotsLoading}
+                >
+                  <option value="" disabled>
+                    {!selectedTherapist
+                      ? 'Select a therapist first'
+                      : slotsLoading
+                        ? 'Loading time slots…'
+                        : 'Select a time slot'}
+                  </option>
+                  {AVAILABILITY_SLOTS.map(slot => {
+                    const available = isSlotAvailable(slot)
+                    return (
+                      <option key={slot.label} value={slot.label} disabled={!available}>
+                        {slot.label} {available ? '(Available)' : '(Not Available)'}
+                      </option>
+                    )
+                  })}
+                </select>
+                {slotsNote && <p className="appt-field-hint">{slotsNote}</p>}
               </div>
             </div>
 

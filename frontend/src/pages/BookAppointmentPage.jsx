@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
-import { AVAILABILITY_SLOTS } from '../components/AvailabilityModal'
+import { SESSION_MODES } from '../data/sessionModes'
 import { logActivity } from '../utils/auditLog'
-import { manilaDateKey } from '../utils/manilaTime'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -21,18 +20,11 @@ const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="
 const ChevronIcon = ({ open }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9"/></svg>
 const CheckLgIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
 
-/* ─── Session mode icons ─── */
-const InPersonIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-const CognitiveIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.14z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-1.14z"/></svg>
-const SpeechIcon    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-const BehaviorIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-
 /* ─── Constants ─── */
 const STEPS = [
   { n: 1, label: 'Personal\nDetails' },
-  { n: 2, label: 'Booking\nDetails' },
-  { n: 3, label: 'Summary &\nPayment' },
-  { n: 4, label: 'Confirmation' },
+  { n: 2, label: 'Summary &\nPayment' },
+  { n: 3, label: 'Confirmation' },
 ]
 
 const CHILD_CONDITIONS = [
@@ -40,14 +32,6 @@ const CHILD_CONDITIONS = [
   'Cerebral Palsy', 'Developmental Delay', 'Learning Disability', 'Other'
 ]
 const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other']
-
-const SESSION_MODES = [
-  { id: 'in-person',  label: 'In-Person',  Icon: InPersonIcon  },
-  { id: 'cognitive',  label: 'Cognitive',  Icon: CognitiveIcon },
-  { id: 'speech',     label: 'Speech',     Icon: SpeechIcon    },
-  { id: 'behavioral', label: 'Behavioral', Icon: BehaviorIcon  },
-]
-
 
 const PAYMENT_METHODS = [
   { id: 'cash',   label: 'Cash',                desc: 'Pay in cash at the clinic' },
@@ -68,36 +52,22 @@ export default function BookAppointmentPage({ user }) {
   const preselectedMonth = location.state?.month        ?? new Date().getMonth()
   const preselectedYear  = location.state?.year         ?? new Date().getFullYear()
   const bookingDateLabel = `${MONTHS[preselectedMonth]} ${preselectedDate}, ${preselectedYear}`
-  // 'YYYY-MM-DD', matching the day-key format therapist_availability rows use.
-  const bookingDateKey = `${preselectedYear}-${String(preselectedMonth + 1).padStart(2, '0')}-${String(preselectedDate).padStart(2, '0')}`
-  // A therapist can only confirm slots for *today*, right after clocking in —
-  // there's no such thing as a therapist_availability record for a date that
-  // hasn't happened yet. So unlike today (where "no record" just means they
-  // haven't answered yet this morning), a future date with no record means
-  // it's simply too early to know — treated as not-yet-available rather than
-  // wide open.
-  const isFutureBookingDate = bookingDateKey > manilaDateKey()
+
+  // Therapist, session mode and time slot are all picked on the Appointments
+  // calendar page before getting here — this page only displays them. If
+  // they're missing (e.g. the URL was opened directly), bounce back there.
+  const therapistObj  = location.state?.therapist || null
+  const sessionMode   = location.state?.sessionMode || 'in-person'
+  const pickedTime    = location.state?.pickedTime || null
+  const sessionModeObj = SESSION_MODES.find(m => m.id === sessionMode)
 
   const [step, setStep]             = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const birthdateRef = useRef(null)
 
-  /* ── Therapist roster, straight from the employees collection ── */
-  const [therapists, setTherapists] = useState([])
-  const [therapistsLoading, setTherapistsLoading] = useState(true)
-
   useEffect(() => {
-    let cancelled = false
-    fetch('/api/appointments/therapists')
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-        if (!cancelled) setTherapists(body.therapists || [])
-      })
-      .catch((e) => console.warn('Could not load therapists:', e.message))
-      .finally(() => { if (!cancelled) setTherapistsLoading(false) })
-    return () => { cancelled = true }
-  }, [])
+    if (!therapistObj || !pickedTime) navigate('/appointments', { replace: true })
+  }, []) // eslint-disable-line
 
   /* ── Step 1: Personal Details ── */
   const [form1, setForm1] = useState({
@@ -115,78 +85,7 @@ export default function BookAppointmentPage({ user }) {
   const capitalizeFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
   const setF1Cap = (k, v) => setF1(k, capitalizeFirst(v))
 
-  /* ── Step 2: Booking Details ── */
-  const [selectedTherapist, setSelectedTherapist] = useState(null)
-  const [sessionMode, setSessionMode]             = useState('in-person')
-  const [pickedTime, setPickedTime]               = useState(null)
-  const [errors2, setErrors2]                     = useState({})
-
-  // Once a therapist is picked, ask which same-day slots they confirmed via
-  // the "You're clocked in" modal on their Attendance page. The dropdown
-  // always lists all 8 clinic slots — `openSlots` only decides which of
-  // them get marked Not Available: `null` means the therapist hasn't
-  // answered for this date yet (true for every date besides today, since
-  // answering requires having clocked in that day), so every slot is left
-  // selectable; an array means they explicitly opened just those slots.
-  const [openSlots, setOpenSlots] = useState(null)
-  const [slotsLoading, setSlotsLoading] = useState(false)
-  const [slotsNote, setSlotsNote] = useState('')
-
-  useEffect(() => {
-    if (!selectedTherapist) {
-      setOpenSlots(null)
-      setSlotsNote('')
-      return
-    }
-    let cancelled = false
-    setSlotsLoading(true)
-    fetch(`/api/appointments/therapist-slots?employeeId=${encodeURIComponent(selectedTherapist)}&date=${bookingDateKey}`)
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-        if (cancelled) return
-        if (Array.isArray(body.slots)) {
-          setOpenSlots(body.slots)
-          setSlotsNote(
-            body.slots.length
-              ? 'Slots this therapist hasn’t opened up for this day are marked Not Available.'
-              : "This therapist hasn't opened any slots for this day yet — all marked Not Available."
-          )
-        } else {
-          setOpenSlots(null)
-          setSlotsNote(
-            isFutureBookingDate
-              ? "This therapist hasn't confirmed their availability for this day yet — slots open up once they clock in that morning. All marked Not Available for now."
-              : ''
-          )
-        }
-      })
-      .catch((e) => {
-        if (cancelled) return
-        console.warn('Could not load therapist slots:', e.message)
-        setOpenSlots(null)
-        setSlotsNote('')
-      })
-      .finally(() => { if (!cancelled) setSlotsLoading(false) })
-    return () => { cancelled = true }
-  }, [selectedTherapist, bookingDateKey, isFutureBookingDate])
-
-  // `openSlots` (when the therapist has answered) is an array of
-  // { start, end, status, appointment } — a slot is bookable only while it's
-  // still 'available' (not already 'booked' or explicitly 'blocked').
-  const openSlotSet = useMemo(() => {
-    if (!openSlots) return null
-    return new Set(openSlots.filter((s) => s.status === 'available').map((s) => s.start))
-  }, [openSlots])
-  // No record for this day -> today defaults every slot open (the therapist
-  // just hasn't answered yet this morning); a future date defaults every
-  // slot closed (there's nothing to answer yet).
-  const isSlotAvailable = (slotDef) => {
-    if (openSlotSet) return openSlotSet.has(slotDef.start)
-    return !isFutureBookingDate
-  }
-
-  /* ── Step 3: Summary & Payment ── */
+  /* ── Step 2: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
   const [errors3, setErrors3]     = useState({})
   const [cashOpen, setCashOpen]   = useState(true)
@@ -214,12 +113,6 @@ export default function BookAppointmentPage({ user }) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form1.email.trim())) e.email = 'Invalid email'
     return e
   }
-  const validate2 = () => {
-    const e = {}
-    if (!selectedTherapist) e.therapist = 'Please select a therapist'
-    if (!pickedTime)        e.time      = 'Please select a time slot'
-    return e
-  }
   const validate3 = () => {
     const e = {}
     if (!payMethod) e.method = 'Please select a payment method'
@@ -232,20 +125,19 @@ export default function BookAppointmentPage({ user }) {
 
   const handleNext = () => {
     if (step === 1) { const e = validate1(); if (Object.keys(e).length) { setErrors1(e); return } }
-    if (step === 2) { const e = validate2(); if (Object.keys(e).length) { setErrors2(e); return } }
-    if (step === 3) {
+    if (step === 2) {
       const e = validate3()
       if (Object.keys(e).length) { setErrors3(e); if (e.received) setCashOpen(true); return }
       // Pay Online → run the Stripe checkout first; advance only once it's paid.
       if (payMethod === 'stripe' && !onlinePayment) { setCheckoutOpen(true); return }
     }
-    setStep(s => Math.min(s + 1, 4))
+    setStep(s => Math.min(s + 1, 3))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleCheckoutDone = () => {
     setCheckoutOpen(false)
-    setStep(4)
+    setStep(3)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const handleBack = () => {
@@ -255,8 +147,6 @@ export default function BookAppointmentPage({ user }) {
   }
 
   /* Derived */
-  const therapistObj = therapists.find(t => t.id === selectedTherapist)
-  const sessionModeObj = SESSION_MODES.find(m => m.id === sessionMode)
   const fullName = `${form1.firstName} ${form1.lastName}`.trim() || '—'
 
   /* Confirmation email status: null | 'sending' | 'sent' | 'error' */
@@ -275,7 +165,7 @@ export default function BookAppointmentPage({ user }) {
      confirmation step is reached. Runs exactly once. */
   const loggedBookingRef = useRef(false)
   useEffect(() => {
-    if (step !== 4 || loggedBookingRef.current) return
+    if (step !== 3 || loggedBookingRef.current) return
     loggedBookingRef.current = true
 
     // Save the appointment (and a patient record) to MongoDB via the serverless
@@ -486,6 +376,34 @@ export default function BookAppointmentPage({ user }) {
           {step === 1 && (
             <>
               <h2 className="book-heading">Book your appointment!</h2>
+
+              {/* Date & Rate Info Card */}
+              <div className="booking-info-card">
+                <div className="booking-info-item">
+                  <span className="bii-label">Booking Date</span>
+                  <div className="bii-value">
+                    <CalIcon />
+                    <span>{bookingDateLabel}</span>
+                  </div>
+                </div>
+                <div className="booking-info-divider" />
+                <div className="booking-info-item">
+                  <span className="bii-label">Booking Rate</span>
+                  <div className="bii-value">
+                    <span className="peso-sign">₱</span>
+                    <span>300.00 / Session</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="reschedule-note" style={{ marginTop: '10px', marginBottom: '20px' }}>
+                <InfoIcon />
+                <p>
+                  Booking with <strong>{therapistObj?.name || '—'}</strong> ({therapistObj?.role || '—'}) ·{' '}
+                  {sessionModeObj?.label || '—'} session · {pickedTime || '—'}
+                </p>
+              </div>
+
               <h3 className="book-section-title">Personal Details</h3>
 
               <div className="book-row">
@@ -605,119 +523,8 @@ export default function BookAppointmentPage({ user }) {
             </>
           )}
 
-          {/* ══ STEP 2: Booking Details ══ */}
+          {/* ══ STEP 2: Booking Summary & Payment ══ */}
           {step === 2 && (
-            <>
-              <h2 className="book-heading">Book your appointment!</h2>
-              <h3 className="book-section-title">Booking Details</h3>
-
-              {/* Date & Rate Info Card */}
-              <div className="booking-info-card">
-                <div className="booking-info-item">
-                  <span className="bii-label">Booking Date</span>
-                  <div className="bii-value">
-                    <CalIcon />
-                    <span>{bookingDateLabel}</span>
-                  </div>
-                </div>
-                <div className="booking-info-divider" />
-                <div className="booking-info-item">
-                  <span className="bii-label">Booking Rate</span>
-                  <div className="bii-value">
-                    <span className="peso-sign">₱</span>
-                    <span>300.00 / Session</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Select Therapist ── */}
-              <h3 className="book-section-title" style={{ marginTop: '18px' }}>Select your therapist</h3>
-              {errors2.therapist && <div className="step-error">{errors2.therapist}</div>}
-              <div className="book-field booking-dropdown-field">
-                <label htmlFor="therapist-select">Therapist <span className="req">*</span></label>
-                <select
-                  id="therapist-select"
-                  value={selectedTherapist ?? ''}
-                  onChange={e => {
-                    const value = e.target.value || null
-                    setSelectedTherapist(value)
-                    setPickedTime(null)
-                    setErrors2(p => ({ ...p, therapist: '', time: '' }))
-                  }}
-                  className={errors2.therapist ? 'err' : ''}
-                  disabled={therapistsLoading}
-                >
-                  <option value="" disabled>
-                    {therapistsLoading ? 'Loading therapists…' : 'Select your therapist'}
-                  </option>
-                  {therapists.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} - {t.role}</option>
-                  ))}
-                </select>
-                {!therapistsLoading && therapists.length === 0 && (
-                  <p className="field-hint">No staff are on record yet — add employees from the owner dashboard first.</p>
-                )}
-              </div>
-
-              {/* ── Session Mode ── */}
-              <h3 className="book-section-title" style={{ marginTop: '18px' }}>Session Mode</h3>
-              <div className="book-field booking-dropdown-field">
-                <label htmlFor="session-mode-select">Choose session mode</label>
-                <select
-                  id="session-mode-select"
-                  value={sessionMode}
-                  onChange={e => setSessionMode(e.target.value)}
-                >
-                  {SESSION_MODES.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* ── Time Slots ── */}
-              <h3 className="book-section-title" style={{ marginTop: '18px' }}>Select Time Slot</h3>
-              {errors2.time && <div className="step-error">{errors2.time}</div>}
-              <div className="book-field booking-dropdown-field">
-                <label htmlFor="time-slot-select">Available time slots <span className="req">*</span></label>
-                <select
-                  id="time-slot-select"
-                  value={pickedTime ?? ''}
-                  onChange={e => {
-                    setPickedTime(e.target.value)
-                    setErrors2(p => ({ ...p, time: '' }))
-                  }}
-                  className={errors2.time ? 'err' : ''}
-                  disabled={!selectedTherapist || slotsLoading}
-                >
-                  <option value="" disabled>
-                    {!selectedTherapist
-                      ? 'Select a therapist first'
-                      : slotsLoading
-                        ? 'Loading time slots…'
-                        : 'Select a time slot'}
-                  </option>
-                  {AVAILABILITY_SLOTS.map(slot => {
-                    const available = isSlotAvailable(slot)
-                    return (
-                      <option key={slot.label} value={slot.label} disabled={!available}>
-                        {slot.label} {available ? '(Available)' : '(Not Available)'}
-                      </option>
-                    )
-                  })}
-                </select>
-                {slotsNote && <p className="field-hint">{slotsNote}</p>}
-              </div>
-
-              {/* Reschedule Note */}
-              <div className="reschedule-note">
-                <InfoIcon />
-                <p>You can reschedule or cancel your appointment up to 24 hours before the session.</p>
-              </div>
-            </>
-          )}
-
-          {/* ══ STEP 3: Booking Summary & Payment ══ */}
-          {step === 3 && (
             <>
               <h2 className="book-heading">Booking Summary</h2>
               <h3 className="book-section-title">Review your details</h3>
@@ -818,8 +625,8 @@ export default function BookAppointmentPage({ user }) {
             </>
           )}
 
-          {/* ══ STEP 4: Confirmation ══ */}
-          {step === 4 && (
+          {/* ══ STEP 3: Confirmation ══ */}
+          {step === 3 && (
             <>
               <div className="confirm-check-wrap">
                 <div className="confirm-check-circle"><CheckLgIcon /></div>
@@ -895,13 +702,13 @@ export default function BookAppointmentPage({ user }) {
         </div>
 
         {/* ── Action Buttons ── */}
-        {step < 4 && (
+        {step < 3 && (
           <div className="book-actions">
             <button className="book-cancel-btn" onClick={handleBack}>
               {step === 1 ? 'CANCEL' : 'BACK'}
             </button>
             <button className="book-continue-btn" onClick={handleNext}>
-              {step === 2 ? 'PROCEED TO SUMMARY' : step === 3 ? 'CONFIRM BOOKING' : 'CONTINUE'}
+              {step === 2 ? 'CONFIRM BOOKING' : 'CONTINUE'}
               <ArrowRight />
             </button>
           </div>

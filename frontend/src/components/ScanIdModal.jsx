@@ -5,9 +5,23 @@ import { BarcodeScanner } from 'react-barcode-scanner'
 // alternative ZXing polyfill because it's ~1/4 the wasm payload and covers
 // the code_128 + qr_code formats a staff badge actually uses.
 import 'react-barcode-scanner/polyfill'
-import { apiPost } from '../utils/api'
 import { formatManilaTime } from '../utils/manilaTime'
 import './ScanIdModal.css'
+
+// /api/attendance/scan lives in this app's own Vercel serverless functions
+// (frontend/api/_lib/routes/attendance-scan.js), not the separate Express
+// dev backend — so this calls same-origin rather than going through
+// utils/api.js's apiPost (which targets VITE_API_URL / localhost:5000).
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
+  return data
+}
 
 // Restricting formats (vs. every format the detector supports) keeps the
 // scan loop cheap and avoids false positives from unrelated codes in frame.

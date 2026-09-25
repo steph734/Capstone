@@ -39,6 +39,11 @@ import sendResetOtp from './_lib/routes/send-reset-otp.js'
 import verifyResetOtp from './_lib/routes/verify-reset-otp.js'
 import auditLogs from './_lib/routes/audit-logs.js'
 import setPassword from './_lib/routes/set-password.js'
+import attendanceScan from './_lib/routes/attendance-scan.js'
+import attendanceMe from './_lib/routes/attendance-me.js'
+import attendanceAvailability from './_lib/routes/attendance-availability.js'
+import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
+import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 
 const app = express()
 
@@ -72,6 +77,11 @@ app.all('/api/auth/send-reset-otp', sendResetOtp)
 app.all('/api/auth/verify-reset-otp', verifyResetOtp)
 app.all('/api/audit-logs', auditLogs)
 app.all('/api/set-password/:token', setPassword)
+app.all('/api/attendance/scan', attendanceScan)
+app.all('/api/attendance/me', attendanceMe)
+app.all('/api/attendance/availability', attendanceAvailability)
+app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
+app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

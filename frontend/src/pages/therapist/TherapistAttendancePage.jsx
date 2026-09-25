@@ -1,12 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
-import { apiGet, apiPost } from '../../utils/api'
 import { manilaDateKey, formatManilaTime, formatManilaDate, manilaMinutesOfDay } from '../../utils/manilaTime'
 import AvailabilityModal, { AVAILABILITY_SLOTS } from '../../components/AvailabilityModal'
 import LeaveRequestModal from '../../components/LeaveRequestModal'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
+
+// The `/api/attendance/*` endpoints live in this app's own Vercel serverless
+// functions (frontend/api/_lib/routes/attendance-*.js), not the separate
+// Express dev backend — so these call same-origin, unlike utils/api.js's
+// apiGet/apiPost which target VITE_API_URL (localhost:5000 by default).
+async function apiGet(path) {
+  const res = await fetch(path)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `GET ${path} failed: ${res.status}`)
+  return data
+}
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
+  return data
+}
 
 // No shift schedule exists in the data model yet, so "late" has no official
 // definition — 9:00 AM is a simple, visible stand-in cutoff used only for the

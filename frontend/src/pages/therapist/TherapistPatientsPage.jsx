@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useSharedMessages } from '../../context/MessagesContext'
@@ -337,6 +338,13 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [messagePt, setMessagePt] = useState(null)
   const [threads, setThreads]     = useState({})
   const [openMenuId, setOpenMenuId] = useState(null)
+  // Fixed-position coordinates for the open row menu, computed from the
+  // kebab button that opened it. The menu is portaled to <body> (see
+  // RowMenu below) instead of living inside the table's own scroll
+  // container, so it can never get clipped into its own tiny scrollbar by
+  // that container's overflow-x: auto (which — per the CSS overflow spec —
+  // forces overflow-y to auto too whenever only one axis is set).
+  const [menuPos, setMenuPos] = useState(null)
 
   const { thread, sendAsTherapist } = useSharedMessages()
 
@@ -374,12 +382,23 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     return () => { cancelled = true }
   }, [user?.email])
 
-  // Close the row action menu on an outside click.
+  // Close the row action menu on an outside click, or on any scroll/resize
+  // — its position is computed once when it opens, so it would otherwise
+  // drift out of place under the button that opened it.
   useEffect(() => {
     if (openMenuId == null) return
-    const onDocClick = (e) => { if (!e.target.closest('.tp-menu-cell')) setOpenMenuId(null) }
+    const close = () => { setOpenMenuId(null); setMenuPos(null) }
+    const onDocClick = (e) => {
+      if (!e.target.closest('.tp-menu-cell') && !e.target.closest('.tp-row-menu-portal')) close()
+    }
     document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
   }, [openMenuId])
 
   // Build the message list for a given patient.
@@ -395,8 +414,8 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     return threads[patientId] || []
   }
 
-  const archivePatient = (id) => {
-    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: true } : p)))
+  const toggleArchived = (id) => {
+    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: !p.archived } : p)))
     setOpenMenuId(null)
   }
 
@@ -407,15 +426,19 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     setOpenMenuId(null)
   }
 
-  // Archived patients drop out of the roster entirely — counts, filters and
-  // the table below all work off this list, never the raw `patients` state.
+  // The KPI cards and the All/Active/Inactive tabs only ever look at patients
+  // who aren't archived — an archived patient stays in `patients` (so it can
+  // still be found and unarchived) but is otherwise treated as gone until you
+  // switch to the dedicated Archived tab.
   const roster = patients.filter(p => !p.archived)
 
-  const filtered = roster.filter(p => {
+  const filtered = patients.filter(p => {
     const q = search.toLowerCase()
     const matchSearch = p.name.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q)
-    const matchFilter = filter === 'All' || p.status === filter
-    return matchSearch && matchFilter
+    if (!matchSearch) return false
+    if (filter === 'Archived') return p.archived
+    if (p.archived) return false
+    return filter === 'All' || p.status === filter
   })
 
   const sorted = [...filtered].sort((a, b) => {
@@ -429,6 +452,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     total:          roster.length,
     active:         roster.filter(p => p.status === 'Active').length,
     inactive:       roster.filter(p => p.status === 'Inactive').length,
+    archived:       patients.filter(p => p.archived).length,
     upcomingBooked: roster.filter(p => p.nextSessionDate).length,
     noUpcoming:     roster.filter(p => !p.nextSessionDate).length,
   }
@@ -535,7 +559,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           />
         </div>
         <div className="tp-filter-tabs">
-          {[['All', counts.total], ['Active', counts.active], ['Inactive', counts.inactive]].map(([f, n]) => (
+          {[['All', counts.total], ['Active', counts.active], ['Inactive', counts.inactive], ['Archived', counts.archived]].map(([f, n]) => (
             <button key={f} className={`tp-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
               {f} <span className="tp-filter-count">{n}</span>
             </button>
@@ -601,8 +625,8 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                         <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
                           <EyeIcon /> View
                         </button>
-                        <button className="tp-action-btn tp-action-archive" onClick={() => archivePatient(p.id)}>
-                          <ArchiveIcon /> Archive
+                        <button className="tp-action-btn tp-action-archive" onClick={() => toggleArchived(p.id)}>
+                          <ArchiveIcon /> {p.archived ? 'Unarchive' : 'Archive'}
                         </button>
                         <button className="tp-action-btn tp-action-delete" onClick={() => deletePatient(p.id)}>
                           <TrashIcon /> Delete
@@ -612,32 +636,19 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                     <td className="tp-menu-cell">
                       <button
                         className="tp-kebab-btn"
-                        onClick={() => setOpenMenuId(id => (id === p.id ? null : p.id))}
+                        onClick={(e) => {
+                          if (openMenuId === p.id) { setOpenMenuId(null); setMenuPos(null); return }
+                          const r = e.currentTarget.getBoundingClientRect()
+                          const menuW = 190
+                          const left = Math.min(Math.max(r.right - menuW, 8), window.innerWidth - menuW - 8)
+                          setMenuPos({ top: r.bottom + 4, left })
+                          setOpenMenuId(p.id)
+                        }}
                         aria-label="Patient actions"
                         aria-expanded={openMenuId === p.id}
                       >
                         <KebabIcon />
                       </button>
-                      {openMenuId === p.id && (
-                        <div className="tp-row-menu">
-                          <button onClick={() => { setMessagePt(p); setOpenMenuId(null) }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                            Send message
-                          </button>
-                          <a
-                            href={p.email ? `mailto:${p.email}` : undefined}
-                            aria-disabled={!p.email}
-                            onClick={(e) => { if (!p.email) e.preventDefault(); setOpenMenuId(null) }}
-                          >
-                            <EmailIcon />
-                            Send email
-                          </a>
-                          <button onClick={() => { setProfilePt(p); setOpenMenuId(null) }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
-                            View notes
-                          </button>
-                        </div>
-                      )}
                     </td>
                   </tr>
                 )
@@ -648,6 +659,32 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       </div>
       </>
       )}
+
+      {openMenuId != null && menuPos && (() => {
+        const p = sorted.find(pt => pt.id === openMenuId)
+        if (!p) return null
+        return createPortal(
+          <div className="tp-row-menu tp-row-menu-portal" style={{ top: menuPos.top, left: menuPos.left }}>
+            <button onClick={() => { setMessagePt(p); setOpenMenuId(null); setMenuPos(null) }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+              Send message
+            </button>
+            <a
+              href={p.email ? `mailto:${p.email}` : undefined}
+              aria-disabled={!p.email}
+              onClick={(e) => { if (!p.email) e.preventDefault(); setOpenMenuId(null); setMenuPos(null) }}
+            >
+              <EmailIcon />
+              Send email
+            </a>
+            <button onClick={() => { setProfilePt(p); setOpenMenuId(null); setMenuPos(null) }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
+              View notes
+            </button>
+          </div>,
+          document.body
+        )
+      })()}
 
       {showAdd && (
         <AddPatientModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />

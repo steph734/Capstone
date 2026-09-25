@@ -689,19 +689,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       ) : (
       <div className="tapp2-wrap">
 
-        {/* Incoming appointment requests — every real booking still Pending */}
-        {incomingRequests.length > 0 && (
-          <section className="tapp2-requests">
-            <div className="tapp2-requests-banner">
-              <ClockIcon />
-              <span>{incomingRequests.length} request{incomingRequests.length !== 1 ? 's' : ''} need{incomingRequests.length === 1 ? 's' : ''} your response</span>
-            </div>
-            {incomingRequests.map(req => (
-              <RequestCard key={req.id} req={req} onAccept={handleAcceptRequest} onDecline={handleDeclineRequest} />
-            ))}
-          </section>
-        )}
-
         {/* KPI strip */}
         <div className="tapp-stats">
           <div className="tapp-stat">
@@ -740,6 +727,19 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
         />
+
+        {/* Incoming appointment requests — every real booking still Pending */}
+        {incomingRequests.length > 0 && (
+          <section className="tapp2-requests">
+            <div className="tapp2-requests-banner">
+              <ClockIcon />
+              <span>{incomingRequests.length} request{incomingRequests.length !== 1 ? 's' : ''} need{incomingRequests.length === 1 ? 's' : ''} your response</span>
+            </div>
+            {incomingRequests.map(req => (
+              <RequestCard key={req.id} req={req} onAccept={handleAcceptRequest} onDecline={handleDeclineRequest} />
+            ))}
+          </section>
+        )}
 
         {/* Header */}
         <div className="tapp2-header">

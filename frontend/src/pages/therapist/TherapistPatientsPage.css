@@ -9,6 +9,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   background: #fff;
   border: 1px solid #e8f5f0;
   border-radius: 16px;
@@ -337,11 +338,13 @@
 
 .tp-kebab-btn:hover { background: #f0f7f4; color: #2c4a3e; }
 
+/* Portaled to <body> and positioned in JS (see TherapistPatientsPage.jsx) —
+   `position: fixed` with viewport coordinates, rather than living inside the
+   table's own scroll container, so it can't get clipped into its own tiny
+   scrollbar by that container's overflow. */
 .tp-row-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 250;
   min-width: 190px;
   background: #fff;
   border: 1px solid #e8f5f0;
@@ -885,8 +888,18 @@
     gap: 10px;
   }
 
-  .tp-kpi-card { padding: 12px 14px; }
-  .tp-kpi-num  { font-size: 19px; }
+  .tp-kpi-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .tp-kpi-icon { width: 36px; height: 36px; }
+  .tp-kpi-num  { font-size: 18px; }
+  /* The KPI labels are the actual cause of horizontal overflow at narrow
+     widths: `nowrap` (kept for the roomy desktop layout) forces each grid
+     item to stay at least as wide as its longest label — "No upcoming
+     session" — which is wider than a phone-width column, so the whole grid
+     (and page) scrolls sideways. Letting it wrap fixes that. */
+  .tp-kpi-lbl { white-space: normal; line-height: 1.25; }
 
   .tp-toolbar {
     flex-direction: column;
@@ -907,9 +920,15 @@
     justify-content: center;
   }
 
+  .tp-action-btn { padding: 7px 8px; font-size: 11.5px; }
+
   .tp-modal-form {
     grid-template-columns: 1fr;
   }
 
   .tp-form-full { grid-column: 1; }
+}
+
+@media (max-width: 400px) {
+  .tp-kpi-grid { grid-template-columns: 1fr; }
 }

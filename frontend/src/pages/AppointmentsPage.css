@@ -263,8 +263,10 @@
 .cal-past:not(.cal-selected):not(.cal-today) { opacity: 0.3; cursor: not-allowed; }
 .cal-past:not(.cal-selected):not(.cal-today) .cal-day-num { text-decoration: line-through; }
 
-/* Booked by someone else — visible but not selectable for a new booking. */
-.cal-booked:not(.cal-selected):not(.cal-today) { opacity: 0.55; cursor: not-allowed; }
+/* Booked = this date already has at least one appointment somewhere, not
+   that the whole day is full — it stays fully selectable (other therapists
+   or other time slots may still be open), just visually flagged. */
+.cal-booked:not(.cal-selected):not(.cal-today) { opacity: 0.85; }
 
 .schedule-hint {
   margin: 8px 2px 0;

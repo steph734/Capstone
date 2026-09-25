@@ -222,7 +222,13 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
 
   const selectedStatus = selectedDate ? dotStatus(selectedDate) : null
   const selectedIsPast = selectedDate ? isPast(selectedDate) : false
-  const canSchedule = selectedStatus === 'available' && !selectedIsPast
+  // "Booked" only means this date already has at least one appointment
+  // somewhere — it doesn't mean the whole day is full. Other therapists (or
+  // other slots with the same therapist) can still be open, so it must not
+  // block scheduling here; the therapist/time-slot pickers below already
+  // grey out the specific slots that are actually taken. Only a genuinely
+  // closed day (or a past one) should stop scheduling outright.
+  const canSchedule = selectedStatus !== 'closed' && !selectedIsPast
     && !!selectedTherapist && !!pickedTime
 
   const handleSchedule = () => {
@@ -324,7 +330,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
                         past
                           ? 'Past date'
                           : status === 'booked'
-                            ? 'Already booked'
+                            ? 'Some appointments are already booked this day'
                             : undefined
                       }
                     >
@@ -424,7 +430,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
               <p className="schedule-hint">You can&apos;t book a date in the past. Please choose today or a later date.</p>
             )}
             {!selectedIsPast && selectedStatus === 'booked' && (
-              <p className="schedule-hint">This date is already booked. Please choose an available date.</p>
+              <p className="schedule-hint">Some appointments are already booked on this date — pick an available therapist and time slot below.</p>
             )}
             {!selectedIsPast && selectedStatus === 'closed' && (
               <p className="schedule-hint">The clinic is closed on this date.</p>

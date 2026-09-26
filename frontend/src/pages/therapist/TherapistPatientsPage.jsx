@@ -325,6 +325,29 @@ function AddPatientModal({ onClose, onAdd }) {
   )
 }
 
+/* ── Confirm Modal (Archive / Delete) ─────────────────────── */
+function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCancel }) {
+  return (
+    <div className="tp-modal-backdrop" onClick={onCancel}>
+      <div className="tp-modal tp-confirm-modal" onClick={e => e.stopPropagation()}>
+        <div className="tp-modal-header">
+          <h3>{title}</h3>
+          <button className="tp-modal-close" onClick={onCancel} aria-label="Close">✕</button>
+        </div>
+        <div className="tp-modal-body">
+          <p className="tp-confirm-message">{message}</p>
+        </div>
+        <div className="tp-modal-footer">
+          <button className="tp-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className={`tp-btn-add ${danger ? 'tp-btn-danger' : ''}`} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Main Page ──────────────────────────────────────────── */
 export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [search, setSearch]       = useState('')
@@ -336,6 +359,8 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [showAdd, setShowAdd]     = useState(false)
   const [profilePt, setProfilePt] = useState(null)
   const [messagePt, setMessagePt] = useState(null)
+  // { type: 'archive' | 'delete', patient } while a confirm modal is open.
+  const [confirmModal, setConfirmModal] = useState(null)
   const [threads, setThreads]     = useState({})
   const [openMenuId, setOpenMenuId] = useState(null)
   // Fixed-position coordinates for the open row menu, computed from the
@@ -414,16 +439,15 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     return threads[patientId] || []
   }
 
+  // These just apply the change — the confirm/unarchive decision lives in
+  // the button handlers below (via `confirmModal`), so callers here are
+  // always acting on an already-confirmed action.
   const toggleArchived = (id) => {
     setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: !p.archived } : p)))
-    setOpenMenuId(null)
   }
 
   const deletePatient = (id) => {
-    const p = patients.find(pt => pt.id === id)
-    if (p && !window.confirm(`Delete ${p.name} from your patient list? This can't be undone.`)) return
     setPatients(prev => prev.filter(pt => pt.id !== id))
-    setOpenMenuId(null)
   }
 
   // The KPI cards and the All/Active/Inactive tabs only ever look at patients
@@ -603,7 +627,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                 const pal = paletteFor(p.id)
                 return (
                   <tr key={p.id}>
-                    <td>
+                    <td className="tp-td-patient">
                       <div className="tp-table-patient">
                         <span className="tp-avatar-initials" style={{ background: pal.bg, color: pal.fg }}>
                           {initialsFor(p.name)}
@@ -617,18 +641,24 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
                         </div>
                       </div>
                     </td>
-                    <td>{p.lastSession}</td>
-                    <td>{p.nextSessionDate ? p.nextSession : 'None'}</td>
-                    <td>{p.sessions}</td>
-                    <td>
+                    <td data-label="Last">{p.lastSession}</td>
+                    <td data-label="Next">{p.nextSessionDate ? p.nextSession : 'None'}</td>
+                    <td data-label="Sessions">{p.sessions}</td>
+                    <td className="tp-td-actions">
                       <div className="tp-table-actions">
                         <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
                           <EyeIcon /> View
                         </button>
-                        <button className="tp-action-btn tp-action-archive" onClick={() => toggleArchived(p.id)}>
+                        <button
+                          className="tp-action-btn tp-action-archive"
+                          onClick={() => setConfirmModal({ type: p.archived ? 'unarchive' : 'archive', patient: p })}
+                        >
                           <ArchiveIcon /> {p.archived ? 'Unarchive' : 'Archive'}
                         </button>
-                        <button className="tp-action-btn tp-action-delete" onClick={() => deletePatient(p.id)}>
+                        <button
+                          className="tp-action-btn tp-action-delete"
+                          onClick={() => setConfirmModal({ type: 'delete', patient: p })}
+                        >
                           <TrashIcon /> Delete
                         </button>
                       </div>
@@ -702,6 +732,34 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           messages={getMessages(messagePt.id)}
           onSend={handleSend}
           onClose={() => setMessagePt(null)}
+        />
+      )}
+      {confirmModal && (
+        <ConfirmModal
+          title={
+            confirmModal.type === 'delete' ? 'Delete patient?'
+              : confirmModal.type === 'unarchive' ? 'Unarchive patient?'
+              : 'Archive patient?'
+          }
+          message={
+            confirmModal.type === 'delete'
+              ? `This permanently removes ${confirmModal.patient.name} from your patient list. This can't be undone.`
+              : confirmModal.type === 'unarchive'
+                ? `${confirmModal.patient.name} will move back into your active roster.`
+                : `${confirmModal.patient.name} will be hidden from your active roster and moved to the Archived tab. You can unarchive them later.`
+          }
+          confirmLabel={
+            confirmModal.type === 'delete' ? 'Delete'
+              : confirmModal.type === 'unarchive' ? 'Unarchive'
+              : 'Archive'
+          }
+          danger={confirmModal.type === 'delete'}
+          onCancel={() => setConfirmModal(null)}
+          onConfirm={() => {
+            if (confirmModal.type === 'delete') deletePatient(confirmModal.patient.id)
+            else toggleArchived(confirmModal.patient.id)
+            setConfirmModal(null)
+          }}
         />
       )}
     </TherapistPageShell>

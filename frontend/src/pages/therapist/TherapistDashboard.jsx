@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
+import { getAuditLogs } from '../../utils/auditLog'
 import './TherapistDashboard.css'
 
 // ── Icons ──────────────────────────────────────────────
@@ -29,12 +30,11 @@ function NoteIcon() {
     </svg>
   )
 }
-function ExerciseIcon() {
+function ClockIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
-      <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
-      <path d="M6 1v3M10 1v3M14 1v3" />
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
     </svg>
   )
 }
@@ -53,160 +53,83 @@ function TrendDownIcon() {
   )
 }
 
-// ── Data ───────────────────────────────────────────────
-const KPI_DATA = [
-  {
-    label: 'Patients Assigned',
-    value: '24',
-    meta: '5 active today',
-    trend: '+2 this week',
-    trendUp: true,
-    color: 'teal',
-    Icon: PatientIcon,
-    path: '/therapist/patients',
-  },
-  {
-    label: 'Appointments Today',
-    value: '8',
-    meta: '6 confirmed · 2 pending',
-    trend: '+1 added',
-    trendUp: true,
-    color: 'blue',
-    Icon: CalendarIcon,
-    path: '/therapist/appointments',
-  },
-  {
-    label: 'Notes Completed',
-    value: '18',
-    meta: '4 remaining today',
-    trend: '+5 vs yesterday',
-    trendUp: true,
-    color: 'purple',
-    Icon: NoteIcon,
-    path: '/therapist/notes-progress',
-  },
-  {
-    label: 'Avg. Completion',
-    value: '85%',
-    meta: 'Exercises this week',
-    trend: '-3% vs last week',
-    trendUp: false,
-    color: 'amber',
-    Icon: ExerciseIcon,
-    path: '/therapist/gamified-activities',
-  },
-]
-
-// Real "today" anchor
-const REAL_TODAY = { year: 2026, month: 6, day: 4 } // July 4 2026
-
-// Sessions by "year-month" key → { day: count }
-const ALL_SESSIONS = {
-  '2026-4': { 4:3, 7:5, 8:6, 12:4, 13:7, 19:5, 20:8, 26:4, 27:6 },
-  '2026-5': { 1:4, 2:6, 8:5, 9:7, 15:8, 16:5, 22:6, 23:4, 29:7, 30:5 },
-  '2026-6': {
-    1:3, 2:5, 3:4, 4:5,
-    7:6, 8:5, 9:8, 10:6,
-    14:7, 15:5, 16:9, 17:6,
-    21:5, 22:8, 23:7, 24:6,
-    28:4, 29:6, 30:7, 31:5,
-  },
-  '2026-7': { 3:5, 4:7, 5:6, 6:4, 10:8, 11:6, 12:5, 13:3, 17:9, 18:7, 19:5, 20:4, 24:6, 25:8, 26:5, 27:4, 31:3 },
-  '2026-8': { 1:4, 2:6, 8:7, 9:5, 14:8, 15:6, 21:5, 22:7, 28:4, 29:6 },
-}
-
-// Appointments by "year-month" key → { day: [strings] }
-const ALL_APPTS = {
-  '2026-6': {
-    4:  ['9:00 AM – Aira Lopez', '10:30 AM – Noah Cruz', '1:00 PM – Mika Santos', '2:30 PM – Lily Santos', '4:00 PM – Jasper Reyes'],
-    9:  ['8:00 AM – Aira Lopez', '10:00 AM – Noah Cruz', '2:00 PM – Mika Santos'],
-    16: ['9:00 AM – Jasper Reyes', '11:00 AM – Lily Santos', '3:00 PM – Aira Lopez'],
-  },
-  '2026-7': {
-    4:  ['8:30 AM – Noah Cruz', '10:00 AM – Aira Lopez', '2:00 PM – Jasper Reyes'],
-    17: ['9:00 AM – Mika Santos', '11:00 AM – Lily Santos'],
-  },
-}
-
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const DISTRIBUTION = [
-  { label: 'On Track',         count: 16, color: '#4a6b5d' },
-  { label: 'Needs Attention',  count: 6,  color: '#f59e0b' },
-  { label: 'Critical',         count: 2,  color: '#ef4444' },
-]
-const TOTAL_PATIENTS = DISTRIBUTION.reduce((s, d) => s + d.count, 0)
-
-const THERAPY_TYPE_COUNTS = [
-  { type: 'Speech Therapy',       count: 14, color: '#2a9d8f' },
-  { type: 'Occupational Therapy', count: 9,  color: '#3b82f6' },
-  { type: 'Physical Therapy',     count: 7,  color: '#8b5cf6' },
-  { type: 'Developmental',        count: 11, color: '#f59e0b' },
-  { type: 'Articulation',         count: 5,  color: '#e46a4b' },
-]
-const THERAPY_MAX = Math.max(...THERAPY_TYPE_COUNTS.map(t => t.count))
-
-const APPOINTMENTS = [
-  { time: '9:00 AM',  patient: 'Aira Lopez',    type: 'Speech Therapy',    status: 'confirmed', emoji: '👧' },
-  { time: '10:30 AM', patient: 'Noah Cruz',      type: 'Developmental',     status: 'pending',   emoji: '👦' },
-  { time: '1:00 PM',  patient: 'Mika Santos',   type: 'Articulation',      status: 'confirmed', emoji: '👧' },
-  { time: '2:30 PM',  patient: 'Lily Santos',   type: 'Speech Therapy',    status: 'confirmed', emoji: '👧' },
-  { time: '4:00 PM',  patient: 'Jasper Reyes',  type: 'Physical Therapy',  status: 'pending',   emoji: '👦' },
-]
-
-const TODAY_TASKS = [
-  { text: "Review Jasper's speech progress note",                     priority: 'high'   },
-  { text: 'Prepare balance exercise set for afternoon sessions',       priority: 'medium' },
-  { text: 'Follow up on parent feedback forms',                        priority: 'medium' },
-  { text: 'Update patient assessments for weekly review',              priority: 'low'    },
-]
-
-const ACTIVITY = [
-  { time: '2h ago',    text: 'SOAP note completed — Aira Lopez',          icon: '📝' },
-  { time: '3h ago',    text: 'Exercise set assigned — Noah Cruz',          icon: '🏃' },
-  { time: '5h ago',    text: 'Appointment rescheduled — Mika Santos',     icon: '📅' },
-  { time: 'Yesterday', text: 'Progress report submitted — Jasper Reyes',  icon: '📊' },
-  { time: 'Yesterday', text: 'New patient intake completed — Lily Santos', icon: '👤' },
-]
+// ── Helpers ────────────────────────────────────────────
+function isoToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+function fmt12(t) {
+  if (!t) return '—'
+  const [h, m] = t.split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+}
+// Sunday of the week containing `iso` (YYYY-MM-DD), as an ISO date string.
+function startOfWeekIso(iso) {
+  const d = new Date(iso + 'T00:00')
+  d.setDate(d.getDate() - d.getDay())
+  return d.toISOString().slice(0, 10)
+}
+function addDaysIso(iso, days) {
+  const d = new Date(iso + 'T00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+function monthPrefixOf(iso) {
+  return iso.slice(0, 7)
+}
+function prevMonthPrefix(iso) {
+  const d = new Date(iso + 'T00:00')
+  d.setMonth(d.getMonth() - 1)
+  return d.toISOString().slice(0, 7)
+}
+// Initials for the avatar circle, e.g. "Alvrine Santiago" -> "AS".
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
+}
+const AVATAR_PALETTE = ['#e8f5f0', '#e0f0ff', '#fde8f3', '#fef3c7', '#f3e8ff', '#e0fbf5']
+const AVATAR_FG = ['#2c4a3e', '#1565c0', '#a3175c', '#92400e', '#7b1fa2', '#0f766e']
+function avatarColorFor(id) {
+  const s = String(id)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  const idx = h % AVATAR_PALETTE.length
+  return { bg: AVATAR_PALETTE[idx], fg: AVATAR_FG[idx] }
+}
+const DONUT_COLORS = ['#4a6b5d', '#3b82f6', '#f59e0b', '#8b5cf6', '#e46a4b', '#0f766e']
 
 // ── Sub-components ─────────────────────────────────────
-function CalendarPanel() {
-  const [view, setView] = useState({ year: REAL_TODAY.year, month: REAL_TODAY.month })
-  const [selectedDay, setSelectedDay] = useState(REAL_TODAY.day)
+function CalendarPanel({ appointments }) {
+  const today = isoToday()
+  const [view, setView] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() } })
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate())
 
   const { year, month } = view
-  const isToday = (d) => d === REAL_TODAY.day && year === REAL_TODAY.year && month === REAL_TODAY.month
+  const isToday = (d) => {
+    const t = new Date()
+    return d === t.getDate() && year === t.getFullYear() && month === t.getMonth()
+  }
 
-  // Dynamic calendar math
-  const firstDOW   = new Date(year, month, 1).getDay()
+  const firstDOW = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
 
-  // Look up data for this month
-  const sessKey  = `${year}-${month}`
-  const sessions = ALL_SESSIONS[sessKey] || {}
-  const appts    = (ALL_APPTS[sessKey] || {})[selectedDay] || []
-  const selSess  = sessions[selectedDay] || 0
-  const monthTotal = Object.values(sessions).reduce((s, v) => s + v, 0)
+  const active = useMemo(() => appointments.filter(a => !a.isArchived), [appointments])
 
-  // Matches the patient calendar's meaning: green = nothing booked yet,
-  // yellow = the day already has sessions on it.
-  const sessLevel = (n) => n > 0 ? 'med' : 'low'
+  const iso = (d) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  const apptsForDay = (d) => active.filter(a => a.date === iso(d)).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
-  const goPrev = () => setView(v => {
-    const nm = v.month === 0  ? { year: v.year - 1, month: 11 } : { year: v.year, month: v.month - 1 }
-    setSelectedDay(null)
-    return nm
-  })
-  const goNext = () => setView(v => {
-    const nm = v.month === 11 ? { year: v.year + 1, month: 0  } : { year: v.year, month: v.month + 1 }
-    setSelectedDay(null)
-    return nm
-  })
+  const monthTotal = active.filter(a => a.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`)).length
 
-  // Build grid
+  const goPrev = () => setView(v => v.month === 0 ? { year: v.year - 1, month: 11 } : { year: v.year, month: v.month - 1 })
+  const goNext = () => setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { year: v.year, month: v.month + 1 })
+
   const cells = Array.from({ length: firstDOW }, (_, i) => ({ key: `e${i}`, empty: true }))
   for (let d = 1; d <= daysInMonth; d++) cells.push({ key: d, day: d })
+
+  const selectedAppts = selectedDay ? apptsForDay(selectedDay) : []
 
   return (
     <div className="th-panel th-cal-panel">
@@ -233,15 +156,15 @@ function CalendarPanel() {
               key={key}
               className={[
                 'th-cal-cell',
-                isToday(day)                                 ? 'th-cal-today'    : '',
-                day === selectedDay && !isToday(day)         ? 'th-cal-selected' : '',
-                sessions[day]                                ? 'th-cal-has-sess' : '',
+                isToday(day) ? 'th-cal-today' : '',
+                day === selectedDay && !isToday(day) ? 'th-cal-selected' : '',
+                apptsForDay(day).length ? 'th-cal-has-sess' : '',
               ].filter(Boolean).join(' ')}
-              onClick={() => setSelectedDay(day)}
+              onClick={() => setSelectedDay(day === selectedDay ? null : day)}
               aria-label={`${MONTH_NAMES[month]} ${day} ${year}`}
             >
               <span className="th-cal-dn">{day}</span>
-              <span className={`th-cal-pip th-pip-${sessLevel(sessions[day] || 0)}`} />
+              <span className={`th-cal-pip th-pip-${apptsForDay(day).length ? 'med' : 'low'}`} />
             </button>
           )
         )}
@@ -254,13 +177,12 @@ function CalendarPanel() {
         <span className="th-cal-leg-sep" />
         <span className="th-cal-leg-total">
           {monthTotal > 0
-            ? <>{MONTH_NAMES[month]} total: <strong>{monthTotal} sessions</strong></>
-            : <>{MONTH_NAMES[month]}: <strong>no data</strong></>
+            ? <>{MONTH_NAMES[month]} total: <strong>{monthTotal} session{monthTotal !== 1 ? 's' : ''}</strong></>
+            : <>{MONTH_NAMES[month]}: <strong>no sessions</strong></>
           }
         </span>
       </div>
 
-      {/* Selected day detail */}
       {selectedDay && (
         <div className="th-cal-detail">
           <div className="th-cal-detail-head">
@@ -269,20 +191,18 @@ function CalendarPanel() {
               {isToday(selectedDay) && <span className="th-cal-today-tag">Today</span>}
             </span>
             <span className="th-cal-detail-count">
-              {selSess ? `${selSess} sessions` : 'No sessions'}
+              {selectedAppts.length ? `${selectedAppts.length} session${selectedAppts.length !== 1 ? 's' : ''}` : 'No sessions'}
             </span>
           </div>
-          {appts.length > 0 ? (
+          {selectedAppts.length > 0 ? (
             <div className="th-cal-appt-list">
-              {appts.map((a, i) => (
-                <div key={i} className="th-cal-appt-row">
+              {selectedAppts.map((a) => (
+                <div key={a.id} className="th-cal-appt-row">
                   <span className="th-cal-appt-dot" />
-                  <span className="th-cal-appt-text">{a}</span>
+                  <span className="th-cal-appt-text">{fmt12(a.time)} – {a.patientName}</span>
                 </div>
               ))}
             </div>
-          ) : selSess > 0 ? (
-            <p className="th-cal-no-detail">Session details not available for this date.</p>
           ) : (
             <p className="th-cal-no-detail">No appointments scheduled.</p>
           )}
@@ -293,6 +213,9 @@ function CalendarPanel() {
 }
 
 function DonutChart({ data, total }) {
+  if (!total) {
+    return <p className="th-panel-note">No patients yet — this fills in once you have appointments booked.</p>
+  }
   let currentPct = 0
   const stops = data.map(d => {
     const start = currentPct
@@ -325,6 +248,192 @@ function DonutChart({ data, total }) {
 export default function TherapistDashboard({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
 
+  const [patients, setPatients] = useState([])
+  const [patientsLoading, setPatientsLoading] = useState(true)
+  const [patientsError, setPatientsError] = useState('')
+
+  const [appointments, setAppointments] = useState([])
+  const [apptsLoading, setApptsLoading] = useState(true)
+  const [apptsError, setApptsError] = useState('')
+
+  const [attendance, setAttendance] = useState(null)
+  const [attLoading, setAttLoading] = useState(true)
+  const [attError, setAttError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.email) {
+      setPatientsLoading(false); setApptsLoading(false); setAttLoading(false)
+      setPatientsError('Your account isn’t linked to a staff record yet.')
+      return
+    }
+    const email = encodeURIComponent(user.email)
+
+    fetch(`/api/patients/therapist-list?email=${email}`)
+      .then(async (r) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`); if (!cancelled) setPatients(b.patients || []) })
+      .catch((e) => { if (!cancelled) setPatientsError(e.message || 'Could not load patients.') })
+      .finally(() => { if (!cancelled) setPatientsLoading(false) })
+
+    fetch(`/api/appointments/therapist-list?email=${email}`)
+      .then(async (r) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`); if (!cancelled) setAppointments(b.appointments || []) })
+      .catch((e) => { if (!cancelled) setApptsError(e.message || 'Could not load appointments.') })
+      .finally(() => { if (!cancelled) setApptsLoading(false) })
+
+    fetch(`/api/attendance/me?email=${email}`)
+      .then(async (r) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`); if (!cancelled) setAttendance(b) })
+      .catch((e) => { if (!cancelled) setAttError(e.message || 'Could not load attendance.') })
+      .finally(() => { if (!cancelled) setAttLoading(false) })
+
+    return () => { cancelled = true }
+  }, [user?.email])
+
+  const today = isoToday()
+  const weekStart = startOfWeekIso(today)
+  const weekEnd = addDaysIso(weekStart, 6)
+  const lastWeekStart = addDaysIso(weekStart, -7)
+  const lastWeekEnd = addDaysIso(weekStart, -1)
+
+  const activeAppts = useMemo(() => appointments.filter(a => !a.isArchived), [appointments])
+  const todaysAppts = useMemo(
+    () => activeAppts.filter(a => a.date === today).sort((a, b) => (a.time || '').localeCompare(b.time || '')),
+    [activeAppts, today],
+  )
+  const bookedAppts = useMemo(() => activeAppts.filter(a => a.status !== 'Cancelled'), [activeAppts])
+
+  const confirmedToday = todaysAppts.filter(a => a.status === 'Confirmed').length
+  const pendingToday = todaysAppts.filter(a => a.status === 'Pending').length
+  const activePatientsToday = new Set(todaysAppts.map(a => a.patientName)).size
+
+  const addedTodayCount = useMemo(
+    () => appointments.filter(a => a.createdAt && new Date(a.createdAt).toISOString().slice(0, 10) === today).length,
+    [appointments, today],
+  )
+
+  const sevenDaysAgo = addDaysIso(today, -7)
+  const newPatientsThisWeek = useMemo(
+    () => patients.filter(p => p.joinedDate && p.joinedDate >= sevenDaysAgo).length,
+    [patients, sevenDaysAgo],
+  )
+
+  const weekSessions = useMemo(() => bookedAppts.filter(a => a.date >= weekStart && a.date <= weekEnd).length, [bookedAppts, weekStart, weekEnd])
+  const lastWeekSessions = useMemo(() => bookedAppts.filter(a => a.date >= lastWeekStart && a.date <= lastWeekEnd).length, [bookedAppts, lastWeekStart, lastWeekEnd])
+  const weekDelta = weekSessions - lastWeekSessions
+
+  const daysThisMonth = attendance?.summary?.daysThisMonth ?? 0
+  const hoursThisMonth = attendance?.summary?.hoursThisMonth ?? 0
+  const daysLastMonth = useMemo(() => {
+    if (!attendance?.records) return 0
+    const prefix = prevMonthPrefix(today)
+    return attendance.records.filter(r => r.date.startsWith(prefix)).length
+  }, [attendance, today])
+  const attendanceDelta = daysThisMonth - daysLastMonth
+
+  const KPI_DATA = [
+    {
+      label: 'Patients Assigned',
+      value: String(patients.length),
+      meta: `${activePatientsToday} active today`,
+      trend: newPatientsThisWeek > 0 ? `+${newPatientsThisWeek} this week` : null,
+      trendUp: true,
+      color: 'teal',
+      Icon: PatientIcon,
+      path: '/therapist/patients',
+      loading: patientsLoading,
+      error: patientsError,
+    },
+    {
+      label: 'Appointments Today',
+      value: String(todaysAppts.length),
+      meta: `${confirmedToday} confirmed · ${pendingToday} pending`,
+      trend: addedTodayCount > 0 ? `+${addedTodayCount} added today` : null,
+      trendUp: true,
+      color: 'blue',
+      Icon: CalendarIcon,
+      path: '/therapist/appointments',
+      loading: apptsLoading,
+      error: apptsError,
+    },
+    {
+      label: "This Week's Sessions",
+      value: String(weekSessions),
+      meta: `${MONTH_NAMES[new Date(weekStart + 'T00:00').getMonth()]} ${weekStart.slice(8)}–${weekEnd.slice(8)}`,
+      trend: weekDelta !== 0 ? `${weekDelta > 0 ? '+' : ''}${weekDelta} vs last week` : null,
+      trendUp: weekDelta >= 0,
+      color: 'purple',
+      Icon: NoteIcon,
+      path: '/therapist/appointments',
+      loading: apptsLoading,
+      error: apptsError,
+    },
+    {
+      label: 'Attendance This Month',
+      value: String(daysThisMonth),
+      meta: `${hoursThisMonth} hrs logged`,
+      trend: attendanceDelta !== 0 ? `${attendanceDelta > 0 ? '+' : ''}${attendanceDelta} vs last month` : null,
+      trendUp: attendanceDelta >= 0,
+      color: 'amber',
+      Icon: ClockIcon,
+      path: '/therapist/attendance',
+      loading: attLoading,
+      error: attError,
+    },
+  ]
+
+  // Patient mix by condition — the only real per-patient category the
+  // schema tracks (clinical risk status isn't captured anywhere yet).
+  const conditionDistribution = useMemo(() => {
+    const counts = new Map()
+    patients.forEach(p => {
+      const key = (p.condition || '').trim() || 'Unspecified'
+      counts.set(key, (counts.get(key) || 0) + 1)
+    })
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
+    const top = sorted.slice(0, 5)
+    const rest = sorted.slice(5).reduce((s, [, c]) => s + c, 0)
+    const list = top.map(([label, count], i) => ({ label, count, color: DONUT_COLORS[i % DONUT_COLORS.length] }))
+    if (rest > 0) list.push({ label: 'Other', count: rest, color: DONUT_COLORS[5] })
+    return list
+  }, [patients])
+
+  // Sessions grouped by the actual session type recorded on each appointment.
+  const typeDistribution = useMemo(() => {
+    const counts = new Map()
+    bookedAppts.forEach(a => {
+      const key = (a.type || '').trim() || 'Other'
+      counts.set(key, (counts.get(key) || 0) + 1)
+    })
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
+    const max = Math.max(1, ...sorted.map(([, c]) => c))
+    return sorted.map(([type, count], i) => ({ type, count, color: DONUT_COLORS[i % DONUT_COLORS.length], pct: Math.round((count / max) * 100) }))
+  }, [bookedAppts])
+
+  // Real, derived "what needs attention" items — no invented task copy.
+  const focusItems = useMemo(() => {
+    const items = []
+    const pendingCount = activeAppts.filter(a => a.status === 'Pending').length
+    if (pendingCount > 0) {
+      items.push({ text: `${pendingCount} appointment request${pendingCount !== 1 ? 's' : ''} need${pendingCount === 1 ? 's' : ''} your response`, priority: 'high' })
+    }
+    const noUpcoming = patients.filter(p => !p.nextSessionDate).length
+    if (noUpcoming > 0) {
+      items.push({ text: `${noUpcoming} patient${noUpcoming !== 1 ? 's have' : ' has'} no upcoming session scheduled`, priority: 'medium' })
+    }
+    if (todaysAppts.length > 0) {
+      items.push({ text: `You have ${todaysAppts.length} session${todaysAppts.length !== 1 ? 's' : ''} today`, priority: 'low' })
+    }
+    return items
+  }, [activeAppts, patients, todaysAppts])
+
+  // Recent activity — this therapist's own real actions, logged locally as
+  // they happen (see logActivity() calls on the Appointments page).
+  const recentActivity = useMemo(() => {
+    if (!user?.email) return []
+    const mine = getAuditLogs().filter(l => (l.email || '').toLowerCase() === user.email.toLowerCase())
+    return mine.slice(0, 5)
+  }, [user?.email])
+
+  const statusKey = (s) => String(s || '').toLowerCase()
+
   return (
     <TherapistPageShell
       user={user}
@@ -336,7 +445,7 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
     >
       {/* ── KPI Cards ── */}
       <div className="th-kpi-grid">
-        {KPI_DATA.map(({ label, value, meta, trend, trendUp, color, Icon, path }) => (
+        {KPI_DATA.map(({ label, value, meta, trend, trendUp, color, Icon, path, loading, error }) => (
           <div
             key={label}
             className={`th-kpi-card ${color} th-kpi-clickable`}
@@ -347,14 +456,16 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
           >
             <div className="th-kpi-top">
               <div className="th-kpi-icon"><Icon /></div>
-              <span className={`th-kpi-trend ${trendUp ? 'up' : 'down'}`}>
-                {trendUp ? <TrendUpIcon /> : <TrendDownIcon />}
-                {trend}
-              </span>
+              {trend && (
+                <span className={`th-kpi-trend ${trendUp ? 'up' : 'down'}`}>
+                  {trendUp ? <TrendUpIcon /> : <TrendDownIcon />}
+                  {trend}
+                </span>
+              )}
             </div>
-            <div className="th-kpi-value">{value}</div>
+            <div className="th-kpi-value">{loading ? '—' : value}</div>
             <div className="th-kpi-label">{label}</div>
-            <div className="th-kpi-meta">{meta}</div>
+            <div className="th-kpi-meta">{error ? 'Unavailable' : loading ? 'Loading…' : meta}</div>
           </div>
         ))}
       </div>
@@ -363,23 +474,30 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
       <div className="th-charts-row">
         {/* Left column: Calendar + Bar Chart */}
         <div className="th-left-col">
-          <CalendarPanel />
+          {apptsError ? (
+            <div className="th-panel th-cal-panel"><p className="th-panel-note error">Couldn't load your calendar: {apptsError}</p></div>
+          ) : (
+            <CalendarPanel appointments={appointments} />
+          )}
 
           <div className="th-panel th-bar-panel">
             <div className="th-panel-head">
               <div>
-                <h3>Sessions by Therapy Type</h3>
-                <p>Total patients per therapy category</p>
+                <h3>Sessions by Type</h3>
+                <p>Booked appointments grouped by session type</p>
               </div>
             </div>
-            <div className="th-bar-chart">
-              <div className="th-bar-grid">
-                {[...Array(4)].map((_, i) => <div key={i} className="th-bar-gridline" />)}
-              </div>
-              <div className="th-bar-bars">
-                {THERAPY_TYPE_COUNTS.map(({ type, count, color }) => {
-                  const pct = Math.round((count / THERAPY_MAX) * 100)
-                  return (
+            {apptsError ? (
+              <p className="th-panel-note error">Couldn't load sessions.</p>
+            ) : typeDistribution.length === 0 ? (
+              <p className="th-panel-note">{apptsLoading ? 'Loading…' : 'No booked sessions yet.'}</p>
+            ) : (
+              <div className="th-bar-chart">
+                <div className="th-bar-grid">
+                  {[...Array(4)].map((_, i) => <div key={i} className="th-bar-gridline" />)}
+                </div>
+                <div className="th-bar-bars">
+                  {typeDistribution.map(({ type, count, color, pct }) => (
                     <div key={type} className="th-bar-group">
                       <span className="th-bar-count">{count}</span>
                       <div className="th-bar-wrap">
@@ -387,11 +505,11 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
                       </div>
                       <span className="th-bar-label">{type}</span>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
+                <div className="th-bar-baseline" />
               </div>
-              <div className="th-bar-baseline" />
-            </div>
+            )}
           </div>
         </div>
 
@@ -400,35 +518,48 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
           <div className="th-panel">
             <div className="th-panel-head">
               <div>
-                <h3>Patient Status</h3>
-                <p>Progress distribution</p>
+                <h3>Patient Mix</h3>
+                <p>By condition on file</p>
               </div>
             </div>
-            <DonutChart data={DISTRIBUTION} total={TOTAL_PATIENTS} />
+            {patientsError ? (
+              <p className="th-panel-note error">Couldn't load patients: {patientsError}</p>
+            ) : patientsLoading ? (
+              <p className="th-panel-note">Loading…</p>
+            ) : (
+              <DonutChart data={conditionDistribution} total={patients.length} />
+            )}
           </div>
 
           <div className="th-panel">
             <div className="th-panel-head">
               <div>
                 <h3>Today's Appointments</h3>
-                <p>{APPOINTMENTS.length} sessions scheduled</p>
+                <p>{apptsLoading ? 'Loading…' : `${todaysAppts.length} session${todaysAppts.length !== 1 ? 's' : ''} scheduled`}</p>
               </div>
             </div>
-            <div className="th-appt-list">
-              {APPOINTMENTS.map((a) => (
-                <div key={a.time + a.patient} className="th-appt-row">
-                  <span className="th-appt-time">{a.time}</span>
-                  <div className="th-appt-avatar">{a.emoji}</div>
-                  <div className="th-appt-info">
-                    <div className="th-appt-name">{a.patient}</div>
-                    <div className="th-appt-type">{a.type}</div>
-                  </div>
-                  <span className={`th-appt-badge ${a.status}`}>
-                    {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {apptsError ? (
+              <p className="th-panel-note error">Couldn't load appointments: {apptsError}</p>
+            ) : todaysAppts.length === 0 ? (
+              <p className="th-panel-note">{apptsLoading ? 'Loading…' : 'No appointments today.'}</p>
+            ) : (
+              <div className="th-appt-list">
+                {todaysAppts.map((a) => {
+                  const c = avatarColorFor(a.id)
+                  return (
+                    <div key={a.id} className="th-appt-row">
+                      <span className="th-appt-time">{fmt12(a.time)}</span>
+                      <div className="th-appt-avatar" style={{ background: c.bg, color: c.fg }}>{initials(a.patientName)}</div>
+                      <div className="th-appt-info">
+                        <div className="th-appt-name">{a.patientName}</div>
+                        <div className="th-appt-type">{a.type} session</div>
+                      </div>
+                      <span className={`th-appt-badge ${statusKey(a.status)}`}>{a.status}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -440,20 +571,28 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
           <div className="th-panel-head">
             <div>
               <h3>Today's Focus</h3>
-              <p>Priority tasks for the current shift</p>
+              <p>What actually needs your attention</p>
             </div>
           </div>
-          <div className="th-task-list">
-            {TODAY_TASKS.map((t, i) => (
-              <div key={i} className="th-task-row">
-                <span className={`th-task-dot ${t.priority}`} />
-                <span className="th-task-text">{t.text}</span>
-                <span className={`th-task-pri ${t.priority}`}>
-                  {t.priority.charAt(0).toUpperCase() + t.priority.slice(1)}
-                </span>
-              </div>
-            ))}
-          </div>
+          {apptsError || patientsError ? (
+            <p className="th-panel-note error">Some data couldn't load, so this list may be incomplete.</p>
+          ) : (apptsLoading || patientsLoading) ? (
+            <p className="th-panel-note">Loading…</p>
+          ) : focusItems.length === 0 ? (
+            <p className="th-panel-note">You're all caught up — nothing needs attention right now.</p>
+          ) : (
+            <div className="th-task-list">
+              {focusItems.map((t, i) => (
+                <div key={i} className="th-task-row">
+                  <span className={`th-task-dot ${t.priority}`} />
+                  <span className="th-task-text">{t.text}</span>
+                  <span className={`th-task-pri ${t.priority}`}>
+                    {t.priority.charAt(0).toUpperCase() + t.priority.slice(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recent Activity */}
@@ -461,20 +600,24 @@ export default function TherapistDashboard({ user, onLogout, betaTier }) {
           <div className="th-panel-head">
             <div>
               <h3>Recent Activity</h3>
-              <p>Latest updates across patients</p>
+              <p>Your latest actions in TherapyPro</p>
             </div>
           </div>
-          <div className="th-activity-list">
-            {ACTIVITY.map((a, i) => (
-              <div key={i} className="th-activity-row">
-                <div className="th-activity-icon">{a.icon}</div>
-                <div className="th-activity-info">
-                  <div className="th-activity-text">{a.text}</div>
-                  <div className="th-activity-time">{a.time}</div>
+          {recentActivity.length === 0 ? (
+            <p className="th-panel-note">No recent activity yet.</p>
+          ) : (
+            <div className="th-activity-list">
+              {recentActivity.map((a) => (
+                <div key={a.id} className="th-activity-row">
+                  <div className="th-activity-icon">{a.actionIcon || '📋'}</div>
+                  <div className="th-activity-info">
+                    <div className="th-activity-text">{a.description}</div>
+                    <div className="th-activity-time">{a.date} · {a.time}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </TherapistPageShell>

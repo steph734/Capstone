@@ -400,6 +400,17 @@
 }
 .th-appt-badge.confirmed { background: #e8f5f0; color: #2c4a3e; }
 .th-appt-badge.pending   { background: #fef3c7; color: #92400e; }
+.th-appt-badge.completed { background: #e0f0ff; color: #1565c0; }
+.th-appt-badge.cancelled { background: #fee2e2; color: #991b1b; }
+.th-appt-badge.archived  { background: #f3f4f6; color: #6b7280; }
+
+/* ── Panel loading / empty / error states ── */
+.th-panel-note {
+  font-size: 13px;
+  color: #9aab9f;
+  padding: 8px 0;
+}
+.th-panel-note.error { color: #b91c1c; }
 
 /* ── Bottom Row ── */
 .th-bottom-row {

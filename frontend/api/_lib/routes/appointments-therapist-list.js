@@ -57,6 +57,7 @@ export default async function handler(req, res) {
 
     const appointments = docs.map((doc) => ({
       id: String(doc._id),
+      patientId: doc.patient_id ? String(doc.patient_id) : null,
       patientName: doc.patient_name || [doc.patient?.first_name, doc.patient?.last_name].filter(Boolean).join(' ') || 'Unknown',
       condition: doc.condition || '',
       age: ageFromBirthdate(doc.patient?.birthdate),

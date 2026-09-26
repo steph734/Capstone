@@ -1,7 +1,13 @@
 /* ── Layout ──────────────────────────────────────────────── */
-.tae-grid {
+.tae-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tae-planner-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -47,102 +53,254 @@
   color: #9aab9f;
 }
 
-/* ── Form ────────────────────────────────────────────────── */
-.tae-form {
+/* ── Today's Schedule ────────────────────────────────────── */
+.tae-schedule-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 
-.tae-field {
+.tae-session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: #f8fbf9;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tae-session-row:hover { background: #f0f7f4; }
+.tae-session-row.active {
+  background: #e6f5ec;
+  border-color: #159a72;
+  box-shadow: inset 3px 0 0 #159a72;
+}
+
+.tae-session-time {
+  flex-shrink: 0;
+  width: 52px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b7c75;
+  line-height: 1.3;
+}
+
+.tae-session-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tae-session-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2c4a3e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tae-session-meta {
+  font-size: 11px;
+  color: #9aab9f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tae-status-pill {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tae-status-finished { background: #f3f4f6; color: #6b7280; }
+.tae-status-active    { background: #dbeafe; color: #1d4ed8; }
+.tae-status-next      { background: #dcfce7; color: #15803d; }
+.tae-status-upcoming  { background: #fef3c7; color: #92400e; }
+
+/* ── Session planner ─────────────────────────────────────── */
+.tae-planner-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tae-time-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tae-time-label { font-size: 14.5px; font-weight: 700; color: #2c4a3e; }
+.tae-time-left { font-size: 13px; font-weight: 700; color: #159a72; white-space: nowrap; }
+.tae-time-left.zero { color: #dc2626; }
+
+.tae-time-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef4f1;
+}
+.tae-time-seg-warmup { background: #cbd5e1; }
+.tae-time-seg-games  { background: #2c4a3e; }
+
+.tae-time-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: #6b7c75;
+}
+.tae-time-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tae-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.tae-dot-warmup { background: #cbd5e1; }
+.tae-dot-games  { background: #2c4a3e; }
+
+/* ── Games header + toggle ───────────────────────────────── */
+.tae-games-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid #f0f5f2;
+}
+.tae-games-head h4 { margin: 14px 0 2px; font-size: 15.5px; font-weight: 800; color: #2c4a3e; }
+.tae-games-head p  { margin: 0; margin-top: 14px; font-size: 12.5px; color: #9aab9f; }
+
+.tae-match-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2c4a3e;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tae-match-toggle input { width: 15px; height: 15px; cursor: pointer; accent-color: #159a72; }
+
+/* ── Game cards ───────────────────────────────────────────── */
+.tae-games-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.tae-game-card {
+  position: relative;
+  text-align: left;
+  background: #fff;
+  border: 1.5px solid #e8f0ec;
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  font-family: inherit;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
+.tae-game-card:hover { border-color: #b7ddca; background: #f8fdfa; }
+.tae-game-card.picked { border-color: #159a72; background: #eefaf3; }
 
-.tae-field label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #2c4a3e;
-}
-
-.tae-input-wrap {
-  position: relative;
+.tae-game-picked-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #159a72;
+  color: #fff;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
-.tae-input-icon {
-  position: absolute;
-  left: 12px;
+.tae-game-tags { display: flex; gap: 6px; flex-wrap: wrap; padding-right: 26px; }
+.tae-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tae-tag-domain { background: #ede9fe; color: #6d28d9; }
+.tae-diff-easy   { background: #dcfce7; color: #166534; }
+.tae-diff-medium { background: #fef3c7; color: #92400e; }
+.tae-diff-hard   { background: #fee2e2; color: #b91c1c; }
+
+.tae-game-card h5 { margin: 2px 0 0; font-size: 14.5px; font-weight: 800; color: #2c4a3e; }
+.tae-game-card p  { margin: 0; font-size: 12px; color: #6b7c75; line-height: 1.4; }
+.tae-game-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: #9aab9f;
-  display: flex;
-  pointer-events: none;
 }
 
-.tae-input-caret {
-  position: absolute;
-  right: 12px;
-  color: #9aab9f;
-  display: flex;
-  pointer-events: none;
+/* ── Session plan box ─────────────────────────────────────── */
+.tae-plan-box {
+  border: 1.5px dashed #cddbd4;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #f8fbf9;
 }
+.tae-plan-box h4 { margin: 0 0 10px; font-size: 14.5px; font-weight: 800; color: #2c4a3e; }
 
-.tae-input-wrap input,
-.tae-input-wrap select,
-.tae-input-wrap textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px 14px 12px 38px;
-  border: 1px solid #dfe8e3;
-  border-radius: 10px;
+.tae-plan-empty { margin: 0; font-size: 13px; color: #9aab9f; text-align: center; padding: 10px 0; }
+
+.tae-plan-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tae-plan-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   background: #fff;
-  font-family: inherit;
-  font-size: 14px;
-  color: #2c4a3e;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  border: 1px solid #eef4f1;
+  border-radius: 9px;
+  font-size: 13px;
 }
-
-.tae-input-wrap select {
-  padding-right: 36px;
-  appearance: none;
+.tae-plan-item-name { flex: 1; min-width: 0; font-weight: 700; color: #2c4a3e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tae-plan-item-time { flex-shrink: 0; color: #6b7c75; font-size: 12px; }
+.tae-plan-remove {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.tae-plan-remove:hover { background: #fecaca; }
 
-.tae-input-wrap textarea {
-  resize: vertical;
-  min-height: 78px;
-  line-height: 1.5;
+.tae-plan-total {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #159a72;
+  margin-bottom: 10px;
 }
+.tae-plan-total.over { color: #dc2626; }
 
-.tae-input-wrap-area .tae-input-icon {
-  top: 13px;
-}
-
-.tae-input-wrap input::placeholder,
-.tae-input-wrap textarea::placeholder {
-  color: #a9b7b0;
-}
-
-.tae-input-wrap input:focus,
-.tae-input-wrap select:focus,
-.tae-input-wrap textarea:focus {
-  border-color: #159a72;
-  box-shadow: 0 0 0 3px rgba(21, 154, 114, 0.12);
-}
-
-.tae-input-wrap select:invalid { color: #a9b7b0; }
+.tae-plan-assign { width: 100%; justify-content: center; }
 
 /* ── Buttons ─────────────────────────────────────────────── */
-.tae-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.tae-btn-primary,
-.tae-btn-secondary {
+.tae-btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -153,23 +311,14 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, transform 0.15s, filter 0.15s;
-}
-
-.tae-btn-primary {
   border: none;
   background: #1a7f4f;
   color: #fff;
 }
 .tae-btn-primary:hover { background: #16703f; transform: translateY(-1px); }
+.tae-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-.tae-btn-secondary {
-  border: 1px solid #cddbd4;
-  background: #fff;
-  color: #2c4a3e;
-}
-.tae-btn-secondary:hover { background: #f4faf7; }
-
-/* ── Assignments list ────────────────────────────────────── */
+/* ── Assigned Exercises list ─────────────────────────────── */
 .tae-list {
   display: flex;
   flex-direction: column;
@@ -313,15 +462,43 @@
   line-height: 1.45;
 }
 
+/* ── Toast ───────────────────────────────────────────────── */
+.tae-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c4a3e;
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  z-index: 500;
+  white-space: nowrap;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .tae-grid { grid-template-columns: 1fr; }
+@media (max-width: 1024px) {
+  .tae-planner-grid { grid-template-columns: 1fr; }
+  .tae-schedule-list {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .tae-session-row { flex: 0 0 auto; width: 230px; }
+}
+
+@media (max-width: 640px) {
+  .tae-games-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
   .tae-card { padding: 18px 16px; }
-  .tae-actions { flex-direction: column; }
-  .tae-btn-primary, .tae-btn-secondary { justify-content: center; }
   .tae-assignment { flex-wrap: wrap; }
   .tae-delete { align-self: stretch; width: 100%; justify-content: center; }
+  .tae-games-head { flex-direction: column; }
+  .tae-match-toggle { margin-top: 4px; }
 }

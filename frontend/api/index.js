@@ -48,6 +48,9 @@ import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
 import notesCreate from './_lib/routes/notes-create.js'
 import notesShare from './_lib/routes/notes-share.js'
+import exercisesTherapistList from './_lib/routes/exercises-therapist-list.js'
+import exercisesCreate from './_lib/routes/exercises-create.js'
+import exercisesDelete from './_lib/routes/exercises-delete.js'
 
 const app = express()
 
@@ -90,6 +93,9 @@ app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/notes/therapist-list', notesTherapistList)
 app.all('/api/notes/create', notesCreate)
 app.all('/api/notes/:id/share', notesShare)
+app.all('/api/exercises/therapist-list', exercisesTherapistList)
+app.all('/api/exercises/create', exercisesCreate)
+app.all('/api/exercises/:id', exercisesDelete)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

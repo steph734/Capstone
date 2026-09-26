@@ -1418,6 +1418,29 @@
   .tapp2-seg, .tapp2-status-select, .tapp2-add-btn { width: 100%; justify-content: center; }
   .tapp2-req-top { flex-wrap: wrap; }
   .tapp2-req-actions { align-items: flex-start; width: 100%; }
-  .tapp2-row { flex-wrap: wrap; }
-  .tapp2-row-time { width: auto; }
+
+  /* Appointment row → stacked card. Plain `flex-wrap: wrap` here used to
+     just push whatever didn't fit — almost always the kebab button alone —
+     onto its own orphaned line below the row. Using `flex-basis: 100%` as
+     an explicit line break instead gives a clean 3-line card: time+avatar+
+     name on top, the status badge on its own line, then the action button,
+     with the kebab pulled out of flow into the top-right corner. */
+  .tapp2-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 14px 44px 14px 14px;
+    position: relative;
+  }
+  .tapp2-row-time { order: 1; width: auto; }
+  .tapp2-rows .tapp2-row .tapp2-avatar { order: 2; }
+  .tapp2-row-info { order: 3; flex: 1 1 120px; min-width: 0; }
+  .tapp2-row .tapp-status-badge { order: 4; flex: 0 0 100%; width: fit-content; }
+  .tapp2-row .tapp2-btn-start,
+  .tapp2-row .tapp2-btn-view { order: 5; flex: 0 0 100%; justify-content: center; }
+  .tapp2-row .tapp2-kebab-wrap {
+    order: 6;
+    position: absolute;
+    top: 10px;
+    right: 8px;
+  }
 }

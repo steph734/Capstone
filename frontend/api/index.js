@@ -45,6 +45,9 @@ import attendanceMe from './_lib/routes/attendance-me.js'
 import attendanceAvailability from './_lib/routes/attendance-availability.js'
 import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
+import notesTherapistList from './_lib/routes/notes-therapist-list.js'
+import notesCreate from './_lib/routes/notes-create.js'
+import notesShare from './_lib/routes/notes-share.js'
 
 const app = express()
 
@@ -84,6 +87,9 @@ app.all('/api/attendance/me', attendanceMe)
 app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
+app.all('/api/notes/therapist-list', notesTherapistList)
+app.all('/api/notes/create', notesCreate)
+app.all('/api/notes/:id/share', notesShare)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

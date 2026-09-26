@@ -49,6 +49,13 @@
 
 .tnp-row-active { background: #e4f2ec !important; box-shadow: inset 4px 0 0 #4a6b5d; }
 
+.tnp-table-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9aab9f;
+  font-size: 14px;
+}
+
 .tnp-table-patient-cell {
   display: flex;
   align-items: center;

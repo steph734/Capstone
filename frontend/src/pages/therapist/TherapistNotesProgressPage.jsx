@@ -3,46 +3,49 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { useSharedProgress } from '../../context/ProgressContext'
+import { manilaDateKey } from '../../utils/manilaTime'
 import './TherapistNotesProgressPage.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
-// Alvrin (id 0) is the shared demo patient wired to the parent-facing
-// Progress page via ProgressContext — same pattern as MessagesContext.
-const PATIENTS = [
-  { id: 0, name: 'Alvrin',      diagnosis: 'Anxiety Disorder',                   avatar: 'https://i.pravatar.cc/150?img=33' },
-  { id: 1, name: 'Aira Lopez',  diagnosis: 'Speech delay — expressive language', avatar: '/patients/images%20(8).jpg' },
-  { id: 2, name: 'Mika Santos', diagnosis: 'Articulation disorder',               avatar: '/patients/images%20(9).jpg' },
-  { id: 3, name: 'Noah Cruz',   diagnosis: 'Developmental delay — F82',           avatar: '/patients/images%20(7).jpg' },
-]
+// A stable placeholder avatar for a given id — same hash-to-pravatar trick
+// used on the My Patients page, since patient ids here are Mongo ObjectId
+// strings rather than small sequential ints.
+function avatarFor(id) {
+  const s = String(id)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
+}
 
-const INITIAL_NOTES = {
-  0: [{
-    id: 'n0a', date: 'Jun 30, 2026', shortDate: 'Jun 30',
-    subjective: 'Alvrin reports feeling calmer this week and completed all assigned balance exercises at home.',
-    objective:  'Single-leg balance improved to 12 seconds (up from 8). Engaged fully for the full session.',
-    assessment: 'Good progress on coordination and balance. Anxiety triggers less frequent during session.',
-    plan:       'Continue balance program. Introduce a new coordination game next session.',
-    signatureData: null, signed: true, shareable: true, domain: 'Physical',
-    parentSummary: 'Getting stronger every session — Alvrin is showing great improvement with balance and coordination!',
-  }],
-  1: [{
-    id: 'n1a', date: 'Jun 30, 2026', shortDate: 'Jun 30',
-    subjective: 'Patient reports feeling more energetic this week. Completed all assigned home exercises. States "I feel stronger now." Parents confirm daily compliance and improved mood.',
-    objective:  'ROM improved by 15%. Left-hand grasp maintained for 3 seconds consistently. Single-leg balance: 8 seconds (up from 6). Fine motor task accuracy: 72%.',
-    assessment: 'Patient is progressing well. Motor skills showing measurable improvement across all domains. Motivation is high. No adverse effects noted.',
-    plan:       'Continue current exercise regimen. Add fine motor bead-threading activity. Schedule follow-up in 2 weeks. Monitor fatigue levels during sessions.',
-    signatureData: null, signed: true,
-  }],
-  2: [{
-    id: 'n2a', date: 'Jun 23, 2026', shortDate: 'Jun 23',
-    subjective: 'Some difficulty noted with wrist extension exercises. Patient fatigued easily during session.',
-    objective:  'Coin sorting task completed in 45 sec (down from 62 sec). Grip strength: 10 kg. Fine motor accuracy: 65%.',
-    assessment: 'Moderate improvement. Fatigue may be affecting performance output. Motivation remains positive.',
-    plan:       'Reduce wrist extension sets temporarily. Monitor fatigue levels. Home program: 10 min daily fine motor tasks.',
-    signatureData: null, signed: true,
-  }],
-  3: [],
+// 'YYYY-MM-DD' -> "Jun 30, 2026" / "Jun 30", matching how the old hardcoded
+// demo notes were displayed.
+function fmtNoteDate(iso) {
+  if (!iso) return '—'
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+function fmtNoteDateShort(iso) {
+  if (!iso) return '—'
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// therapy_notes doc (see api/_lib/routes/notes-therapist-list.js) -> the
+// shape NoteForm/NoteViewer/PatientOverview already expect.
+function fromApiNote(n) {
+  return {
+    id: n.id,
+    date: fmtNoteDate(n.date),
+    shortDate: fmtNoteDateShort(n.date),
+    subjective: n.subjective || '',
+    objective: n.objective || '',
+    assessment: n.assessment || '',
+    plan: n.plan || '',
+    signatureData: n.signatureImage || null,
+    signed: n.status === 'signed',
+    shareable: !!n.sharedWithGuardian,
+    domain: n.domain || DOMAINS[0],
+    parentSummary: n.sharedSummary || '',
+  }
 }
 
 // ── Signature Pad ─────────────────────────────────────────────────────────────
@@ -149,6 +152,7 @@ function NoteForm({ patient, onSave, onCancel }) {
   const [soap,    setSoap]    = useState({ subjective: '', objective: '', assessment: '', plan: '' })
   const [sigData, setSigData] = useState(null)
   const [saved,   setSaved]   = useState(false)
+  const [saving,  setSaving]  = useState(false)
   const [shareWithParent, setShareWithParent] = useState(false)
   const [parentSummary,   setParentSummary]   = useState('')
   const [domain,          setDomain]          = useState(DOMAINS[0])
@@ -157,16 +161,22 @@ function NoteForm({ patient, onSave, onCancel }) {
   const allFilled = soap.subjective.trim() && soap.objective.trim() && soap.assessment.trim() && soap.plan.trim()
   const shareReady = !shareWithParent || parentSummary.trim()
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!allFilled)  { alert('Please fill in all SOAP fields before saving.'); return }
     if (!sigData)    { alert('Please sign the note before saving.'); return }
     if (!shareReady) { alert('Please add a parent-friendly summary before sharing this note.'); return }
-    onSave({
-      id: `n${Date.now()}`, date: today, shortDate: todayShort, ...soap,
-      signatureData: sigData, signed: true,
-      shareable: shareWithParent, domain, parentSummary: shareWithParent ? parentSummary.trim() : '',
-    })
-    setSaved(true)
+    setSaving(true)
+    try {
+      await onSave({
+        ...soap, signatureData: sigData, signed: true,
+        shareable: shareWithParent, domain, parentSummary: shareWithParent ? parentSummary.trim() : '',
+      })
+      setSaved(true)
+    } catch (err) {
+      alert(err.message || 'Could not save this note. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (saved) {
@@ -266,11 +276,12 @@ function NoteForm({ patient, onSave, onCancel }) {
         <div className="tnp-form-footer">
           <button className="tnp-ghost-btn" onClick={onCancel} type="button">Cancel</button>
           <button
-            className={`tnp-primary-btn${(!allFilled || !sigData || !shareReady) ? ' tnp-btn-dim' : ''}`}
+            className={`tnp-primary-btn${(saving || !allFilled || !sigData || !shareReady) ? ' tnp-btn-dim' : ''}`}
             onClick={handleSave}
+            disabled={saving}
             type="button"
           >
-            💾 Save &amp; Sign Note
+            {saving ? 'Saving…' : '💾 Save & Sign Note'}
           </button>
         </div>
       </div>
@@ -408,13 +419,63 @@ function PatientOverview({ patient, notes, onNewNote, onViewNote, onToggleShare 
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TherapistNotesProgressPage({ user, onLogout, betaTier }) {
-  const [notes,       setNotes]       = useState(INITIAL_NOTES)
+  const [patients,    setPatients]    = useState([])
+  const [notes,       setNotes]       = useState({})
+  const [loading,     setLoading]     = useState(true)
+  const [loadError,   setLoadError]   = useState('')
   const [selectedId,  setSelectedId]  = useState(null)
   const [view,        setView]        = useState('overview')  // 'overview' | 'new' | 'viewer'
   const [viewingNote, setViewingNote] = useState(null)
   const { shareNote, unshareNote } = useSharedProgress()
 
-  const selectedPatient = PATIENTS.find(p => p.id === selectedId)
+  // Every patient who has actually booked with this therapist (see
+  // api/_lib/routes/patients-therapist-list.js) plus every signed session
+  // note they've written for those patients (api/_lib/routes/notes-*.js),
+  // straight from the `therapy_notes` collection — replacing the old
+  // hardcoded demo roster/notes.
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.email) {
+      setLoading(false)
+      setLoadError('Your account isn’t linked to a staff record yet.')
+      return
+    }
+    setLoading(true)
+    Promise.all([
+      fetch(`/api/patients/therapist-list?email=${encodeURIComponent(user.email)}`)
+        .then(async (r) => {
+          const body = await r.json().catch(() => ({}))
+          if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+          return body.patients || []
+        }),
+      fetch(`/api/notes/therapist-list?email=${encodeURIComponent(user.email)}`)
+        .then(async (r) => {
+          const body = await r.json().catch(() => ({}))
+          if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+          return body.notes || []
+        }),
+    ])
+      .then(([apiPatients, apiNotes]) => {
+        if (cancelled) return
+        setPatients(apiPatients.map((p) => ({
+          id: p.id,
+          name: p.name,
+          diagnosis: p.condition || 'No condition on file',
+          avatar: avatarFor(p.id),
+        })))
+        const grouped = {}
+        for (const n of apiNotes) {
+          if (!grouped[n.patientId]) grouped[n.patientId] = []
+          grouped[n.patientId].push(fromApiNote(n))
+        }
+        setNotes(grouped)
+      })
+      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load notes.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.email])
+
+  const selectedPatient = patients.find(p => p.id === selectedId)
   const patientNotes    = selectedId !== null ? (notes[selectedId] || []) : []
 
   // On phones the detail panel renders below the patient table, so tapping
@@ -434,10 +495,50 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const openNote  = (note) => { setViewingNote(note); setView('viewer') }
   const startNew  = ()     => { setView('new'); setViewingNote(null) }
 
-  const saveNote = (note) => {
+  const saveNote = async (formNote) => {
+    const sessionDate = manilaDateKey()
+    const res = await fetch('/api/notes/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patientId: selectedId,
+        patientName: selectedPatient?.name,
+        diagnosis: selectedPatient?.diagnosis,
+        employeeEmail: user?.email,
+        sessionDate,
+        subjective: formNote.subjective,
+        objective: formNote.objective,
+        assessment: formNote.assessment,
+        plan: formNote.plan,
+        signatureImage: formNote.signatureData,
+        domain: formNote.domain,
+        shareWithGuardian: formNote.shareable,
+        parentSummary: formNote.parentSummary,
+      }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+
+    const note = {
+      id: body.id,
+      date: fmtNoteDate(sessionDate),
+      shortDate: fmtNoteDateShort(sessionDate),
+      subjective: formNote.subjective,
+      objective: formNote.objective,
+      assessment: formNote.assessment,
+      plan: formNote.plan,
+      signatureData: formNote.signatureData,
+      signed: true,
+      shareable: formNote.shareable,
+      domain: formNote.domain,
+      parentSummary: formNote.parentSummary,
+    }
     setNotes(prev => ({ ...prev, [selectedId]: [note, ...(prev[selectedId] || [])] }))
-    // Alvrin (id 0) is the demo patient wired to the parent-facing Progress page.
-    if (selectedId === 0 && note.shareable) {
+
+    // Alvrin is the shared demo patient wired to the parent-facing Progress
+    // page via ProgressContext — matched by name since real patient ids are
+    // now Mongo ObjectId strings, not the old fixed demo index.
+    if (selectedPatient?.name === 'Alvrin' && note.shareable) {
       shareNote({ id: `sn-${note.id}`, date: note.date, domain: note.domain, summary: note.parentSummary })
     }
     logActivity({
@@ -452,23 +553,34 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     })
   }
 
-  const toggleShare = (note) => {
+  const toggleShare = async (note) => {
     const nextShareable = !note.shareable
+    const domain = note.domain || DOMAINS[0]
+    const summary = note.parentSummary || note.assessment
+    try {
+      const res = await fetch(`/api/notes/${note.id}/share`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shared: nextShareable, domain, summary }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+    } catch (err) {
+      alert(err.message || 'Could not update sharing for this note.')
+      return
+    }
+
     setNotes(prev => ({
       ...prev,
-      [selectedId]: prev[selectedId].map(n => n.id === note.id ? { ...n, shareable: nextShareable } : n),
+      [selectedId]: prev[selectedId].map(n => (
+        n.id === note.id
+          ? { ...n, shareable: nextShareable, domain, parentSummary: nextShareable ? summary : n.parentSummary }
+          : n
+      )),
     }))
-    if (selectedId === 0) {
-      if (nextShareable) {
-        shareNote({
-          id: `sn-${note.id}`,
-          date: note.date,
-          domain: note.domain || DOMAINS[0],
-          summary: note.parentSummary || note.assessment,
-        })
-      } else {
-        unshareNote(`sn-${note.id}`)
-      }
+    if (selectedPatient?.name === 'Alvrin') {
+      if (nextShareable) shareNote({ id: `sn-${note.id}`, date: note.date, domain, summary })
+      else unshareNote(`sn-${note.id}`)
     }
   }
 
@@ -483,6 +595,11 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       icon="📝"
       menuItems={getTherapistMenuItems(betaTier)}
     >
+      {loading ? (
+        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your patients and notes…</p>
+      ) : loadError ? (
+        <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
+      ) : (
       <div className="tnp-page">
 
         {/* ── Patient table ── */}
@@ -500,7 +617,9 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
                 </tr>
               </thead>
               <tbody>
-                {PATIENTS.map(p => {
+                {patients.length === 0 ? (
+                  <tr><td colSpan={6} className="tnp-table-empty">No patients yet — they'll show up here once they book with you.</td></tr>
+                ) : patients.map(p => {
                   const pNotes = notes[p.id] || []
                   const last = pNotes[0]
                   return (
@@ -571,6 +690,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         )}
 
       </div>
+      )}
     </TherapistPageShell>
   )
 }

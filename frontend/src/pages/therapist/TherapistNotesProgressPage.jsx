@@ -8,14 +8,34 @@ import './TherapistNotesProgressPage.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
-// A stable placeholder avatar for a given id — same hash-to-pravatar trick
-// used on the My Patients page, since patient ids here are Mongo ObjectId
-// strings rather than small sequential ints.
-function avatarFor(id) {
+// Deterministic initials + a matching pastel color — same approach as the
+// My Patients page, so a patient without a real profile photo still gets a
+// stable, recognizable avatar circle.
+const AVATAR_PALETTE = [
+  { bg: '#dbeafe', fg: '#1d4ed8' },
+  { bg: '#dcfce7', fg: '#15803d' },
+  { bg: '#fef3c7', fg: '#b45309' },
+  { bg: '#fce7f3', fg: '#be185d' },
+  { bg: '#ede9fe', fg: '#6d28d9' },
+  { bg: '#ffe4e6', fg: '#be123c' },
+  { bg: '#e0f2fe', fg: '#0369a1' },
+  { bg: '#fef9c3', fg: '#854d0e' },
+]
+function paletteFor(id) {
   const s = String(id)
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length]
+}
+function initialsFor(name) {
+  return (
+    (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('') || '?'
+  )
 }
 
 // 'YYYY-MM-DD' -> "Jun 30, 2026" / "Jun 30", matching how the old hardcoded
@@ -30,7 +50,7 @@ function fmtNoteDateShort(iso) {
 }
 
 // therapy_notes doc (see api/_lib/routes/notes-therapist-list.js) -> the
-// shape NoteForm/NoteViewer/PatientOverview already expect.
+// shape NoteForm/NoteViewer/NotesShell already expect.
 function fromApiNote(n) {
   return {
     id: n.id,
@@ -352,67 +372,196 @@ function NoteViewer({ note, patient, onBack }) {
   )
 }
 
-// ── Patient Overview ──────────────────────────────────────────────────────────
-function PatientOverview({ patient, notes, onNewNote, onViewNote, onToggleShare }) {
+// ── Notes Shell (KPI cards + filter/search + patient list / note previews) ────
+// This is the "overview" screen — a patient list on the left and, on the
+// right, a preview of the selected patient's notes. Opening a note ("View")
+// or starting a new one swaps this whole screen out for the notebook-styled
+// NoteViewer/NoteForm below; it isn't touched by this component.
+function statusPillClass(status) {
+  if (status === 'Signed') return 'tnp2-pill tnp2-pill-signed'
+  if (status === 'Draft') return 'tnp2-pill tnp2-pill-draft'
+  return 'tnp2-pill tnp2-pill-none'
+}
+
+const PATIENT_FILTERS = ['All', 'Needs signing', 'Signed', 'No notes']
+
+function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNote, onToggleShare }) {
+  const [filter, setFilter] = useState('All')
+  const [search, setSearch] = useState('')
+
+  const statusFor = (p) => {
+    const pNotes = notes[p.id] || []
+    if (pNotes.length === 0) return 'No notes'
+    return pNotes[0].signed ? 'Signed' : 'Draft'
+  }
+
+  const allNotesFlat = Object.values(notes).flat()
+  const kpi = {
+    total: allNotesFlat.length,
+    drafts: allNotesFlat.filter(n => !n.signed).length,
+    shared: allNotesFlat.filter(n => n.shareable).length,
+    noNotes: patients.filter(p => (notes[p.id] || []).length === 0).length,
+  }
+
+  const counts = {
+    All: patients.length,
+    'Needs signing': patients.filter(p => statusFor(p) === 'Draft').length,
+    Signed: patients.filter(p => statusFor(p) === 'Signed').length,
+    'No notes': patients.filter(p => statusFor(p) === 'No notes').length,
+  }
+
+  const filteredPatients = patients.filter(p => {
+    const status = statusFor(p)
+    const matchFilter =
+      filter === 'All' ? true :
+      filter === 'Needs signing' ? status === 'Draft' :
+      filter === 'Signed' ? status === 'Signed' :
+      status === 'No notes'
+    const q = search.toLowerCase()
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.diagnosis.toLowerCase().includes(q)
+    return matchFilter && matchSearch
+  })
+
+  const selectedPatient = patients.find(p => p.id === selectedId)
+  const patientNotes = selectedId != null ? (notes[selectedId] || []) : []
+
   return (
-    <div className="tnp-overview">
-      <div className="tnp-overview-header">
-        <img className="tnp-overview-avatar" src={patient.avatar} alt={patient.name} />
-        <div className="tnp-overview-meta">
-          <h2 className="tnp-overview-name">{patient.name}</h2>
-          <p className="tnp-overview-diag">{patient.diagnosis}</p>
+    <div className="tnp2-shell">
+      {/* KPI cards */}
+      <div className="tnp2-kpi-grid">
+        <div className="tnp2-kpi-card">
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-total">📝</span>
+          <div className="tnp2-kpi-text">
+            <span className="tnp2-kpi-num">{kpi.total}</span>
+            <span className="tnp2-kpi-lbl">Total notes</span>
+          </div>
+        </div>
+        <div className="tnp2-kpi-card">
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-draft">✏️</span>
+          <div className="tnp2-kpi-text">
+            <span className="tnp2-kpi-num">{kpi.drafts}</span>
+            <span className="tnp2-kpi-lbl">Unsigned drafts</span>
+          </div>
+        </div>
+        <div className="tnp2-kpi-card">
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-shared">🔗</span>
+          <div className="tnp2-kpi-text">
+            <span className="tnp2-kpi-num">{kpi.shared}</span>
+            <span className="tnp2-kpi-lbl">Shared with parents</span>
+          </div>
+        </div>
+        <div className="tnp2-kpi-card">
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-empty">📭</span>
+          <div className="tnp2-kpi-text">
+            <span className="tnp2-kpi-num">{kpi.noNotes}</span>
+            <span className="tnp2-kpi-lbl">No notes yet</span>
+          </div>
         </div>
       </div>
 
-      <button className="tnp-new-note-btn" onClick={onNewNote}>
-        + New Session Note
-      </button>
+      {/* Toolbar */}
+      <div className="tnp2-toolbar">
+        <div className="tnp2-filter-tabs">
+          {PATIENT_FILTERS.map(f => (
+            <button key={f} className={`tnp2-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+              {f} <span className="tnp2-filter-count">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="tnp2-search-wrap">
+          <svg className="tnp2-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            className="tnp2-search"
+            placeholder="Search patient or diagnosis…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
 
-      {notes.length === 0 ? (
-        <div className="tnp-no-notes">
-          <p>📋 No session notes yet for this patient.</p>
+      {/* Two-pane split */}
+      <div className="tnp2-split">
+        <div className="tnp2-list-pane">
+          {filteredPatients.length === 0 ? (
+            <p className="tnp2-list-empty">No patients match.</p>
+          ) : filteredPatients.map(p => {
+            const pNotes = notes[p.id] || []
+            const status = statusFor(p)
+            const pal = paletteFor(p.id)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`tnp2-list-row${selectedId === p.id ? ' active' : ''}`}
+                onClick={() => onSelect(p.id)}
+              >
+                <span className="tnp2-avatar" style={{ background: pal.bg, color: pal.fg }}>
+                  {initialsFor(p.name)}
+                </span>
+                <div className="tnp2-list-row-info">
+                  <div className="tnp2-list-row-top">
+                    <span className="tnp2-list-row-name">{p.name}</span>
+                    <span className={statusPillClass(status)}>{status}</span>
+                  </div>
+                  <span className="tnp2-list-row-sub">{p.diagnosis} · {pNotes.length} note{pNotes.length === 1 ? '' : 's'}</span>
+                </div>
+              </button>
+            )
+          })}
         </div>
-      ) : (
-        <div className="tnp-notes-table-wrap">
-          <table className="tnp-notes-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Preview</th>
-                <th>Status</th>
-                <th>Parent Sharing</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {notes.map(n => (
-                <tr key={n.id}>
-                  <td className="tnp-notes-table-date" data-label="Date">{n.date}</td>
-                  <td className="tnp-notes-table-preview" data-label="Preview">{n.subjective?.slice(0, 90)}…</td>
-                  <td data-label="Status">
-                    {n.signed
-                      ? <span className="tnp-signed-pill">✅ Signed</span>
-                      : <span className="tnp-pending-pill">Pending</span>}
-                  </td>
-                  <td data-label="Parent Sharing">
-                    {n.shareable
-                      ? <span className="tnp-shared-pill">🏡 Shared</span>
-                      : <span className="tnp-pending-pill">Private</span>}
-                  </td>
-                  <td className="tnp-cell-actions" data-label="">
-                    <div className="tnp-table-actions">
-                      <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
-                      <button className="tnp-share-toggle-btn" onClick={() => onToggleShare(n)}>
-                        {n.shareable ? 'Unshare' : 'Share'}
-                      </button>
+
+        <div className="tnp2-detail-pane">
+          {!selectedPatient ? (
+            <div className="tnp2-detail-empty">Select a patient to see their notes.</div>
+          ) : (
+            <>
+              <div className="tnp2-detail-header">
+                <span
+                  className="tnp2-avatar tnp2-avatar-lg"
+                  style={{ background: paletteFor(selectedPatient.id).bg, color: paletteFor(selectedPatient.id).fg }}
+                >
+                  {initialsFor(selectedPatient.name)}
+                </span>
+                <div className="tnp2-detail-meta">
+                  <h3>{selectedPatient.name}</h3>
+                  <p>{selectedPatient.diagnosis} · {patientNotes.length} note{patientNotes.length === 1 ? '' : 's'}</p>
+                </div>
+                <button className="tnp2-new-note-btn" onClick={onNewNote}>+ New session note</button>
+              </div>
+
+              {patientNotes.length === 0 ? (
+                <div className="tnp2-empty-notes">📋 No session notes yet for this patient.</div>
+              ) : (
+                <div className="tnp2-note-list">
+                  {patientNotes.map(n => (
+                    <div key={n.id} className="tnp2-note-card">
+                      <div className="tnp2-note-card-top">
+                        <span className="tnp2-note-date">{n.date}</span>
+                        <span className={n.signed ? 'tnp-signed-pill' : 'tnp-pending-pill'}>
+                          {n.signed ? '✅ Signed' : 'Draft'}
+                        </span>
+                        <span className={n.shareable ? 'tnp-shared-pill' : 'tnp2-private-pill'}>
+                          {n.shareable ? '🏡 Shared' : 'Private'}
+                        </span>
+                      </div>
+                      <p className="tnp2-note-preview"><strong>O</strong> · {n.objective ? `${n.objective.slice(0, 90)}…` : '—'}</p>
+                      <p className="tnp2-note-preview"><strong>P</strong> · {n.plan ? `${n.plan.slice(0, 90)}…` : '—'}</p>
+                      <div className="tnp2-note-actions">
+                        <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
+                        <button className="tnp2-share-btn" onClick={() => onToggleShare(n)}>
+                          {n.shareable ? 'Unshare' : 'Share'}
+                        </button>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -461,7 +610,6 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
           id: p.id,
           name: p.name,
           diagnosis: p.condition || 'No condition on file',
-          avatar: avatarFor(p.id),
         })))
         const grouped = {}
         for (const n of apiNotes) {
@@ -476,22 +624,28 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   }, [user?.email])
 
   const selectedPatient = patients.find(p => p.id === selectedId)
-  const patientNotes    = selectedId !== null ? (notes[selectedId] || []) : []
 
-  // On phones the detail panel renders below the patient table, so tapping
-  // "View Notes" / "+ New Note" would otherwise look like nothing happened —
-  // bring the panel into view once it mounts / changes view.
+  // The two-pane overview always shows a patient's notes on the right, so
+  // default to the first one once the roster loads rather than starting on
+  // an empty "select a patient" state.
+  useEffect(() => {
+    if (!loading && selectedId === null && patients.length > 0) {
+      setSelectedId(patients[0].id)
+    }
+  }, [loading, patients, selectedId])
+
+  // On phones the notebook (new/viewer) renders below the patient list, so
+  // opening it would otherwise look like nothing happened — bring it into
+  // view once it mounts / changes.
   const detailRef = useRef(null)
   useEffect(() => {
-    if (selectedId === null) return
+    if (view === 'overview') return
     if (typeof window !== 'undefined' && window.innerWidth <= 768) {
       detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [selectedId, view, viewingNote])
+  }, [view, viewingNote])
 
-  const viewNotesFor = (id) => { setSelectedId(id); setView('overview'); setViewingNote(null) }
-  const newNoteFor   = (id) => { setSelectedId(id); setView('new'); setViewingNote(null) }
-
+  const selectPatient = (id) => { setSelectedId(id); setView('overview'); setViewingNote(null) }
   const openNote  = (note) => { setViewingNote(note); setView('viewer') }
   const startNew  = ()     => { setView('new'); setViewingNote(null) }
 
@@ -601,94 +755,33 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
       ) : (
       <div className="tnp-page">
+        {view === 'overview' && (
+          patients.length === 0 ? (
+            <p className="tnp2-empty-notes">No patients yet — they'll show up here once they book with you.</p>
+          ) : (
+            <NotesShell
+              patients={patients}
+              notes={notes}
+              selectedId={selectedId}
+              onSelect={selectPatient}
+              onNewNote={startNew}
+              onViewNote={openNote}
+              onToggleShare={toggleShare}
+            />
+          )
+        )}
 
-        {/* ── Patient table ── */}
-        <div className="tnp-table-card">
-          <div className="tnp-table-scroll">
-            <table className="tnp-full-table">
-              <thead>
-                <tr>
-                  <th>Patient</th>
-                  <th>Diagnosis</th>
-                  <th>Total Notes</th>
-                  <th>Last Note</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {patients.length === 0 ? (
-                  <tr><td colSpan={6} className="tnp-table-empty">No patients yet — they'll show up here once they book with you.</td></tr>
-                ) : patients.map(p => {
-                  const pNotes = notes[p.id] || []
-                  const last = pNotes[0]
-                  return (
-                    <tr key={p.id} className={selectedId === p.id ? 'tnp-row-active' : ''}>
-                      <td className="tnp-cell-patient" data-label="Patient">
-                        <div className="tnp-table-patient-cell">
-                          <img className="tnp-patient-avatar" src={p.avatar} alt={p.name} />
-                          <span className="tnp-patient-name">{p.name}</span>
-                        </div>
-                      </td>
-                      <td data-label="Diagnosis">{p.diagnosis}</td>
-                      <td className="tnp-table-notes-count" data-label="Total Notes">{pNotes.length}</td>
-                      <td data-label="Last Note">{last ? last.date : '—'}</td>
-                      <td data-label="Status">
-                        {pNotes.length === 0
-                          ? <span className="tnp-pending-pill">No notes</span>
-                          : last.signed
-                            ? <span className="tnp-signed-pill">✅ Signed</span>
-                            : <span className="tnp-pending-pill">Pending</span>}
-                      </td>
-                      <td className="tnp-cell-actions" data-label="">
-                        <div className="tnp-table-actions">
-                          <button className="tnp-table-view-btn" onClick={() => viewNotesFor(p.id)}>View Notes</button>
-                          <button className="tnp-table-new-btn" onClick={() => newNoteFor(p.id)}>+ New Note</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Detail panel for the selected patient ── */}
-        {selectedPatient && (
-          <div className="tnp-detail-card" ref={detailRef}>
-            <button
-              type="button"
-              className="tnp-detail-close"
-              onClick={() => { setSelectedId(null); setView('overview'); setViewingNote(null) }}
-            >
-              ← Back to patient list
-            </button>
-
-            {view === 'overview' && (
-              <PatientOverview
-                patient={selectedPatient}
-                notes={patientNotes}
-                onNewNote={startNew}
-                onViewNote={openNote}
-                onToggleShare={toggleShare}
-              />
-            )}
-
-            {view === 'new' && (
-              <div className="tnp-scroll-area">
-                <NoteForm patient={selectedPatient} onSave={saveNote} onCancel={backToOverview} />
-              </div>
-            )}
-
-            {view === 'viewer' && viewingNote && (
-              <div className="tnp-scroll-area">
-                <NoteViewer note={viewingNote} patient={selectedPatient} onBack={backToOverview} />
-              </div>
-            )}
+        {view === 'new' && (
+          <div className="tnp-scroll-area" ref={detailRef}>
+            <NoteForm patient={selectedPatient} onSave={saveNote} onCancel={backToOverview} />
           </div>
         )}
 
+        {view === 'viewer' && viewingNote && (
+          <div className="tnp-scroll-area" ref={detailRef}>
+            <NoteViewer note={viewingNote} patient={selectedPatient} onBack={backToOverview} />
+          </div>
+        )}
       </div>
       )}
     </TherapistPageShell>

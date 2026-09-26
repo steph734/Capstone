@@ -8,6 +8,30 @@ import './TherapistNotesProgressPage.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
+// ── Icons for the Notes Shell (KPI cards, pills, empty states) — the
+// notebook editor below keeps its own emoji styling on purpose.
+function NotesFileIcon({ size = 20 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
+}
+function PencilLineIcon({ size = 20 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+}
+function ShareNodesIcon({ size = 20 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" /></svg>
+}
+function InboxIcon({ size = 20 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
+}
+function CheckCircleIcon({ size = 12 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10" /><polyline points="8 12 11 15 16 9" /></svg>
+}
+function HomeIcon({ size = 12 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9" /></svg>
+}
+function ClipboardListIcon({ size = 26 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="15" y2="16" /></svg>
+}
+
 // Deterministic initials + a matching pastel color — same approach as the
 // My Patients page, so a patient without a real profile photo still gets a
 // stable, recognizable avatar circle.
@@ -430,28 +454,28 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
       {/* KPI cards */}
       <div className="tnp2-kpi-grid">
         <div className="tnp2-kpi-card">
-          <span className="tnp2-kpi-icon tnp2-kpi-icon-total">📝</span>
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-total"><NotesFileIcon /></span>
           <div className="tnp2-kpi-text">
             <span className="tnp2-kpi-num">{kpi.total}</span>
             <span className="tnp2-kpi-lbl">Total notes</span>
           </div>
         </div>
         <div className="tnp2-kpi-card">
-          <span className="tnp2-kpi-icon tnp2-kpi-icon-draft">✏️</span>
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-draft"><PencilLineIcon /></span>
           <div className="tnp2-kpi-text">
             <span className="tnp2-kpi-num">{kpi.drafts}</span>
             <span className="tnp2-kpi-lbl">Unsigned drafts</span>
           </div>
         </div>
         <div className="tnp2-kpi-card">
-          <span className="tnp2-kpi-icon tnp2-kpi-icon-shared">🔗</span>
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-shared"><ShareNodesIcon /></span>
           <div className="tnp2-kpi-text">
             <span className="tnp2-kpi-num">{kpi.shared}</span>
             <span className="tnp2-kpi-lbl">Shared with parents</span>
           </div>
         </div>
         <div className="tnp2-kpi-card">
-          <span className="tnp2-kpi-icon tnp2-kpi-icon-empty">📭</span>
+          <span className="tnp2-kpi-icon tnp2-kpi-icon-empty"><InboxIcon /></span>
           <div className="tnp2-kpi-text">
             <span className="tnp2-kpi-num">{kpi.noNotes}</span>
             <span className="tnp2-kpi-lbl">No notes yet</span>
@@ -532,7 +556,10 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
               </div>
 
               {patientNotes.length === 0 ? (
-                <div className="tnp2-empty-notes">📋 No session notes yet for this patient.</div>
+                <div className="tnp2-empty-notes">
+                  <ClipboardListIcon />
+                  <span>No session notes yet for this patient.</span>
+                </div>
               ) : (
                 <div className="tnp2-note-list">
                   {patientNotes.map(n => (
@@ -540,10 +567,10 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
                       <div className="tnp2-note-card-top">
                         <span className="tnp2-note-date">{n.date}</span>
                         <span className={n.signed ? 'tnp-signed-pill' : 'tnp-pending-pill'}>
-                          {n.signed ? '✅ Signed' : 'Draft'}
+                          {n.signed && <CheckCircleIcon />} {n.signed ? 'Signed' : 'Draft'}
                         </span>
                         <span className={n.shareable ? 'tnp-shared-pill' : 'tnp2-private-pill'}>
-                          {n.shareable ? '🏡 Shared' : 'Private'}
+                          {n.shareable && <HomeIcon />} {n.shareable ? 'Shared' : 'Private'}
                         </span>
                       </div>
                       <p className="tnp2-note-preview"><strong>O</strong> · {n.objective ? `${n.objective.slice(0, 90)}…` : '—'}</p>

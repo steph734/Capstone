@@ -133,18 +133,49 @@ function Decal({ x, y, size, glyph }) {
 }
 
 // ─── the piece itself ───────────────────────────────────────────────────────
-export function DesignedOutfit({ category, design }) {
+// Pao's own body, in the shared 300x366 space — fitted pieces trace these
+// so they read as worn rather than stuck on top.
+const BODY = { cx: 150, cy: 272, rx: 92, ry: 84 }
+const SHIRT_REGION = 'M 30,150 L 270,150 L 270,314 Q 150,342 30,314 Z'
+const WAIST = 'M 30,286 Q 150,314 270,286'
+const PANTS_REGION = `${WAIST} L 270,380 L 30,380 Z`
+const SHORTS_REGION = `${WAIST} L 270,334 Q 205,352 150,338 Q 95,352 30,334 Z`
+const VEST_REGION = 'M 30,150 L 139,150 L 139,338 Q 90,332 30,312 Z M 270,150 L 161,150 L 161,338 Q 210,332 270,312 Z'
+
+// `layer` lets PandaMascot slot a piece in at the right depth: 'feet'
+// (shoes, under the belly), 'body' (shirt/pants, under the arms and head),
+// 'arms' (sleeves/scarf, over the arms but under the head). 'all' draws
+// every part in order — used for the stand-alone thumbnails.
+export function DesignedOutfit({ category, design, layer = 'all' }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const d = { ...DEFAULT_DESIGNS[category], ...design }
   const main = d.main
   const trim = d.trim
   const hasPattern = d.pattern && d.pattern !== 'solid'
   const patId = `pdo-pat-${uid}`
-  const clipId = `pdo-clip-${uid}`
   const outline = darken(main, 0.35)
+  // Cartoon ink lines, same weight as Pao's own outlines
+  const ink = darken(main, 0.6)
+  const trimInk = darken(trim, 0.5)
+  const show = (l) => layer === 'all' || layer === l
 
-  // Paint one base shape: solid fill, the pattern on top, then a soft
-  // outline — so every template gets the same colour/pattern treatment.
+  const ids = {
+    shade: `pdo-shade-${uid}`,
+    body: `pdo-body-${uid}`,
+    shirt: `pdo-shirt-${uid}`,
+    region: `pdo-region-${uid}`,
+    sleeve: `pdo-sleeve-${uid}`,
+    aboveCuff: `pdo-cuff-${uid}`,
+    hood: `pdo-hood-${uid}`,
+    scarf: `pdo-scarf-${uid}`,
+    hem: `pdo-hem-${uid}`,
+    sides: `pdo-sides-${uid}`,
+    footL: `pdo-footl-${uid}`,
+    footR: `pdo-footr-${uid}`,
+  }
+  const url = (id) => `url(#${id})`
+
+  // Hair pieces: solid fill, the pattern on top, then a soft outline.
   const paint = (el, key) => (
     <g key={key}>
       {cloneElement(el, { fill: main })}
@@ -153,16 +184,74 @@ export function DesignedOutfit({ category, design }) {
     </g>
   )
 
+  // Worn pieces: fill, pattern, a soft light-to-shadow shading so the
+  // fabric wraps around Pao's round body, then an ink outline.
+  const cloth = (el, key, { stroke = true } = {}) => (
+    <g key={key}>
+      {cloneElement(el, { fill: main })}
+      {hasPattern && cloneElement(el, { fill: url(patId) })}
+      {cloneElement(el, { fill: url(ids.shade) })}
+      {stroke && cloneElement(el, { fill: 'none', stroke: ink, strokeWidth: 4, strokeLinejoin: 'round' })}
+    </g>
+  )
+
+  // A trim band with its own outline (cuffs, hems, waistbands).
+  const band = (dPath, width, key) => (
+    <g key={key}>
+      <path d={dPath} fill="none" stroke={trimInk} strokeWidth={width + 3.5} strokeLinecap="round" />
+      <path d={dPath} fill="none" stroke={trim} strokeWidth={width} strokeLinecap="round" />
+    </g>
+  )
+
+  // Fabric cut to Pao's body: the region clipped to his silhouette, with
+  // the body edge re-inked only where the fabric covers it.
+  const fitted = (regionD, key) => (
+    <g key={key}>
+      <g clipPath={url(ids.body)}>{cloth(<path d={regionD} />, 'f')}</g>
+      <g clipPath={url(ids.region)}>
+        <ellipse cx={BODY.cx} cy={BODY.cy} rx={BODY.rx + 1} ry={BODY.ry + 1} fill="none" stroke={ink} strokeWidth="4.5" />
+      </g>
+    </g>
+  )
+
+  // Draw the left-hand version, then mirror it for the right side.
+  const pairLR = (render, key) => (
+    <g key={key}>
+      {render()}
+      <g transform="translate(300 0) scale(-1 1)">{render()}</g>
+    </g>
+  )
+
+  let regionD = null
+  if (category === 'clothes') regionD = d.style === 'vest' ? VEST_REGION : SHIRT_REGION
+  if (category === 'pants') regionD = d.style === 'shorts' ? SHORTS_REGION : PANTS_REGION
+
   const defs = (
     <defs>
       {hasPattern && <PatternDef id={patId} pattern={d.pattern} color={d.patternColor} />}
-      <clipPath id={clipId}><ellipse cx="150" cy="272" rx="91" ry="83" /></clipPath>
+      <radialGradient id={ids.shade} cx="38%" cy="30%" r="78%">
+        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.32" />
+        <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
+        <stop offset="100%" stopColor="#000000" stopOpacity="0.24" />
+      </radialGradient>
+      <clipPath id={ids.body}><ellipse cx={BODY.cx} cy={BODY.cy} rx={BODY.rx + 2.5} ry={BODY.ry + 2.5} /></clipPath>
+      {regionD && <clipPath id={ids.region}><path d={regionD} /></clipPath>}
+      {/* short sleeve: shoulder half of the upper arm, in the arm's rotated frame */}
+      <clipPath id={ids.sleeve}><rect x="57" y="230" width="90" height="100" /></clipPath>
+      {/* long sleeve stops at the wrist so the paw stays out */}
+      <clipPath id={ids.aboveCuff}><rect x="0" y="150" width="300" height="147" /></clipPath>
+      <clipPath id={ids.hood}><ellipse cx="150" cy="276" rx="104" ry="96" /></clipPath>
+      <clipPath id={ids.scarf}><rect x="0" y="206" width="300" height="160" /></clipPath>
+      <clipPath id={ids.hem}><rect x="0" y="340" width="300" height="40" /></clipPath>
+      <clipPath id={ids.sides}><rect x="0" y="290" width="92" height="90" /><rect x="208" y="290" width="92" height="90" /></clipPath>
+      <clipPath id={ids.footL}><ellipse cx="108" cy="339" rx="48.5" ry="26" /></clipPath>
+      <clipPath id={ids.footR}><ellipse cx="192" cy="339" rx="48.5" ry="26" /></clipPath>
     </defs>
   )
 
   let body = null
 
-  if (category === 'hair') {
+  if (category === 'hair' && show('hair')) {
     if (d.style === 'cap') {
       body = (
         <>
@@ -237,204 +326,239 @@ export function DesignedOutfit({ category, design }) {
   }
 
   if (category === 'clothes') {
-    // Every ellipse here is sized a hair larger than the matching arm/torso
-    // part it sits over in PandaMascot.jsx (body 92×84, upper arm 34×21,
-    // forearm 27×19, paw 22×14) so the fabric fully swallows Pao's own
-    // brown fur with no sliver showing at the seams — an exact 1:1 match
-    // left a visible crescent at the elbow bend.
-    const torso = <ellipse cx="150" cy="272" rx="95" ry="87" />
-    const upperL = <ellipse cx="68" cy="278" rx="37" ry="24" transform="rotate(-28 68 278)" />
-    const upperR = <ellipse cx="232" cy="278" rx="37" ry="24" transform="rotate(28 232 278)" />
-    const forearmL = <ellipse cx="58" cy="300" rx="30" ry="22" />
-    const forearmR = <ellipse cx="242" cy="300" rx="30" ry="22" />
-    const pawCuffL = <ellipse cx="52" cy="308" rx="25" ry="17" />
-    const pawCuffR = <ellipse cx="248" cy="308" rx="25" ry="17" />
-    // Short sleeve: covers the upper arm + elbow only, paw stays bare.
-    const shortSleeves = (
-      <>
-        {paint(upperL, 'ul')}{paint(upperR, 'ur')}
-        {paint(forearmL, 'fl')}{paint(forearmR, 'fr')}
-        <ellipse cx="58" cy="300" rx="8" ry="19" fill={trim} transform="rotate(-10 58 300)" />
-        <ellipse cx="242" cy="300" rx="8" ry="19" fill={trim} transform="rotate(10 242 300)" />
-      </>
-    )
-    // Long sleeve: also covers the paw, with a cuff ring at the wrist.
-    const longSleeves = (
-      <>
-        {paint(upperL, 'ul')}{paint(upperR, 'ur')}
-        {paint(forearmL, 'fl')}{paint(forearmR, 'fr')}
-        {paint(pawCuffL, 'pl')}{paint(pawCuffR, 'pr')}
-        <ellipse cx="52" cy="303" rx="12" ry="4" fill={trim} transform="rotate(-18 52 303)" />
-        <ellipse cx="248" cy="303" rx="12" ry="4" fill={trim} transform="rotate(18 248 303)" />
-      </>
-    )
-    const hem = (
-      <g clipPath={`url(#${clipId})`}>
-        <rect x="52" y="332" width="196" height="16" fill={trim} />
+    const collar = (
+      <g clipPath={url(ids.body)}>
+        <circle cx="150" cy="138" r="120" fill="none" stroke={trimInk} strokeWidth="13" />
+        <circle cx="150" cy="138" r="120" fill="none" stroke={trim} strokeWidth="9.5" />
       </g>
     )
+    const hem = <g clipPath={url(ids.body)}>{band('M 30,308 Q 150,335 270,308', 9, 'hem')}</g>
+    const creases = (
+      <g fill="none" stroke={ink} strokeWidth="2.5" strokeLinecap="round" opacity=".35">
+        <path d="M 118,300 Q 130,307 142,303" />
+        <path d="M 160,305 Q 172,309 184,300" />
+        <path d="M 96,262 Q 104,276 102,292" />
+        <path d="M 204,262 Q 196,276 198,292" />
+      </g>
+    )
+    const shortSleeve = () => (
+      <g transform="rotate(-28 68 278)">
+        <g clipPath={url(ids.sleeve)}>{cloth(<ellipse cx="68" cy="278" rx="37" ry="24" />)}</g>
+        <ellipse cx="58" cy="278" rx="5" ry="22.6" fill={trim} stroke={trimInk} strokeWidth="2.5" />
+      </g>
+    )
+    const longSleeve = () => (
+      <>
+        <g clipPath={url(ids.aboveCuff)}>
+          <g transform="rotate(-28 68 278)">{cloth(<ellipse cx="68" cy="278" rx="37" ry="24" />, 'u')}</g>
+          {cloth(<ellipse cx="58" cy="300" rx="29" ry="21" />, 'lo')}
+        </g>
+        <ellipse cx="58" cy="297" rx="28.4" ry="5.5" fill={trim} stroke={trimInk} strokeWidth="2.5" />
+      </>
+    )
+
+    let bodyPart = null
+    let armsPart = null
 
     if (d.style === 'sweater') {
-      body = (
-        <>
-          {paint(torso)}
-          {hem}
-          {longSleeves}
-          <path d="M 116,198 Q 150,224 184,198" fill="none" stroke={trim} strokeWidth="9" strokeLinecap="round" />
-          <Decal x={150} y={264} size={40} glyph={d.decal} />
-        </>
-      )
+      bodyPart = (<>{fitted(SHIRT_REGION)}{creases}{hem}{collar}<Decal x={150} y={290} size={30} glyph={d.decal} /></>)
+      armsPart = pairLR(longSleeve)
     } else if (d.style === 'hoodie') {
-      body = (
+      bodyPart = (
         <>
-          {paint(torso)}
+          {fitted(SHIRT_REGION)}
+          {creases}
           {hem}
-          {longSleeves}
-          <path d="M 108,292 Q 150,284 192,292 L 184,326 Q 150,332 116,326 Z" fill={darken(main, 0.12)} stroke={outline} strokeWidth="1.5" strokeOpacity=".5" />
-          <path d="M 96,206 Q 94,182 116,186 Q 150,176 184,186 Q 206,182 204,206 Q 150,232 96,206 Z" fill={darken(main, 0.18)} stroke={outline} strokeWidth="2" strokeOpacity=".5" />
-          <path d="M 136,214 L 134,250 M 164,214 L 166,250" stroke={trim} strokeWidth="3" strokeLinecap="round" />
-          <circle cx="134" cy="252" r="3.5" fill={trim} />
-          <circle cx="166" cy="252" r="3.5" fill={trim} />
-          <Decal x={150} y={266} size={32} glyph={d.decal} />
+          {/* hood down: a thick rolled rim around the neck, under the chin */}
+          <g clipPath={url(ids.hood)}>
+            <circle cx="150" cy="138" r="125" fill="none" stroke={ink} strokeWidth="24" />
+            <circle cx="150" cy="138" r="125" fill="none" stroke={darken(main, 0.12)} strokeWidth="19.5" />
+            {hasPattern && <circle cx="150" cy="138" r="125" fill="none" stroke={url(patId)} strokeWidth="19.5" />}
+            <circle cx="150" cy="138" r="125" fill="none" stroke={url(ids.shade)} strokeWidth="19.5" />
+          </g>
+          {cloth(<path d="M 112,296 Q 150,288 188,296 L 180,326 Q 150,333 120,326 Z" />, 'pocket')}
+          <path d="M 136,252 Q 134,268 133,284 M 164,252 Q 166,268 167,284" fill="none" stroke={trim} strokeWidth="3.2" strokeLinecap="round" />
+          <circle cx="133" cy="286" r="3.6" fill={trim} stroke={trimInk} strokeWidth="1.5" />
+          <circle cx="167" cy="286" r="3.6" fill={trim} stroke={trimInk} strokeWidth="1.5" />
+          <Decal x={150} y={311} size={18} glyph={d.decal} />
         </>
       )
+      armsPart = pairLR(longSleeve)
     } else if (d.style === 'vest') {
-      body = (
+      bodyPart = (
         <>
-          <g clipPath={`url(#${clipId})`}>
-            {paint(<path d="M 40,190 L 128,190 L 140,236 L 140,370 L 40,370 Z" />, 'l')}
-            {paint(<path d="M 260,190 L 172,190 L 160,236 L 160,370 L 260,370 Z" />, 'r')}
+          {fitted(VEST_REGION)}
+          <g clipPath={url(ids.body)}>
+            {band('M 139,246 L 139,337', 5, 'l')}
+            {band('M 161,246 L 161,337', 5, 'r')}
           </g>
-          <path d="M 128,194 L 140,236 L 140,352 M 172,194 L 160,236 L 160,352" fill="none" stroke={trim} strokeWidth="5" strokeLinecap="round" />
-          {[256, 282, 308].map((y) => <circle key={y} cx="131" cy={y} r="4.5" fill={trim} stroke={darken(trim, 0.3)} strokeWidth="1" />)}
-          <Decal x={102} y={244} size={24} glyph={d.decal} />
+          {[272, 294, 316].map((y) => <circle key={y} cx="130" cy={y} r="4.2" fill={trim} stroke={trimInk} strokeWidth="1.5" />)}
+          <Decal x={104} y={288} size={20} glyph={d.decal} />
         </>
       )
     } else if (d.style === 'scarf') {
-      body = (
+      armsPart = (
         <>
-          {paint(<path d="M 92,196 Q 150,224 208,196 Q 210,212 208,222 Q 150,250 92,222 Q 90,212 92,196 Z" />, 'band')}
-          {paint(<path d="M 128,214 Q 116,254 112,300 Q 112,312 124,312 Q 134,312 136,300 Q 140,256 152,220 Z" />, 'tail')}
-          <path d="M 112,294 L 136,294" stroke={trim} strokeWidth="5" />
-          {[116, 122, 128, 134].map((x) => (
-            <line key={x} x1={x} y1="310" x2={x} y2="322" stroke={trim} strokeWidth="3" strokeLinecap="round" />
+          {/* wraps around the neck — the head, drawn after, hides the inner edge */}
+          <g clipPath={url(ids.scarf)}>
+            <circle cx="150" cy="140" r="122" fill="none" stroke={ink} strokeWidth="22" />
+            <circle cx="150" cy="140" r="122" fill="none" stroke={main} strokeWidth="17" />
+            {hasPattern && <circle cx="150" cy="140" r="122" fill="none" stroke={url(patId)} strokeWidth="17" />}
+          </g>
+          {cloth(<path d="M 172,240 Q 184,280 178,318 L 204,314 Q 208,274 196,236 Z" />, 'tail')}
+          <path d="M 180,302 L 204,299" stroke={trim} strokeWidth="5" />
+          {[182, 188, 194, 200].map((x) => (
+            <line key={x} x1={x} y1="316" x2={x + 1} y2="327" stroke={trim} strokeWidth="3" strokeLinecap="round" />
           ))}
-          <Decal x={125} y={262} size={18} glyph={d.decal} />
+          <Decal x={189} y={276} size={14} glyph={d.decal} />
         </>
       )
     } else {
       // tee
-      body = (
-        <>
-          {paint(torso)}
-          {shortSleeves}
-          <path d="M 118,198 Q 150,222 182,198" fill="none" stroke={trim} strokeWidth="7" strokeLinecap="round" />
-          <Decal x={150} y={264} size={40} glyph={d.decal} />
-        </>
-      )
+      bodyPart = (<>{fitted(SHIRT_REGION)}{creases}{hem}{collar}<Decal x={150} y={290} size={30} glyph={d.decal} /></>)
+      armsPart = pairLR(shortSleeve)
     }
+
+    body = (<>{show('body') && bodyPart}{show('arms') && armsPart}</>)
   }
 
-  if (category === 'pants') {
-    const PANTS = 'M 60,282 Q 62,362 108,362 Q 138,364 150,356 Q 162,364 192,362 Q 238,362 240,282 Q 198,298 150,298 Q 102,298 60,282 Z'
-    const waistband = <rect x="62" y="278" width="176" height="12" rx="6" fill={trim} stroke={darken(trim, 0.3)} strokeWidth="1" />
+  if (category === 'pants' && show('body')) {
+    const waistband = <g clipPath={url(ids.body)}>{band('M 30,291 Q 150,319 270,291', 10, 'waist')}</g>
+    const seam = <path d="M 150,318 L 150,344 M 138,357 Q 150,342 162,357" fill="none" stroke={ink} strokeWidth="3" strokeLinecap="round" opacity=".7" />
+    const legHem = (width, key) => (
+      <g key={key} clipPath={url(ids.body)}>
+        <g clipPath={url(ids.hem)}>
+          <ellipse cx={BODY.cx} cy={BODY.cy} rx={BODY.rx - 3} ry={BODY.ry - 3} fill="none" stroke={trimInk} strokeWidth={width + 3.5} />
+          <ellipse cx={BODY.cx} cy={BODY.cy} rx={BODY.rx - 3} ry={BODY.ry - 3} fill="none" stroke={trim} strokeWidth={width} />
+        </g>
+      </g>
+    )
 
     if (d.style === 'shorts') {
       body = (
         <>
-          {paint(<path d="M 60,282 Q 58,326 96,334 Q 132,338 150,326 Q 168,338 204,334 Q 242,326 240,282 Q 198,298 150,298 Q 102,298 60,282 Z" />)}
-          <path d="M 64,318 Q 96,334 146,328 M 236,318 Q 204,334 154,328" fill="none" stroke={trim} strokeWidth="6" strokeLinecap="round" />
+          {fitted(SHORTS_REGION)}
+          <g clipPath={url(ids.body)}>{band('M 34,329 Q 95,346 150,333 Q 205,346 266,329', 7, 'cuffs')}</g>
+          <path d="M 150,326 L 150,336" stroke={ink} strokeWidth="3" strokeLinecap="round" opacity=".7" />
           {waistband}
-          <Decal x={100} y={310} size={20} glyph={d.decal} />
+          <Decal x={110} y={322} size={14} glyph={d.decal} />
         </>
       )
     } else if (d.style === 'skirt') {
+      const SKIRT = 'M 60,300 Q 150,324 240,300 Q 256,326 266,350 Q 150,378 34,350 Q 44,326 60,300 Z'
       body = (
         <>
-          {paint(<path d="M 62,282 Q 150,300 238,282 L 258,334 Q 150,358 42,334 Z" />)}
-          {[100, 150, 200].map((x) => (
-            <line key={x} x1={x} y1="296" x2={x + (x - 150) * 0.2} y2="346" stroke={outline} strokeWidth="1.8" opacity=".35" />
-          ))}
-          <path d="M 44,332 Q 150,356 256,332" fill="none" stroke={trim} strokeWidth="8" strokeLinecap="round" />
-          {waistband}
-          <Decal x={150} y={320} size={22} glyph={d.decal} />
+          {cloth(<path d={SKIRT} />, 'skirt')}
+          <g fill="none" stroke={ink} strokeWidth="2.5" strokeLinecap="round" opacity=".35">
+            <path d="M 104,316 L 92,364" /><path d="M 150,324 L 150,370" /><path d="M 196,316 L 208,364" />
+          </g>
+          {band('M 38,349 Q 150,376 262,349', 8, 'hem')}
+          {band('M 60,301 Q 150,326 240,301', 9, 'waist')}
+          <Decal x={150} y={346} size={18} glyph={d.decal} />
         </>
       )
     } else if (d.style === 'joggers') {
       body = (
         <>
-          {paint(<path d={PANTS} />)}
-          <path d="M 66,292 Q 64,338 90,356 M 234,292 Q 236,338 210,356" fill="none" stroke={trim} strokeWidth="6" strokeLinecap="round" />
-          <ellipse cx="108" cy="358" rx="30" ry="7" fill={trim} />
-          <ellipse cx="192" cy="358" rx="30" ry="7" fill={trim} />
+          {fitted(PANTS_REGION)}
+          <g clipPath={url(ids.region)}>
+            <g clipPath={url(ids.sides)}>
+              <ellipse cx={BODY.cx} cy={BODY.cy} rx={BODY.rx - 9} ry={BODY.ry - 8} fill="none" stroke={trim} strokeWidth="6" />
+            </g>
+          </g>
+          {seam}
+          {legHem(11, 'cuff')}
           {waistband}
-          <Decal x={112} y={322} size={20} glyph={d.decal} />
+          <path d="M 146,304 Q 142,316 138,322 M 154,304 Q 158,316 162,322" fill="none" stroke={trimInk} strokeWidth="2.5" strokeLinecap="round" />
+          <Decal x={112} y={332} size={15} glyph={d.decal} />
         </>
       )
     } else {
       body = (
         <>
-          {paint(<path d={PANTS} />)}
-          {/* Ankle cuffs — the leg path narrows to a point at the ankle,
-              which leaves a gap against Pao's much wider (46px) feet; a
-              cuff ellipse at each foot bridges that gap so the pant leg
-              reads as reaching all the way down instead of floating. */}
-          <ellipse cx="108" cy="352" rx="40" ry="11" fill={main} />
-          <ellipse cx="192" cy="352" rx="40" ry="11" fill={main} />
-          <line x1="150" y1="292" x2="150" y2="352" stroke={outline} strokeWidth="2" opacity=".35" />
+          {fitted(PANTS_REGION)}
+          {seam}
+          {legHem(6, 'cuff')}
           {waistband}
-          <Decal x={104} y={322} size={22} glyph={d.decal} />
+          {[96, 204].map((x) => <rect key={x} x={x - 3} y="291" width="6" height="13" rx="2" fill={darken(trim, 0.15)} transform={`rotate(${x < 150 ? 10 : -10} ${x} 305)`} />)}
+          <Decal x={112} y={332} size={15} glyph={d.decal} />
         </>
       )
     }
   }
 
-  if (category === 'shoes') {
-    const pair = (render) => [108, 192].map((x) => <g key={x}>{render(x, x < 150 ? -1 : 1)}</g>)
+  if (category === 'shoes' && show('feet')) {
+    // Each shoe is drawn at the left foot (x=108) and mirrored; Pao's belly,
+    // drawn after, covers the back of the shoe just like his real feet.
+    const x = 108
+    const foot = <ellipse cx={x} cy="339" rx="48.5" ry="26" />
+    let decalAt = [x - 27, 344, 13]
 
+    let shoe = null
     if (d.style === 'boots') {
-      body = pair((x) => (
+      shoe = () => (
         <>
-          {paint(<path d={`M ${x - 36},340 L ${x - 30},300 Q ${x},292 ${x + 30},300 L ${x + 36},340 Z`} />, 's')}
-          {paint(<ellipse cx={x} cy="344" rx="49" ry="23" />, 'f')}
-          <rect x={x - 32} y="296" width="64" height="13" rx="6.5" fill={trim} />
-          <ellipse cx={x} cy="360" rx="42" ry="7" fill={darken(trim, 0.15)} />
-          <Decal x={x} y={322} size={16} glyph={d.decal} />
+          {cloth(<path d={`M ${x - 48},342 L ${x - 53},302 Q ${x},288 ${x + 53},302 L ${x + 48},342 Z`} />, 'shaft')}
+          {band(`M ${x - 53},304 Q ${x},291 ${x + 53},304`, 9, 'cuffb')}
+          {cloth(foot, 'foot')}
+          <g clipPath={url(ids.footL)}><rect x={x - 50} y="355" width="100" height="12" fill={darken(trim, 0.2)} /></g>
         </>
-      ))
+      )
     } else if (d.style === 'slippers') {
-      body = pair((x) => (
+      shoe = () => (
         <>
-          {paint(<ellipse cx={x} cy="342" rx="48" ry="24" />)}
-          <ellipse cx={x} cy="326" rx="40" ry="10" fill={trim} />
-          <circle cx={x} cy="320" r="10" fill={lighten(trim, 0.2)} stroke={darken(trim, 0.2)} strokeWidth="1" />
-          <Decal x={x} y={348} size={16} glyph={d.decal} />
+          {cloth(foot, 'foot')}
+          <path d={`M ${x - 48},339 A 48 26 0 0 1 ${x + 48},339`} fill="none" stroke={trimInk} strokeWidth="12" strokeLinecap="round" />
+          <path d={`M ${x - 48},339 A 48 26 0 0 1 ${x + 48},339`} fill="none" stroke={trim} strokeWidth="8.5" strokeLinecap="round" strokeDasharray="0.1 7" />
+          <path d={`M ${x - 48},339 A 48 26 0 0 1 ${x + 48},339`} fill="none" stroke={trim} strokeWidth="6" strokeLinecap="round" />
+          <circle cx={x - 40} cy="324" r="9" fill={lighten(trim, 0.2)} stroke={trimInk} strokeWidth="2" />
         </>
-      ))
+      )
     } else if (d.style === 'sandals') {
-      body = pair((x) => (
+      decalAt = [x - 36, 332, 11]
+      shoe = () => (
         <>
-          <ellipse cx={x} cy="354" rx="46" ry="12" fill={trim} stroke={darken(trim, 0.3)} strokeWidth="1.5" />
-          <path d={`M ${x - 40},334 Q ${x},320 ${x + 40},334`} fill="none" stroke={main} strokeWidth="10" strokeLinecap="round" />
-          <path d={`M ${x - 36},348 Q ${x},336 ${x + 36},348`} fill="none" stroke={main} strokeWidth="9" strokeLinecap="round" />
-          {hasPattern && <path d={`M ${x - 40},334 Q ${x},320 ${x + 40},334`} fill="none" stroke={`url(#${patId})`} strokeWidth="10" strokeLinecap="round" />}
-          <Decal x={x} y={326} size={14} glyph={d.decal} />
+          <g clipPath={url(ids.footL)}>
+            <rect x={x - 50} y="354" width="100" height="14" fill={trim} />
+            <path d={`M ${x - 50},354 L ${x + 50},354`} stroke={trimInk} strokeWidth="2.5" />
+          </g>
+          <ellipse cx={x} cy="339" rx="48.5" ry="26" fill="none" stroke={trimInk} strokeWidth="2" opacity=".4" />
+          {[`M ${x - 47},330 Q ${x},314 ${x + 47},330`, `M ${x - 46},346 Q ${x},334 ${x + 46},346`].map((p, i) => (
+            <g key={i}>
+              <path d={p} fill="none" stroke={ink} strokeWidth="12.5" strokeLinecap="round" />
+              <path d={p} fill="none" stroke={main} strokeWidth="9" strokeLinecap="round" />
+              {hasPattern && <path d={p} fill="none" stroke={url(patId)} strokeWidth="9" strokeLinecap="round" />}
+            </g>
+          ))}
         </>
-      ))
+      )
     } else {
       // sneakers
-      body = pair((x, side) => (
+      shoe = () => (
         <>
-          {paint(<ellipse cx={x} cy="338" rx="49" ry="27" />)}
-          <ellipse cx={x} cy="346" rx="30" ry="12" fill={lighten(main, 0.25)} opacity=".8" />
-          <path d={`M ${x - 46},342 Q ${x},370 ${x + 46},342 L ${x + 44},352 Q ${x},376 ${x - 44},352 Z`} fill={trim} stroke={darken(trim, 0.25)} strokeWidth="1.5" />
+          {cloth(foot, 'foot')}
+          <g clipPath={url(ids.footL)}>
+            <ellipse cx={x + 4} cy="350" rx="34" ry="10" fill={lighten(main, 0.3)} opacity=".6" />
+            <rect x={x - 50} y="353" width="100" height="14" fill={trim} />
+            <path d={`M ${x - 50},353 L ${x + 50},353`} stroke={trimInk} strokeWidth="2.5" />
+          </g>
+          <path d={`M ${x - 46},331 Q ${x - 32},343 ${x - 12},338`} fill="none" stroke={trim} strokeWidth="5" strokeLinecap="round" />
           {[322, 330].map((y) => (
             <line key={y} x1={x - 12} y1={y} x2={x + 12} y2={y} stroke="#fff" strokeWidth="2.5" strokeLinecap="round" opacity=".9" />
           ))}
-          <Decal x={x + side * 26} y={336} size={14} glyph={d.decal} />
         </>
-      ))
+      )
     }
+    // Stickers sit outside the mirror so the right shoe's isn't flipped.
+    const [dx, dy, size] = decalAt
+    body = (
+      <>
+        {shoe()}
+        <g transform="translate(300 0) scale(-1 1)">{shoe()}</g>
+        <Decal x={dx} y={dy} size={size} glyph={d.decal} />
+        <Decal x={300 - dx} y={dy} size={size} glyph={d.decal} />
+      </>
+    )
   }
 
   return <g>{defs}{body}</g>

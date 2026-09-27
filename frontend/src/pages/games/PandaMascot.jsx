@@ -72,6 +72,17 @@ export default function PandaMascot({
   const vbH      = 366 + padTop + padBot
   const pxHeight = Math.round(pxWidth * vbH / 300)
 
+  // Admin-designed pieces ({ design }) are layered into Pao's body so they
+  // look worn (under the head/arms/belly); built-in items stay overlays.
+  const designed = (cat) => {
+    const a = accessories[cat]
+    return a && typeof a === 'object' && a.design ? a.design : null
+  }
+  const wear = (cat, layer) => {
+    const d = designed(cat)
+    return d ? <DesignedOutfit key={`${cat}-${layer}`} category={cat} design={d} layer={layer}/> : null
+  }
+
   const isShy     = pandaState === 'shy'
   const isHappy   = pandaState === 'happy'
   const isExcited = pandaState === 'excited'
@@ -193,10 +204,15 @@ export default function PandaMascot({
           <ellipse cx="108" cy="344" rx="34" ry="14" fill="url(#pm-pawG)"/>
           <ellipse cx="192" cy="344" rx="34" ry="14" fill="url(#pm-pawG)"/>
 
+          {wear('shoes', 'feet')}
+
           {/* ── Body ── */}
           <ellipse cx="150" cy="272" rx="92" ry="84" fill="url(#pm-bodyG)" stroke="#2a1d13" strokeWidth="5"/>
           <ellipse cx="148" cy="262" rx="58" ry="52" fill="white" opacity="0.4"/>
           <ellipse cx="144" cy="252" rx="32" ry="28" fill="white" opacity="0.28"/>
+
+          {wear('pants', 'body')}
+          {wear('clothes', 'body')}
 
           {/* ── Left arm ── */}
           <g>
@@ -211,6 +227,8 @@ export default function PandaMascot({
             <ellipse cx="242" cy="300" rx="27" ry="19" fill="url(#pm-armG)" stroke="#2a1d13" strokeWidth="4"/>
             <ellipse cx="248" cy="308" rx="22" ry="14" fill="url(#pm-pawG)"/>
           </g>
+
+          {wear('clothes', 'arms')}
 
           {/* ── Raised shy / excited arms ── */}
           {(isShy || isExcited) && (
@@ -351,8 +369,7 @@ export default function PandaMascot({
           {['shoes','pants','clothes','hair'].map(cat => {
             const id = accessories[cat]
             if (!id || id === 'none') return null
-            // Admin-designed pieces come through as { design } instead of a built-in item id
-            if (typeof id === 'object') return id.design ? <DesignedOutfit key={cat} category={cat} design={id.design}/> : null
+            if (typeof id === 'object') return cat === 'hair' ? wear('hair', 'all') : null
             const Comp = OUTFIT_MAP[cat]?.[id]
             return Comp ? <Comp key={`${cat}-${id}`}/> : null
           })}

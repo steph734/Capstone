@@ -344,6 +344,16 @@
   color: #55655d;
 }
 
+.admin-pill.blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.admin-pill.purple {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
 .admin-table-card {
   overflow: hidden;
   min-width: 0;

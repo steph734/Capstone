@@ -1,0 +1,207 @@
+/* ── KPI cards (icon + number + label, 5-up) ─────────────────
+   .admin-stats-grid already sets the shared card grid/gap; this just
+   overrides the column count for a 5th card and defines the icon+text
+   layout, since the shared .admin-stat-card is label-on-top/no-icon. */
+.badge-kpi-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.badge-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  min-width: 0;
+}
+
+.badge-kpi-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.badge-kpi-icon-total  { background: #eef2ff; color: #4338ca; }
+.badge-kpi-icon-active { background: #dcfce7; color: #15803d; }
+.badge-kpi-icon-hidden { background: #f3f4f6; color: #6b7280; }
+.badge-kpi-icon-game   { background: #dbeafe; color: #1d4ed8; }
+.badge-kpi-icon-earned { background: #fef3c7; color: #b45309; }
+
+.badge-kpi-text { min-width: 0; }
+.badge-kpi-text h3 { margin: 0; font-size: 22px; font-weight: 800; color: #2c4a3e; line-height: 1.1; }
+.badge-kpi-text p  { margin: 2px 0 0; font-size: 12.5px; font-weight: 600; color: #2c4a3e; }
+.badge-kpi-meta    { display: block; font-size: 11px; color: #9aab9f; margin-top: 1px; }
+
+/* ── Filter tab counts ────────────────────────────────────── */
+.badge-filter-count {
+  margin-left: 5px;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+/* ── Badge medal (shape + colour + symbol) ───────────────────
+   Shape comes from an inline `style` (border-radius or clip-path) passed
+   by the caller — this only supplies the base box + centering. */
+.badge-medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.badge-earned-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7c75;
+  font-weight: 600;
+}
+
+/* ── Badge builder modal ─────────────────────────────────── */
+.badge-builder-modal { max-width: 640px; }
+
+.badge-builder-body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.badge-builder-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.badge-builder-actions { grid-column: 1 / -1; }
+
+/* Live preview card */
+.badge-preview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #1a2540, #0f1729);
+  text-align: center;
+}
+
+.badge-preview-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.badge-preview-rule {
+  font-size: 11.5px;
+  color: #9fb0d4;
+  line-height: 1.4;
+}
+
+.badge-shuffle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.badge-shuffle-btn:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* Swatch pickers (shape / colour / symbol) */
+.badge-swatch-field { display: flex; flex-direction: column; gap: 6px; }
+
+.badge-swatch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7c75;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.badge-swatch-selected { color: #2c4a3e; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+.badge-swatch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.badge-swatch {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #f5faf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.badge-swatch:hover { background: #eef6f2; }
+.badge-swatch.selected { border-color: #2c4a3e; background: #fff; }
+
+.badge-swatch-shape {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: #b7c4be;
+}
+
+.badge-swatch-colour {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.badge-swatch-symbol { font-size: 15px; line-height: 1; }
+
+/* "Visible to patients" checkbox — .admin-field is normally a stacked
+   label-above-input column; this variant lays the checkbox and its text
+   out in a row instead, with the text read as a regular label, not the
+   uppercase field caption the base class styles `span` as. */
+.admin-field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.admin-field-checkbox input { width: 16px; height: 16px; cursor: pointer; accent-color: #2c4a3e; }
+.admin-field-checkbox > span {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c4a3e;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .badge-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .badge-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .badge-builder-body { grid-template-columns: 1fr; }
+}

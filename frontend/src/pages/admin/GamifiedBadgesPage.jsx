@@ -7,6 +7,11 @@ import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
   ShuffleIcon, GameControllerIcon, ShirtIcon,
 } from './gamifiedIcons'
+import PandaMascot from '../games/PandaMascot'
+import {
+  STYLE_OPTIONS, SLOT_ICONS, COLOURS as CLOTHING_COLOURS, PATTERNS, STICKERS,
+  colourHex, patternBackgroundStyle, ClothingPreviewIcon,
+} from './clothingBuilderData'
 import './GamifiedBadgesPage.css'
 
 /* ── Badge design options — enums mirror the `badges` collection's
@@ -162,7 +167,11 @@ const emptyForm = {
   unlockItemCode: '', isActive: true,
 }
 
-const emptyClothingForm = { name: '', category: 'Hair', emoji: '🎁', description: '' }
+const emptyClothingForm = {
+  name: '', category: 'Hair', style: 'beanie',
+  mainColour: 'blue', trimColour: 'yellow',
+  pattern: 'solid', patternColour: 'white', sticker: 'none',
+}
 
 function slugifyLocal(name) {
   return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'item'
@@ -422,7 +431,11 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
   const openEditClothing = (item) => {
     setEditingClothingId(item.id)
-    setClothingForm({ name: item.name, category: item.category, emoji: item.emoji, description: item.description || '' })
+    setClothingForm({
+      name: item.name, category: item.category, style: item.style,
+      mainColour: item.mainColour, trimColour: item.trimColour,
+      pattern: item.pattern, patternColour: item.patternColour, sticker: item.sticker,
+    })
     setShowClothingEditor(true)
   }
 
@@ -627,7 +640,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <h3>Pao's wardrobe</h3>
             <p>Cosmetic items badges can unlock for Pao</p>
           </div>
-          <button className="admin-btn" onClick={openCreateClothing}>Add clothing item</button>
+          <button className="admin-btn" onClick={openCreateClothing}>Design new item</button>
         </div>
 
         <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
@@ -645,25 +658,20 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
 
-        <div className="games-list">
+        <div className="clothing-grid">
           {visibleClothes.length === 0 && (
             <div className="game-card">
               <div>
                 <h4>No items found</h4>
-                <p>Try a different filter or add a new clothing item.</p>
+                <p>Try a different filter or design a new item.</p>
               </div>
             </div>
           )}
           {visibleClothes.map((item) => (
-            <div key={item.id} className="game-card">
-              <div className="game-card-main">
-                <div className="branch-card-title-row">
-                  <span className="clothing-emoji" aria-hidden="true">{item.emoji}</span>
-                  <h4>{item.name}</h4>
-                  <span className="admin-pill gray">{item.category}</span>
-                </div>
-                <p>{item.description}</p>
-              </div>
+            <div key={item.id} className="clothing-card">
+              <ClothingPreviewIcon {...item} size={72} />
+              <h4>{item.name}</h4>
+              <span className="admin-pill gray">{item.category}</span>
               <div className="admin-item-actions">
                 <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>
                   <PencilIcon />
@@ -813,62 +821,139 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
       {showClothingEditor && (
         <div className="admin-modal-backdrop" onClick={() => setShowClothingEditor(false)}>
-          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="admin-modal clothing-builder-modal" onClick={(event) => event.stopPropagation()}>
             <div className="admin-modal-header">
               <div className="admin-modal-title">
                 <span className="admin-modal-icon"><ShirtIcon /></span>
                 <div>
-                  <h3>{editingClothing ? 'Edit clothing item' : 'Add clothing item'}</h3>
-                  <p>Add a piece to Pao's wardrobe that badges can unlock.</p>
+                  <h3>{editingClothing ? 'Edit clothing item' : 'Design a clothing item'}</h3>
+                  <p>Pick a style, colours and a sticker — Pao tries it on as you go.</p>
                 </div>
               </div>
               <button className="admin-modal-close" onClick={() => setShowClothingEditor(false)} aria-label="Close">✕</button>
             </div>
 
-            <form onSubmit={saveClothing} className="admin-modal-form badge-builder-fields">
-              <label className="admin-field">
-                <span>Name</span>
-                <input
-                  type="text"
-                  required
-                  value={clothingForm.name}
-                  onChange={(event) => setClothingForm((f) => ({ ...f, name: event.target.value }))}
-                />
-              </label>
+            <form onSubmit={saveClothing} className="clothing-builder-body">
+              <div className="clothing-preview-col">
+                <div className="clothing-pao-frame">
+                  <PandaMascot pxWidth={140} pandaState="happy" />
+                </div>
+                <div className="clothing-preview-card">
+                  <ClothingPreviewIcon {...clothingForm} size={56} />
+                  <div>
+                    <h4>{clothingForm.name || 'Untitled item'}</h4>
+                    <p>{clothingForm.category}</p>
+                  </div>
+                </div>
+              </div>
 
-              <label className="admin-field">
-                <span>Category</span>
-                <select
-                  value={clothingForm.category}
-                  onChange={(event) => setClothingForm((f) => ({ ...f, category: event.target.value }))}
-                >
-                  {PAO_ITEM_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="clothing-builder-fields">
+                <div className="clothing-builder-section">
+                  <span className="clothing-section-label"><em>1</em> Name &amp; slot</span>
+                  <label className="admin-field">
+                    <span>Item name</span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Starry Beanie"
+                      value={clothingForm.name}
+                      onChange={(event) => setClothingForm((f) => ({ ...f, name: event.target.value }))}
+                    />
+                  </label>
+                  <div className="clothing-slot-row">
+                    {PAO_ITEM_CATEGORIES.map((cat) => {
+                      const SlotIcon = SLOT_ICONS[cat]
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          className={`clothing-slot-btn${clothingForm.category === cat ? ' selected' : ''}`}
+                          onClick={() => setClothingForm((f) => ({ ...f, category: cat, style: STYLE_OPTIONS[cat][0].id }))}
+                        >
+                          <SlotIcon size={20} />
+                          {cat}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
 
-              <label className="admin-field">
-                <span>Emoji</span>
-                <input
-                  type="text"
-                  value={clothingForm.emoji}
-                  onChange={(event) => setClothingForm((f) => ({ ...f, emoji: event.target.value }))}
-                />
-              </label>
+                <div className="clothing-builder-section">
+                  <span className="clothing-section-label"><em>2</em> Style</span>
+                  <div className="clothing-style-row">
+                    {STYLE_OPTIONS[clothingForm.category].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`clothing-style-btn${clothingForm.style === opt.id ? ' selected' : ''}`}
+                        onClick={() => setClothingForm((f) => ({ ...f, style: opt.id }))}
+                      >
+                        <opt.Icon size={22} />
+                        <span>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              <label className="admin-field">
-                <span>Description</span>
-                <textarea
-                  rows={2}
-                  value={clothingForm.description}
-                  onChange={(event) => setClothingForm((f) => ({ ...f, description: event.target.value }))}
-                />
-              </label>
+                <div className="clothing-builder-section">
+                  <span className="clothing-section-label"><em>3</em> Colours</span>
+                  <SwatchField
+                    label="Main colour" options={CLOTHING_COLOURS} value={clothingForm.mainColour}
+                    onChange={(id) => setClothingForm((f) => ({ ...f, mainColour: id }))}
+                    renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
+                  />
+                  <SwatchField
+                    label="Trim colour" options={CLOTHING_COLOURS} value={clothingForm.trimColour}
+                    onChange={(id) => setClothingForm((f) => ({ ...f, trimColour: id }))}
+                    renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
+                  />
+                </div>
 
-              <div className="admin-button-row badge-builder-actions">
-                <button className="admin-btn" type="submit">{editingClothing ? 'Save changes' : 'Add item'}</button>
-                <button className="admin-btn-secondary" type="button" onClick={() => setShowClothingEditor(false)}>Cancel</button>
+                <div className="clothing-builder-section">
+                  <span className="clothing-section-label"><em>4</em> Pattern</span>
+                  <div className="clothing-style-row">
+                    {PATTERNS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`clothing-style-btn${clothingForm.pattern === p.id ? ' selected' : ''}`}
+                        onClick={() => setClothingForm((f) => ({ ...f, pattern: p.id }))}
+                      >
+                        <span className="clothing-pattern-swatch" style={patternBackgroundStyle(p.id, colourHex(clothingForm.patternColour)) || { background: colourHex(clothingForm.mainColour) }} />
+                        <span>{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {clothingForm.pattern !== 'solid' && (
+                    <SwatchField
+                      label="Pattern colour" options={CLOTHING_COLOURS} value={clothingForm.patternColour}
+                      onChange={(id) => setClothingForm((f) => ({ ...f, patternColour: id }))}
+                      renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
+                    />
+                  )}
+                </div>
+
+                <div className="clothing-builder-section">
+                  <span className="clothing-section-label"><em>5</em> Sticker</span>
+                  <div className="clothing-style-row">
+                    {STICKERS.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`clothing-style-btn${clothingForm.sticker === s.id ? ' selected' : ''}`}
+                        onClick={() => setClothingForm((f) => ({ ...f, sticker: s.id }))}
+                      >
+                        <span className="clothing-sticker-glyph">{s.glyph || '—'}</span>
+                        <span>{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-button-row badge-builder-actions">
+                  <button className="admin-btn" type="submit">{editingClothing ? 'Save changes' : 'Add item'}</button>
+                  <button className="admin-btn-secondary" type="button" onClick={() => setShowClothingEditor(false)}>Cancel</button>
+                </div>
               </div>
             </form>
           </div>

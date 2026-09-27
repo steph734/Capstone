@@ -126,6 +126,14 @@ export function UsersIcon(props) {
   )
 }
 
+export function ShirtIcon(props) {
+  return (
+    <svg width={props?.size || 15} height={props?.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 4l4 3-2 3-2-1.5V20a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8.5L6 10 4 7l4-3 2 2h4z" />
+    </svg>
+  )
+}
+
 export function ShuffleIcon(props) {
   return (
     <svg width={props?.size || 15} height={props?.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEMS, PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
-  ShuffleIcon, GameControllerIcon,
+  ShuffleIcon, GameControllerIcon, ShirtIcon,
 } from './gamifiedIcons'
 import './GamifiedBadgesPage.css'
 
 /* ── Badge design options — enums mirror the `badges` collection's
    $jsonSchema exactly, since Mongo will reject anything outside them. ── */
+
+/* CSS clip-path percentages, for the small flat swatch buttons in the
+   picker (kept simple/cheap — the real medal render below uses SVG). */
 function polygonPoints(sides, rotate = -90) {
   const pts = []
   for (let i = 0; i < sides; i++) {
@@ -30,17 +33,69 @@ function starPolygon(points, innerRatio = 0.5, rotate = -90) {
   return `polygon(${pts.join(', ')})`
 }
 
+/* Absolute SVG coordinates (not %), for the actual medal outline in
+   BadgeMedal — a real <svg> shape rather than a CSS clip-path, since the
+   medal also needs ribbon tails layered behind it. */
+function polygonSvgPoints(sides, cx, cy, r, rotate = -90) {
+  const pts = []
+  for (let i = 0; i < sides; i++) {
+    const angle = (rotate + (360 / sides) * i) * (Math.PI / 180)
+    pts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`)
+  }
+  return pts.join(' ')
+}
+function starSvgPoints(points, cx, cy, r, innerRatio = 0.5, rotate = -90) {
+  const pts = []
+  const step = 360 / (points * 2)
+  for (let i = 0; i < points * 2; i++) {
+    const rad = i % 2 === 0 ? r : r * innerRatio
+    const angle = (rotate + step * i) * (Math.PI / 180)
+    pts.push(`${(cx + rad * Math.cos(angle)).toFixed(1)},${(cy + rad * Math.sin(angle)).toFixed(1)}`)
+  }
+  return pts.join(' ')
+}
+
 const SHAPES = [
-  { id: 'circle',  label: 'Circle',  style: { borderRadius: '50%' } },
-  { id: 'rounded', label: 'Rounded', style: { borderRadius: '22%' } },
-  { id: 'octagon', label: 'Octagon', style: { clipPath: polygonPoints(8) } },
-  { id: 'hexagon', label: 'Hexagon', style: { clipPath: polygonPoints(6) } },
-  { id: 'diamond', label: 'Diamond', style: { clipPath: polygonPoints(4) } },
-  { id: 'shield',  label: 'Shield',  style: { clipPath: 'polygon(50% 0%, 100% 20%, 100% 62%, 50% 100%, 0% 62%, 0% 20%)' } },
-  { id: 'star',    label: 'Star',    style: { clipPath: starPolygon(5, 0.5) } },
-  { id: 'flower',  label: 'Flower',  style: { clipPath: starPolygon(8, 0.72) } },
-  { id: 'scallop', label: 'Scallop', style: { clipPath: starPolygon(12, 0.86) } },
-  { id: 'gear',    label: 'Gear',    style: { clipPath: starPolygon(10, 0.8) } },
+  {
+    id: 'circle', label: 'Circle', swatchStyle: { borderRadius: '50%' },
+    outline: (cx, cy, r) => <circle cx={cx} cy={cy} r={r} />,
+  },
+  {
+    id: 'rounded', label: 'Rounded', swatchStyle: { borderRadius: '22%' },
+    outline: (cx, cy, r) => <rect x={cx - r} y={cy - r} width={r * 2} height={r * 2} rx={r * 0.4} ry={r * 0.4} />,
+  },
+  {
+    id: 'octagon', label: 'Octagon', swatchStyle: { clipPath: polygonPoints(8) },
+    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(8, cx, cy, r)} />,
+  },
+  {
+    id: 'hexagon', label: 'Hexagon', swatchStyle: { clipPath: polygonPoints(6) },
+    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(6, cx, cy, r)} />,
+  },
+  {
+    id: 'diamond', label: 'Diamond', swatchStyle: { clipPath: polygonPoints(4) },
+    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(4, cx, cy, r)} />,
+  },
+  {
+    id: 'shield', label: 'Shield', swatchStyle: { clipPath: 'polygon(50% 0%, 100% 20%, 100% 62%, 50% 100%, 0% 62%, 0% 20%)' },
+    outline: (cx, cy, r) => <polygon points={`${cx - r},${cy - r} ${cx + r},${cy - r} ${cx + r},${cy + 0.24 * r} ${cx},${cy + r} ${cx - r},${cy + 0.24 * r}`} />,
+  },
+  {
+    id: 'star', label: 'Star', swatchStyle: { clipPath: starPolygon(5, 0.5) },
+    outline: (cx, cy, r) => <polygon points={starSvgPoints(5, cx, cy, r, 0.5)} />,
+  },
+  {
+    id: 'flower', label: 'Flower', swatchStyle: { clipPath: starPolygon(8, 0.72) },
+    outline: (cx, cy, r) => <polygon points={starSvgPoints(8, cx, cy, r, 0.72)} />,
+  },
+  {
+    id: 'scallop', label: 'Scallop', swatchStyle: { clipPath: starPolygon(12, 0.86) },
+    outline: (cx, cy, r) => <polygon points={starSvgPoints(12, cx, cy, r, 0.88)} />,
+  },
+  {
+    id: 'gear', label: 'Gear', swatchStyle: { clipPath: starPolygon(10, 0.8) },
+    outline: (cx, cy, r) => <polygon points={starSvgPoints(10, cx, cy, r, 0.82)} />,
+  },
 ]
 const COLOURS = [
   { id: 'gold',   label: 'Gold',   from: '#f6e27a', to: '#c9982a' },
@@ -95,9 +150,9 @@ function ruleClause(form) {
   if (c.id === 'all_categories') return 'Tries every therapy game category'
   return c.label
 }
-function describeForSave(form) {
+function describeForSave(form, clothesList) {
   const base = ruleClause(form)
-  const item = PAO_ITEMS.find((i) => i.id === form.unlockItemCode)
+  const item = clothesList.find((i) => i.id === form.unlockItemCode)
   return item ? `${base} · unlocks ${item.name}` : base
 }
 
@@ -107,19 +162,53 @@ const emptyForm = {
   unlockItemCode: '', isActive: true,
 }
 
-/* ── Badge medal (shape + colour + symbol rendered together) ── */
-function BadgeMedal({ shape, colour, symbol, size = 40 }) {
+const emptyClothingForm = { name: '', category: 'Hair', emoji: '🎁', description: '' }
+
+function slugifyLocal(name) {
+  return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'item'
+}
+
+/* ── Badge medal: a real award-ribbon icon (shape + colour + symbol),
+   not just a flat colored blob — two ribbon tails behind a medallion,
+   with an inner rim and the symbol centered on top. `muted` renders a
+   hidden/not-yet-earned badge washed out, same idea as a grayed-out
+   trophy case slot. ── */
+function BadgeMedal({ shape, colour, symbol, size = 40, muted = false }) {
   const shp = SHAPES.find((s) => s.id === shape) || SHAPES[0]
   const col = COLOURS.find((c) => c.id === colour) || COLOURS[0]
   const sym = SYMBOLS.find((s) => s.id === symbol) || SYMBOLS[0]
+  const gradId = useId()
+  // The medallion (upper ~55% of the viewBox) is the part a viewer reads as
+  // the icon's "center" — nudge the whole element down a little so that
+  // part, not the ribbon-tail-inclusive bounding box, lines up with
+  // sibling text when this sits in a flex row with align-items: center.
+  const nudge = size * 0.17
+
   return (
-    <span
-      className="badge-medal"
-      style={{ width: size, height: size, fontSize: size * 0.5, background: `linear-gradient(135deg, ${col.from}, ${col.to})`, ...shp.style }}
+    <svg
+      className={`badge-medal-svg${muted ? ' muted' : ''}`}
+      width={size}
+      height={size * 1.3}
+      viewBox="0 0 100 128"
+      style={{ overflow: 'visible', flexShrink: 0, transform: `translateY(${nudge}px)` }}
       aria-hidden="true"
     >
-      {sym.glyph}
-    </span>
+      <defs>
+        <linearGradient id={gradId} x1="15%" y1="5%" x2="85%" y2="95%">
+          <stop offset="0%" stopColor={col.from} />
+          <stop offset="100%" stopColor={col.to} />
+        </linearGradient>
+      </defs>
+      {/* Ribbon tails, tucked behind the medallion */}
+      <polygon points="34,72 46,72 46,120 40,106 34,120" fill={col.to} />
+      <polygon points="54,72 66,72 66,120 60,106 54,120" fill={col.to} />
+      {/* Medallion */}
+      <g fill={`url(#${gradId})`} stroke="rgba(0,0,0,0.15)" strokeWidth="1.5">
+        {shp.outline(50, 44, 36)}
+      </g>
+      <circle cx="50" cy="44" r="28" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
+      <text x="50" y="45" textAnchor="middle" dominantBaseline="central" fontSize="30">{sym.glyph}</text>
+    </svg>
   )
 }
 
@@ -153,16 +242,30 @@ function SwatchField({ label, options, value, onChange, renderSwatch }) {
 const FILTERS = ['All', 'Game badges', 'Milestones', 'Hidden']
 
 export default function GamifiedBadgesPage({ user, onLogout }) {
+  const [pageTab, setPageTab] = useState('Badges') // 'Badges' | 'Clothes'
+
   const [badges, setBadges] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+
+  // Pao's wardrobe catalog — local-only (no schema was given for this one,
+  // unlike badges), same as how the game catalog on Assign Exercises works.
+  // Seeded from src/data/paoItems.js, which also mirrors the real item
+  // ids/names a patient sees in PaoCustomizePage.jsx.
+  const [clothes, setClothes] = useState(PAO_ITEMS)
+  const [clothesFilter, setClothesFilter] = useState('All')
+  const [editingClothingId, setEditingClothingId] = useState(null)
+  const [showClothingEditor, setShowClothingEditor] = useState(false)
+  const [clothingForm, setClothingForm] = useState(emptyClothingForm)
+
+  // { kind: 'badge' | 'clothing', item } while a delete confirmation is open.
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -231,7 +334,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     const meta = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
     const payload = {
       name: form.name,
-      description: describeForSave(form),
+      description: describeForSave(form, clothes),
       art: { shape: form.shape, color: form.colour, symbol: form.symbol },
       badgeType: meta.badgeType,
       criteriaType: form.criteriaType,
@@ -283,21 +386,73 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     }
   }
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
+  const confirmDeleteBadge = async (badge) => {
     try {
-      const res = await fetch(`/api/badges/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/badges/${badge.id}`, { method: 'DELETE' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-      setBadges((current) => current.filter((badge) => badge.id !== deleteTarget.id))
+      setBadges((current) => current.filter((b) => b.id !== badge.id))
     } catch (err) {
       showToast(err.message || 'Could not delete the badge.')
-    } finally {
-      setDeleteTarget(null)
     }
   }
 
   const activeCriteria = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
+
+  /* ── Clothes (Pao wardrobe) ── */
+  const CLOTHES_FILTERS = ['All', ...PAO_ITEM_CATEGORIES]
+
+  const clothesFilterCounts = useMemo(() => ({
+    All: clothes.length,
+    ...Object.fromEntries(PAO_ITEM_CATEGORIES.map((cat) => [cat, clothes.filter((c) => c.category === cat).length])),
+  }), [clothes])
+
+  const visibleClothes = useMemo(() => {
+    if (clothesFilter === 'All') return clothes
+    return clothes.filter((c) => c.category === clothesFilter)
+  }, [clothes, clothesFilter])
+
+  const editingClothing = useMemo(() => clothes.find((c) => c.id === editingClothingId) || null, [clothes, editingClothingId])
+
+  const openCreateClothing = () => {
+    setEditingClothingId(null)
+    setClothingForm(emptyClothingForm)
+    setShowClothingEditor(true)
+  }
+
+  const openEditClothing = (item) => {
+    setEditingClothingId(item.id)
+    setClothingForm({ name: item.name, category: item.category, emoji: item.emoji, description: item.description || '' })
+    setShowClothingEditor(true)
+  }
+
+  const saveClothing = (event) => {
+    event.preventDefault()
+    if (editingClothing) {
+      setClothes((current) => current.map((c) => (c.id === editingClothing.id ? { ...c, ...clothingForm } : c)))
+    } else {
+      const base = slugifyLocal(clothingForm.name)
+      let candidate = base
+      let n = 2
+      while (clothes.some((c) => c.id === candidate)) {
+        candidate = `${base}_${n}`
+        n += 1
+      }
+      setClothes((current) => [...current, { id: candidate, ...clothingForm }])
+    }
+    setShowClothingEditor(false)
+  }
+
+  const deleteClothingItem = (item) => {
+    setClothes((current) => current.filter((c) => c.id !== item.id))
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    if (deleteTarget.kind === 'badge') confirmDeleteBadge(deleteTarget.item)
+    else deleteClothingItem(deleteTarget.item)
+    setDeleteTarget(null)
+  }
 
   return (
     <AdminPageShell
@@ -308,7 +463,25 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       icon={<MedalIcon />}
       menuItems={adminMenuItems}
     >
-      {loading ? (
+      <div className="badges-page-tabs">
+        <button
+          type="button"
+          className={pageTab === 'Badges' ? 'active' : ''}
+          onClick={() => setPageTab('Badges')}
+        >
+          <MedalIcon size={16} /> Badges
+        </button>
+        <button
+          type="button"
+          className={pageTab === 'Clothes' ? 'active' : ''}
+          onClick={() => setPageTab('Clothes')}
+        >
+          <ShirtIcon size={16} /> Clothes
+        </button>
+      </div>
+
+      {pageTab === 'Badges' && (
+      loading ? (
         <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading badges…</p>
       ) : loadError ? (
         <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
@@ -394,7 +567,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div key={badge.id} className="game-card">
               <div className="game-card-main">
                 <div className="branch-card-title-row">
-                  <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} size={36} />
+                  <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} size={36} muted={!badge.isActive} />
                   <h4>{badge.name}</h4>
                   <span className={`admin-pill ${badge.isActive ? 'green' : 'gray'}`}>{badge.isActive ? 'Active' : 'Hidden'}</span>
                   <span className={`admin-pill ${badge.badgeType === 'game_completion' ? 'blue' : 'purple'}`}>
@@ -413,7 +586,89 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(badge)} title="Edit" aria-label={`Edit ${badge.name}`}>
                   <PencilIcon />
                 </button>
-                <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget(badge)} title="Delete" aria-label={`Delete ${badge.name}`}>
+                <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget({ kind: 'badge', item: badge })} title="Delete" aria-label={`Delete ${badge.name}`}>
+                  <TrashIcon />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      </>
+      )
+      )}
+
+      {pageTab === 'Clothes' && (
+      <>
+      <div className="admin-stats-grid badge-kpi-grid">
+        <section className="badge-kpi-card">
+          <span className="badge-kpi-icon badge-kpi-icon-total"><ShirtIcon size={18} /></span>
+          <div className="badge-kpi-text">
+            <h3>{clothesFilterCounts.All}</h3>
+            <p>Total items</p>
+            <span className="badge-kpi-meta">In the wardrobe</span>
+          </div>
+        </section>
+        {PAO_ITEM_CATEGORIES.map((cat) => (
+          <section className="badge-kpi-card" key={cat}>
+            <span className="badge-kpi-icon badge-kpi-icon-active"><ShirtIcon size={18} /></span>
+            <div className="badge-kpi-text">
+              <h3>{clothesFilterCounts[cat]}</h3>
+              <p>{cat}</p>
+              <span className="badge-kpi-meta">Unlockable items</span>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <div className="admin-panel">
+        <div className="admin-panel-header">
+          <div>
+            <h3>Pao's wardrobe</h3>
+            <p>Cosmetic items badges can unlock for Pao</p>
+          </div>
+          <button className="admin-btn" onClick={openCreateClothing}>Add clothing item</button>
+        </div>
+
+        <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
+          <div className="admin-button-row">
+            {CLOTHES_FILTERS.map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className={clothesFilter === filter ? 'admin-btn' : 'admin-btn-secondary'}
+                onClick={() => setClothesFilter(filter)}
+              >
+                {filter} <span className="badge-filter-count">{clothesFilterCounts[filter]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="games-list">
+          {visibleClothes.length === 0 && (
+            <div className="game-card">
+              <div>
+                <h4>No items found</h4>
+                <p>Try a different filter or add a new clothing item.</p>
+              </div>
+            </div>
+          )}
+          {visibleClothes.map((item) => (
+            <div key={item.id} className="game-card">
+              <div className="game-card-main">
+                <div className="branch-card-title-row">
+                  <span className="clothing-emoji" aria-hidden="true">{item.emoji}</span>
+                  <h4>{item.name}</h4>
+                  <span className="admin-pill gray">{item.category}</span>
+                </div>
+                <p>{item.description}</p>
+              </div>
+              <div className="admin-item-actions">
+                <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>
+                  <PencilIcon />
+                </button>
+                <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget({ kind: 'clothing', item })} title="Delete" aria-label={`Delete ${item.name}`}>
                   <TrashIcon />
                 </button>
               </div>
@@ -440,7 +695,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
             <form className="admin-modal-form badge-builder-body" onSubmit={saveBadge}>
               <div className="badge-preview-card">
-                <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} size={72} />
+                <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} size={72} muted={!form.isActive} />
                 <div className="badge-preview-name">{form.name || 'Untitled badge'}</div>
                 <div className="badge-preview-rule">{ruleClause(form)}</div>
                 <button type="button" className="badge-shuffle-btn" onClick={shuffleAppearance}>
@@ -462,7 +717,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <SwatchField
                   label="Shape" options={SHAPES} value={form.shape}
                   onChange={(id) => setForm((f) => ({ ...f, shape: id }))}
-                  renderSwatch={(opt) => <span className="badge-swatch-shape" style={opt.style} />}
+                  renderSwatch={(opt) => <span className="badge-swatch-shape" style={opt.swatchStyle} />}
                 />
                 <SwatchField
                   label="Colour" options={COLOURS} value={form.colour}
@@ -527,7 +782,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     <option value="">None</option>
                     {PAO_ITEM_CATEGORIES.map((cat) => (
                       <optgroup key={cat} label={cat}>
-                        {PAO_ITEMS.filter((i) => i.category === cat).map((i) => (
+                        {clothes.filter((i) => i.category === cat).map((i) => (
                           <option key={i.id} value={i.id}>{i.name}</option>
                         ))}
                       </optgroup>
@@ -556,13 +811,78 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
         </div>
       )}
 
+      {showClothingEditor && (
+        <div className="admin-modal-backdrop" onClick={() => setShowClothingEditor(false)}>
+          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="admin-modal-title">
+                <span className="admin-modal-icon"><ShirtIcon /></span>
+                <div>
+                  <h3>{editingClothing ? 'Edit clothing item' : 'Add clothing item'}</h3>
+                  <p>Add a piece to Pao's wardrobe that badges can unlock.</p>
+                </div>
+              </div>
+              <button className="admin-modal-close" onClick={() => setShowClothingEditor(false)} aria-label="Close">✕</button>
+            </div>
+
+            <form onSubmit={saveClothing} className="admin-modal-form badge-builder-fields">
+              <label className="admin-field">
+                <span>Name</span>
+                <input
+                  type="text"
+                  required
+                  value={clothingForm.name}
+                  onChange={(event) => setClothingForm((f) => ({ ...f, name: event.target.value }))}
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>Category</span>
+                <select
+                  value={clothingForm.category}
+                  onChange={(event) => setClothingForm((f) => ({ ...f, category: event.target.value }))}
+                >
+                  {PAO_ITEM_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="admin-field">
+                <span>Emoji</span>
+                <input
+                  type="text"
+                  value={clothingForm.emoji}
+                  onChange={(event) => setClothingForm((f) => ({ ...f, emoji: event.target.value }))}
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>Description</span>
+                <textarea
+                  rows={2}
+                  value={clothingForm.description}
+                  onChange={(event) => setClothingForm((f) => ({ ...f, description: event.target.value }))}
+                />
+              </label>
+
+              <div className="admin-button-row badge-builder-actions">
+                <button className="admin-btn" type="submit">{editingClothing ? 'Save changes' : 'Add item'}</button>
+                <button className="admin-btn-secondary" type="button" onClick={() => setShowClothingEditor(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {deleteTarget && (
         <div className="admin-modal-backdrop" onClick={() => setDeleteTarget(null)}>
           <div className="admin-confirm-modal" onClick={(event) => event.stopPropagation()}>
             <div className="admin-confirm-icon" style={{ color: '#b45309' }}><TrashIcon size={32} /></div>
-            <h3 className="admin-confirm-title">Delete badge?</h3>
+            <h3 className="admin-confirm-title">{deleteTarget.kind === 'badge' ? 'Delete badge?' : 'Delete clothing item?'}</h3>
             <p className="admin-confirm-msg">
-              This will permanently remove <strong>{deleteTarget.name}</strong> from the badge library. This cannot be undone.
+              This will permanently remove <strong>{deleteTarget.item.name}</strong>{' '}
+              {deleteTarget.kind === 'badge' ? 'from the badge library' : "from Pao's wardrobe"}. This cannot be undone.
             </p>
             <div className="admin-confirm-actions">
               <button className="admin-confirm-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>

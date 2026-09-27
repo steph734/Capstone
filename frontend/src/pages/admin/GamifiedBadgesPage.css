@@ -1,3 +1,47 @@
+/* ── Badges / Clothes tab switcher ───────────────────────────── */
+.badges-page-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.badges-page-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border: 1px solid #e8f5f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7c75;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.badges-page-tabs button:hover { background: #f5faf8; }
+.badges-page-tabs button.active {
+  background: #2c4a3e;
+  border-color: #2c4a3e;
+  color: #fff;
+}
+
+/* Emoji swatch for a clothing row, mirrors the badge medal's spot in the
+   same .branch-card-title-row layout. */
+.clothing-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  font-size: 19px;
+  background: #f5faf8;
+  border: 1px solid #e8f5f0;
+  border-radius: 10px;
+}
+
 /* ── KPI cards (icon + number + label, 5-up) ─────────────────
    .admin-stats-grid already sets the shared card grid/gap; this just
    overrides the column count for a 5th card and defines the icon+text
@@ -48,13 +92,17 @@
 /* ── Badge medal (shape + colour + symbol) ───────────────────
    Shape comes from an inline `style` (border-radius or clip-path) passed
    by the caller — this only supplies the base box + centering. */
-.badge-medal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  line-height: 1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+.badge-medal-svg {
+  display: block;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+/* Hidden / not-yet-earned badges render washed out, like an empty slot in
+   a trophy case, instead of full color. */
+.badge-medal-svg.muted {
+  filter: grayscale(70%) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.1));
+  opacity: 0.55;
 }
 
 .badge-earned-line {

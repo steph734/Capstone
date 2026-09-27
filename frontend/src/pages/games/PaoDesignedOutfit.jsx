@@ -237,22 +237,40 @@ export function DesignedOutfit({ category, design }) {
   }
 
   if (category === 'clothes') {
-    const torso = <ellipse cx="150" cy="272" rx="91" ry="83" />
-    const upperL = <ellipse cx="68" cy="278" rx="35" ry="22" transform="rotate(-28 68 278)" />
-    const upperR = <ellipse cx="232" cy="278" rx="35" ry="22" transform="rotate(28 232 278)" />
-    const lowerL = <ellipse cx="64" cy="296" rx="24" ry="18" />
-    const lowerR = <ellipse cx="236" cy="296" rx="24" ry="18" />
+    // Every ellipse here is sized a hair larger than the matching arm/torso
+    // part it sits over in PandaMascot.jsx (body 92×84, upper arm 34×21,
+    // forearm 27×19, paw 22×14) so the fabric fully swallows Pao's own
+    // brown fur with no sliver showing at the seams — an exact 1:1 match
+    // left a visible crescent at the elbow bend.
+    const torso = <ellipse cx="150" cy="272" rx="95" ry="87" />
+    const upperL = <ellipse cx="68" cy="278" rx="37" ry="24" transform="rotate(-28 68 278)" />
+    const upperR = <ellipse cx="232" cy="278" rx="37" ry="24" transform="rotate(28 232 278)" />
+    const forearmL = <ellipse cx="58" cy="300" rx="30" ry="22" />
+    const forearmR = <ellipse cx="242" cy="300" rx="30" ry="22" />
+    const pawCuffL = <ellipse cx="52" cy="308" rx="25" ry="17" />
+    const pawCuffR = <ellipse cx="248" cy="308" rx="25" ry="17" />
+    // Short sleeve: covers the upper arm + elbow only, paw stays bare.
+    const shortSleeves = (
+      <>
+        {paint(upperL, 'ul')}{paint(upperR, 'ur')}
+        {paint(forearmL, 'fl')}{paint(forearmR, 'fr')}
+        <ellipse cx="58" cy="300" rx="8" ry="19" fill={trim} transform="rotate(-10 58 300)" />
+        <ellipse cx="242" cy="300" rx="8" ry="19" fill={trim} transform="rotate(10 242 300)" />
+      </>
+    )
+    // Long sleeve: also covers the paw, with a cuff ring at the wrist.
     const longSleeves = (
       <>
         {paint(upperL, 'ul')}{paint(upperR, 'ur')}
-        {paint(lowerL, 'll')}{paint(lowerR, 'lr')}
-        <ellipse cx="46" cy="303" rx="8" ry="16" fill={trim} />
-        <ellipse cx="254" cy="303" rx="8" ry="16" fill={trim} />
+        {paint(forearmL, 'fl')}{paint(forearmR, 'fr')}
+        {paint(pawCuffL, 'pl')}{paint(pawCuffR, 'pr')}
+        <ellipse cx="52" cy="303" rx="12" ry="4" fill={trim} transform="rotate(-18 52 303)" />
+        <ellipse cx="248" cy="303" rx="12" ry="4" fill={trim} transform="rotate(18 248 303)" />
       </>
     )
     const hem = (
       <g clipPath={`url(#${clipId})`}>
-        <rect x="56" y="332" width="188" height="14" fill={trim} />
+        <rect x="52" y="332" width="196" height="16" fill={trim} />
       </g>
     )
 
@@ -309,9 +327,7 @@ export function DesignedOutfit({ category, design }) {
       body = (
         <>
           {paint(torso)}
-          {paint(upperL, 'ul')}{paint(upperR, 'ur')}
-          <ellipse cx="40" cy="292" rx="6" ry="19" fill={trim} transform="rotate(-28 40 292)" />
-          <ellipse cx="260" cy="292" rx="6" ry="19" fill={trim} transform="rotate(28 260 292)" />
+          {shortSleeves}
           <path d="M 118,198 Q 150,222 182,198" fill="none" stroke={trim} strokeWidth="7" strokeLinecap="round" />
           <Decal x={150} y={264} size={40} glyph={d.decal} />
         </>
@@ -359,6 +375,12 @@ export function DesignedOutfit({ category, design }) {
       body = (
         <>
           {paint(<path d={PANTS} />)}
+          {/* Ankle cuffs — the leg path narrows to a point at the ankle,
+              which leaves a gap against Pao's much wider (46px) feet; a
+              cuff ellipse at each foot bridges that gap so the pant leg
+              reads as reaching all the way down instead of floating. */}
+          <ellipse cx="108" cy="352" rx="40" ry="11" fill={main} />
+          <ellipse cx="192" cy="352" rx="40" ry="11" fill={main} />
           <line x1="150" y1="292" x2="150" y2="352" stroke={outline} strokeWidth="2" opacity=".35" />
           {waistband}
           <Decal x={104} y={322} size={22} glyph={d.decal} />
@@ -373,8 +395,8 @@ export function DesignedOutfit({ category, design }) {
     if (d.style === 'boots') {
       body = pair((x) => (
         <>
-          {paint(<path d={`M ${x - 34},340 L ${x - 30},304 Q ${x},298 ${x + 30},304 L ${x + 34},340 Z`} />, 's')}
-          {paint(<ellipse cx={x} cy="344" rx="46" ry="20" />, 'f')}
+          {paint(<path d={`M ${x - 36},340 L ${x - 30},300 Q ${x},292 ${x + 30},300 L ${x + 36},340 Z`} />, 's')}
+          {paint(<ellipse cx={x} cy="344" rx="49" ry="23" />, 'f')}
           <rect x={x - 32} y="296" width="64" height="13" rx="6.5" fill={trim} />
           <ellipse cx={x} cy="360" rx="42" ry="7" fill={darken(trim, 0.15)} />
           <Decal x={x} y={322} size={16} glyph={d.decal} />
@@ -403,7 +425,7 @@ export function DesignedOutfit({ category, design }) {
       // sneakers
       body = pair((x, side) => (
         <>
-          {paint(<ellipse cx={x} cy="338" rx="46" ry="24" />)}
+          {paint(<ellipse cx={x} cy="338" rx="49" ry="27" />)}
           <ellipse cx={x} cy="346" rx="30" ry="12" fill={lighten(main, 0.25)} opacity=".8" />
           <path d={`M ${x - 46},342 Q ${x},370 ${x + 46},342 L ${x + 44},352 Q ${x},376 ${x - 44},352 Z`} fill={trim} stroke={darken(trim, 0.25)} strokeWidth="1.5" />
           {[322, 330].map((y) => (

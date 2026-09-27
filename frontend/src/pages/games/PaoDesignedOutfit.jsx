@@ -10,12 +10,27 @@ import { THUMB_VB } from './PaoOutfits'
 
 export const DESIGN_STYLES = {
   hair: [
+    { id: 'tuft',      label: 'Tuft' },
+    { id: 'bangs',     label: 'Bangs' },
+    { id: 'curly',     label: 'Curly' },
+    { id: 'spiky',     label: 'Spiky' },
+    { id: 'bun',       label: 'Bun' },
+    { id: 'ponytail',  label: 'Ponytail' },
+    { id: 'pigtails',  label: 'Pigtails' },
+    { id: 'long',      label: 'Long' },
+  ],
+  hats: [
     { id: 'beanie',   label: 'Beanie' },
     { id: 'cap',      label: 'Cap' },
     { id: 'tophat',   label: 'Top hat' },
     { id: 'crown',    label: 'Crown' },
     { id: 'bow',      label: 'Bow' },
     { id: 'headband', label: 'Headband' },
+    { id: 'witch',    label: 'Witch hat' },
+    { id: 'santa',    label: 'Santa hat' },
+    { id: 'antlers',  label: 'Antlers' },
+    { id: 'bunny',    label: 'Bunny ears' },
+    { id: 'party',    label: 'Party hat' },
   ],
   clothes: [
     { id: 'tee',     label: 'T-shirt' },
@@ -23,6 +38,7 @@ export const DESIGN_STYLES = {
     { id: 'hoodie',  label: 'Hoodie' },
     { id: 'vest',    label: 'Vest' },
     { id: 'scarf',   label: 'Scarf' },
+    { id: 'cape',    label: 'Cape' },
   ],
   pants: [
     { id: 'pants',   label: 'Pants' },
@@ -46,6 +62,11 @@ export const DESIGN_PATTERNS = [
   { id: 'hearts',  label: 'Hearts' },
   { id: 'checks',  label: 'Checks' },
   { id: 'zigzag',  label: 'Zigzag' },
+  { id: 'snowflakes', label: 'Snowflakes' },
+  { id: 'candycane',  label: 'Candy cane' },
+  { id: 'bats',       label: 'Bats' },
+  { id: 'flowers',    label: 'Flowers' },
+  { id: 'confetti',   label: 'Confetti' },
 ]
 
 export const DESIGN_COLOURS = [
@@ -56,8 +77,12 @@ export const DESIGN_COLOURS = [
 
 export const DESIGN_DECALS = ['⭐', '❤️', '🌈', '🚀', '🐾', '🌸', '⚡', '🎵', '🍀', '🦋', '🌙', '☀️', '🍓', '🐼', '🏆', '🧩']
 
+// Natural hair shades, offered ahead of the regular palette for hair.
+export const HAIR_COLOURS = ['#2a1d13', '#5b3a1e', '#8b5a2b', '#c68642', '#f5d17a', '#d9772b', '#e5e7eb']
+
 export const DEFAULT_DESIGNS = {
-  hair:    { style: 'beanie',   main: '#3b82f6', trim: '#fbbf24', pattern: 'solid',   patternColor: '#ffffff', decal: '' },
+  hair:    { style: 'bangs',    main: '#5b3a1e', trim: '#ec4899', pattern: 'solid',   patternColor: '#ffffff', decal: '' },
+  hats:    { style: 'beanie',   main: '#3b82f6', trim: '#fbbf24', pattern: 'solid',   patternColor: '#ffffff', decal: '' },
   clothes: { style: 'tee',      main: '#22c55e', trim: '#ffffff', pattern: 'solid',   patternColor: '#ffffff', decal: '⭐' },
   pants:   { style: 'pants',    main: '#6366f1', trim: '#1f2937', pattern: 'solid',   patternColor: '#ffffff', decal: '' },
   shoes:   { style: 'sneakers', main: '#ef4444', trim: '#ffffff', pattern: 'solid',   patternColor: '#ffffff', decal: '' },
@@ -115,6 +140,41 @@ function PatternDef({ id, pattern, color }) {
       <rect width="24" height="12" fill={color} opacity=".45" />
     </pattern>
   )
+  if (pattern === 'snowflakes') return (
+    <pattern id={id} width="26" height="26" patternUnits="userSpaceOnUse">
+      <g stroke={color} strokeWidth="1.8" strokeLinecap="round">
+        <line x1="6" y1="13" x2="20" y2="13" /><line x1="9.5" y1="6.9" x2="16.5" y2="19.1" /><line x1="16.5" y1="6.9" x2="9.5" y2="19.1" />
+      </g>
+    </pattern>
+  )
+  if (pattern === 'candycane') return (
+    <pattern id={id} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="7" height="14" fill={color} />
+    </pattern>
+  )
+  if (pattern === 'bats') return (
+    <pattern id={id} width="30" height="24" patternUnits="userSpaceOnUse">
+      <path d="M15,9 Q11,3 5,5 Q8,8 3,11 Q9,11 11,15 Q13,12 15,13 Q17,12 19,15 Q21,11 27,11 Q22,8 25,5 Q19,3 15,9 Z" fill={color} />
+    </pattern>
+  )
+  if (pattern === 'flowers') return (
+    <pattern id={id} width="26" height="26" patternUnits="userSpaceOnUse">
+      {[0, 72, 144, 216, 288].map((a) => {
+        const r = (a * Math.PI) / 180
+        return <circle key={a} cx={13 + 4 * Math.cos(r)} cy={13 + 4 * Math.sin(r)} r="3" fill={color} />
+      })}
+      <circle cx="13" cy="13" r="2.2" fill="#fde68a" />
+    </pattern>
+  )
+  if (pattern === 'confetti') return (
+    <pattern id={id} width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect x="3" y="4" width="6" height="3" rx="1" fill={color} transform="rotate(25 6 5)" />
+      <rect x="18" y="8" width="6" height="3" rx="1" fill="#fbbf24" transform="rotate(-30 21 9)" />
+      <rect x="8" y="19" width="6" height="3" rx="1" fill="#22c55e" transform="rotate(60 11 20)" />
+      <rect x="21" y="22" width="6" height="3" rx="1" fill="#3b82f6" transform="rotate(10 24 23)" />
+      <circle cx="15" cy="14" r="1.8" fill="#ec4899" />
+    </pattern>
+  )
   if (pattern === 'zigzag') return (
     <pattern id={id} width="24" height="14" patternUnits="userSpaceOnUse">
       <polyline points="0,10 6,4 12,10 18,4 24,10" fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" />
@@ -142,10 +202,17 @@ const PANTS_REGION = `${WAIST} L 270,380 L 30,380 Z`
 const SHORTS_REGION = `${WAIST} L 270,334 Q 205,352 150,338 Q 95,352 30,334 Z`
 const VEST_REGION = 'M 30,150 L 139,150 L 139,338 Q 90,332 30,312 Z M 270,150 L 161,150 L 161,338 Q 210,332 270,312 Z'
 
+// Hair sits on Pao's head: circle (150,138) r=114, ears at (57,50) and
+// (243,50). CAP covers the crown down to a soft hairline; BANGS adds a
+// scalloped fringe over the forehead.
+const HAIR_CAP = 'M 0,-60 L 300,-60 L 300,118 Q 264,80 218,74 Q 184,70 150,84 Q 116,70 82,74 Q 36,80 0,118 Z'
+const HAIR_BANGS = 'M 0,-60 L 300,-60 L 300,120 Q 280,104 262,92 Q 246,106 228,86 Q 210,102 192,82 Q 172,98 150,80 Q 128,98 108,82 Q 90,102 72,86 Q 54,106 38,92 Q 20,104 0,120 Z'
+
 // `layer` lets PandaMascot slot a piece in at the right depth: 'feet'
 // (shoes, under the belly), 'body' (shirt/pants, under the arms and head),
-// 'arms' (sleeves/scarf, over the arms but under the head). 'all' draws
-// every part in order — used for the stand-alone thumbnails.
+// 'arms' (sleeves/scarf, over the arms but under the head), 'cape' (behind
+// the body), 'back'/'front' (hair behind/on the head). 'all' draws every
+// part in order — used for the stand-alone thumbnails.
 export function DesignedOutfit({ category, design, layer = 'all' }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const d = { ...DEFAULT_DESIGNS[category], ...design }
@@ -172,6 +239,7 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
     sides: `pdo-sides-${uid}`,
     footL: `pdo-footl-${uid}`,
     footR: `pdo-footr-${uid}`,
+    head: `pdo-head-${uid}`,
   }
   const url = (id) => `url(#${id})`
 
@@ -225,6 +293,7 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
   let regionD = null
   if (category === 'clothes') regionD = d.style === 'vest' ? VEST_REGION : SHIRT_REGION
   if (category === 'pants') regionD = d.style === 'shorts' ? SHORTS_REGION : PANTS_REGION
+  if (category === 'hair' && !['tuft', 'curly'].includes(d.style)) regionD = d.style === 'bangs' ? HAIR_BANGS : HAIR_CAP
 
   const defs = (
     <defs>
@@ -246,12 +315,13 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
       <clipPath id={ids.sides}><rect x="0" y="290" width="92" height="90" /><rect x="208" y="290" width="92" height="90" /></clipPath>
       <clipPath id={ids.footL}><ellipse cx="108" cy="339" rx="48.5" ry="26" /></clipPath>
       <clipPath id={ids.footR}><ellipse cx="192" cy="339" rx="48.5" ry="26" /></clipPath>
+      <clipPath id={ids.head}><circle cx="150" cy="138" r="116.5" /></clipPath>
     </defs>
   )
 
   let body = null
 
-  if (category === 'hair' && show('hair')) {
+  if (category === 'hats' && show('hats')) {
     if (d.style === 'cap') {
       body = (
         <>
@@ -297,6 +367,71 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
           <Decal x={192} y={40} size={14} glyph={d.decal} />
         </>
       )
+    } else if (d.style === 'witch') {
+      body = (
+        <>
+          <ellipse cx="150" cy="60" rx="92" ry="17" fill={darken(main, 0.25)} stroke={outline} strokeWidth="2" />
+          {paint(<path d="M 104,60 Q 124,20 140,-12 Q 150,-36 176,-46 Q 196,-50 206,-40 Q 184,-38 176,-20 Q 170,10 196,60 Z" />)}
+          <path d="M 108,42 Q 150,52 192,42 L 195,58 Q 150,68 105,58 Z" fill={trim} stroke={darken(trim, 0.3)} strokeWidth="1.5" />
+          <rect x="140" y="44" width="20" height="16" rx="3" fill="none" stroke={lighten(trim, 0.45)} strokeWidth="3.5" />
+          <Decal x={150} y={16} size={22} glyph={d.decal} />
+        </>
+      )
+    } else if (d.style === 'santa') {
+      body = (
+        <>
+          {paint(<path d="M 84,64 Q 86,2 150,-2 Q 214,-4 240,92 Q 222,44 198,36 Q 212,50 216,64 Z" />)}
+          <ellipse cx="124" cy="22" rx="18" ry="9" fill="#fff" opacity=".2" transform="rotate(-24 124 22)" />
+          <rect x="76" y="50" width="148" height="26" rx="13" fill={trim} stroke={darken(trim, 0.25)} strokeWidth="1.5" />
+          <circle cx="240" cy="94" r="15" fill={trim} stroke={darken(trim, 0.25)} strokeWidth="1.5" />
+          <Decal x={150} y={63} size={16} glyph={d.decal} />
+        </>
+      )
+    } else if (d.style === 'antlers') {
+      const antler = () => (
+        <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+          {['M 104,40 Q 92,10 76,-18', 'M 90,14 Q 70,10 56,-4', 'M 84,-2 Q 98,-14 102,-32'].map((p) => (
+            <g key={p}>
+              <path d={p} stroke={darken(main, 0.45)} strokeWidth="14" />
+              <path d={p} stroke={main} strokeWidth="9.5" />
+            </g>
+          ))}
+        </g>
+      )
+      body = (
+        <>
+          {antler()}
+          <g transform="translate(300 0) scale(-1 1)">{antler()}</g>
+          <path d="M 72,86 Q 72,20 150,16 Q 228,20 228,86" fill="none" stroke={darken(trim, 0.3)} strokeWidth="13" strokeLinecap="round" />
+          <path d="M 72,86 Q 72,20 150,16 Q 228,20 228,86" fill="none" stroke={trim} strokeWidth="9" strokeLinecap="round" />
+          <Decal x={150} y={17} size={16} glyph={d.decal} />
+        </>
+      )
+    } else if (d.style === 'bunny') {
+      const ear = () => (
+        <>
+          {paint(<ellipse cx="116" cy="-14" rx="18" ry="46" transform="rotate(-10 116 -14)" />)}
+          <ellipse cx="117" cy="-8" rx="8" ry="32" fill={trim} opacity=".9" transform="rotate(-10 117 -8)" />
+        </>
+      )
+      body = (
+        <>
+          {ear()}
+          <g transform="translate(300 0) scale(-1 1)">{ear()}</g>
+          <path d="M 72,86 Q 72,20 150,16 Q 228,20 228,86" fill="none" stroke={outline} strokeWidth="13" strokeLinecap="round" strokeOpacity=".6" />
+          <path d="M 72,86 Q 72,20 150,16 Q 228,20 228,86" fill="none" stroke={main} strokeWidth="10" strokeLinecap="round" />
+          <Decal x={150} y={17} size={16} glyph={d.decal} />
+        </>
+      )
+    } else if (d.style === 'party') {
+      body = (
+        <g transform="rotate(-8 150 40)">
+          {paint(<polygon points="110,58 150,-34 190,58" />)}
+          <path d="M 110,58 Q 150,68 190,58" fill="none" stroke={trim} strokeWidth="8" strokeLinecap="round" />
+          <circle cx="150" cy="-36" r="12" fill={trim} stroke={darken(trim, 0.3)} strokeWidth="1.5" />
+          <Decal x={150} y={24} size={20} glyph={d.decal} />
+        </g>
+      )
     } else if (d.style === 'headband') {
       body = (
         <>
@@ -323,6 +458,100 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
         </>
       )
     }
+  }
+
+  if (category === 'hair') {
+    // Hair covering the top of the head, cut to his head shape, with the
+    // head outline re-inked under it and a glossy highlight.
+    const onHead = (
+      <>
+        {regionD && (
+          <>
+            <g clipPath={url(ids.head)}>{cloth(<path d={regionD} />, 'cap')}</g>
+            <g clipPath={url(ids.region)}><circle cx="150" cy="138" r="115" fill="none" stroke={ink} strokeWidth="5" /></g>
+            <path d="M 98,40 Q 150,18 202,40" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity=".3" />
+          </>
+        )}
+      </>
+    )
+    // Soft cloud of curls: all the ink rings first, then all the fills, so
+    // the outline only shows around the outside of the cloud.
+    const cloud = (circles, key) => (
+      <g key={key}>
+        {circles.map(([cx, cy, r]) => <circle key={`o${cx}-${cy}`} cx={cx} cy={cy} r={r + 4} fill={ink} />)}
+        {circles.map(([cx, cy, r]) => <circle key={`f${cx}-${cy}`} cx={cx} cy={cy} r={r} fill={main} />)}
+        {hasPattern && circles.map(([cx, cy, r]) => <circle key={`p${cx}-${cy}`} cx={cx} cy={cy} r={r} fill={url(patId)} />)}
+        {circles.map(([cx, cy, r]) => <circle key={`s${cx}-${cy}`} cx={cx} cy={cy} r={r} fill={url(ids.shade)} />)}
+      </g>
+    )
+    const tie = (cx, cy, r = 8) => <circle cx={cx} cy={cy} r={r} fill={trim} stroke={trimInk} strokeWidth="2.5" />
+
+    let back = null
+    let front = null
+    let clip = null // [x, y, size] of the hair-clip sticker
+
+    if (d.style === 'tuft') {
+      front = cloth(<path d="M 136,30 Q 120,-4 148,-22 Q 140,0 156,10 Q 162,-12 188,-14 Q 170,4 168,30 Z" />, 'tuft')
+      clip = [182, 30, 16]
+    } else if (d.style === 'curly') {
+      const ring = (radius, from, to, step, r) => {
+        const out = []
+        for (let a = from; a <= to; a += step) {
+          const rad = (a * Math.PI) / 180
+          out.push([Math.round(150 + radius * Math.cos(rad)), Math.round(138 + radius * Math.sin(rad)), r])
+        }
+        return out
+      }
+      front = cloud([...ring(106, 205, 335, 16, 24), ...ring(84, 222, 318, 24, 22)], 'curls')
+      clip = [96, 50, 18]
+    } else if (d.style === 'spiky') {
+      back = cloth(<polygon points="56,74 30,18 86,34 88,-18 126,14 150,-38 174,14 212,-18 214,34 270,18 244,74" />, 'spikes')
+      front = onHead
+      clip = [106, 44, 16]
+    } else if (d.style === 'bun') {
+      back = (
+        <>
+          {cloth(<circle cx="150" cy="2" r="30" />, 'bun')}
+          <path d="M 132,-6 Q 150,-20 168,-6 M 134,10 Q 150,-2 166,10" fill="none" stroke={ink} strokeWidth="2.5" opacity=".35" strokeLinecap="round" />
+        </>
+      )
+      front = (<>{onHead}<ellipse cx="150" cy="28" rx="22" ry="7" fill={trim} stroke={trimInk} strokeWidth="2.5" /></>)
+      clip = [110, 42, 16]
+    } else if (d.style === 'ponytail') {
+      back = cloth(<path d="M 212,22 Q 292,18 288,110 Q 286,164 262,196 Q 270,128 244,72 Z" />, 'tail')
+      front = (<>{onHead}{tie(226, 30, 9)}</>)
+      clip = [226, 30, 14]
+    } else if (d.style === 'pigtails') {
+      back = pairLR(() => (
+        <>
+          {cloth(<ellipse cx="30" cy="124" rx="26" ry="42" transform="rotate(18 30 124)" />, 'tail')}
+          <path d="M 22,108 Q 32,128 26,152" fill="none" stroke={ink} strokeWidth="2.5" opacity=".35" strokeLinecap="round" />
+        </>
+      ), 'tails')
+      front = (
+        <>
+          {onHead}
+          <path d="M 150,62 L 150,26" stroke={ink} strokeWidth="3" strokeLinecap="round" opacity=".45" />
+          {pairLR(() => tie(46, 88))}
+        </>
+      )
+      clip = [46, 88, 15]
+    } else if (d.style === 'long') {
+      back = cloth(<path d="M 150,6 C 60,6 22,70 24,150 C 26,200 30,238 48,266 Q 70,258 84,270 Q 96,250 100,236 L 200,236 Q 204,250 216,270 Q 230,258 252,266 C 270,238 274,200 276,150 C 278,70 240,6 150,6 Z" />, 'long')
+      front = onHead
+      clip = [92, 60, 18]
+    } else {
+      // bangs
+      front = onHead
+      clip = [96, 64, 16]
+    }
+
+    body = (
+      <>
+        {show('back') && back}
+        {show('front') && (<>{front}{clip && <Decal x={clip[0]} y={clip[1]} size={clip[2]} glyph={d.decal} />}</>)}
+      </>
+    )
   }
 
   if (category === 'clothes') {
@@ -359,6 +588,7 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
 
     let bodyPart = null
     let armsPart = null
+    let capePart = null
 
     if (d.style === 'sweater') {
       bodyPart = (<>{fitted(SHIRT_REGION)}{creases}{hem}{collar}<Decal x={150} y={290} size={30} glyph={d.decal} /></>)
@@ -396,6 +626,20 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
           <Decal x={104} y={288} size={20} glyph={d.decal} />
         </>
       )
+    } else if (d.style === 'cape') {
+      // The cape hangs behind Pao's body (the 'cape' layer), so only its
+      // edges show around him; the collar and clasp sit at his neck.
+      capePart = cloth(<path d="M 92,206 Q 42,276 28,352 Q 90,372 150,362 Q 210,372 272,352 Q 258,276 208,206 Z" />, 'cape')
+      armsPart = (
+        <>
+          {pairLR(() => (
+            <path d="M 106,224 L 72,168 L 126,206 Z" fill={trim} stroke={trimInk} strokeWidth="3" strokeLinejoin="round" />
+          ))}
+          <path d="M 112,248 Q 150,266 188,248" fill="none" stroke={trim} strokeWidth="5" strokeLinecap="round" />
+          <circle cx="150" cy="258" r="9" fill={trim} stroke={trimInk} strokeWidth="2.5" />
+          <Decal x={150} y={259} size={14} glyph={d.decal} />
+        </>
+      )
     } else if (d.style === 'scarf') {
       armsPart = (
         <>
@@ -419,7 +663,7 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
       armsPart = pairLR(shortSleeve)
     }
 
-    body = (<>{show('body') && bodyPart}{show('arms') && armsPart}</>)
+    body = (<>{show('cape') && capePart}{show('body') && bodyPart}{show('arms') && armsPart}</>)
   }
 
   if (category === 'pants' && show('body')) {
@@ -564,13 +808,25 @@ export function DesignedOutfit({ category, design, layer = 'all' }) {
   return <g>{defs}{body}</g>
 }
 
-// Cropped close-up of a designed piece, same framing as OutfitThumbnail.
+// Hair is shown on a plain head so a fringe reads as a fringe.
+const THUMB_VIEWBOXES = { ...THUMB_VB, hats: THUMB_VB.hair, hair: '8 -46 284 270' }
+
 export function DesignedOutfitThumbnail({ category, design, width = 72 }) {
-  const vb = THUMB_VB[category] || '0 0 300 366'
+  const vb = THUMB_VIEWBOXES[category] || '0 0 300 366'
   const [,, vw, vh] = vb.split(' ').map(Number)
   return (
     <svg viewBox={vb} width={width} height={Math.round(width * vh / vw)} style={{ display: 'block', overflow: 'visible' }}>
-      <DesignedOutfit category={category} design={design} />
+      {category === 'hair' ? (
+        <>
+          <DesignedOutfit category="hair" design={design} layer="back" />
+          <circle cx="57" cy="50" r="38" fill="#3b2a1d" stroke="#2a1d13" strokeWidth="4" />
+          <circle cx="243" cy="50" r="38" fill="#3b2a1d" stroke="#2a1d13" strokeWidth="4" />
+          <circle cx="150" cy="138" r="114" fill="#fbfbfb" stroke="#2a1d13" strokeWidth="5" />
+          <DesignedOutfit category="hair" design={design} layer="front" />
+        </>
+      ) : (
+        <DesignedOutfit category={category} design={design} />
+      )}
     </svg>
   )
 }

@@ -205,6 +205,7 @@ export default function PandaMascot({
           <ellipse cx="192" cy="344" rx="34" ry="14" fill="url(#pm-pawG)"/>
 
           {wear('shoes', 'feet')}
+          {wear('clothes', 'cape')}
 
           {/* ── Body ── */}
           <ellipse cx="150" cy="272" rx="92" ry="84" fill="url(#pm-bodyG)" stroke="#2a1d13" strokeWidth="5"/>
@@ -240,6 +241,8 @@ export default function PandaMascot({
             </g>
           )}
 
+          {wear('hair', 'back')}
+
           {/* ── Head group ── */}
           <g>
             <circle cx="150" cy="138" r="114" fill="url(#pm-headG)" stroke="#2a1d13" strokeWidth="5"/>
@@ -248,6 +251,9 @@ export default function PandaMascot({
             <ellipse cx="102" cy="84" rx="40" ry="28" fill="white" opacity="0.35" transform="rotate(-28 102 84)"/>
             <ellipse cx="106" cy="82" rx="22" ry="14" fill="white" opacity="0.4" transform="rotate(-28 106 82)"/>
             <ellipse cx="110" cy="80" rx="10" ry="7"  fill="white" opacity="0.5" transform="rotate(-28 110 80)"/>
+
+            {/* Designed hair sits on the head but under the ears and face */}
+            {wear('hair', 'front')}
 
             {/* ── Left ear ── */}
             <g>
@@ -366,11 +372,15 @@ export default function PandaMascot({
           </g>{/* end head group */}
 
           {/* ── Outfit accessories ── */}
-          {['shoes','pants','clothes','hair'].map(cat => {
+          {['shoes','pants','clothes','hair','hats'].map(cat => {
             const id = accessories[cat]
             if (!id || id === 'none') return null
-            if (typeof id === 'object') return cat === 'hair' ? wear('hair', 'all') : null
-            const Comp = OUTFIT_MAP[cat]?.[id]
+            if (typeof id === 'object') {
+              if (cat === 'hats') return wear('hats', 'all')
+              return null
+            }
+            // Built-in hats keep their art under OUTFIT_MAP.hair
+            const Comp = OUTFIT_MAP[cat === 'hats' ? 'hair' : cat]?.[id]
             return Comp ? <Comp key={`${cat}-${id}`}/> : null
           })}
         </svg>

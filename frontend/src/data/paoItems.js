@@ -11,13 +11,16 @@
 // list — wiring an admin-managed catalog to actually grant items on the
 // patient side is a separate, larger feature (shared storage + a
 // patient-side check) beyond this page.
+// The 6 items below are hats, not hairstyles — they keep category 'Hats'
+// here, but the patient-facing PaoCustomizePage.jsx still wears them in
+// its "hair" slot, and their hand-drawn art lives at OUTFIT_MAP.hair.
 export const PAO_ITEMS = [
-  { id: 'party_hat',     name: 'Party Hat',              category: 'Hair',    emoji: '🎉', description: 'Cone hat with pompom — celebrate your first win!' },
-  { id: 'flower_crown',  name: 'Flower Crown',           category: 'Hair',    emoji: '🌸', description: 'Soft daisy chain crown, cute & gender-neutral' },
-  { id: 'wizard_hat',    name: 'Wizard Hat',             category: 'Hair',    emoji: '🧙', description: 'Starry wizard hat — perfect for the Word Wizard!' },
-  { id: 'backwards_cap', name: 'Backwards Cap',          category: 'Hair',    emoji: '🧢', description: 'Casual & playful, a mid-tier look' },
-  { id: 'bunny_ears',    name: 'Bunny Ears',             category: 'Hair',    emoji: '🐰', description: 'Soft rounded bunny ears headband' },
-  { id: 'thinking_cap',  name: 'Thinking Cap',           category: 'Hair',    emoji: '🎓', description: 'Graduation cap with a green tassel — for great problem solvers!' },
+  { id: 'party_hat',     name: 'Party Hat',              category: 'Hats',    emoji: '🎉', description: 'Cone hat with pompom — celebrate your first win!' },
+  { id: 'flower_crown',  name: 'Flower Crown',           category: 'Hats',    emoji: '🌸', description: 'Soft daisy chain crown, cute & gender-neutral' },
+  { id: 'wizard_hat',    name: 'Wizard Hat',             category: 'Hats',    emoji: '🧙', description: 'Starry wizard hat — perfect for the Word Wizard!' },
+  { id: 'backwards_cap', name: 'Backwards Cap',          category: 'Hats',    emoji: '🧢', description: 'Casual & playful, a mid-tier look' },
+  { id: 'bunny_ears',    name: 'Bunny Ears',             category: 'Hats',    emoji: '🐰', description: 'Soft rounded bunny ears headband' },
+  { id: 'thinking_cap',  name: 'Thinking Cap',           category: 'Hats',    emoji: '🎓', description: 'Graduation cap with a green tassel — for great problem solvers!' },
   { id: 'rainbow_tee',   name: 'Rainbow Tee',            category: 'Clothes', emoji: '🌈', description: 'Simple tee with a rainbow stripe across the chest' },
   { id: 'astronaut',     name: 'Astronaut Suit',         category: 'Clothes', emoji: '👨‍🚀', description: 'Puffy white suit with round belly window' },
   { id: 'hero_tee',      name: 'Superhero Cape',         category: 'Clothes', emoji: '🦸', description: 'Logo on chest + tiny cape flutter!' },
@@ -35,4 +38,4 @@ export const PAO_ITEMS = [
   { id: 'hightops',      name: 'High-Top Stars',         category: 'Shoes',   emoji: '👟', description: 'High-tops covered in star motifs' },
 ]
 
-export const PAO_ITEM_CATEGORIES = ['Hair', 'Clothes', 'Pants', 'Shoes']
+export const PAO_ITEM_CATEGORIES = ['Hair', 'Hats', 'Clothes', 'Pants', 'Shoes']

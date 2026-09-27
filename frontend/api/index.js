@@ -54,6 +54,14 @@ import exercisesDelete from './_lib/routes/exercises-delete.js'
 import badgesList from './_lib/routes/badges-list.js'
 import badgesCreate from './_lib/routes/badges-create.js'
 import badgesItem from './_lib/routes/badges-item.js'
+import paoItemsList from './_lib/routes/pao-items-list.js'
+import paoItemsCreate from './_lib/routes/pao-items-create.js'
+import paoItemsItem from './_lib/routes/pao-items-item.js'
+import paoHairList from './_lib/routes/pao-hair-list.js'
+import paoHairCreate from './_lib/routes/pao-hair-create.js'
+import paoHairItem from './_lib/routes/pao-hair-item.js'
+import paoThemesList from './_lib/routes/pao-themes-list.js'
+import paoThemesItem from './_lib/routes/pao-themes-item.js'
 
 const app = express()
 
@@ -102,6 +110,14 @@ app.all('/api/exercises/:id', exercisesDelete)
 app.all('/api/badges/list', badgesList)
 app.all('/api/badges/create', badgesCreate)
 app.all('/api/badges/:id', badgesItem)
+app.all('/api/pao-items/list', paoItemsList)
+app.all('/api/pao-items/create', paoItemsCreate)
+app.all('/api/pao-items/:id', paoItemsItem)
+app.all('/api/pao-hair/list', paoHairList)
+app.all('/api/pao-hair/create', paoHairCreate)
+app.all('/api/pao-hair/:id', paoHairItem)
+app.all('/api/pao-themes/list', paoThemesList)
+app.all('/api/pao-themes/:code', paoThemesItem)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

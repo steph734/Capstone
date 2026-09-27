@@ -2,8 +2,11 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
-import { PAO_ITEMS, PAO_ITEM_CATEGORIES } from '../../data/paoItems'
+import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
+import { PAO_THEMES, themeById } from '../../data/paoThemes'
+import { isSchemaLegal } from './paoSchemaLimits'
 import PaoClothingDesigner, { WardrobeItemThumb } from './PaoClothingDesigner'
+import PaoThemeSets from './PaoThemeSets'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
   ShuffleIcon, GameControllerIcon, ShirtIcon,
@@ -153,7 +156,7 @@ function ruleClause(form) {
 }
 function describeForSave(form, clothesList) {
   const base = ruleClause(form)
-  const item = clothesList.find((i) => i.id === form.unlockItemCode)
+  const item = clothesList.find((i) => i.code === form.unlockItemCode)
   return item ? `${base} · unlocks ${item.name}` : base
 }
 
@@ -161,22 +164,6 @@ const emptyForm = {
   name: '', shape: 'circle', colour: 'gold', symbol: 'star',
   criteriaType: 'complete_any_game', criteriaGameId: null, criteriaValue: null,
   unlockItemCode: '', isActive: true,
-}
-
-// Admin-designed wardrobe is kept in this browser until the catalog gets
-// its own collection — so a designed piece survives a page refresh.
-const WARDROBE_STORAGE_KEY = 'therapypro_pao_wardrobe_v1'
-
-function loadWardrobe() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(WARDROBE_STORAGE_KEY) || 'null')
-    if (Array.isArray(saved)) return saved
-  } catch { /* storage unavailable or corrupt — fall back to the seed list */ }
-  return PAO_ITEMS
-}
-
-function slugifyLocal(name) {
-  return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'item'
 }
 
 /* ── Badge medal: a real award-ribbon icon (shape + colour + symbol),
@@ -265,19 +252,22 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
 
-  // Pao's wardrobe catalog — not in Mongo (no schema was given for this
-  // one, unlike badges), so it's saved to localStorage instead. Seeded from
-  // src/data/paoItems.js, which also mirrors the real item ids/names a
-  // patient sees in PaoCustomizePage.jsx. Items made in the designer carry
-  // a `design` object; the seeded ones use Pao's hand-drawn art.
-  const [clothes, setClothes] = useState(loadWardrobe)
+  // Pao's wardrobe — hats/clothes/pants/shoes live in the `pao_items`
+  // collection, real hairstyles in the separate `pao_hair` collection (its
+  // design.style enum has no hairstyle values), and theme-set membership
+  // in `pao_themes`. `wardrobe` is the raw merge of the two item
+  // collections, each doc tagged `source` so saves/deletes know which API
+  // to call; `clothes` (below) is the enriched view components use.
+  const [wardrobe, setWardrobe] = useState([])
+  const [themes, setThemes] = useState([])
+  const [clothesLoading, setClothesLoading] = useState(true)
+  const [clothesLoadError, setClothesLoadError] = useState('')
   const [clothesFilter, setClothesFilter] = useState('All')
+  const [themeFilter, setThemeFilter] = useState('all') // 'all' | 'everyday' | theme id
+  const [showThemeSets, setShowThemeSets] = useState(false)
+  const [addingThemeId, setAddingThemeId] = useState(null)
   const [editingClothingId, setEditingClothingId] = useState(null)
   const [showClothingEditor, setShowClothingEditor] = useState(false)
-
-  useEffect(() => {
-    try { localStorage.setItem(WARDROBE_STORAGE_KEY, JSON.stringify(clothes)) } catch { /* ignore */ }
-  }, [clothes])
 
   // { kind: 'badge' | 'clothing', item } while a delete confirmation is open.
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -295,6 +285,42 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setClothesLoading(true)
+    Promise.all([
+      fetch('/api/pao-items/list').then((r) => r.json().then((body) => ({ ok: r.ok, body }))),
+      fetch('/api/pao-hair/list').then((r) => r.json().then((body) => ({ ok: r.ok, body }))),
+      fetch('/api/pao-themes/list').then((r) => r.json().then((body) => ({ ok: r.ok, body }))),
+    ])
+      .then(([itemsRes, hairRes, themesRes]) => {
+        if (cancelled) return
+        if (!itemsRes.ok) throw new Error(itemsRes.body.error || 'Could not load hats/clothes/pants/shoes.')
+        if (!hairRes.ok) throw new Error(hairRes.body.error || 'Could not load hairstyles.')
+        if (!themesRes.ok) throw new Error(themesRes.body.error || 'Could not load themes.')
+        setWardrobe([
+          ...itemsRes.body.items.map((i) => ({ ...i, source: 'items' })),
+          ...hairRes.body.items.map((i) => ({ ...i, source: 'hair' })),
+        ])
+        setThemes(themesRes.body.themes || [])
+      })
+      .catch((e) => { if (!cancelled) setClothesLoadError(e.message || "Could not load Pao's wardrobe.") })
+      .finally(() => { if (!cancelled) setClothesLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // pao_items has no theme field of its own (only pao_themes.set_items
+  // points at it) — this cross-references every theme's set_items to tag
+  // those pieces with the theme they belong to, the same way pao_hair
+  // pieces already carry it directly via theme_code.
+  const clothes = useMemo(() => {
+    const codeToTheme = {}
+    themes.forEach((t) => {
+      Object.values(t.setItems || {}).forEach((code) => { if (code) codeToTheme[code] = t.code })
+    })
+    return wardrobe.map((w) => ({ ...w, theme: w.theme || codeToTheme[w.code] || null }))
+  }, [wardrobe, themes])
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3200) }
 
@@ -422,10 +448,19 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     ...Object.fromEntries(PAO_ITEM_CATEGORIES.map((cat) => [cat, clothes.filter((c) => c.category === cat).length])),
   }), [clothes])
 
-  const visibleClothes = useMemo(() => {
-    if (clothesFilter === 'All') return clothes
-    return clothes.filter((c) => c.category === clothesFilter)
-  }, [clothes, clothesFilter])
+  const visibleClothes = useMemo(() => clothes.filter((c) => {
+    if (clothesFilter !== 'All' && c.category !== clothesFilter) return false
+    if (themeFilter === 'everyday') return !c.theme
+    if (themeFilter !== 'all') return c.theme === themeFilter
+    return true
+  }), [clothes, clothesFilter, themeFilter])
+
+  // Only themes that actually have pieces get a filter chip.
+  const themeCounts = useMemo(() => {
+    const counts = {}
+    clothes.forEach((c) => { if (c.theme) counts[c.theme] = (counts[c.theme] || 0) + 1 })
+    return counts
+  }, [clothes])
 
   const editingClothing = useMemo(() => clothes.find((c) => c.id === editingClothingId) || null, [clothes, editingClothingId])
 
@@ -439,27 +474,114 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     setShowClothingEditor(true)
   }
 
-  const saveClothing = (data) => {
-    if (editingClothing) {
-      setClothes((current) => current.map((c) => (c.id === editingClothing.id ? { ...c, ...data } : c)))
-      showToast(`Saved ${data.name}`)
-    } else {
-      const base = slugifyLocal(data.name)
-      let candidate = base
-      let n = 2
-      while (clothes.some((c) => c.id === candidate)) {
-        candidate = `${base}_${n}`
-        n += 1
+  const paoEndpointFor = (isHair) => (isHair ? '/api/pao-hair' : '/api/pao-items')
+
+  const saveClothing = async (data) => {
+    const targetIsHair = data.category === 'Hair'
+    const payload = targetIsHair
+      ? { name: data.name, description: data.description, emoji: data.emoji, theme: data.theme, design: data.design, adminEmail: user?.email }
+      : { name: data.name, category: data.category, description: data.description, emoji: data.emoji, design: data.design, adminEmail: user?.email }
+    // Editing may change slot from Hair to a hat/clothes/pants/shoes (or
+    // back) — that's a move between collections, not a plain update, since
+    // pao_hair and pao_items are separate. Create in the target, then drop
+    // the old doc, rather than trying to PATCH across collections.
+    const movingCollections = editingClothing && ((editingClothing.source === 'hair') !== targetIsHair)
+
+    try {
+      let saved
+      if (editingClothing && !movingCollections) {
+        const res = await fetch(`${paoEndpointFor(targetIsHair)}/${editingClothing.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+        saved = { ...body.item, source: targetIsHair ? 'hair' : 'items' }
+        setWardrobe((current) => current.map((c) => (c.id === editingClothing.id ? saved : c)))
+      } else {
+        const res = await fetch(`${paoEndpointFor(targetIsHair)}/create`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+        saved = { ...body.item, source: targetIsHair ? 'hair' : 'items' }
+        if (movingCollections) {
+          await fetch(`${paoEndpointFor(editingClothing.source === 'hair')}/${editingClothing.id}`, { method: 'DELETE' }).catch(() => {})
+          setWardrobe((current) => [...current.filter((c) => c.id !== editingClothing.id), saved])
+        } else {
+          setWardrobe((current) => [...current, saved])
+          setClothesFilter((f) => (f === 'All' || f === data.category ? f : data.category))
+        }
       }
-      setClothes((current) => [...current, { id: candidate, ...data }])
-      setClothesFilter((f) => (f === 'All' || f === data.category ? f : data.category))
-      showToast(`${data.name} added to Pao's wardrobe`)
+      showToast(editingClothing ? `Saved ${data.name}` : `${data.name} added to Pao's wardrobe`)
+      setShowClothingEditor(false)
+    } catch (err) {
+      showToast(err.message || 'Could not save the item.')
     }
-    setShowClothingEditor(false)
   }
 
-  const deleteClothingItem = (item) => {
-    setClothes((current) => current.filter((c) => c.id !== item.id))
+  const deleteClothingItem = async (item) => {
+    try {
+      const res = await fetch(`${paoEndpointFor(item.source === 'hair')}/${item.id}`, { method: 'DELETE' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      setWardrobe((current) => current.filter((c) => c.id !== item.id))
+    } catch (err) {
+      showToast(err.message || 'Could not delete the item.')
+    }
+  }
+
+  // One-click "add this theme's set": creates whichever pieces the real
+  // schema can represent (see paoSchemaLimits.js) and links them into the
+  // theme's set_items; a look using a style/pattern pao_items doesn't
+  // support yet (e.g. a Witch Hat) is skipped rather than failing loudly,
+  // since most of a theme's pieces still go through fine.
+  const addThemeSet = async (theme) => {
+    if (addingThemeId) return
+    setAddingThemeId(theme.id)
+    const serverTheme = themes.find((t) => t.code === theme.id)
+    const setItems = { ...(serverTheme?.setItems || {}) }
+    const created = []
+    const skipped = []
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [uiCategory, look] of Object.entries(theme.looks)) {
+      const slotKey = uiCategory.toLowerCase()
+      if (setItems[slotKey]) continue // already added
+      if (!isSchemaLegal(uiCategory, look.design)) { skipped.push(look.name); continue }
+      const isHair = uiCategory === 'Hair'
+      const payload = isHair
+        ? { name: look.name, description: look.description, emoji: look.design.decal || theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
+        : { name: look.name, category: uiCategory, description: look.description, emoji: look.design.decal || theme.icon, design: look.design, adminEmail: user?.email }
+      // eslint-disable-next-line no-await-in-loop
+      const res = await fetch(`${paoEndpointFor(isHair)}/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      })
+      // eslint-disable-next-line no-await-in-loop
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { skipped.push(look.name); continue }
+      created.push({ ...body.item, source: isHair ? 'hair' : 'items' })
+      setItems[slotKey] = body.item.code
+    }
+
+    if (created.length) {
+      setWardrobe((current) => [...current, ...created])
+      const res = await fetch(`/api/pao-themes/${theme.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setItems }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) setThemes((current) => current.map((t) => (t.code === theme.id ? body.theme : t)))
+    }
+
+    if (created.length && skipped.length) {
+      showToast(`Added ${created.length} piece${created.length === 1 ? '' : 's'} from the ${theme.label} set — ${skipped.length} couldn't be saved yet.`)
+    } else if (created.length) {
+      showToast(`Added the ${theme.label} set to Pao's wardrobe`)
+    } else if (skipped.length) {
+      showToast(`Couldn't save the ${theme.label} set — those styles aren't supported by the wardrobe schema yet.`)
+    } else {
+      showToast(`The ${theme.label} set is already in the wardrobe`)
+    }
+    setAddingThemeId(null)
   }
 
   const confirmDelete = () => {
@@ -614,8 +736,13 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       )}
 
       {pageTab === 'Clothes' && (
+      clothesLoading ? (
+        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading Pao's wardrobe…</p>
+      ) : clothesLoadError ? (
+        <p style={{ color: '#b91c1c', fontSize: 14 }}>{clothesLoadError}</p>
+      ) : (
       <>
-      <div className="admin-stats-grid badge-kpi-grid">
+      <div className="admin-stats-grid badge-kpi-grid wardrobe-kpi-grid">
         <section className="badge-kpi-card">
           <span className="badge-kpi-icon badge-kpi-icon-total"><ShirtIcon size={18} /></span>
           <div className="badge-kpi-text">
@@ -630,7 +757,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div className="badge-kpi-text">
               <h3>{clothesFilterCounts[cat]}</h3>
               <p>{cat}</p>
-              <span className="badge-kpi-meta">Unlockable items</span>
+              <span className="badge-kpi-meta">Unlockable</span>
             </div>
           </section>
         ))}
@@ -642,7 +769,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <h3>Pao's wardrobe</h3>
             <p>Design outfit pieces for Pao that badges can unlock</p>
           </div>
-          <button className="admin-btn" onClick={openCreateClothing}>Design new item</button>
+          <div className="admin-button-row">
+            <button className="admin-btn-secondary" onClick={() => setShowThemeSets(true)}>🎃 Theme sets</button>
+            <button className="admin-btn" onClick={openCreateClothing}>Design new item</button>
+          </div>
         </div>
 
         <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
@@ -658,6 +788,17 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
               </button>
             ))}
           </div>
+          {Object.keys(themeCounts).length > 0 && (
+            <div className="wardrobe-theme-row" role="radiogroup" aria-label="Theme">
+              <button type="button" className={themeFilter === 'all' ? 'active' : ''} onClick={() => setThemeFilter('all')}>All themes</button>
+              <button type="button" className={themeFilter === 'everyday' ? 'active' : ''} onClick={() => setThemeFilter('everyday')}>Everyday</button>
+              {PAO_THEMES.filter((t) => themeCounts[t.id]).map((t) => (
+                <button key={t.id} type="button" className={themeFilter === t.id ? 'active' : ''} onClick={() => setThemeFilter(t.id)}>
+                  {t.icon} {t.label} <span className="badge-filter-count">{themeCounts[t.id]}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {visibleClothes.length === 0 ? (
@@ -679,6 +820,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                   <div className="wardrobe-card-pills">
                     <span className="admin-pill gray">{item.category}</span>
                     {item.design && <span className="admin-pill purple">Custom design</span>}
+                    {themeById(item.theme) && <span className="admin-pill wardrobe-theme-pill">{themeById(item.theme).icon} {themeById(item.theme).label}</span>}
                   </div>
                   <p>{item.description}</p>
                 </div>
@@ -696,6 +838,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
         )}
       </div>
       </>
+      )
       )}
 
       {showEditor && (
@@ -799,10 +942,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     onChange={(event) => setForm((f) => ({ ...f, unlockItemCode: event.target.value }))}
                   >
                     <option value="">None</option>
-                    {PAO_ITEM_CATEGORIES.map((cat) => (
+                    {PAO_ITEM_CATEGORIES.filter((cat) => clothes.some((i) => i.category === cat)).map((cat) => (
                       <optgroup key={cat} label={cat}>
                         {clothes.filter((i) => i.category === cat).map((i) => (
-                          <option key={i.id} value={i.id}>{i.name}</option>
+                          <option key={i.id} value={i.code}>{i.name}</option>
                         ))}
                       </optgroup>
                     ))}
@@ -837,6 +980,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           onSave={saveClothing}
           onClose={() => setShowClothingEditor(false)}
         />
+      )}
+
+      {showThemeSets && (
+        <PaoThemeSets clothes={clothes} addingId={addingThemeId} onAdd={addThemeSet} onClose={() => setShowThemeSets(false)} />
       )}
 
       {deleteTarget && (

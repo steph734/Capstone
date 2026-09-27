@@ -8,7 +8,7 @@ import PaoClothingDesigner, { WardrobeItemThumb } from './PaoClothingDesigner'
 import PaoThemeSets from './PaoThemeSets'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
-  ShuffleIcon, GameControllerIcon, ShirtIcon,
+  ShuffleIcon, GameControllerIcon, ShirtIcon, CheckIcon,
 } from './gamifiedIcons'
 import './GamifiedBadgesPage.css'
 
@@ -271,6 +271,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   // { kind: 'badge' | 'clothing', item } while a delete confirmation is open.
   const [deleteTarget, setDeleteTarget] = useState(null)
 
+  // { name, category } for the "added to the database" confirmation modal
+  // shown right after a brand-new wardrobe item is created (not on edits).
+  const [addedConfirmation, setAddedConfirmation] = useState(null)
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -511,8 +515,12 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           setClothesFilter((f) => (f === 'All' || f === data.category ? f : data.category))
         }
       }
-      showToast(editingClothing ? `Saved ${data.name}` : `${data.name} added to Pao's wardrobe`)
       setShowClothingEditor(false)
+      if (editingClothing) {
+        showToast(`Saved ${data.name}`)
+      } else {
+        setAddedConfirmation({ name: data.name, category: data.category })
+      }
     } catch (err) {
       showToast(err.message || 'Could not save the item.')
     }
@@ -996,6 +1004,21 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div className="admin-confirm-actions">
               <button className="admin-confirm-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
               <button className="admin-confirm-ok" onClick={confirmDelete}>Yes, delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addedConfirmation && (
+        <div className="admin-modal-backdrop" onClick={() => setAddedConfirmation(null)}>
+          <div className="admin-confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-confirm-icon" style={{ color: '#15803d', background: '#dcfce7' }}><CheckIcon size={32} /></div>
+            <h3 className="admin-confirm-title">Added to Pao's wardrobe!</h3>
+            <p className="admin-confirm-msg">
+              <strong>{addedConfirmation.name}</strong> ({addedConfirmation.category}) was saved and recorded in the database.
+            </p>
+            <div className="admin-confirm-actions">
+              <button className="admin-btn" style={{ flex: 1 }} onClick={() => setAddedConfirmation(null)}>Got it</button>
             </div>
           </div>
         </div>

@@ -10,6 +10,9 @@ export const PAO_HAIR_PATTERNS = [
   'solid', 'stripes', 'dots', 'stars', 'hearts', 'checks', 'zigzag',
   'snowflakes', 'candycane', 'bats', 'flowers', 'confetti',
 ]
+// Drawn hair clips (see HAIR_CLIPS in PaoDesignedOutfit.jsx) — the clip is
+// an id painted in tie_color client-side, not a free-form emoji.
+export const PAO_HAIR_CLIPS = ['bow', 'heart', 'star', 'flower', 'butterfly', 'barrette', 'snap', 'pearls', 'bobby']
 
 const paoHairSchema = new mongoose.Schema(
   {
@@ -23,7 +26,7 @@ const paoHairSchema = new mongoose.Schema(
     tie_color: { type: String, required: true, match: /^#[0-9a-fA-F]{6}$/ },
     pattern: { type: String, required: true, enum: PAO_HAIR_PATTERNS },
     pattern_color: { type: String, default: null, match: /^#[0-9a-fA-F]{6}$/ },
-    clip: { type: String, default: null, maxlength: 16 },
+    clip: { type: String, default: null, enum: [...PAO_HAIR_CLIPS, null] },
     is_active: { type: Boolean, required: true, default: true },
     sort_order: { type: Number, default: null },
     created_by: { type: mongoose.Schema.Types.ObjectId, default: null },

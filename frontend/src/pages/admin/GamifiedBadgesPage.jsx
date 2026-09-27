@@ -550,7 +550,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       if (!isSchemaLegal(uiCategory, look.design)) { skipped.push(look.name); continue }
       const isHair = uiCategory === 'Hair'
       const payload = isHair
-        ? { name: look.name, description: look.description, emoji: look.design.decal || theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
+        // Hair clips are drawn (their id isn't an emoji), so hair falls back to the theme icon
+        ? { name: look.name, description: look.description, emoji: (uiCategory !== 'Hair' && look.design.decal) || theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
         : { name: look.name, category: uiCategory, description: look.description, emoji: look.design.decal || theme.icon, design: look.design, adminEmail: user?.email }
       // eslint-disable-next-line no-await-in-loop
       const res = await fetch(`${paoEndpointFor(isHair)}/create`, {

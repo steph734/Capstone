@@ -376,6 +376,7 @@ export default function PandaMascot({
             const id = accessories[cat]
             if (!id || id === 'none') return null
             if (typeof id === 'object') {
+              if (cat === 'hair') return wear('hair', 'clip')
               if (cat === 'hats') return wear('hats', 'all')
               return null
             }

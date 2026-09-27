@@ -470,6 +470,10 @@
 
 .pao-designer-actions { justify-content: flex-end; }
 
+/* Drawn hair-clip picker */
+.pao-clip-tile { width: 76px; padding: 6px 4px; gap: 2px; }
+.pao-clip-tile svg { display: block; }
+
 /* ── Themes ─────────────────────────────────────────────── */
 .pao-theme-row,
 .wardrobe-theme-row { display: flex; flex-wrap: wrap; gap: 8px; }

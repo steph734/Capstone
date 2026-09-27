@@ -3,7 +3,7 @@ import PandaMascot from '../games/PandaMascot'
 import { OutfitThumbnail } from '../games/PaoOutfits'
 import {
   DesignedOutfitThumbnail, DESIGN_STYLES, DESIGN_PATTERNS, DESIGN_COLOURS,
-  DESIGN_DECALS, DEFAULT_DESIGNS, HAIR_COLOURS,
+  DESIGN_DECALS, DEFAULT_DESIGNS, HAIR_COLOURS, HAIR_CLIPS, HairClipShape,
 } from '../games/PaoDesignedOutfit'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
@@ -152,7 +152,7 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
       trim: pick(trimPool.length ? trimPool : DESIGN_COLOURS),
       pattern: pick(patternOptions).id,
       patternColor: pick(['#ffffff', '#fbbf24', '#1f2937', '#ec4899']),
-      decal: Math.random() < 0.6 ? pick(decalPool) : '',
+      decal: Math.random() < 0.6 ? (cat === 'hair' ? pick(HAIR_CLIPS).id : pick(decalPool)) : '',
     })
   }
 
@@ -164,7 +164,8 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
       name: trimmedName,
       category,
       description: description.trim() || (design ? describeDesign(category, design) : ''),
-      emoji: design ? (design.decal || theme?.icon || CATEGORY_ICONS[category]) : item?.emoji,
+      // Hair clips are drawn (their id isn't an emoji), so hair uses the slot/theme icon
+      emoji: design ? ((cat !== 'hair' && design.decal) || theme?.icon || CATEGORY_ICONS[category]) : item?.emoji,
       theme: themeId,
       ...(design ? { design } : {}),
     })
@@ -331,7 +332,7 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
                     >
                       None
                     </button>
-                    {themeFirst(theme?.decals, DESIGN_DECALS).map((glyph) => (
+                    {cat !== 'hair' && themeFirst(theme?.decals, DESIGN_DECALS).map((glyph) => (
                       <button
                         key={glyph}
                         type="button"
@@ -343,6 +344,23 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
                       </button>
                     ))}
                   </div>
+                  {cat === 'hair' && (
+                    <div className="pao-tile-grid">
+                      {HAIR_CLIPS.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`pao-tile pao-clip-tile${design.decal === c.id ? ' selected' : ''}`}
+                          onClick={() => setField('decal', c.id)}
+                        >
+                          <svg viewBox="-18 -14 36 28" width="40" height="31" aria-hidden="true">
+                            <HairClipShape type={c.id} color={design.trim} />
+                          </svg>
+                          <span className="pao-tile-label">{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </Step>
               </>
             )}

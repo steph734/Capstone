@@ -7,7 +7,6 @@ import {
 } from '../games/PaoDesignedOutfit'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
-import { SCHEMA_STYLES, SCHEMA_PATTERNS } from './paoSchemaLimits'
 import { ShirtIcon, ShuffleIcon } from './gamifiedIcons'
 
 const CATEGORY_ICONS = { Hair: '💇', Hats: '🎩', Clothes: '👕', Pants: '👖', Shoes: '👟' }
@@ -107,11 +106,8 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
   const autoText = useRef({ name: '', description: '' })
 
   const cat = catKey(category)
-  // Only offer what pao_items/pao_hair can actually save — see
-  // paoSchemaLimits.js for why hats/clothes/pants/shoes are more limited
-  // than Hair.
-  const styles = category === 'Hair' ? DESIGN_STYLES[cat] : DESIGN_STYLES[cat].filter((s) => SCHEMA_STYLES[category]?.includes(s.id))
-  const patternOptions = category === 'Hair' ? DESIGN_PATTERNS : DESIGN_PATTERNS.filter((p) => SCHEMA_PATTERNS.includes(p.id))
+  const styles = DESIGN_STYLES[cat]
+  const patternOptions = DESIGN_PATTERNS
   const isBuiltIn = !design
   const setField = (field, value) => setDesign((d) => ({ ...d, [field]: value }))
 

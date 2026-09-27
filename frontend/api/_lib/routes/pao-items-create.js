@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { name, category, description, emoji, design, adminEmail } = req.body || {}
+  const { name, category, description, emoji, theme, design, adminEmail } = req.body || {}
 
   if (!str(name)) return res.status(400).json({ error: 'Item name is required.' })
   const dbCategory = dbCategoryFromUi(category)
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       description: str(description) || null,
       emoji: str(emoji) || null,
       is_builtin: false,
+      theme_code: str(theme) || null,
       design: {
         style: design.style,
         main_color: design.main,

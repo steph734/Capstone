@@ -1,18 +1,19 @@
-// Matches the `pao_items` collection's $jsonSchema validator. Holds Pao's
+// Matches the `clothes` collection's $jsonSchema validator. Holds Pao's
 // hats, clothes, pants and shoes — real hairstyles live in the separate
-// `pao_hair` collection instead (see paoHair.js), since this collection's
-// own `design.style` enum has no hairstyle values. `category: 'hair'` here
-// means "worn in Pao's hair slot", i.e. a hat.
+// `pao_hair` collection instead (see paoHair.js).
 import mongoose from 'mongoose'
 
-export const PAO_ITEM_CATEGORIES = ['hair', 'clothes', 'pants', 'shoes']
+export const PAO_ITEM_CATEGORIES = ['hats', 'clothes', 'pants', 'shoes']
 export const PAO_ITEM_STYLES = [
-  'beanie', 'cap', 'tophat', 'crown', 'bow', 'headband',
-  'tee', 'sweater', 'hoodie', 'vest', 'scarf',
+  'beanie', 'cap', 'tophat', 'crown', 'bow', 'headband', 'witch', 'santa', 'antlers', 'bunny', 'party',
+  'tee', 'sweater', 'hoodie', 'vest', 'scarf', 'cape',
   'pants', 'shorts', 'skirt', 'joggers',
   'sneakers', 'boots', 'slippers', 'sandals',
 ]
-export const PAO_ITEM_PATTERNS = ['solid', 'stripes', 'dots', 'stars', 'hearts', 'checks', 'zigzag']
+export const PAO_ITEM_PATTERNS = [
+  'solid', 'stripes', 'dots', 'stars', 'hearts', 'checks', 'zigzag',
+  'snowflakes', 'candycane', 'bats', 'flowers', 'confetti',
+]
 
 const paoItemDesignSchema = new mongoose.Schema(
   {
@@ -34,13 +35,14 @@ const paoItemSchema = new mongoose.Schema(
     description: { type: String, default: null, maxlength: 200 },
     emoji: { type: String, default: null, maxlength: 16 },
     is_builtin: { type: Boolean, required: true, default: false },
+    theme_code: { type: String, default: null, match: /^[a-z0-9_]+$/ },
     design: { type: paoItemDesignSchema, default: null },
     is_active: { type: Boolean, required: true, default: true },
     sort_order: { type: Number, default: null },
     created_by: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   {
-    collection: 'pao_items',
+    collection: 'clothes',
     versionKey: false,
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   }

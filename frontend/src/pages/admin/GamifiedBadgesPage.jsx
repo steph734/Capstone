@@ -4,7 +4,6 @@ import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
-import { isSchemaLegal } from './paoSchemaLimits'
 import PaoClothingDesigner, { WardrobeItemThumb } from './PaoClothingDesigner'
 import PaoThemeSets from './PaoThemeSets'
 import {
@@ -480,7 +479,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     const targetIsHair = data.category === 'Hair'
     const payload = targetIsHair
       ? { name: data.name, description: data.description, emoji: data.emoji, theme: data.theme, design: data.design, adminEmail: user?.email }
-      : { name: data.name, category: data.category, description: data.description, emoji: data.emoji, design: data.design, adminEmail: user?.email }
+      : { name: data.name, category: data.category, description: data.description, emoji: data.emoji, theme: data.theme, design: data.design, adminEmail: user?.email }
     // Editing may change slot from Hair to a hat/clothes/pants/shoes (or
     // back) — that's a move between collections, not a plain update, since
     // pao_hair and pao_items are separate. Create in the target, then drop
@@ -530,11 +529,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     }
   }
 
-  // One-click "add this theme's set": creates whichever pieces the real
-  // schema can represent (see paoSchemaLimits.js) and links them into the
-  // theme's set_items; a look using a style/pattern pao_items doesn't
-  // support yet (e.g. a Witch Hat) is skipped rather than failing loudly,
-  // since most of a theme's pieces still go through fine.
+  // One-click "add this theme's set": creates every piece and links them
+  // into the theme's set_items. A create can still fail for an unrelated
+  // reason (a duplicate code, a transient error) — that's skipped rather
+  // than aborting the whole set.
   const addThemeSet = async (theme) => {
     if (addingThemeId) return
     setAddingThemeId(theme.id)
@@ -547,12 +545,11 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     for (const [uiCategory, look] of Object.entries(theme.looks)) {
       const slotKey = uiCategory.toLowerCase()
       if (setItems[slotKey]) continue // already added
-      if (!isSchemaLegal(uiCategory, look.design)) { skipped.push(look.name); continue }
       const isHair = uiCategory === 'Hair'
       const payload = isHair
         // Hair clips are drawn (their id isn't an emoji), so hair falls back to the theme icon
-        ? { name: look.name, description: look.description, emoji: (uiCategory !== 'Hair' && look.design.decal) || theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
-        : { name: look.name, category: uiCategory, description: look.description, emoji: look.design.decal || theme.icon, design: look.design, adminEmail: user?.email }
+        ? { name: look.name, description: look.description, emoji: theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
+        : { name: look.name, category: uiCategory, description: look.description, emoji: look.design.decal || theme.icon, theme: theme.id, design: look.design, adminEmail: user?.email }
       // eslint-disable-next-line no-await-in-loop
       const res = await fetch(`${paoEndpointFor(isHair)}/create`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -574,11 +571,11 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     }
 
     if (created.length && skipped.length) {
-      showToast(`Added ${created.length} piece${created.length === 1 ? '' : 's'} from the ${theme.label} set — ${skipped.length} couldn't be saved yet.`)
+      showToast(`Added ${created.length} piece${created.length === 1 ? '' : 's'} from the ${theme.label} set — ${skipped.length} couldn't be saved.`)
     } else if (created.length) {
       showToast(`Added the ${theme.label} set to Pao's wardrobe`)
     } else if (skipped.length) {
-      showToast(`Couldn't save the ${theme.label} set — those styles aren't supported by the wardrobe schema yet.`)
+      showToast(`Couldn't save the ${theme.label} set — please try again.`)
     } else {
       showToast(`The ${theme.label} set is already in the wardrobe`)
     }

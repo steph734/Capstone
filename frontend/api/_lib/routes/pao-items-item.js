@@ -18,7 +18,7 @@ async function handlePatch(req, res) {
   const id = req.params?.id
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'Invalid item id.' })
 
-  const { name, category, description, emoji, design, isActive } = req.body || {}
+  const { name, category, description, emoji, theme, design, isActive } = req.body || {}
 
   const update = {}
   if (name !== undefined) update.name = str(name)
@@ -29,6 +29,7 @@ async function handlePatch(req, res) {
   }
   if (description !== undefined) update.description = str(description) || null
   if (emoji !== undefined) update.emoji = str(emoji) || null
+  if (theme !== undefined) update.theme_code = str(theme) || null
   if (design !== undefined) {
     update.design = design ? {
       style: design.style,

@@ -3,17 +3,16 @@ import { PaoItem } from '../models/paoItem.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 
 // The original hand-drawn wardrobe (OUTFIT_MAP in PaoOutfits.jsx) — seeded
-// into pao_items the first time the collection is empty, same idea as a
-// migration's initial data. `category: 'hair'` here means "hat" (see
-// serializePaoItem.js); is_builtin items keep design: null forever unless
-// an admin explicitly redesigns them.
+// into the `clothes` collection the first time it's empty, same idea as a
+// migration's initial data. is_builtin items keep design: null forever
+// unless an admin explicitly redesigns them.
 const BUILT_INS = [
-  { code: 'party_hat', name: 'Party Hat', category: 'hair', emoji: '🎉', description: 'Cone hat with pompom — celebrate your first win!' },
-  { code: 'flower_crown', name: 'Flower Crown', category: 'hair', emoji: '🌸', description: 'Soft daisy chain crown, cute & gender-neutral' },
-  { code: 'wizard_hat', name: 'Wizard Hat', category: 'hair', emoji: '🧙', description: 'Starry wizard hat — perfect for the Word Wizard!' },
-  { code: 'backwards_cap', name: 'Backwards Cap', category: 'hair', emoji: '🧢', description: 'Casual & playful, a mid-tier look' },
-  { code: 'bunny_ears', name: 'Bunny Ears', category: 'hair', emoji: '🐰', description: 'Soft rounded bunny ears headband' },
-  { code: 'thinking_cap', name: 'Thinking Cap', category: 'hair', emoji: '🎓', description: 'Graduation cap with a green tassel — for great problem solvers!' },
+  { code: 'party_hat', name: 'Party Hat', category: 'hats', emoji: '🎉', description: 'Cone hat with pompom — celebrate your first win!' },
+  { code: 'flower_crown', name: 'Flower Crown', category: 'hats', emoji: '🌸', description: 'Soft daisy chain crown, cute & gender-neutral' },
+  { code: 'wizard_hat', name: 'Wizard Hat', category: 'hats', emoji: '🧙', description: 'Starry wizard hat — perfect for the Word Wizard!' },
+  { code: 'backwards_cap', name: 'Backwards Cap', category: 'hats', emoji: '🧢', description: 'Casual & playful, a mid-tier look' },
+  { code: 'bunny_ears', name: 'Bunny Ears', category: 'hats', emoji: '🐰', description: 'Soft rounded bunny ears headband' },
+  { code: 'thinking_cap', name: 'Thinking Cap', category: 'hats', emoji: '🎓', description: 'Graduation cap with a green tassel — for great problem solvers!' },
   { code: 'rainbow_tee', name: 'Rainbow Tee', category: 'clothes', emoji: '🌈', description: 'Simple tee with a rainbow stripe across the chest' },
   { code: 'astronaut', name: 'Astronaut Suit', category: 'clothes', emoji: '👨‍🚀', description: 'Puffy white suit with round belly window' },
   { code: 'hero_tee', name: 'Superhero Cape', category: 'clothes', emoji: '🦸', description: 'Logo on chest + tiny cape flutter!' },

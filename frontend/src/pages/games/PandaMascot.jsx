@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { OUTFIT_MAP } from './PaoOutfits'
+import { DesignedOutfit } from './PaoDesignedOutfit'
 
 // ── Click reaction — one gentle, predictable bounce (no spin/shake/wiggle,
 // which read as chaotic and can overwhelm kids with sensory sensitivities) ──
@@ -350,6 +351,8 @@ export default function PandaMascot({
           {['shoes','pants','clothes','hair'].map(cat => {
             const id = accessories[cat]
             if (!id || id === 'none') return null
+            // Admin-designed pieces come through as { design } instead of a built-in item id
+            if (typeof id === 'object') return id.design ? <DesignedOutfit key={cat} category={cat} design={id.design}/> : null
             const Comp = OUTFIT_MAP[cat]?.[id]
             return Comp ? <Comp key={`${cat}-${id}`}/> : null
           })}

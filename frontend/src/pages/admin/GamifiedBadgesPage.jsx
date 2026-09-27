@@ -3,15 +3,11 @@ import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEMS, PAO_ITEM_CATEGORIES } from '../../data/paoItems'
+import PaoClothingDesigner, { WardrobeItemThumb } from './PaoClothingDesigner'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
   ShuffleIcon, GameControllerIcon, ShirtIcon,
 } from './gamifiedIcons'
-import PandaMascot from '../games/PandaMascot'
-import {
-  STYLE_OPTIONS, SLOT_ICONS, COLOURS as CLOTHING_COLOURS, PATTERNS, STICKERS,
-  colourHex, patternBackgroundStyle, ClothingPreviewIcon,
-} from './clothingBuilderData'
 import './GamifiedBadgesPage.css'
 
 /* ── Badge design options — enums mirror the `badges` collection's
@@ -167,10 +163,16 @@ const emptyForm = {
   unlockItemCode: '', isActive: true,
 }
 
-const emptyClothingForm = {
-  name: '', category: 'Hair', style: 'beanie',
-  mainColour: 'blue', trimColour: 'yellow',
-  pattern: 'solid', patternColour: 'white', sticker: 'none',
+// Admin-designed wardrobe is kept in this browser until the catalog gets
+// its own collection — so a designed piece survives a page refresh.
+const WARDROBE_STORAGE_KEY = 'therapypro_pao_wardrobe_v1'
+
+function loadWardrobe() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WARDROBE_STORAGE_KEY) || 'null')
+    if (Array.isArray(saved)) return saved
+  } catch { /* storage unavailable or corrupt — fall back to the seed list */ }
+  return PAO_ITEMS
 }
 
 function slugifyLocal(name) {
@@ -263,15 +265,19 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
 
-  // Pao's wardrobe catalog — local-only (no schema was given for this one,
-  // unlike badges), same as how the game catalog on Assign Exercises works.
-  // Seeded from src/data/paoItems.js, which also mirrors the real item
-  // ids/names a patient sees in PaoCustomizePage.jsx.
-  const [clothes, setClothes] = useState(PAO_ITEMS)
+  // Pao's wardrobe catalog — not in Mongo (no schema was given for this
+  // one, unlike badges), so it's saved to localStorage instead. Seeded from
+  // src/data/paoItems.js, which also mirrors the real item ids/names a
+  // patient sees in PaoCustomizePage.jsx. Items made in the designer carry
+  // a `design` object; the seeded ones use Pao's hand-drawn art.
+  const [clothes, setClothes] = useState(loadWardrobe)
   const [clothesFilter, setClothesFilter] = useState('All')
   const [editingClothingId, setEditingClothingId] = useState(null)
   const [showClothingEditor, setShowClothingEditor] = useState(false)
-  const [clothingForm, setClothingForm] = useState(emptyClothingForm)
+
+  useEffect(() => {
+    try { localStorage.setItem(WARDROBE_STORAGE_KEY, JSON.stringify(clothes)) } catch { /* ignore */ }
+  }, [clothes])
 
   // { kind: 'badge' | 'clothing', item } while a delete confirmation is open.
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -425,33 +431,29 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
   const openCreateClothing = () => {
     setEditingClothingId(null)
-    setClothingForm(emptyClothingForm)
     setShowClothingEditor(true)
   }
 
   const openEditClothing = (item) => {
     setEditingClothingId(item.id)
-    setClothingForm({
-      name: item.name, category: item.category, style: item.style,
-      mainColour: item.mainColour, trimColour: item.trimColour,
-      pattern: item.pattern, patternColour: item.patternColour, sticker: item.sticker,
-    })
     setShowClothingEditor(true)
   }
 
-  const saveClothing = (event) => {
-    event.preventDefault()
+  const saveClothing = (data) => {
     if (editingClothing) {
-      setClothes((current) => current.map((c) => (c.id === editingClothing.id ? { ...c, ...clothingForm } : c)))
+      setClothes((current) => current.map((c) => (c.id === editingClothing.id ? { ...c, ...data } : c)))
+      showToast(`Saved ${data.name}`)
     } else {
-      const base = slugifyLocal(clothingForm.name)
+      const base = slugifyLocal(data.name)
       let candidate = base
       let n = 2
       while (clothes.some((c) => c.id === candidate)) {
         candidate = `${base}_${n}`
         n += 1
       }
-      setClothes((current) => [...current, { id: candidate, ...clothingForm }])
+      setClothes((current) => [...current, { id: candidate, ...data }])
+      setClothesFilter((f) => (f === 'All' || f === data.category ? f : data.category))
+      showToast(`${data.name} added to Pao's wardrobe`)
     }
     setShowClothingEditor(false)
   }
@@ -638,7 +640,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
         <div className="admin-panel-header">
           <div>
             <h3>Pao's wardrobe</h3>
-            <p>Cosmetic items badges can unlock for Pao</p>
+            <p>Design outfit pieces for Pao that badges can unlock</p>
           </div>
           <button className="admin-btn" onClick={openCreateClothing}>Design new item</button>
         </div>
@@ -658,31 +660,40 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
 
-        <div className="clothing-grid">
-          {visibleClothes.length === 0 && (
-            <div className="game-card">
-              <div>
-                <h4>No items found</h4>
-                <p>Try a different filter or design a new item.</p>
-              </div>
+        {visibleClothes.length === 0 ? (
+          <div className="game-card">
+            <div>
+              <h4>No items found</h4>
+              <p>Try a different filter or design a new clothing item.</p>
             </div>
-          )}
-          {visibleClothes.map((item) => (
-            <div key={item.id} className="clothing-card">
-              <ClothingPreviewIcon {...item} size={72} />
-              <h4>{item.name}</h4>
-              <span className="admin-pill gray">{item.category}</span>
-              <div className="admin-item-actions">
-                <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>
-                  <PencilIcon />
+          </div>
+        ) : (
+          <div className="wardrobe-grid">
+            {visibleClothes.map((item) => (
+              <article key={item.id} className="wardrobe-card">
+                <button type="button" className="wardrobe-card-art" onClick={() => openEditClothing(item)} aria-label={`Edit ${item.name}`}>
+                  <WardrobeItemThumb item={item} width={96} />
                 </button>
-                <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget({ kind: 'clothing', item })} title="Delete" aria-label={`Delete ${item.name}`}>
-                  <TrashIcon />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="wardrobe-card-body">
+                  <h4>{item.name}</h4>
+                  <div className="wardrobe-card-pills">
+                    <span className="admin-pill gray">{item.category}</span>
+                    {item.design && <span className="admin-pill purple">Custom design</span>}
+                  </div>
+                  <p>{item.description}</p>
+                </div>
+                <div className="admin-item-actions wardrobe-card-actions">
+                  <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>
+                    <PencilIcon />
+                  </button>
+                  <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget({ kind: 'clothing', item })} title="Delete" aria-label={`Delete ${item.name}`}>
+                    <TrashIcon />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
       </>
       )}
@@ -820,144 +831,12 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       )}
 
       {showClothingEditor && (
-        <div className="admin-modal-backdrop" onClick={() => setShowClothingEditor(false)}>
-          <div className="admin-modal clothing-builder-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div className="admin-modal-title">
-                <span className="admin-modal-icon"><ShirtIcon /></span>
-                <div>
-                  <h3>{editingClothing ? 'Edit clothing item' : 'Design a clothing item'}</h3>
-                  <p>Pick a style, colours and a sticker — Pao tries it on as you go.</p>
-                </div>
-              </div>
-              <button className="admin-modal-close" onClick={() => setShowClothingEditor(false)} aria-label="Close">✕</button>
-            </div>
-
-            <form onSubmit={saveClothing} className="clothing-builder-body">
-              <div className="clothing-preview-col">
-                <div className="clothing-pao-frame">
-                  <PandaMascot pxWidth={140} pandaState="happy" />
-                </div>
-                <div className="clothing-preview-card">
-                  <ClothingPreviewIcon {...clothingForm} size={56} />
-                  <div>
-                    <h4>{clothingForm.name || 'Untitled item'}</h4>
-                    <p>{clothingForm.category}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="clothing-builder-fields">
-                <div className="clothing-builder-section">
-                  <span className="clothing-section-label"><em>1</em> Name &amp; slot</span>
-                  <label className="admin-field">
-                    <span>Item name</span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Starry Beanie"
-                      value={clothingForm.name}
-                      onChange={(event) => setClothingForm((f) => ({ ...f, name: event.target.value }))}
-                    />
-                  </label>
-                  <div className="clothing-slot-row">
-                    {PAO_ITEM_CATEGORIES.map((cat) => {
-                      const SlotIcon = SLOT_ICONS[cat]
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          className={`clothing-slot-btn${clothingForm.category === cat ? ' selected' : ''}`}
-                          onClick={() => setClothingForm((f) => ({ ...f, category: cat, style: STYLE_OPTIONS[cat][0].id }))}
-                        >
-                          <SlotIcon size={20} />
-                          {cat}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="clothing-builder-section">
-                  <span className="clothing-section-label"><em>2</em> Style</span>
-                  <div className="clothing-style-row">
-                    {STYLE_OPTIONS[clothingForm.category].map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        className={`clothing-style-btn${clothingForm.style === opt.id ? ' selected' : ''}`}
-                        onClick={() => setClothingForm((f) => ({ ...f, style: opt.id }))}
-                      >
-                        <opt.Icon size={22} />
-                        <span>{opt.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="clothing-builder-section">
-                  <span className="clothing-section-label"><em>3</em> Colours</span>
-                  <SwatchField
-                    label="Main colour" options={CLOTHING_COLOURS} value={clothingForm.mainColour}
-                    onChange={(id) => setClothingForm((f) => ({ ...f, mainColour: id }))}
-                    renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
-                  />
-                  <SwatchField
-                    label="Trim colour" options={CLOTHING_COLOURS} value={clothingForm.trimColour}
-                    onChange={(id) => setClothingForm((f) => ({ ...f, trimColour: id }))}
-                    renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
-                  />
-                </div>
-
-                <div className="clothing-builder-section">
-                  <span className="clothing-section-label"><em>4</em> Pattern</span>
-                  <div className="clothing-style-row">
-                    {PATTERNS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={`clothing-style-btn${clothingForm.pattern === p.id ? ' selected' : ''}`}
-                        onClick={() => setClothingForm((f) => ({ ...f, pattern: p.id }))}
-                      >
-                        <span className="clothing-pattern-swatch" style={patternBackgroundStyle(p.id, colourHex(clothingForm.patternColour)) || { background: colourHex(clothingForm.mainColour) }} />
-                        <span>{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {clothingForm.pattern !== 'solid' && (
-                    <SwatchField
-                      label="Pattern colour" options={CLOTHING_COLOURS} value={clothingForm.patternColour}
-                      onChange={(id) => setClothingForm((f) => ({ ...f, patternColour: id }))}
-                      renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: opt.hex }} />}
-                    />
-                  )}
-                </div>
-
-                <div className="clothing-builder-section">
-                  <span className="clothing-section-label"><em>5</em> Sticker</span>
-                  <div className="clothing-style-row">
-                    {STICKERS.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className={`clothing-style-btn${clothingForm.sticker === s.id ? ' selected' : ''}`}
-                        onClick={() => setClothingForm((f) => ({ ...f, sticker: s.id }))}
-                      >
-                        <span className="clothing-sticker-glyph">{s.glyph || '—'}</span>
-                        <span>{s.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="admin-button-row badge-builder-actions">
-                  <button className="admin-btn" type="submit">{editingClothing ? 'Save changes' : 'Add item'}</button>
-                  <button className="admin-btn-secondary" type="button" onClick={() => setShowClothingEditor(false)}>Cancel</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <PaoClothingDesigner
+          item={editingClothing}
+          defaultCategory={clothesFilter !== 'All' ? clothesFilter : 'Hair'}
+          onSave={saveClothing}
+          onClose={() => setShowClothingEditor(false)}
+        />
       )}
 
       {deleteTarget && (

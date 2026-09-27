@@ -27,157 +27,6 @@
   color: #fff;
 }
 
-/* ── Clothes tab: wardrobe grid ──────────────────────────────── */
-.clothing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 14px;
-}
-
-.clothing-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  padding: 18px 14px;
-  background: #fff;
-  border: 1px solid #e8f5f0;
-  border-radius: 16px;
-  transition: box-shadow 0.15s, border-color 0.15s;
-}
-.clothing-card:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07); border-color: #d7ede4; }
-.clothing-card h4 { margin: 2px 0 0; font-size: 13.5px; color: #2c4a3e; }
-.clothing-card .admin-item-actions { margin-top: 2px; }
-
-/* ── Clothing item builder modal ─────────────────────────────── */
-.clothing-builder-modal { max-width: 700px; }
-
-.clothing-builder-body {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
-  max-height: 72vh;
-}
-
-.clothing-preview-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  position: sticky;
-  top: 0;
-}
-
-.clothing-pao-frame {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px 0 8px;
-  background: linear-gradient(160deg, #eafaf1, #d9f2e6);
-  border-radius: 18px;
-}
-
-.clothing-preview-card {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  background: #f5faf8;
-  border: 1px solid #e8f5f0;
-  border-radius: 14px;
-}
-.clothing-preview-card h4 { margin: 0; font-size: 13px; color: #2c4a3e; }
-.clothing-preview-card p { margin: 1px 0 0; font-size: 11.5px; color: #6b7c75; }
-
-.clothing-builder-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-width: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-  max-height: 72vh;
-}
-
-.clothing-builder-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.clothing-section-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #2c4a3e;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.clothing-section-label em {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: #2c4a3e;
-  color: #fff;
-  font-style: normal;
-  font-size: 10px;
-}
-
-.clothing-slot-row, .clothing-style-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.clothing-slot-btn, .clothing-style-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 64px;
-  padding: 10px 8px;
-  border: 1.5px solid #e8f5f0;
-  border-radius: 12px;
-  background: #f9fdfb;
-  color: #6b7c75;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-.clothing-slot-btn:hover, .clothing-style-btn:hover { background: #eef6f2; }
-.clothing-slot-btn.selected, .clothing-style-btn.selected {
-  border-color: #2c4a3e;
-  background: #2c4a3e;
-  color: #fff;
-}
-
-.clothing-pattern-swatch {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.clothing-sticker-glyph { font-size: 17px; line-height: 1; }
-
-@media (max-width: 640px) {
-  .clothing-builder-body { grid-template-columns: 1fr; max-height: none; }
-  .clothing-preview-col { position: static; }
-  .clothing-builder-fields { max-height: none; overflow-y: visible; }
-}
-
 /* ── KPI cards (icon + number + label, 5-up) ─────────────────
    .admin-stats-grid already sets the shared card grid/gap; this just
    overrides the column count for a 5th card and defines the icon+text
@@ -403,6 +252,221 @@
   cursor: not-allowed;
 }
 
+/* ── Pao's wardrobe grid ──────────────────────────────────── */
+.wardrobe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.wardrobe-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e8f5f0;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.wardrobe-card:hover { box-shadow: 0 8px 22px rgba(44, 74, 62, 0.1); transform: translateY(-2px); }
+
+.wardrobe-card-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 128px;
+  padding: 0;
+  border: none;
+  background: radial-gradient(circle at 50% 40%, #ffffff 0%, #eef6f2 70%);
+  cursor: pointer;
+}
+
+.wardrobe-card-body { padding: 12px 14px 4px; flex: 1; min-width: 0; }
+.wardrobe-card-body h4 { margin: 0; font-size: 15px; font-weight: 800; color: #2c4a3e; }
+.wardrobe-card-body p { margin: 8px 0 0; font-size: 12.5px; color: #6b7c75; line-height: 1.45; }
+.wardrobe-card-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.wardrobe-card-actions { justify-content: flex-end; padding: 8px 12px 12px; }
+
+/* ── Clothing designer modal ─────────────────────────────── */
+.pao-designer-modal { max-width: 980px; width: 96vw; }
+.pao-designer-modal input,
+.pao-designer-modal textarea { box-sizing: border-box; }
+
+.pao-designer-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.pao-designer-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(170deg, #e6f4ee 0%, #d4ebe1 100%);
+}
+
+.pao-stage-backdrop {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 70% 12% at 50% 94%, rgba(44, 74, 62, 0.12), transparent 70%),
+    radial-gradient(circle at 50% 35%, #ffffff 0%, #f1f8f5 65%);
+}
+
+.pao-stage-caption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 14px;
+}
+.pao-stage-caption strong { display: block; font-size: 14px; color: #2c4a3e; }
+.pao-stage-caption span { font-size: 12px; color: #6b7c75; font-weight: 600; }
+
+.pao-stage-closeup {
+  flex-shrink: 0;
+  width: 72px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5faf8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pao-stage-shuffle {
+  align-self: center;
+  background: #2c4a3e;
+  padding: 8px 18px;
+  font-size: 12.5px;
+}
+.pao-stage-shuffle:hover { background: #3a5f50; }
+
+.pao-designer-controls { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+.pao-designer-step { display: flex; flex-direction: column; gap: 12px; }
+.pao-designer-step h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #2c4a3e;
+}
+.pao-designer-step h4 span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #2c4a3e;
+  color: #fff;
+  font-size: 11.5px;
+}
+
+.pao-category-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pao-category-row button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 2px solid #e8f5f0;
+  border-radius: 14px;
+  background: #f5faf8;
+  color: #2c4a3e;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pao-category-row button span { font-size: 22px; line-height: 1; }
+.pao-category-row button:hover:not(:disabled) { background: #eef6f2; }
+.pao-category-row button.active { border-color: #2c4a3e; background: #fff; }
+.pao-category-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.pao-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.pao-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 8px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: #f5faf8;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pao-tile:hover { background: #eef6f2; }
+.pao-tile.selected { border-color: #2c4a3e; background: #fff; }
+
+.pao-tile-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 58px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pao-tile-label { font-size: 11.5px; font-weight: 700; color: #2c4a3e; }
+
+.pao-colour-dot { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+
+.pao-custom-colour { position: relative; overflow: hidden; }
+.pao-designer-modal .pao-custom-colour input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.pao-sticker-none {
+  width: auto;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b7c75;
+}
+
+.pao-builtin-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f5faf8;
+  border: 1px dashed #c9ddd4;
+}
+.pao-builtin-note p { margin: 0; font-size: 13px; color: #4b5f57; line-height: 1.5; }
+
+.pao-designer-actions { justify-content: flex-end; }
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .badge-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -411,4 +475,9 @@
 @media (max-width: 640px) {
   .badge-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .badge-builder-body { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 820px) {
+  .pao-designer-body { grid-template-columns: 1fr; }
+  .pao-designer-stage { position: static; }
 }

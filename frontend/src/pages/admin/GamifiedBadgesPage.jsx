@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialBadges, initialGames } from './gamifiedLibraryData'
+import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEMS, PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
@@ -9,63 +9,102 @@ import {
 } from './gamifiedIcons'
 import './GamifiedBadgesPage.css'
 
-/* ── Badge design options ─────────────────────────────────── */
+/* ── Badge design options — enums mirror the `badges` collection's
+   $jsonSchema exactly, since Mongo will reject anything outside them. ── */
+function polygonPoints(sides, rotate = -90) {
+  const pts = []
+  for (let i = 0; i < sides; i++) {
+    const angle = (rotate + (360 / sides) * i) * (Math.PI / 180)
+    pts.push(`${(50 + 50 * Math.cos(angle)).toFixed(1)}% ${(50 + 50 * Math.sin(angle)).toFixed(1)}%`)
+  }
+  return `polygon(${pts.join(', ')})`
+}
+function starPolygon(points, innerRatio = 0.5, rotate = -90) {
+  const pts = []
+  const step = 360 / (points * 2)
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? 50 : 50 * innerRatio
+    const angle = (rotate + step * i) * (Math.PI / 180)
+    pts.push(`${(50 + r * Math.cos(angle)).toFixed(1)}% ${(50 + r * Math.sin(angle)).toFixed(1)}%`)
+  }
+  return `polygon(${pts.join(', ')})`
+}
+
 const SHAPES = [
   { id: 'circle',  label: 'Circle',  style: { borderRadius: '50%' } },
+  { id: 'rounded', label: 'Rounded', style: { borderRadius: '22%' } },
+  { id: 'octagon', label: 'Octagon', style: { clipPath: polygonPoints(8) } },
+  { id: 'hexagon', label: 'Hexagon', style: { clipPath: polygonPoints(6) } },
+  { id: 'diamond', label: 'Diamond', style: { clipPath: polygonPoints(4) } },
   { id: 'shield',  label: 'Shield',  style: { clipPath: 'polygon(50% 0%, 100% 20%, 100% 62%, 50% 100%, 0% 62%, 0% 20%)' } },
-  { id: 'star',    label: 'Star',    style: { clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' } },
-  { id: 'hexagon', label: 'Hexagon', style: { clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' } },
-  { id: 'ribbon',  label: 'Ribbon',  style: { clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 50% 80%, 18% 100%, 0% 38%)' } },
+  { id: 'star',    label: 'Star',    style: { clipPath: starPolygon(5, 0.5) } },
+  { id: 'flower',  label: 'Flower',  style: { clipPath: starPolygon(8, 0.72) } },
+  { id: 'scallop', label: 'Scallop', style: { clipPath: starPolygon(12, 0.86) } },
+  { id: 'gear',    label: 'Gear',    style: { clipPath: starPolygon(10, 0.8) } },
 ]
 const COLOURS = [
   { id: 'gold',   label: 'Gold',   from: '#f6e27a', to: '#c9982a' },
   { id: 'silver', label: 'Silver', from: '#eef1f5', to: '#9aa3ad' },
   { id: 'bronze', label: 'Bronze', from: '#e6b085', to: '#a05a2c' },
+  { id: 'red',    label: 'Red',    from: '#fca5a5', to: '#dc2626' },
+  { id: 'orange', label: 'Orange', from: '#fdba74', to: '#ea580c' },
+  { id: 'amber',  label: 'Amber',  from: '#fde68a', to: '#d97706' },
+  { id: 'green',  label: 'Green',  from: '#86efac', to: '#16a34a' },
   { id: 'teal',   label: 'Teal',   from: '#7fe9d8', to: '#0d9488' },
+  { id: 'blue',   label: 'Blue',   from: '#93c5fd', to: '#2563eb' },
+  { id: 'indigo', label: 'Indigo', from: '#a5b4fc', to: '#4338ca' },
   { id: 'purple', label: 'Purple', from: '#d3c2fb', to: '#7c3aed' },
   { id: 'pink',   label: 'Pink',   from: '#fbd0e8', to: '#db2777' },
 ]
 const SYMBOLS = [
-  { id: 'star',    label: 'Star',    glyph: '⭐' },
-  { id: 'medal',   label: 'Medal',   glyph: '🥇' },
-  { id: 'flame',   label: 'Flame',   glyph: '🔥' },
-  { id: 'trophy',  label: 'Trophy',  glyph: '🏆' },
-  { id: 'heart',   label: 'Heart',   glyph: '❤️' },
-  { id: 'crown',   label: 'Crown',   glyph: '👑' },
-  { id: 'sparkle', label: 'Sparkle', glyph: '✨' },
-  { id: 'target',  label: 'Target',  glyph: '🎯' },
+  { id: 'star',   label: 'Star',   glyph: '⭐' }, { id: 'heart',  label: 'Heart',  glyph: '❤️' },
+  { id: 'leaf',   label: 'Leaf',   glyph: '🍃' }, { id: 'drop',   label: 'Drop',   glyph: '💧' },
+  { id: 'trophy', label: 'Trophy', glyph: '🏆' }, { id: 'bolt',   label: 'Bolt',   glyph: '⚡' },
+  { id: 'crown',  label: 'Crown',  glyph: '👑' }, { id: 'flake',  label: 'Flake',  glyph: '❄️' },
+  { id: 'brain',  label: 'Brain',  glyph: '🧠' }, { id: 'target', label: 'Target', glyph: '🎯' },
+  { id: 'flame',  label: 'Flame',  glyph: '🔥' }, { id: 'book',   label: 'Book',   glyph: '📖' },
+  { id: 'rocket', label: 'Rocket', glyph: '🚀' }, { id: 'puzzle', label: 'Puzzle', glyph: '🧩' },
+  { id: 'music',  label: 'Music',  glyph: '🎵' }, { id: 'sun',    label: 'Sun',    glyph: '☀️' },
+  { id: 'medal',  label: 'Medal',  glyph: '🥇' }, { id: 'shield', label: 'Shield', glyph: '🛡️' },
+  { id: 'paw',    label: 'Paw',    glyph: '🐾' }, { id: 'key',    label: 'Key',    glyph: '🔑' },
 ]
-// A badge's `type` (Milestone vs Game) is fixed by which trigger it uses —
-// "finishes a specific game" is the only trigger tied to one game, so it's
-// the only one that counts as a "Game badge" for filtering/stats.
-const TRIGGERS = [
-  { id: 'first-game',    label: 'finishes any game for the first time', type: 'Milestone', needsGame: false },
-  { id: 'specific-game', label: 'finishes a specific game',             type: 'Game',      needsGame: true },
-  { id: 'streak',        label: 'plays 7 days in a row',                type: 'Milestone', needsGame: false },
-  { id: 'perfect-score', label: 'gets every answer right on the first try', type: 'Milestone', needsGame: false },
+// `badgeType` is fixed by which criteria a badge uses — "finishes a
+// specific game" is the only one tied to one game, so it's the only one
+// that counts as a game-completion badge.
+const CRITERIA_TYPES = [
+  { id: 'complete_any_game',      label: 'finishes any game for the first time',     badgeType: 'milestone',       needsGame: false, needsValue: false },
+  { id: 'complete_specific_game', label: 'finishes a specific game',                 badgeType: 'game_completion', needsGame: true,  needsValue: false },
+  { id: 'perfect_score',          label: 'gets every answer right on the first try', badgeType: 'milestone',       needsGame: false, needsValue: false },
+  { id: 'reach_level',            label: 'reaches a specific level',                 badgeType: 'milestone',       needsGame: false, needsValue: true, valueLabel: 'Level', defaultValue: 5 },
+  { id: 'total_xp',               label: 'earns a total amount of XP',               badgeType: 'milestone',       needsGame: false, needsValue: true, valueLabel: 'XP points', defaultValue: 500 },
+  { id: 'games_in_a_row',         label: 'plays games on consecutive days',          badgeType: 'milestone',       needsGame: false, needsValue: true, valueLabel: 'Days in a row', defaultValue: 7 },
+  { id: 'all_categories',         label: 'tries every therapy game category',        badgeType: 'milestone',       needsGame: false, needsValue: false },
 ]
+
+function ruleClause(form) {
+  const c = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
+  if (c.id === 'complete_specific_game') {
+    const game = initialGames.find((g) => g.mongoId === form.criteriaGameId)
+    return `Finishes ${game ? game.name : 'a specific game'}`
+  }
+  if (c.id === 'complete_any_game') return 'Finishes any game for the first time'
+  if (c.id === 'perfect_score') return 'Gets every answer right on the first try'
+  if (c.id === 'reach_level') return `Reaches level ${form.criteriaValue ?? c.defaultValue}`
+  if (c.id === 'total_xp') return `Earns ${form.criteriaValue ?? c.defaultValue} XP`
+  if (c.id === 'games_in_a_row') return `Plays ${form.criteriaValue ?? c.defaultValue} days in a row`
+  if (c.id === 'all_categories') return 'Tries every therapy game category'
+  return c.label
+}
+function describeForSave(form) {
+  const base = ruleClause(form)
+  const item = PAO_ITEMS.find((i) => i.id === form.unlockItemCode)
+  return item ? `${base} · unlocks ${item.name}` : base
+}
 
 const emptyForm = {
   name: '', shape: 'circle', colour: 'gold', symbol: 'star',
-  trigger: 'first-game', gameId: null, unlocksPaoItem: '', status: 'Active',
-}
-
-function ruleClause(form, games) {
-  const trig = TRIGGERS.find((t) => t.id === form.trigger) || TRIGGERS[0]
-  if (trig.id === 'specific-game') {
-    const game = games.find((g) => g.id === form.gameId)
-    return `Finishes ${game ? game.name : 'a specific game'}`
-  }
-  if (trig.id === 'first-game') return 'Finishes any game for the first time'
-  if (trig.id === 'streak') return 'Plays 7 days in a row'
-  if (trig.id === 'perfect-score') return 'Gets every answer right on the first try'
-  return trig.label
-}
-
-function fullDescription(badge, games) {
-  const base = ruleClause(badge, games)
-  const item = PAO_ITEMS.find((i) => i.id === badge.unlocksPaoItem)
-  return item ? `${base} · unlocks ${item.name}` : base
+  criteriaType: 'complete_any_game', criteriaGameId: null, criteriaValue: null,
+  unlockItemCode: '', isActive: true,
 }
 
 /* ── Badge medal (shape + colour + symbol rendered together) ── */
@@ -114,35 +153,55 @@ function SwatchField({ label, options, value, onChange, renderSwatch }) {
 const FILTERS = ['All', 'Game badges', 'Milestones', 'Hidden']
 
 export default function GamifiedBadgesPage({ user, onLogout }) {
-  const [badges, setBadges] = useState(initialBadges)
+  const [badges, setBadges] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch('/api/badges/list')
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (!cancelled) setBadges(body.badges || [])
+      })
+      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load badges.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3200) }
 
   const editingBadge = useMemo(() => badges.find((badge) => badge.id === editingId) || null, [badges, editingId])
 
   const stats = useMemo(() => {
-    const active = badges.filter((b) => b.status === 'Active')
-    const hidden = badges.filter((b) => b.status === 'Hidden')
-    const gameBadges = badges.filter((b) => b.type === 'Game')
+    const active = badges.filter((b) => b.isActive)
+    const hidden = badges.filter((b) => !b.isActive)
+    const gameBadges = badges.filter((b) => b.badgeType === 'game_completion')
     const timesEarned = badges.reduce((sum, b) => sum + Number(b.earnedCount || 0), 0)
     return { total: badges.length, active: active.length, hidden: hidden.length, gameBadges: gameBadges.length, timesEarned }
   }, [badges])
 
   const filterCounts = useMemo(() => ({
     All: badges.length,
-    'Game badges': badges.filter((b) => b.type === 'Game').length,
-    Milestones: badges.filter((b) => b.type === 'Milestone').length,
-    Hidden: badges.filter((b) => b.status === 'Hidden').length,
+    'Game badges': badges.filter((b) => b.badgeType === 'game_completion').length,
+    Milestones: badges.filter((b) => b.badgeType === 'milestone').length,
+    Hidden: badges.filter((b) => !b.isActive).length,
   }), [badges])
 
   const visibleBadges = useMemo(() => {
     if (statusFilter === 'All') return badges
-    if (statusFilter === 'Game badges') return badges.filter((b) => b.type === 'Game')
-    if (statusFilter === 'Milestones') return badges.filter((b) => b.type === 'Milestone')
-    return badges.filter((b) => b.status === 'Hidden')
+    if (statusFilter === 'Game badges') return badges.filter((b) => b.badgeType === 'game_completion')
+    if (statusFilter === 'Milestones') return badges.filter((b) => b.badgeType === 'milestone')
+    return badges.filter((b) => !b.isActive)
   }, [badges, statusFilter])
 
   const openCreate = () => {
@@ -155,7 +214,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     setEditingId(badge.id)
     setForm({
       name: badge.name, shape: badge.shape, colour: badge.colour, symbol: badge.symbol,
-      trigger: badge.trigger, gameId: badge.gameId, unlocksPaoItem: badge.unlocksPaoItem || '', status: badge.status,
+      criteriaType: badge.criteriaType, criteriaGameId: badge.criteriaGameId,
+      criteriaValue: badge.criteriaValue, unlockItemCode: badge.unlockItemCode || '', isActive: badge.isActive,
     })
     setShowEditor(true)
   }
@@ -165,33 +225,79 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     setForm((f) => ({ ...f, shape: pick(SHAPES), colour: pick(COLOURS), symbol: pick(SYMBOLS) }))
   }
 
-  const saveBadge = (event) => {
+  const saveBadge = async (event) => {
     event.preventDefault()
-    const trig = TRIGGERS.find((t) => t.id === form.trigger) || TRIGGERS[0]
+    if (saving) return
+    const meta = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
     const payload = {
-      name: form.name, shape: form.shape, colour: form.colour, symbol: form.symbol,
-      trigger: form.trigger, type: trig.type,
-      gameId: trig.needsGame ? form.gameId : null,
-      unlocksPaoItem: form.unlocksPaoItem || null,
-      status: form.status,
+      name: form.name,
+      description: describeForSave(form),
+      art: { shape: form.shape, color: form.colour, symbol: form.symbol },
+      badgeType: meta.badgeType,
+      criteriaType: form.criteriaType,
+      criteriaGameId: meta.needsGame ? form.criteriaGameId : null,
+      criteriaValue: meta.needsValue ? form.criteriaValue : null,
+      unlockItemCode: form.unlockItemCode || null,
+      isActive: form.isActive,
+      adminEmail: user?.email,
     }
-    if (editingBadge) {
-      setBadges((current) => current.map((badge) => (badge.id === editingBadge.id ? { ...badge, ...payload } : badge)))
-    } else {
-      setBadges((current) => [...current, { id: Date.now(), earnedCount: 0, ...payload }])
+    setSaving(true)
+    try {
+      const url = editingBadge ? `/api/badges/${editingBadge.id}` : '/api/badges/create'
+      const res = await fetch(url, {
+        method: editingBadge ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      if (editingBadge) {
+        setBadges((current) => current.map((b) => (b.id === editingBadge.id ? body.badge : b)))
+      } else {
+        setBadges((current) => [...current, body.badge])
+      }
+      setShowEditor(false)
+    } catch (err) {
+      showToast(err.message || 'Could not save the badge.')
+    } finally {
+      setSaving(false)
     }
-    setShowEditor(false)
   }
 
-  const toggleVisibility = (badge) => {
-    setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, status: b.status === 'Active' ? 'Hidden' : 'Active' } : b)))
+  const toggleVisibility = async (badge) => {
+    const nextActive = !badge.isActive
+    setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, isActive: nextActive } : b)))
+    try {
+      const res = await fetch(`/api/badges/${badge.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: nextActive }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+    } catch (err) {
+      setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, isActive: !nextActive } : b)))
+      showToast(err.message || 'Could not update visibility.')
+    }
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return
-    setBadges((current) => current.filter((badge) => badge.id !== deleteTarget.id))
-    setDeleteTarget(null)
+    try {
+      const res = await fetch(`/api/badges/${deleteTarget.id}`, { method: 'DELETE' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      setBadges((current) => current.filter((badge) => badge.id !== deleteTarget.id))
+    } catch (err) {
+      showToast(err.message || 'Could not delete the badge.')
+    } finally {
+      setDeleteTarget(null)
+    }
   }
+
+  const activeCriteria = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
 
   return (
     <AdminPageShell
@@ -202,6 +308,12 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       icon={<MedalIcon />}
       menuItems={adminMenuItems}
     >
+      {loading ? (
+        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading badges…</p>
+      ) : loadError ? (
+        <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
+      ) : (
+      <>
       <div className="admin-stats-grid badge-kpi-grid">
         <section className="badge-kpi-card">
           <span className="badge-kpi-icon badge-kpi-icon-total"><MedalIcon size={20} /></span>
@@ -284,17 +396,19 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <div className="branch-card-title-row">
                   <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} size={36} />
                   <h4>{badge.name}</h4>
-                  <span className={`admin-pill ${badge.status === 'Active' ? 'green' : 'gray'}`}>{badge.status}</span>
-                  <span className={`admin-pill ${badge.type === 'Game' ? 'blue' : 'purple'}`}>{badge.type}</span>
+                  <span className={`admin-pill ${badge.isActive ? 'green' : 'gray'}`}>{badge.isActive ? 'Active' : 'Hidden'}</span>
+                  <span className={`admin-pill ${badge.badgeType === 'game_completion' ? 'blue' : 'purple'}`}>
+                    {badge.badgeType === 'game_completion' ? 'Game' : 'Milestone'}
+                  </span>
                 </div>
-                <p>{fullDescription(badge, initialGames)}</p>
+                <p>{badge.description}</p>
                 <div className="badge-earned-line">
                   <UsersIcon size={13} /> Earned by {badge.earnedCount} patient{badge.earnedCount === 1 ? '' : 's'}
                 </div>
               </div>
               <div className="admin-item-actions">
-                <button className="admin-icon-btn" onClick={() => toggleVisibility(badge)} title={badge.status === 'Active' ? 'Hide from patients' : 'Show to patients'} aria-label={badge.status === 'Active' ? `Hide ${badge.name}` : `Show ${badge.name}`}>
-                  {badge.status === 'Active' ? <EyeIcon /> : <EyeOffIcon />}
+                <button className="admin-icon-btn" onClick={() => toggleVisibility(badge)} title={badge.isActive ? 'Hide from patients' : 'Show to patients'} aria-label={badge.isActive ? `Hide ${badge.name}` : `Show ${badge.name}`}>
+                  {badge.isActive ? <EyeIcon /> : <EyeOffIcon />}
                 </button>
                 <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(badge)} title="Edit" aria-label={`Edit ${badge.name}`}>
                   <PencilIcon />
@@ -307,6 +421,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           ))}
         </div>
       </div>
+      </>
+      )}
 
       {showEditor && (
         <div className="admin-modal-backdrop" onClick={() => setShowEditor(false)}>
@@ -326,7 +442,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
               <div className="badge-preview-card">
                 <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} size={72} />
                 <div className="badge-preview-name">{form.name || 'Untitled badge'}</div>
-                <div className="badge-preview-rule">{ruleClause(form, initialGames)}</div>
+                <div className="badge-preview-rule">{ruleClause(form)}</div>
                 <button type="button" className="badge-shuffle-btn" onClick={shuffleAppearance}>
                   <ShuffleIcon size={13} /> Shuffle
                 </button>
@@ -362,34 +478,51 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <label className="admin-field">
                   <span>Award once, when the patient…</span>
                   <select
-                    value={form.trigger}
+                    value={form.criteriaType}
                     onChange={(event) => {
-                      const nextTrigger = event.target.value
-                      const needsGame = TRIGGERS.find((t) => t.id === nextTrigger)?.needsGame
-                      setForm((f) => ({ ...f, trigger: nextTrigger, gameId: needsGame ? (f.gameId ?? initialGames[0]?.id) : null }))
+                      const nextType = event.target.value
+                      const meta = CRITERIA_TYPES.find((t) => t.id === nextType)
+                      setForm((f) => ({
+                        ...f,
+                        criteriaType: nextType,
+                        criteriaGameId: meta.needsGame ? (f.criteriaGameId ?? initialGames[0]?.mongoId ?? null) : null,
+                        criteriaValue: meta.needsValue ? (f.criteriaValue ?? meta.defaultValue) : null,
+                      }))
                     }}
                   >
-                    {TRIGGERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    {CRITERIA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                   </select>
                 </label>
 
-                {TRIGGERS.find((t) => t.id === form.trigger)?.needsGame && (
+                {activeCriteria.needsGame && (
                   <label className="admin-field">
                     <span>Which game</span>
                     <select
-                      value={form.gameId ?? ''}
-                      onChange={(event) => setForm((f) => ({ ...f, gameId: Number(event.target.value) }))}
+                      value={form.criteriaGameId ?? ''}
+                      onChange={(event) => setForm((f) => ({ ...f, criteriaGameId: event.target.value }))}
                     >
-                      {initialGames.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      {initialGames.map((g) => <option key={g.mongoId} value={g.mongoId}>{g.name}</option>)}
                     </select>
+                  </label>
+                )}
+
+                {activeCriteria.needsValue && (
+                  <label className="admin-field">
+                    <span>{activeCriteria.valueLabel}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.criteriaValue ?? activeCriteria.defaultValue}
+                      onChange={(event) => setForm((f) => ({ ...f, criteriaValue: Number(event.target.value) }))}
+                    />
                   </label>
                 )}
 
                 <label className="admin-field">
                   <span>Unlocks item for Pao</span>
                   <select
-                    value={form.unlocksPaoItem}
-                    onChange={(event) => setForm((f) => ({ ...f, unlocksPaoItem: event.target.value }))}
+                    value={form.unlockItemCode}
+                    onChange={(event) => setForm((f) => ({ ...f, unlockItemCode: event.target.value }))}
                   >
                     <option value="">None</option>
                     {PAO_ITEM_CATEGORIES.map((cat) => (
@@ -405,15 +538,17 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <label className="admin-field admin-field-checkbox">
                   <input
                     type="checkbox"
-                    checked={form.status === 'Active'}
-                    onChange={(event) => setForm((f) => ({ ...f, status: event.target.checked ? 'Active' : 'Hidden' }))}
+                    checked={form.isActive}
+                    onChange={(event) => setForm((f) => ({ ...f, isActive: event.target.checked }))}
                   />
                   <span>Visible to patients</span>
                 </label>
               </div>
 
               <div className="admin-button-row badge-builder-actions">
-                <button className="admin-btn" type="submit">{editingBadge ? 'Save changes' : 'Save badge'}</button>
+                <button className="admin-btn" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : editingBadge ? 'Save changes' : 'Save badge'}
+                </button>
                 <button className="admin-btn-secondary" type="button" onClick={() => setShowEditor(false)}>Cancel</button>
               </div>
             </form>
@@ -436,6 +571,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
       )}
+
+      {toast && <div className="badge-toast">{toast}</div>}
     </AdminPageShell>
   )
 }

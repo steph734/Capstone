@@ -1,8 +1,14 @@
+// `mongoId` is a fixed, hand-assigned ObjectId per game — there's no real
+// `games` collection in MongoDB yet (this catalog is still local-only), but
+// the `badges` collection's `criteria_game_id` field requires an actual
+// ObjectId, not this local numeric `id`. Reusing the same 24-hex string
+// every time a badge references a given game keeps that reference stable
+// and schema-valid without inventing a whole games backend.
 export const initialGames = [
-  { id: 1, name: 'Memory Match', type: 'Cognitive', level: 'Easy', status: 'Published', description: 'Card matching for memory recall.', points: 10 },
-  { id: 2, name: 'Sound Builder', type: 'Speech', level: 'Medium', status: 'Draft', description: 'Drag sounds to build words.', points: 15 },
-  { id: 3, name: 'Balance Quest', type: 'Physical', level: 'Hard', status: 'Published', description: 'Movement game with timed balance tasks.', points: 20 },
-  { id: 4, name: 'Picture-Word Matching', type: 'Speech', level: 'Easy', status: 'Published', description: 'Match each picture to the right word.', points: 10 },
+  { id: 1, mongoId: '650000000000000000000001', name: 'Memory Match', type: 'Cognitive', level: 'Easy', status: 'Published', description: 'Card matching for memory recall.', points: 10 },
+  { id: 2, mongoId: '650000000000000000000002', name: 'Sound Builder', type: 'Speech', level: 'Medium', status: 'Draft', description: 'Drag sounds to build words.', points: 15 },
+  { id: 3, mongoId: '650000000000000000000003', name: 'Balance Quest', type: 'Physical', level: 'Hard', status: 'Published', description: 'Movement game with timed balance tasks.', points: 20 },
+  { id: 4, mongoId: '650000000000000000000004', name: 'Picture-Word Matching', type: 'Speech', level: 'Easy', status: 'Published', description: 'Match each picture to the right word.', points: 10 },
 ]
 
 // Games a branch owner has requested the Super Admin build — surfaced at the

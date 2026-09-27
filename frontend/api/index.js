@@ -51,6 +51,9 @@ import notesShare from './_lib/routes/notes-share.js'
 import exercisesTherapistList from './_lib/routes/exercises-therapist-list.js'
 import exercisesCreate from './_lib/routes/exercises-create.js'
 import exercisesDelete from './_lib/routes/exercises-delete.js'
+import badgesList from './_lib/routes/badges-list.js'
+import badgesCreate from './_lib/routes/badges-create.js'
+import badgesItem from './_lib/routes/badges-item.js'
 
 const app = express()
 
@@ -96,6 +99,9 @@ app.all('/api/notes/:id/share', notesShare)
 app.all('/api/exercises/therapist-list', exercisesTherapistList)
 app.all('/api/exercises/create', exercisesCreate)
 app.all('/api/exercises/:id', exercisesDelete)
+app.all('/api/badges/list', badgesList)
+app.all('/api/badges/create', badgesCreate)
+app.all('/api/badges/:id', badgesItem)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

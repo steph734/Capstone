@@ -196,6 +196,29 @@
   color: #2c4a3e;
 }
 
+/* ── Toast ───────────────────────────────────────────────── */
+.badge-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c4a3e;
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  z-index: 500;
+  max-width: 80vw;
+  text-align: center;
+}
+
+.badge-builder-actions .admin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .badge-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

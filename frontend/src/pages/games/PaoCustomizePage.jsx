@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import PandaMascot from './PandaMascot'
 import { OutfitThumbnail } from './PaoOutfits'
+import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
 
@@ -35,54 +36,47 @@ const BADGES = {
 }
 
 // ─── Outfit categories ────────────────────────────────────────────────────────
-
-const CATEGORIES = [
-  {
-    id: 'hair', label: 'Hair', icon: '💇',
-    items: [
-      { id:'none',         name:'Natural',          preview:null,  badge:null,            desc:'Just Pao being Pao!' },
-      { id:'party_hat',    name:'Party Hat',         preview:'🎉',  badge:'First Win',     desc:'Cone hat with pompom — celebrate your first win!' },
-      { id:'flower_crown', name:'Flower Crown',      preview:'🌸',  badge:'Perfect Score', desc:'Soft daisy chain crown, cute & gender-neutral' },
-      { id:'wizard_hat',   name:'Wizard Hat',        preview:'🧙',  badge:'Word Wizard',   desc:'Starry wizard hat — perfect for the Word Wizard!' },
-      { id:'backwards_cap',name:'Backwards Cap',     preview:'🧢',  badge:'Level 3',       desc:'Casual & playful, a mid-tier look' },
-      { id:'bunny_ears',   name:'Bunny Ears',        preview:'🐰',  badge:'Word Master',   desc:'Soft rounded bunny ears headband' },
-      { id:'thinking_cap', name:'Thinking Cap',      preview:'🎓',  badge:'Puzzle Pro',    desc:'Graduation cap with a green tassel — for great problem solvers!' },
-    ],
-  },
-  {
-    id: 'clothes', label: 'Clothes', icon: '👕',
-    items: [
-      { id:'none',         name:'Natural',           preview:null,  badge:null,            desc:'Pao in his natural fluffiness!' },
-      { id:'rainbow_tee',  name:'Rainbow Tee',       preview:'🌈',  badge:'First Win',     desc:'Simple tee with a rainbow stripe across the chest' },
-      { id:'astronaut',    name:'Astronaut Suit',    preview:'👨‍🚀', badge:'Alphabet Blast', desc:'Puffy white suit with round belly window' },
-      { id:'hero_tee',     name:'Superhero Cape',    preview:'🦸',  badge:'Super Player',  desc:'Logo on chest + tiny cape flutter!' },
-      { id:'cozy_hoodie',  name:'Cozy Hoodie',       preview:'🧥',  badge:'Cozy Player',   desc:'Hoodie with panda ears sewn on top & paw-print pocket' },
-      { id:'overalls',     name:'Star Overalls',     preview:'⭐',  badge:'Star Collector', desc:'Denim overalls with one big star patch on the pocket' },
-      { id:'echo_scarf',   name:'Echo Scarf',        preview:'🧣',  badge:'Echo Master',   desc:'Soft scarf stitched with little sound-wave patterns' },
-      { id:'puzzle_vest',  name:'Patchwork Puzzle Vest', preview:'🧩', badge:'Puzzle Pro', desc:'Vest stitched from colorful puzzle-piece patches' },
-    ],
-  },
-  {
-    id: 'pants', label: 'Pants', icon: '👖',
-    items: [
-      { id:'none',         name:'Natural',            preview:null,  badge:null,           desc:'Pao likes keeping it minimal!' },
-      { id:'polka_dots',   name:'Polka Dot Leggings', preview:'🟣',  badge:'First Win',    desc:'Colorful dots all over — fun & easy to spot!' },
-      { id:'cargo',        name:'Cargo Shorts',       preview:'🩳',  badge:'Explorer',     desc:'Adventurer look, matches Explorer badge' },
-      { id:'pajamas',      name:'Pajama Pants',       preview:'😴',  badge:'Story Builder', desc:'Cozy striped sleepwear for bedtime stories' },
-      { id:'overalls_b',   name:'Denim Overalls',     preview:'👖',  badge:'Level 5',      desc:'Pairs as a matching set with Star Overalls top' },
-    ],
-  },
-  {
-    id: 'shoes', label: 'Shoes', icon: '👟',
-    items: [
-      { id:'none',         name:'Natural',            preview:null,  badge:null,           desc:"Pao's natural soft paws!" },
-      { id:'rockets',      name:'Rocket Sneakers',    preview:'🚀',  badge:'Alphabet Blast',desc:'Sneakers with little flame & star trail graphic' },
-      { id:'rain_boots',   name:'Rain Boots',         preview:'🟡',  badge:'Level 2',      desc:'Bright yellow boots — fun rounded shape' },
-      { id:'ballet',       name:'Ballet Flats',       preview:'🩰',  badge:'Fashionista',  desc:'Soft ballet flats with a little bow' },
-      { id:'hightops',     name:'High-Top Stars',     preview:'👟',  badge:'Star Collector',desc:'High-tops covered in star motifs' },
-    ],
-  },
+// The catalog itself (names/art/descriptions) now comes from MongoDB — the
+// `clothes` collection (hats/clothes/pants/shoes) and `pao_hair` collection
+// (hairstyles), fetched in the component below. What stays local here is
+// just which of the *original* built-in items each badge unlocks, so the
+// existing gameplay-earned-badge experience (BADGES + earnedBadges, a
+// separate localStorage mechanic from the admin's Mongo `badges`
+// collection) keeps working exactly as before for those 21 pieces.
+// Admin-designed pieces added later aren't wired into that badge-gating
+// system yet, so they show up already unlocked.
+const CATEGORY_META = [
+  { id: 'hair', label: 'Hair', icon: '💇' },
+  { id: 'hats', label: 'Hats', icon: '🎩' },
+  { id: 'clothes', label: 'Clothes', icon: '👕' },
+  { id: 'pants', label: 'Pants', icon: '👖' },
+  { id: 'shoes', label: 'Shoes', icon: '👟' },
 ]
+
+const NATURAL_DESC = {
+  hair: 'Just Pao being Pao!',
+  hats: 'No hat today!',
+  clothes: 'Pao in his natural fluffiness!',
+  pants: 'Pao likes keeping it minimal!',
+  shoes: "Pao's natural soft paws!",
+}
+
+const LEGACY_BADGE_BY_CODE = {
+  party_hat: 'First Win', flower_crown: 'Perfect Score', wizard_hat: 'Word Wizard',
+  backwards_cap: 'Level 3', bunny_ears: 'Word Master', thinking_cap: 'Puzzle Pro',
+  rainbow_tee: 'First Win', astronaut: 'Alphabet Blast', hero_tee: 'Super Player',
+  cozy_hoodie: 'Cozy Player', overalls: 'Star Collector', echo_scarf: 'Echo Master', puzzle_vest: 'Puzzle Pro',
+  polka_dots: 'First Win', cargo: 'Explorer', pajamas: 'Story Builder', overalls_b: 'Level 5',
+  rockets: 'Alphabet Blast', rain_boots: 'Level 2', ballet: 'Fashionista', hightops: 'Star Collector',
+}
+
+// The hand-drawn art (OUTFIT_MAP) for built-in pieces, or the generated
+// render for admin-designed ones.
+function WardrobeThumb({ item, categoryId, width = 72 }) {
+  if (item.id === 'none' || !item.code) return <span style={{ fontSize: width * 0.5, opacity: 0.7 }}>🐼</span>
+  if (item.design) return <DesignedOutfitThumbnail category={categoryId} design={item.design} width={width} />
+  return <OutfitThumbnail category={categoryId === 'hats' ? 'hair' : categoryId} itemId={item.code} width={width} />
+}
 
 // ─── TTS helper ───────────────────────────────────────────────────────────────
 
@@ -266,7 +260,7 @@ function Boat({ size = 46 }) {
 
 export default function PaoCustomizePage({ onDone, lang = 'en' }) {
   const [activeTab,     setActiveTab]     = useState('hair')
-  const [equipped,      setEquipped]      = useState({ hair:'none', clothes:'none', pants:'none', shoes:'none' })
+  const [equipped,      setEquipped]      = useState({ hair:'none', hats:'none', clothes:'none', pants:'none', shoes:'none' })
   const [talking,       setTalking]       = useState(false)
   const [mouthOpen,     setMouthOpen]     = useState(false)
   const [displayText,   setDisplayText]   = useState('')
@@ -276,7 +270,41 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
     try { return new Set(JSON.parse(localStorage.getItem('pao_badges') || '[]')) }
     catch { return new Set() }
   })
+  const [wardrobeItems, setWardrobeItems] = useState([])
+  const [wardrobeLoading, setWardrobeLoading] = useState(true)
   const mouthRef = useRef(null)
+
+  // The full wardrobe (hats/clothes/pants/shoes + hairstyles), straight
+  // from MongoDB — see src/pages/admin/GamifiedBadgesPage.jsx for the
+  // admin side that manages these same two collections.
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      fetch('/api/pao-items/list').then((r) => r.json()),
+      fetch('/api/pao-hair/list').then((r) => r.json()),
+    ])
+      .then(([itemsBody, hairBody]) => {
+        if (cancelled) return
+        setWardrobeItems([...(itemsBody.items || []), ...(hairBody.items || [])])
+      })
+      .catch(() => { /* keep the "Natural" fallback for every slot */ })
+      .finally(() => { if (!cancelled) setWardrobeLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const categories = useMemo(() => CATEGORY_META.map((meta) => ({
+    ...meta,
+    items: [
+      { id: 'none', code: 'none', name: 'Natural', design: null, badge: null, desc: NATURAL_DESC[meta.id] },
+      ...wardrobeItems
+        .filter((i) => i.category === meta.label)
+        .map((i) => ({
+          id: i.code, code: i.code, name: i.name, design: i.design,
+          badge: LEGACY_BADGE_BY_CODE[i.code] || null,
+          desc: i.description || '',
+        })),
+    ],
+  })), [wardrobeItems])
 
   // refresh when badge case opens (badge may have just been earned)
   useEffect(() => {
@@ -305,7 +333,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
   const isUnlocked = (item) => !item.badge || earnedBadges.has(item.badge)
 
   const getEquippedName = (catId) =>
-    CATEGORIES.find(c => c.id === catId)?.items.find(i => i.id === equipped[catId])?.name ?? 'None'
+    categories.find(c => c.id === catId)?.items.find(i => i.id === equipped[catId])?.name ?? 'None'
 
   const equip = (catId, item) => {
     if (!isUnlocked(item)) return
@@ -313,7 +341,21 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
     tts(item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : pickLine(CUSTOMIZE_LINES.loveTheItem, lang, item.name), {})
   }
 
-  const activeCategory = CATEGORIES.find(c => c.id === activeTab)
+  const activeCategory = categories.find(c => c.id === activeTab)
+
+  // PandaMascot's `accessories` prop wants a built-in code string (for
+  // OUTFIT_MAP lookups) or { design } for admin-designed pieces — `equipped`
+  // itself just tracks each slot's code, so resolve that here.
+  const previewAccessories = useMemo(() => {
+    const out = {}
+    Object.entries(equipped).forEach(([catId, code]) => {
+      if (!code || code === 'none') return
+      const item = categories.find((c) => c.id === catId)?.items.find((i) => i.code === code)
+      if (!item) return
+      out[catId] = item.design ? { design: item.design } : item.code
+    })
+    return out
+  }, [equipped, categories])
 
   if (showBadgeCase) {
     return <BadgeCasePage earnedBadges={earnedBadges} onBack={() => setShowBadgeCase(false)}/>
@@ -405,12 +447,12 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
 
         {/* Pao with SVG outfit overlays */}
         <div style={{ animation:'cpFloat 3s ease-in-out infinite', flexShrink:0 }}>
-          <PandaMascot entered={true} mouthOpen={mouthOpen} pxWidth={200} accessories={equipped} viewPad={{ top:72, bottom:8 }}/>
+          <PandaMascot entered={true} mouthOpen={mouthOpen} pxWidth={200} accessories={previewAccessories} viewPad={{ top:72, bottom:8 }}/>
         </div>
 
         {/* Equipped slots */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, width:'100%' }}>
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <div key={cat.id} onClick={() => setActiveTab(cat.id)} style={{ display:'flex', alignItems:'center', gap:7, background: activeTab===cat.id ? 'rgba(139,92,246,.16)' : 'rgba(124,79,224,.06)', border:`1px solid ${activeTab===cat.id ? 'rgba(139,92,246,.45)' : 'rgba(124,79,224,.15)'}`, borderRadius:11, padding:'7px 9px', cursor:'pointer', transition:'all .2s' }}>
               <span style={{ fontSize:20 }}>{cat.icon}</span>
               <div style={{ minWidth:0 }}>
@@ -477,8 +519,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
         </div>
 
         {/* Tabs */}
-        <div style={{ display:'flex', gap:6, padding:'10px 22px 0', flexShrink:0 }}>
-          {CATEGORIES.map(cat => (
+        <div style={{ display:'flex', gap:6, padding:'10px 22px 0', flexShrink:0, flexWrap:'wrap' }}>
+          {categories.map(cat => (
             <button key={cat.id} onClick={() => setActiveTab(cat.id)}
               style={{ background: activeTab===cat.id ? 'rgba(139,92,246,.2)' : 'rgba(124,79,224,.06)', border:`1.5px solid ${activeTab===cat.id ? 'rgba(139,92,246,.5)' : 'rgba(124,79,224,.18)'}`, borderRadius:11, padding:'7px 14px', color: activeTab===cat.id ? '#6d28d9' : 'rgba(58,46,107,.55)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all .2s', display:'flex', alignItems:'center', gap:5 }}>
               {cat.icon} {cat.label}
@@ -488,6 +530,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
 
         {/* Items grid */}
         <div style={{ flex:1, overflowY:'auto', padding:'10px 22px 20px' }}>
+          {wardrobeLoading && (
+            <div style={{ padding:'20px 4px', fontSize:12, color:'rgba(58,46,107,.5)', fontWeight:600 }}>Loading Pao's wardrobe…</div>
+          )}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
             {activeCategory?.items.map((item, idx) => {
               const unlocked   = isUnlocked(item)
@@ -518,10 +563,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
 
                   {/* Item thumbnail */}
                   <div style={{ filter: isLocked ? 'grayscale(1) opacity(.55)' : 'none', display:'flex', alignItems:'center', justifyContent:'center', minHeight:52 }}>
-                    {item.id === 'none'
-                      ? <span style={{ fontSize:36, opacity: isLocked ? .4 : .7 }}>🐼</span>
-                      : <OutfitThumbnail category={activeTab} itemId={item.id} width={72}/>
-                    }
+                    <WardrobeThumb item={item} categoryId={activeTab} width={72}/>
                   </div>
 
                   {/* Name + desc */}

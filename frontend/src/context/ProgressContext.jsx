@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { apiPost } from '../utils/api'
 
 // Bumped to v2 so browsers with old cached progress (pre level/stats reset)
 // automatically pick up the fresh baseline instead of keeping stale data.
@@ -113,7 +114,22 @@ export function ProgressProvider({ children }) {
 
   // Called by AnalyticsContext once a played session has been aggregated,
   // so real gameplay actually moves the parent-facing snapshot numbers.
-  const recordGameSession = ({ domain, accuracy, durationMinutes = 0 }) => update((prev) => {
+  // Also fires a best-effort write to the backend's `games` collection
+  // (MongoDB) so a session survives beyond this browser's localStorage —
+  // failures are swallowed since local progress must keep working even if
+  // the backend is unreachable.
+  const recordGameSession = ({ patientId, gameId, domain, accuracy, durationMinutes = 0 }) => update((prev) => {
+    apiPost('/api/game-sessions', {
+      patientId: patientId || prev.patientName,
+      patientName: prev.patientName,
+      gameId: gameId || null,
+      domain,
+      accuracy,
+      durationMinutes,
+      xpEarned: 100,
+      completedAt: new Date().toISOString(),
+    }).catch((err) => console.warn('Could not record game session to backend:', err.message))
+
     const domainKey = domain.toLowerCase()
     const bumpPeriod = (period) => ({
       ...period,

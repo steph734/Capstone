@@ -132,7 +132,13 @@ export function AnalyticsProvider({ children }) {
     if (!latest || latest.id === lastRecordedIdRef.current) return
     lastRecordedIdRef.current = latest.id
     if (latest.patientId === 'alvrin') {
-      recordGameSession({ domain: latest.domain, accuracy: latest.accuracy, durationMinutes: latest.durationMinutes })
+      recordGameSession({
+        patientId: latest.patientId,
+        gameId: latest.exerciseId,
+        domain: latest.domain,
+        accuracy: latest.accuracy,
+        durationMinutes: latest.durationMinutes,
+      })
     }
   }, [analytics.observations]) // eslint-disable-line
 

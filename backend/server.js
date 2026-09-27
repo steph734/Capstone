@@ -34,6 +34,14 @@ app.use('/api/branches', require('./routes/branches'));
 // Attendance: POST /api/attendance/scan (webcam badge-scan check-in/out)
 app.use('/api/attendance', require('./routes/attendance'));
 
+// Gamified activities: GET/POST/PATCH/DELETE /api/games (the game catalog —
+// Super Admin-authored definitions like Puzzle Pals, Picture-Word Matching)
+app.use('/api/games', require('./routes/games'));
+
+// Gamified activities: POST/GET /api/game-sessions (per-play activity log,
+// separate from the catalog above)
+app.use('/api/game-sessions', require('./routes/gameSessions'));
+
 // Public: new-hire self-setup (set password + upload documents) via emailed invite link
 app.use('/api/staff-setup', require('./routes/staffSetup'));
 

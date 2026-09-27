@@ -1,10 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialGames, initialGameRequests } from './gamifiedLibraryData'
+import { initialGameRequests } from './gamifiedLibraryData'
 import { GameControllerIcon, PencilIcon, TrashIcon } from './gamifiedIcons'
+import { apiGet, apiPost, apiPatch, apiDelete } from '../../utils/api'
 
-const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', description: '', points: 10 }
+const GAME_TYPE_OPTIONS = [
+  { value: 'picture_match',  label: 'Picture Match' },
+  { value: 'sort_place',     label: 'Sort & Place' },
+  { value: 'choose_picture', label: 'Choose the Picture' },
+  { value: 'step_by_step',   label: 'Step by Step' },
+  { value: 'say_it',         label: 'Say It' },
+  { value: 'move_with_me',   label: 'Move With Me' },
+]
+
+const emptyForm = { name: '', type: 'Cognitive', level: 'Easy', gameType: 'picture_match', description: '', points: 10 }
 
 const TYPE_ICON = { Cognitive: '🧩', Speech: '🎤', Physical: '🏃', Occupational: '✋' }
 
@@ -14,16 +24,48 @@ function avatarColorFor(id) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length]
 }
 
+const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
+// The backend's `games` collection stores therapy_type/difficulty/status as
+// lowercase enum strings (matches the Atlas $jsonSchema validator); this UI
+// displays them capitalized, same as before this was wired to MongoDB.
+function fromApiGame(g) {
+  return {
+    id: g.id,
+    name: g.name,
+    type: capitalize(g.therapyType),
+    level: capitalize(g.difficulty || 'easy'),
+    status: capitalize(g.status),
+    description: g.description,
+    points: g.pointsPerPlay ?? 0,
+    gameType: g.gameType,
+  }
+}
+
 export default function GamesLibraryPage({ user, onLogout }) {
-  const [games, setGames] = useState(initialGames)
+  const [games, setGames] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [requests, setRequests] = useState(initialGameRequests)
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [declineTarget, setDeclineTarget] = useState(null)
   const [viewRequest, setViewRequest] = useState(null)
   const [form, setForm] = useState(emptyForm)
+
+  const loadGames = () => {
+    setLoading(true)
+    setLoadError('')
+    apiGet('/api/games')
+      .then((data) => setGames((data.games || []).map(fromApiGame)))
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(loadGames, [])
 
   const editingGame = useMemo(() => games.find((game) => game.id === editingId) || null, [games, editingId])
 
@@ -35,29 +77,63 @@ export default function GamesLibraryPage({ user, onLogout }) {
   const openCreate = () => {
     setEditingId(null)
     setForm(emptyForm)
+    setSaveError('')
     setShowEditor(true)
   }
 
   const openEdit = (game) => {
     setEditingId(game.id)
-    setForm({ name: game.name, type: game.type, level: game.level, description: game.description, points: game.points ?? 10 })
+    setForm({ name: game.name, type: game.type, level: game.level, gameType: game.gameType, description: game.description, points: game.points ?? 10 })
+    setSaveError('')
     setShowEditor(true)
   }
 
-  const saveGame = (event) => {
+  const saveGame = async (event) => {
     event.preventDefault()
-    if (editingGame) {
-      setGames((currentGames) => currentGames.map((game) => (game.id === editingGame.id ? { ...game, ...form, points: Number(form.points) || 0 } : game)))
-    } else {
-      setGames((currentGames) => [...currentGames, { id: Date.now(), ...form, points: Number(form.points) || 0, status: 'Draft' }])
+    setSaveError('')
+    const payload = {
+      name: form.name,
+      therapyType: form.type.toLowerCase(),
+      difficulty: form.level.toLowerCase(),
+      gameType: form.gameType,
+      description: form.description,
+      pointsPerPlay: Number(form.points) || 0,
     }
-    setShowEditor(false)
+
+    try {
+      if (editingGame) {
+        payload.updatedBy = user?.id
+        await apiPatch(`/api/games/${editingGame.id}`, payload)
+      } else {
+        payload.createdBy = user?.id
+        await apiPost('/api/games', payload)
+      }
+      setShowEditor(false)
+      loadGames()
+    } catch (err) {
+      setSaveError(err.message)
+    }
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return
-    setGames((currentGames) => currentGames.filter((game) => game.id !== deleteTarget.id))
+    try {
+      await apiDelete(`/api/games/${deleteTarget.id}`)
+      setGames((currentGames) => currentGames.filter((game) => game.id !== deleteTarget.id))
+    } catch (err) {
+      setLoadError(err.message)
+    }
     setDeleteTarget(null)
+  }
+
+  const togglePublish = async (game) => {
+    const nextStatus = game.status === 'Published' ? 'draft' : 'published'
+    try {
+      await apiPatch(`/api/games/${game.id}`, { status: nextStatus, updatedBy: user?.id })
+      setGames((currentGames) => currentGames.map((g) => (g.id === game.id ? { ...g, status: capitalize(nextStatus) } : g)))
+    } catch (err) {
+      setLoadError(err.message)
+    }
   }
 
   // Approving opens the creation workspace (the Add/Edit Game form) prefilled
@@ -160,8 +236,15 @@ export default function GamesLibraryPage({ user, onLogout }) {
           </div>
         </div>
 
+        {loadError && <p style={{ color: '#dc2626', fontSize: '13px', margin: '0 0 12px' }}>{loadError}</p>}
+
         <div className="games-list">
-          {visibleGames.length === 0 && (
+          {loading && (
+            <div className="game-card">
+              <div><h4>Loading games…</h4></div>
+            </div>
+          )}
+          {!loading && visibleGames.length === 0 && (
             <div className="game-card">
               <div>
                 <h4>No games found</h4>
@@ -169,7 +252,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
               </div>
             </div>
           )}
-          {visibleGames.map((game) => (
+          {!loading && visibleGames.map((game) => (
             <div key={game.id} className="aga-row">
               <span className="aga-icon">{TYPE_ICON[game.type] || '🎮'}</span>
 
@@ -188,6 +271,13 @@ export default function GamesLibraryPage({ user, onLogout }) {
               <div className="aga-points">+{game.points ?? 0}<span>points per play</span></div>
 
               <div className="admin-item-actions">
+                <button
+                  className="admin-btn-secondary"
+                  onClick={() => togglePublish(game)}
+                  title={game.status === 'Published' ? 'Unpublish' : 'Publish'}
+                >
+                  {game.status === 'Published' ? 'Unpublish' : 'Publish'}
+                </button>
                 <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(game)} title="Edit" aria-label={`Edit ${game.name}`}>
                   <PencilIcon />
                 </button>
@@ -246,6 +336,15 @@ export default function GamesLibraryPage({ user, onLogout }) {
               </div>
 
               <label className="admin-field">
+                <span>Game Type</span>
+                <select value={form.gameType} onChange={(event) => setForm((current) => ({ ...current, gameType: event.target.value }))}>
+                  {GAME_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="admin-field">
                 <span>Points per Play</span>
                 <input
                   type="number"
@@ -266,6 +365,8 @@ export default function GamesLibraryPage({ user, onLogout }) {
                   required
                 />
               </label>
+
+              {saveError && <p style={{ color: '#dc2626', fontSize: '13px', margin: '-8px 0 4px' }}>{saveError}</p>}
 
               <div className="admin-button-row">
                 <button className="admin-btn" type="submit">{editingGame ? 'Save Changes' : 'Save Game'}</button>

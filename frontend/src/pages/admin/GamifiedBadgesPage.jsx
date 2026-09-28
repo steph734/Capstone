@@ -1,129 +1,46 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
 import PaoClothingDesigner, { WardrobeItemThumb, describeUnlock } from './PaoClothingDesigner'
 import PaoThemeSets from './PaoThemeSets'
+import BadgeMedal from '../../components/BadgeMedal'
+import { SYMBOLS, SYMBOL_GROUPS, symbolForGame } from '../../data/badgeSymbols'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
   ShuffleIcon, GameControllerIcon, ShirtIcon, CheckIcon,
 } from './gamifiedIcons'
 import './GamifiedBadgesPage.css'
 
-/* ── Badge design options — enums mirror the `badges` collection's
+/* ── Badge design options — ids mirror the `badges` collection's
    $jsonSchema exactly, since Mongo will reject anything outside them. ── */
 
-/* CSS clip-path percentages, for the small flat swatch buttons in the
-   picker (kept simple/cheap — the real medal render below uses SVG). */
-function polygonPoints(sides, rotate = -90) {
-  const pts = []
-  for (let i = 0; i < sides; i++) {
-    const angle = (rotate + (360 / sides) * i) * (Math.PI / 180)
-    pts.push(`${(50 + 50 * Math.cos(angle)).toFixed(1)}% ${(50 + 50 * Math.sin(angle)).toFixed(1)}%`)
-  }
-  return `polygon(${pts.join(', ')})`
-}
-function starPolygon(points, innerRatio = 0.5, rotate = -90) {
-  const pts = []
-  const step = 360 / (points * 2)
-  for (let i = 0; i < points * 2; i++) {
-    const r = i % 2 === 0 ? 50 : 50 * innerRatio
-    const angle = (rotate + step * i) * (Math.PI / 180)
-    pts.push(`${(50 + r * Math.cos(angle)).toFixed(1)}% ${(50 + r * Math.sin(angle)).toFixed(1)}%`)
-  }
-  return `polygon(${pts.join(', ')})`
-}
-
-/* Absolute SVG coordinates (not %), for the actual medal outline in
-   BadgeMedal — a real <svg> shape rather than a CSS clip-path, since the
-   medal also needs ribbon tails layered behind it. */
-function polygonSvgPoints(sides, cx, cy, r, rotate = -90) {
-  const pts = []
-  for (let i = 0; i < sides; i++) {
-    const angle = (rotate + (360 / sides) * i) * (Math.PI / 180)
-    pts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`)
-  }
-  return pts.join(' ')
-}
-function starSvgPoints(points, cx, cy, r, innerRatio = 0.5, rotate = -90) {
-  const pts = []
-  const step = 360 / (points * 2)
-  for (let i = 0; i < points * 2; i++) {
-    const rad = i % 2 === 0 ? r : r * innerRatio
-    const angle = (rotate + step * i) * (Math.PI / 180)
-    pts.push(`${(cx + rad * Math.cos(angle)).toFixed(1)},${(cy + rad * Math.sin(angle)).toFixed(1)}`)
-  }
-  return pts.join(' ')
-}
-
 const SHAPES = [
-  {
-    id: 'circle', label: 'Circle', swatchStyle: { borderRadius: '50%' },
-    outline: (cx, cy, r) => <circle cx={cx} cy={cy} r={r} />,
-  },
-  {
-    id: 'rounded', label: 'Rounded', swatchStyle: { borderRadius: '22%' },
-    outline: (cx, cy, r) => <rect x={cx - r} y={cy - r} width={r * 2} height={r * 2} rx={r * 0.4} ry={r * 0.4} />,
-  },
-  {
-    id: 'octagon', label: 'Octagon', swatchStyle: { clipPath: polygonPoints(8) },
-    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(8, cx, cy, r)} />,
-  },
-  {
-    id: 'hexagon', label: 'Hexagon', swatchStyle: { clipPath: polygonPoints(6) },
-    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(6, cx, cy, r)} />,
-  },
-  {
-    id: 'diamond', label: 'Diamond', swatchStyle: { clipPath: polygonPoints(4) },
-    outline: (cx, cy, r) => <polygon points={polygonSvgPoints(4, cx, cy, r)} />,
-  },
-  {
-    id: 'shield', label: 'Shield', swatchStyle: { clipPath: 'polygon(50% 0%, 100% 20%, 100% 62%, 50% 100%, 0% 62%, 0% 20%)' },
-    outline: (cx, cy, r) => <polygon points={`${cx - r},${cy - r} ${cx + r},${cy - r} ${cx + r},${cy + 0.24 * r} ${cx},${cy + r} ${cx - r},${cy + 0.24 * r}`} />,
-  },
-  {
-    id: 'star', label: 'Star', swatchStyle: { clipPath: starPolygon(5, 0.5) },
-    outline: (cx, cy, r) => <polygon points={starSvgPoints(5, cx, cy, r, 0.5)} />,
-  },
-  {
-    id: 'flower', label: 'Flower', swatchStyle: { clipPath: starPolygon(8, 0.72) },
-    outline: (cx, cy, r) => <polygon points={starSvgPoints(8, cx, cy, r, 0.72)} />,
-  },
-  {
-    id: 'scallop', label: 'Scallop', swatchStyle: { clipPath: starPolygon(12, 0.86) },
-    outline: (cx, cy, r) => <polygon points={starSvgPoints(12, cx, cy, r, 0.88)} />,
-  },
-  {
-    id: 'gear', label: 'Gear', swatchStyle: { clipPath: starPolygon(10, 0.8) },
-    outline: (cx, cy, r) => <polygon points={starSvgPoints(10, cx, cy, r, 0.82)} />,
-  },
+  { id: 'circle', label: 'Circle' },
+  { id: 'rounded', label: 'Rounded' },
+  { id: 'octagon', label: 'Octagon' },
+  { id: 'hexagon', label: 'Hexagon' },
+  { id: 'diamond', label: 'Diamond' },
+  { id: 'shield', label: 'Shield' },
+  { id: 'star', label: 'Star' },
+  { id: 'flower', label: 'Flower' },
+  { id: 'scallop', label: 'Scallop' },
+  { id: 'gear', label: 'Gear' },
 ]
 const COLOURS = [
-  { id: 'gold',   label: 'Gold',   from: '#f6e27a', to: '#c9982a' },
-  { id: 'silver', label: 'Silver', from: '#eef1f5', to: '#9aa3ad' },
-  { id: 'bronze', label: 'Bronze', from: '#e6b085', to: '#a05a2c' },
-  { id: 'red',    label: 'Red',    from: '#fca5a5', to: '#dc2626' },
-  { id: 'orange', label: 'Orange', from: '#fdba74', to: '#ea580c' },
-  { id: 'amber',  label: 'Amber',  from: '#fde68a', to: '#d97706' },
-  { id: 'green',  label: 'Green',  from: '#86efac', to: '#16a34a' },
-  { id: 'teal',   label: 'Teal',   from: '#7fe9d8', to: '#0d9488' },
-  { id: 'blue',   label: 'Blue',   from: '#93c5fd', to: '#2563eb' },
-  { id: 'indigo', label: 'Indigo', from: '#a5b4fc', to: '#4338ca' },
-  { id: 'purple', label: 'Purple', from: '#d3c2fb', to: '#7c3aed' },
-  { id: 'pink',   label: 'Pink',   from: '#fbd0e8', to: '#db2777' },
-]
-const SYMBOLS = [
-  { id: 'star',   label: 'Star',   glyph: '⭐' }, { id: 'heart',  label: 'Heart',  glyph: '❤️' },
-  { id: 'leaf',   label: 'Leaf',   glyph: '🍃' }, { id: 'drop',   label: 'Drop',   glyph: '💧' },
-  { id: 'trophy', label: 'Trophy', glyph: '🏆' }, { id: 'bolt',   label: 'Bolt',   glyph: '⚡' },
-  { id: 'crown',  label: 'Crown',  glyph: '👑' }, { id: 'flake',  label: 'Flake',  glyph: '❄️' },
-  { id: 'brain',  label: 'Brain',  glyph: '🧠' }, { id: 'target', label: 'Target', glyph: '🎯' },
-  { id: 'flame',  label: 'Flame',  glyph: '🔥' }, { id: 'book',   label: 'Book',   glyph: '📖' },
-  { id: 'rocket', label: 'Rocket', glyph: '🚀' }, { id: 'puzzle', label: 'Puzzle', glyph: '🧩' },
-  { id: 'music',  label: 'Music',  glyph: '🎵' }, { id: 'sun',    label: 'Sun',    glyph: '☀️' },
-  { id: 'medal',  label: 'Medal',  glyph: '🥇' }, { id: 'shield', label: 'Shield', glyph: '🛡️' },
-  { id: 'paw',    label: 'Paw',    glyph: '🐾' }, { id: 'key',    label: 'Key',    glyph: '🔑' },
+  { id: 'gold', label: 'Gold' },
+  { id: 'silver', label: 'Silver' },
+  { id: 'bronze', label: 'Bronze' },
+  { id: 'red', label: 'Red' },
+  { id: 'orange', label: 'Orange' },
+  { id: 'amber', label: 'Amber' },
+  { id: 'green', label: 'Green' },
+  { id: 'teal', label: 'Teal' },
+  { id: 'blue', label: 'Blue' },
+  { id: 'indigo', label: 'Indigo' },
+  { id: 'purple', label: 'Purple' },
+  { id: 'pink', label: 'Pink' },
 ]
 // `badgeType` is fixed by which criteria a badge uses — "finishes a
 // specific game" is the only one tied to one game, so it's the only one
@@ -159,56 +76,13 @@ function describeForSave(form, clothesList, games) {
 }
 
 const emptyForm = {
-  name: '', shape: 'circle', colour: 'gold', symbol: 'star',
+  name: '', shape: 'circle', colour: 'orange', symbol: 'star', banner: false, symbolTouched: false,
   criteriaType: 'complete_any_game', criteriaGameId: null, criteriaValue: null,
   unlockItemCode: '', isActive: true,
 }
 
-/* ── Badge medal: a real award-ribbon icon (shape + colour + symbol),
-   not just a flat colored blob — two ribbon tails behind a medallion,
-   with an inner rim and the symbol centered on top. `muted` renders a
-   hidden/not-yet-earned badge washed out, same idea as a grayed-out
-   trophy case slot. ── */
-function BadgeMedal({ shape, colour, symbol, size = 40, muted = false }) {
-  const shp = SHAPES.find((s) => s.id === shape) || SHAPES[0]
-  const col = COLOURS.find((c) => c.id === colour) || COLOURS[0]
-  const sym = SYMBOLS.find((s) => s.id === symbol) || SYMBOLS[0]
-  const gradId = useId()
-  // The medallion (upper ~55% of the viewBox) is the part a viewer reads as
-  // the icon's "center" — nudge the whole element down a little so that
-  // part, not the ribbon-tail-inclusive bounding box, lines up with
-  // sibling text when this sits in a flex row with align-items: center.
-  const nudge = size * 0.17
-
-  return (
-    <svg
-      className={`badge-medal-svg${muted ? ' muted' : ''}`}
-      width={size}
-      height={size * 1.3}
-      viewBox="0 0 100 128"
-      style={{ overflow: 'visible', flexShrink: 0, transform: `translateY(${nudge}px)` }}
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={gradId} x1="15%" y1="5%" x2="85%" y2="95%">
-          <stop offset="0%" stopColor={col.from} />
-          <stop offset="100%" stopColor={col.to} />
-        </linearGradient>
-      </defs>
-      {/* Ribbon tails, tucked behind the medallion */}
-      <polygon points="34,72 46,72 46,120 40,106 34,120" fill={col.to} />
-      <polygon points="54,72 66,72 66,120 60,106 54,120" fill={col.to} />
-      {/* Medallion */}
-      <g fill={`url(#${gradId})`} stroke="rgba(0,0,0,0.15)" strokeWidth="1.5">
-        {shp.outline(50, 44, 36)}
-      </g>
-      <circle cx="50" cy="44" r="28" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
-      <text x="50" y="45" textAnchor="middle" dominantBaseline="central" fontSize="30">{sym.glyph}</text>
-    </svg>
-  )
-}
-
-/* ── One row of pick-a-swatch options ── */
+/* ── One row of pick-a-swatch options — each swatch is a mini BadgeMedal
+   preview of that option combined with the form's other current choices. ── */
 function SwatchField({ label, options, value, onChange, renderSwatch }) {
   const selected = options.find((o) => o.id === value)
   return (
@@ -230,6 +104,54 @@ function SwatchField({ label, options, value, onChange, renderSwatch }) {
             {renderSwatch(opt)}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Symbol picker: search box + one labelled row per group, all 85. ── */
+function SymbolPicker({ value, shape, colour, onChange }) {
+  const [search, setSearch] = useState('')
+  const q = search.trim().toLowerCase()
+  const filtered = q ? SYMBOLS.filter((s) => s.label.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)) : SYMBOLS
+  const groups = SYMBOL_GROUPS.map((g) => ({ group: g, items: filtered.filter((s) => s.group === g) })).filter((g) => g.items.length)
+
+  return (
+    <div className="badge-swatch-field">
+      <div className="badge-swatch-head">
+        <span>Symbol</span>
+        <span className="badge-swatch-selected">{SYMBOLS.find((s) => s.id === value)?.label}</span>
+      </div>
+      <input
+        className="badge-symbol-search"
+        placeholder="Search symbols…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <div className="badge-symbol-groups">
+        {groups.length === 0 ? (
+          <p className="badge-symbol-empty">No symbols match.</p>
+        ) : (
+          groups.map(({ group, items }) => (
+            <div key={group} className="badge-symbol-group">
+              <div className="badge-symbol-group-label">{group}</div>
+              <div className="badge-swatch-row">
+                {items.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`badge-swatch${value === opt.id ? ' selected' : ''}`}
+                    onClick={() => onChange(opt.id)}
+                    title={opt.label}
+                    aria-label={opt.label}
+                  >
+                    <BadgeMedal shape={shape} colour={colour} symbol={opt.id} size={50} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -376,6 +298,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     setEditingId(badge.id)
     setForm({
       name: badge.name, shape: badge.shape, colour: badge.colour, symbol: badge.symbol,
+      banner: !!badge.banner, symbolTouched: true,
       criteriaType: badge.criteriaType, criteriaGameId: badge.criteriaGameId,
       criteriaValue: badge.criteriaValue, unlockItemCode: badge.unlockItemCode || '', isActive: badge.isActive,
     })
@@ -384,7 +307,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
   const shuffleAppearance = () => {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)].id
-    setForm((f) => ({ ...f, shape: pick(SHAPES), colour: pick(COLOURS), symbol: pick(SYMBOLS) }))
+    setForm((f) => ({ ...f, shape: pick(SHAPES), colour: pick(COLOURS), symbol: pick(SYMBOLS), symbolTouched: true }))
   }
 
   const saveBadge = async (event) => {
@@ -394,7 +317,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     const payload = {
       name: form.name,
       description: describeForSave(form, clothes, games),
-      art: { shape: form.shape, color: form.colour, symbol: form.symbol },
+      art: { shape: form.shape, color: form.colour, symbol: form.symbol, banner: form.banner },
       badgeType: meta.badgeType,
       criteriaType: form.criteriaType,
       criteriaGameId: meta.needsGame ? form.criteriaGameId : null,
@@ -725,7 +648,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div key={badge.id} className="game-card">
               <div className="game-card-main">
                 <div className="branch-card-title-row">
-                  <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} size={36} muted={!badge.isActive} />
+                  <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} name={badge.name} banner={badge.banner} size={92} muted={!badge.isActive} />
                   <h4>{badge.name}</h4>
                   <span className={`admin-pill ${badge.isActive ? 'green' : 'gray'}`}>{badge.isActive ? 'Active' : 'Hidden'}</span>
                   <span className={`admin-pill ${badge.badgeType === 'game_completion' ? 'blue' : 'purple'}`}>
@@ -872,7 +795,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           <div className="admin-modal badge-builder-modal" onClick={(event) => event.stopPropagation()}>
             <div className="admin-modal-header">
               <div className="admin-modal-title">
-                <span className="admin-modal-icon"><MedalIcon /></span>
+                <span className="admin-modal-icon"><BadgeMedal shape="circle" colour="teal" symbol="medal" size={40} /></span>
                 <div>
                   <h3>{editingBadge ? 'Edit badge' : 'New badge'}</h3>
                   <p>Design the medal, then set the rule that awards it.</p>
@@ -883,7 +806,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
             <form className="admin-modal-form badge-builder-body" onSubmit={saveBadge}>
               <div className="badge-preview-card">
-                <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} size={72} muted={!form.isActive} />
+                <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} name={form.name} banner={form.banner} size={190} muted={!form.isActive} />
                 <div className="badge-preview-name">{form.name || 'Untitled badge'}</div>
                 <div className="badge-preview-rule">{ruleClause(form, games)}</div>
                 <button type="button" className="badge-shuffle-btn" onClick={shuffleAppearance}>
@@ -905,18 +828,26 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 <SwatchField
                   label="Shape" options={SHAPES} value={form.shape}
                   onChange={(id) => setForm((f) => ({ ...f, shape: id }))}
-                  renderSwatch={(opt) => <span className="badge-swatch-shape" style={opt.swatchStyle} />}
+                  renderSwatch={(opt) => <BadgeMedal shape={opt.id} colour={form.colour} symbol={form.symbol} size={50} />}
                 />
                 <SwatchField
                   label="Colour" options={COLOURS} value={form.colour}
                   onChange={(id) => setForm((f) => ({ ...f, colour: id }))}
-                  renderSwatch={(opt) => <span className="badge-swatch-colour" style={{ background: `linear-gradient(135deg, ${opt.from}, ${opt.to})` }} />}
+                  renderSwatch={(opt) => <BadgeMedal shape={form.shape} colour={opt.id} symbol={form.symbol} size={50} />}
                 />
-                <SwatchField
-                  label="Symbol" options={SYMBOLS} value={form.symbol}
-                  onChange={(id) => setForm((f) => ({ ...f, symbol: id }))}
-                  renderSwatch={(opt) => <span className="badge-swatch-symbol">{opt.glyph}</span>}
+                <SymbolPicker
+                  value={form.symbol} shape={form.shape} colour={form.colour}
+                  onChange={(id) => setForm((f) => ({ ...f, symbol: id, symbolTouched: true }))}
                 />
+
+                <label className="admin-field admin-field-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.banner}
+                    onChange={(event) => setForm((f) => ({ ...f, banner: event.target.checked }))}
+                  />
+                  <span>Name banner instead of ribbon tails</span>
+                </label>
 
                 <label className="admin-field">
                   <span>Award once, when the patient…</span>
@@ -925,12 +856,17 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     onChange={(event) => {
                       const nextType = event.target.value
                       const meta = CRITERIA_TYPES.find((t) => t.id === nextType)
-                      setForm((f) => ({
-                        ...f,
-                        criteriaType: nextType,
-                        criteriaGameId: meta.needsGame ? (f.criteriaGameId ?? games[0]?.id ?? null) : null,
-                        criteriaValue: meta.needsValue ? (f.criteriaValue ?? meta.defaultValue) : null,
-                      }))
+                      setForm((f) => {
+                        const nextGameId = meta.needsGame ? (f.criteriaGameId ?? games[0]?.id ?? null) : null
+                        const game = meta.needsGame ? games.find((g) => g.id === nextGameId) : null
+                        return {
+                          ...f,
+                          criteriaType: nextType,
+                          criteriaGameId: nextGameId,
+                          criteriaValue: meta.needsValue ? (f.criteriaValue ?? meta.defaultValue) : null,
+                          symbol: game && !f.symbolTouched ? symbolForGame(game.name) : f.symbol,
+                        }
+                      })
                     }}
                   >
                     {CRITERIA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -942,7 +878,15 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     <span>Which game</span>
                     <select
                       value={form.criteriaGameId ?? ''}
-                      onChange={(event) => setForm((f) => ({ ...f, criteriaGameId: event.target.value }))}
+                      onChange={(event) => {
+                        const gameId = event.target.value
+                        const game = games.find((g) => g.id === gameId)
+                        setForm((f) => ({
+                          ...f,
+                          criteriaGameId: gameId,
+                          symbol: game && !f.symbolTouched ? symbolForGame(game.name) : f.symbol,
+                        }))
+                      }}
                     >
                       {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>

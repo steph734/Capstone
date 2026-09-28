@@ -16,11 +16,22 @@ const badgeArtSchema = new mongoose.Schema(
     symbol: {
       type: String,
       required: true,
+      // Kept as a literal list (rather than importing from src/data/badgeSymbols.js)
+      // so this Vercel function bundle never depends on reaching outside api/ —
+      // must stay in sync with SYMBOL_IDS there.
       enum: [
-        'star', 'heart', 'leaf', 'drop', 'trophy', 'bolt', 'crown', 'flake', 'brain', 'target',
-        'flame', 'book', 'rocket', 'puzzle', 'music', 'sun', 'medal', 'shield', 'paw', 'key',
+        'puzzle', 'picture', 'echo', 'magnifier', 'blocks', 'rhyme', 'scroll', 'abc', 'basket', 'cards',
+        'soundwave', 'balance', 'stretch', 'grab', 'shirt', 'tap', 'red_hood', 'mic', 'speaker', 'ear',
+        'chat', 'music', 'book', 'drum', 'bell', 'smile', 'heart', 'thumbs_up', 'wave', 'check',
+        'star', 'sparkles', 'trophy', 'medal', 'crown', 'gem', 'gift', 'key', 'flag', 'target',
+        'brain', 'idea', 'pencil', 'palette', 'ball', 'balloon', 'gamepad', 'backpack', 'grad_cap', 'glasses',
+        'paw', 'cat', 'dog', 'fish', 'bird', 'rabbit', 'turtle', 'bug', 'apple', 'carrot',
+        'cookie', 'ice_cream', 'pizza', 'cake', 'car', 'bike', 'plane', 'rocket', 'footprints', 'home',
+        'clock', 'calendar', 'sun', 'moon', 'cloud', 'rainbow', 'umbrella', 'flake', 'blossom', 'leaf',
+        'tree', 'drop', 'flame', 'bolt', 'shield',
       ],
     },
+    banner: { type: Boolean, default: null },
   },
   { _id: false }
 )

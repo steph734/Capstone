@@ -36,7 +36,7 @@ async function handlePatch(req, res) {
   if (name !== undefined) update.name = str(name)
   if (description !== undefined) update.description = str(description) || null
   if (art !== undefined && art?.shape && art?.color && art?.symbol) {
-    update.art = { shape: art.shape, color: art.color, symbol: art.symbol }
+    update.art = { shape: art.shape, color: art.color, symbol: art.symbol, banner: !!art.banner }
   }
   if (badgeType !== undefined) update.badge_type = badgeType
   if (criteriaType !== undefined) update.criteria_type = criteriaType

@@ -9,6 +9,7 @@ export function serializeBadge(doc) {
     shape: doc.art?.shape,
     colour: doc.art?.color,
     symbol: doc.art?.symbol,
+    banner: !!doc.art?.banner,
     badgeType: doc.badge_type,
     criteriaType: doc.criteria_type,
     criteriaGameId: doc.criteria_game_id ? String(doc.criteria_game_id) : null,

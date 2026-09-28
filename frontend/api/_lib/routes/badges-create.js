@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       code: candidate,
       name: str(name),
       description: str(description) || null,
-      art: { shape: art.shape, color: art.color, symbol: art.symbol },
+      art: { shape: art.shape, color: art.color, symbol: art.symbol, banner: !!art.banner },
       badge_type: badgeType,
       criteria_type: criteriaType,
       criteria_game_id: mongoose.isValidObjectId(criteriaGameId) ? new mongoose.Types.ObjectId(criteriaGameId) : null,

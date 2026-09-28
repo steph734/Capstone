@@ -256,10 +256,21 @@ export default async function handler(req, res) {
     // 4. Best-effort payment row. `method` here is the raw one constrained to
     // the appointments enum (Cash/Stripe); paymentMethod is the specific
     // method the payments collection actually records (cash/card/gcash/paymaya).
+    // `paymentRecorded` is surfaced in the response so the booking confirmation
+    // screen can tell the payer whether their payment actually made it into
+    // the payments collection, instead of assuming success just because the
+    // appointment itself was saved.
     const paymentMethod = resolvePaymentMethod(payment)
+    let paymentRecorded = false
+    let paymentError = null
     if (paymentMethod && total != null) {
       try {
         const payRes = await db.collection('payments').insertOne({
+          // The collection has a unique index on PaymentID (a legacy key the
+          // app never reads) — without a value here every insert after the
+          // first collides on null and silently fails, which is exactly why
+          // payments were going missing.
+          PaymentID: `PAY-${crypto.randomUUID()}`,
           payment_for: 'appointment',
           appointment_id: appointmentId,
           patient_id: patientId,
@@ -275,15 +286,17 @@ export default async function handler(req, res) {
           { _id: appointmentId },
           { $set: { payment_id: payRes.insertedId, updated_at: new Date() } }
         )
+        paymentRecorded = true
       } catch (err) {
         // Not fatal to the booking, but must not vanish silently — this is
         // exactly the kind of failure (e.g. schema/index violations) that
         // would otherwise leave a booking "successful" with no payment row.
         console.error('appointments/create: failed to record payment:', err)
+        paymentError = err.message || 'Could not record the payment.'
       }
     }
 
-    return res.status(201).json({ success: true, appointmentId, patientId })
+    return res.status(201).json({ success: true, appointmentId, patientId, paymentRecorded, paymentError })
   } catch (err) {
     console.error('appointments/create error:', err)
     return res.status(500).json({ error: err.message || 'Could not save the appointment.' })

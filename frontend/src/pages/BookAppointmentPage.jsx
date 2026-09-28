@@ -249,6 +249,11 @@ export default function BookAppointmentPage({ user }) {
   const [saveStatus, setSaveStatus] = useState(null)
   const [saveError, setSaveError]   = useState('')
 
+  /* Payment-record status (separate from the appointment save above):
+     null | 'recorded' | 'error' */
+  const [paymentRecordStatus, setPaymentRecordStatus] = useState(null)
+  const [paymentRecordError, setPaymentRecordError]   = useState('')
+
   /* Record the booking in the audit log + email a confirmation once the
      confirmation step is reached. Runs exactly once. */
   const loggedBookingRef = useRef(false)
@@ -311,14 +316,24 @@ export default function BookAppointmentPage({ user }) {
           console.warn('Appointment was not saved to MongoDB:', msg)
           setSaveStatus('error')
           setSaveError(msg)
+          setPaymentRecordStatus('error')
+          setPaymentRecordError('The appointment itself was not saved.')
         } else {
           setSaveStatus('saved')
+          if (body.paymentRecorded) {
+            setPaymentRecordStatus('recorded')
+          } else {
+            setPaymentRecordStatus('error')
+            setPaymentRecordError(body.paymentError || 'Could not record the payment.')
+          }
         }
       })
       .catch((e) => {
         console.warn('Appointment save request failed:', e)
         setSaveStatus('error')
         setSaveError(e.message || 'Request failed')
+        setPaymentRecordStatus('error')
+        setPaymentRecordError('The appointment itself was not saved.')
       })
 
     logActivity({
@@ -819,11 +834,20 @@ export default function BookAppointmentPage({ user }) {
                 <p className="confirm-email-note">Saving your appointment…</p>
               )}
               {saveStatus === 'saved' && (
-                <p className="confirm-email-note ok">✓ Appointment saved to your records</p>
+                <p className="confirm-email-note ok">✓ Appointment saved to our records</p>
               )}
               {saveStatus === 'error' && (
                 <p className="confirm-email-note err">
                   Couldn't save the appointment to the database. {saveError}
+                </p>
+              )}
+
+              {paymentRecordStatus === 'recorded' && (
+                <p className="confirm-email-note ok">✓ Payment successfully recorded</p>
+              )}
+              {paymentRecordStatus === 'error' && (
+                <p className="confirm-email-note err">
+                  Payment failed to record. {paymentRecordError}
                 </p>
               )}
 

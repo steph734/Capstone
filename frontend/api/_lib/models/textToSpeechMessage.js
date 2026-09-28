@@ -1,4 +1,4 @@
-// Matches the `text_to_speech_messages` $jsonSchema validator exactly.
+// Matches the `textspeechrecording` collection's $jsonSchema validator exactly.
 import mongoose from 'mongoose'
 
 const ttsMessageSchema = new mongoose.Schema({
@@ -31,7 +31,7 @@ const ttsMessageSchema = new mongoose.Schema({
   restored_at: { type: Date, default: null },
   restored_by: { type: mongoose.Schema.Types.ObjectId, default: null },
 }, {
-  collection: 'text_to_speech_messages',
+  collection: 'textspeechrecording',
   versionKey: false,
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })

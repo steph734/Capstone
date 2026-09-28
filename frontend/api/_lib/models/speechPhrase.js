@@ -1,4 +1,4 @@
-// Matches the `speech_phrases` $jsonSchema validator exactly.
+// Matches the `speechphrases` collection's $jsonSchema validator exactly.
 import mongoose from 'mongoose'
 
 const speechPhraseSchema = new mongoose.Schema({
@@ -23,7 +23,7 @@ const speechPhraseSchema = new mongoose.Schema({
   restored_at: { type: Date, default: null },
   restored_by: { type: mongoose.Schema.Types.ObjectId, default: null },
 }, {
-  collection: 'speech_phrases',
+  collection: 'speechphrases',
   versionKey: false,
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })

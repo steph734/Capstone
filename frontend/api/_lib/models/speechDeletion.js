@@ -1,4 +1,4 @@
-// Matches the `speech_deletions` $jsonSchema validator exactly. This is an
+// Matches the `speechdeletion` collection's $jsonSchema validator exactly. This is an
 // append-only audit log (no updated_at/timestamps plugin — deleted_at is set
 // explicitly at write time), written whenever a speech record is purged for
 // good so support can see what existed without keeping the transcript itself.
@@ -17,7 +17,7 @@ const speechDeletionSchema = new mongoose.Schema({
   had_audio_file: { type: Boolean, default: null },
   deleted_at: { type: Date, required: true, default: Date.now },
 }, {
-  collection: 'speech_deletions',
+  collection: 'speechdeletion',
   versionKey: false,
 })
 

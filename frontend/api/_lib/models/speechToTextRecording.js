@@ -1,5 +1,5 @@
-// Matches the `speech_to_text_recordings` $jsonSchema validator exactly —
-// field names here are the actual DB paths, not a mapped/renamed shape.
+// Matches the `speechtextrecording` collection's $jsonSchema validator
+// exactly — field names here are the actual DB paths, not a renamed shape.
 import mongoose from 'mongoose'
 
 const segmentSchema = new mongoose.Schema({
@@ -47,7 +47,7 @@ const sttSchema = new mongoose.Schema({
   restored_at: { type: Date, default: null },
   restored_by: { type: mongoose.Schema.Types.ObjectId, default: null },
 }, {
-  collection: 'speech_to_text_recordings',
+  collection: 'speechtextrecording',
   versionKey: false,
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })

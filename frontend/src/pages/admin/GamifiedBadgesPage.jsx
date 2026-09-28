@@ -9,7 +9,7 @@ import BadgeMedal from '../../components/BadgeMedal'
 import { SYMBOLS, SYMBOL_GROUPS, symbolForGame } from '../../data/badgeSymbols'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
-  ShuffleIcon, GameControllerIcon, ShirtIcon, CheckIcon,
+  ShuffleIcon, GameControllerIcon, ShirtIcon, CheckIcon, ArchiveIcon, RestoreIcon,
 } from './gamifiedIcons'
 import './GamifiedBadgesPage.css'
 
@@ -167,11 +167,16 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [loadError, setLoadError] = useState('')
   const [games, setGames] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
+  const [archiveView, setArchiveView] = useState('active') // 'active' | 'archived'
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+
+  // { type: 'show'|'hide'|'archive'|'restore'|'softDelete'|'permanentDelete', badge }
+  // while a badge confirmation dialog is open.
+  const [badgeConfirm, setBadgeConfirm] = useState(null)
 
   // Pao's wardrobe — hats/clothes/pants/shoes live in the `pao_items`
   // collection, real hairstyles in the separate `pao_hair` collection (its
@@ -274,19 +279,24 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     return { total: badges.length, active: active.length, hidden: hidden.length, gameBadges: gameBadges.length, timesEarned }
   }, [badges])
 
+  const activeBadgeCount = useMemo(() => badges.filter((b) => !b.isArchived).length, [badges])
+  const archivedBadgeCount = useMemo(() => badges.filter((b) => b.isArchived).length, [badges])
+
+  const badgesInView = useMemo(() => badges.filter((b) => !!b.isArchived === (archiveView === 'archived')), [badges, archiveView])
+
   const filterCounts = useMemo(() => ({
-    All: badges.length,
-    'Game badges': badges.filter((b) => b.badgeType === 'game_completion').length,
-    Milestones: badges.filter((b) => b.badgeType === 'milestone').length,
-    Hidden: badges.filter((b) => !b.isActive).length,
-  }), [badges])
+    All: badgesInView.length,
+    'Game badges': badgesInView.filter((b) => b.badgeType === 'game_completion').length,
+    Milestones: badgesInView.filter((b) => b.badgeType === 'milestone').length,
+    Hidden: badgesInView.filter((b) => !b.isActive).length,
+  }), [badgesInView])
 
   const visibleBadges = useMemo(() => {
-    if (statusFilter === 'All') return badges
-    if (statusFilter === 'Game badges') return badges.filter((b) => b.badgeType === 'game_completion')
-    if (statusFilter === 'Milestones') return badges.filter((b) => b.badgeType === 'milestone')
-    return badges.filter((b) => !b.isActive)
-  }, [badges, statusFilter])
+    if (statusFilter === 'All') return badgesInView
+    if (statusFilter === 'Game badges') return badgesInView.filter((b) => b.badgeType === 'game_completion')
+    if (statusFilter === 'Milestones') return badgesInView.filter((b) => b.badgeType === 'milestone')
+    return badgesInView.filter((b) => !b.isActive)
+  }, [badgesInView, statusFilter])
 
   const openCreate = () => {
     setEditingId(null)
@@ -349,35 +359,79 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     }
   }
 
-  const toggleVisibility = async (badge) => {
-    const nextActive = !badge.isActive
-    setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, isActive: nextActive } : b)))
+  const requestToggleVisibility = (badge) => setBadgeConfirm({ type: badge.isActive ? 'hide' : 'show', badge })
+  const requestArchive = (badge) => setBadgeConfirm({ type: 'archive', badge })
+  const requestRestore = (badge) => setBadgeConfirm({ type: 'restore', badge })
+  const requestSoftDelete = (badge) => setBadgeConfirm({ type: 'softDelete', badge })
+  const requestPermanentDelete = (badge) => setBadgeConfirm({ type: 'permanentDelete', badge })
+
+  const patchBadge = async (badge, body, optimistic) => {
+    setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, ...optimistic } : b)))
     try {
       const res = await fetch(`/api/badges/${badge.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: nextActive }),
+        body: JSON.stringify({ ...body, adminEmail: user?.email }),
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
+      const resBody = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(resBody.error || `HTTP ${res.status}`)
+      setBadges((current) => current.map((b) => (b.id === badge.id ? resBody.badge : b)))
+      return true
     } catch (err) {
-      setBadges((current) => current.map((b) => (b.id === badge.id ? { ...b, isActive: !nextActive } : b)))
-      showToast(err.message || 'Could not update visibility.')
+      setBadges((current) => current.map((b) => (b.id === badge.id ? badge : b)))
+      showToast(err.message || 'Could not update the badge.')
+      return false
     }
   }
 
-  const confirmDeleteBadge = async (badge) => {
-    try {
-      const res = await fetch(`/api/badges/${badge.id}`, { method: 'DELETE' })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-      setBadges((current) => current.filter((b) => b.id !== badge.id))
-    } catch (err) {
-      showToast(err.message || 'Could not delete the badge.')
+  const runBadgeConfirm = async () => {
+    if (!badgeConfirm) return
+    const { type, badge } = badgeConfirm
+    setBadgeConfirm(null)
+    if (type === 'show' || type === 'hide') {
+      const nextActive = type === 'show'
+      await patchBadge(badge, { isActive: nextActive }, { isActive: nextActive })
+    } else if (type === 'archive') {
+      const ok = await patchBadge(badge, { archive: true }, { isArchived: true })
+      if (ok) showToast(`"${badge.name}" was archived.`)
+    } else if (type === 'restore') {
+      const ok = await patchBadge(badge, { archive: false }, { isArchived: false })
+      if (ok) showToast(`"${badge.name}" was restored.`)
+    } else if (type === 'softDelete') {
+      try {
+        const res = await fetch(`/api/badges/${badge.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ softDelete: true, adminEmail: user?.email }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+        setBadges((current) => current.filter((b) => b.id !== badge.id))
+        showToast(`"${badge.name}" was deleted.`)
+      } catch (err) {
+        showToast(err.message || 'Could not delete the badge.')
+      }
+    } else if (type === 'permanentDelete') {
+      try {
+        const res = await fetch(`/api/badges/${badge.id}`, { method: 'DELETE' })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+        setBadges((current) => current.filter((b) => b.id !== badge.id))
+        showToast(`"${badge.name}" was permanently deleted.`)
+      } catch (err) {
+        showToast(err.message || 'Could not delete the badge.')
+      }
     }
   }
+
+  const badgeConfirmCopy = badgeConfirm && {
+    show: { icon: <EyeIcon size={26} />, title: 'Show this badge to patients?', message: `"${badgeConfirm.badge.name}" will appear in the badge case and can be earned.`, confirmLabel: 'Show', danger: false },
+    hide: { icon: <EyeOffIcon size={26} />, title: 'Hide this badge from patients?', message: `"${badgeConfirm.badge.name}" won't be visible or awarded until shown again.`, confirmLabel: 'Hide', danger: false },
+    archive: { icon: <ArchiveIcon size={26} />, title: 'Archive this badge?', message: `"${badgeConfirm.badge.name}" will move to the Archived tab and won't be editable or awarded until restored.`, confirmLabel: 'Archive', danger: false },
+    restore: { icon: <RestoreIcon size={26} />, title: 'Restore this badge?', message: `"${badgeConfirm.badge.name}" will move back to the active badge library.`, confirmLabel: 'Restore', danger: false },
+    softDelete: { icon: <TrashIcon size={26} />, title: 'Delete this badge?', message: `"${badgeConfirm.badge.name}" will be removed from the library. A database admin can still recover it, but not from this page.`, confirmLabel: 'Delete', danger: true },
+    permanentDelete: { icon: <TrashIcon size={26} />, title: 'Permanently delete this badge?', message: `This cannot be undone — "${badgeConfirm.badge.name}" and its rule will be gone for good.`, confirmLabel: 'Delete forever', danger: true },
+  }[badgeConfirm.type]
 
   const activeCriteria = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
 
@@ -530,8 +584,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
 
   const confirmDelete = () => {
     if (!deleteTarget) return
-    if (deleteTarget.kind === 'badge') confirmDeleteBadge(deleteTarget.item)
-    else deleteClothingItem(deleteTarget.item)
+    deleteClothingItem(deleteTarget.item)
     setDeleteTarget(null)
   }
 
@@ -620,6 +673,23 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           <button className="admin-btn" onClick={openCreate}>Add badge</button>
         </div>
 
+        <div className="admin-button-row" style={{ marginBottom: '12px' }}>
+          <button
+            type="button"
+            className={archiveView === 'active' ? 'admin-btn' : 'admin-btn-secondary'}
+            onClick={() => setArchiveView('active')}
+          >
+            Active <span className="badge-filter-count">{activeBadgeCount}</span>
+          </button>
+          <button
+            type="button"
+            className={archiveView === 'archived' ? 'admin-btn' : 'admin-btn-secondary'}
+            onClick={() => setArchiveView('archived')}
+          >
+            <ArchiveIcon size={13} /> Archived <span className="badge-filter-count">{archivedBadgeCount}</span>
+          </button>
+        </div>
+
         <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
           <div className="admin-button-row">
             {FILTERS.map((filter) => (
@@ -640,7 +710,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div className="game-card">
               <div>
                 <h4>No badges found</h4>
-                <p>Try a different filter or add a new badge.</p>
+                <p>{archiveView === 'archived' ? 'No archived badges.' : 'Try a different filter or add a new badge.'}</p>
               </div>
             </div>
           )}
@@ -654,6 +724,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                   <span className={`admin-pill ${badge.badgeType === 'game_completion' ? 'blue' : 'purple'}`}>
                     {badge.badgeType === 'game_completion' ? 'Game' : 'Milestone'}
                   </span>
+                  {badge.isArchived && <span className="admin-pill gray"><ArchiveIcon size={11} /> Archived</span>}
                 </div>
                 <p>{badge.description}</p>
                 <div className="badge-earned-line">
@@ -661,15 +732,31 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 </div>
               </div>
               <div className="admin-item-actions">
-                <button className="admin-icon-btn" onClick={() => toggleVisibility(badge)} title={badge.isActive ? 'Hide from patients' : 'Show to patients'} aria-label={badge.isActive ? `Hide ${badge.name}` : `Show ${badge.name}`}>
-                  {badge.isActive ? <EyeIcon /> : <EyeOffIcon />}
-                </button>
-                <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(badge)} title="Edit" aria-label={`Edit ${badge.name}`}>
-                  <PencilIcon />
-                </button>
-                <button className="admin-icon-btn admin-icon-delete" onClick={() => setDeleteTarget({ kind: 'badge', item: badge })} title="Delete" aria-label={`Delete ${badge.name}`}>
-                  <TrashIcon />
-                </button>
+                {archiveView === 'active' ? (
+                  <>
+                    <button className="admin-icon-btn" onClick={() => requestToggleVisibility(badge)} title={badge.isActive ? 'Hide from patients' : 'Show to patients'} aria-label={badge.isActive ? `Hide ${badge.name}` : `Show ${badge.name}`}>
+                      {badge.isActive ? <EyeIcon /> : <EyeOffIcon />}
+                    </button>
+                    <button className="admin-icon-btn admin-icon-edit" onClick={() => openEdit(badge)} title="Edit" aria-label={`Edit ${badge.name}`}>
+                      <PencilIcon />
+                    </button>
+                    <button className="admin-icon-btn" onClick={() => requestArchive(badge)} title="Archive" aria-label={`Archive ${badge.name}`}>
+                      <ArchiveIcon />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="admin-icon-btn" onClick={() => requestRestore(badge)} title="Restore" aria-label={`Restore ${badge.name}`}>
+                      <RestoreIcon />
+                    </button>
+                    <button className="admin-icon-btn admin-icon-delete" onClick={() => requestSoftDelete(badge)} title="Delete" aria-label={`Delete ${badge.name}`}>
+                      <TrashIcon />
+                    </button>
+                    <button className="admin-icon-btn admin-icon-delete" onClick={() => requestPermanentDelete(badge)} title="Delete forever" aria-label={`Permanently delete ${badge.name}`}>
+                      <TrashIcon />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -970,6 +1057,22 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             <div className="admin-confirm-actions">
               <button className="admin-confirm-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
               <button className="admin-confirm-ok" onClick={confirmDelete}>Yes, delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {badgeConfirm && (
+        <div className="admin-modal-backdrop" onClick={() => setBadgeConfirm(null)}>
+          <div className="admin-confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-confirm-icon" style={{ color: badgeConfirmCopy.danger ? '#b91c1c' : '#2c4a3e', background: badgeConfirmCopy.danger ? '#fef2f2' : '#eef6f2' }}>
+              {badgeConfirmCopy.icon}
+            </div>
+            <h3 className="admin-confirm-title">{badgeConfirmCopy.title}</h3>
+            <p className="admin-confirm-msg">{badgeConfirmCopy.message}</p>
+            <div className="admin-confirm-actions">
+              <button className="admin-confirm-cancel" onClick={() => setBadgeConfirm(null)}>Cancel</button>
+              <button className={badgeConfirmCopy.danger ? 'admin-confirm-ok' : 'admin-btn'} onClick={runBadgeConfirm}>{badgeConfirmCopy.confirmLabel}</button>
             </div>
           </div>
         </div>

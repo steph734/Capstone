@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { PICTURE_WORD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion } from '../../utils/gameProgress'
+import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Questions by category ────────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
   const [talking,     setTalking]     = useState(false)
   const [mouthOpen,   setMouthOpen]   = useState(false)
   const [displayText, setDisplayText] = useState('')
+  const [realBadge,   setRealBadge]   = useState(null)
   const mouthRef = useRef(null)
 
   const BADGE_SCRIPT = pickLine(PICTURE_WORD_LINES.badgeScript, lang)
@@ -174,6 +176,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
       }
     } catch {}
     reportGameCompletion({ patientEmail, gameName: 'Picture-Word Matching', score, maxScore: total })
+    fetchGameBadge('Picture-Word Matching').then(setRealBadge)
     setTimeout(() => speakWithDisplay(BADGE_SCRIPT), 600)
   }, [phase]) // eslint-disable-line
 
@@ -230,10 +233,10 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, animation:'unlockPop .6s cubic-bezier(.34,1.56,.64,1) both', background:'rgba(251,191,36,.08)', border:'2px solid rgba(251,191,36,.3)', borderRadius:24, padding:'16px 32px' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'rgba(251,191,36,.7)', letterSpacing:1.5, textTransform:'uppercase' }}>🎉 Badge Earned!</div>
           <div style={{ animation:'badgeGlow 2s ease-in-out infinite' }}>
-            <WordWizardBadge size={100} animate={true}/>
+            {realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={100} /> : <WordWizardBadge size={100} animate={true}/>}
           </div>
           <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:18, fontWeight:900, color:'#fbbf24' }}>Word Wizard</div>
+            <div style={{ fontSize:18, fontWeight:900, color:'#fbbf24' }}>{realBadge ? realBadge.name : 'Word Wizard'}</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,.5)', marginTop:3 }}>Unlocks new Customize items for Pao!</div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(167,139,250,.12)', border:'1px solid rgba(167,139,250,.3)', borderRadius:10, padding:'6px 14px', fontSize:12, color:'#c4b5fd', fontWeight:600 }}>

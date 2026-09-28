@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { SORT_BASKET_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion } from '../../utils/gameProgress'
+import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Item pool by category ─────────────────────────────────────────────────────
 // Categorisation is the skill being taught here — a shirt and socks belong
@@ -112,6 +113,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
   const [badgeShown, setBadgeShown] = useState(false)
   const [talking,    setTalking]    = useState(false)
   const [mouthOpen,  setMouthOpen]  = useState(false)
+  const [realBadge,  setRealBadge]  = useState(null)
   const mouthRef = useRef(null)
 
   useEffect(() => {
@@ -136,6 +138,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
             }
           } catch {}
           reportGameCompletion({ patientEmail, gameName: 'Sort the Basket', score, maxScore: total })
+          fetchGameBadge('Sort the Basket').then(setRealBadge)
           setBadgeShown(true)
           speak(pickLine(SORT_BASKET_LINES.badgeScript, lang))
         }, 700)
@@ -162,8 +165,8 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
       {badgeShown && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, animation: 'sbFadeUp .5s both', background: 'rgba(251,191,36,.08)', border: '2px solid rgba(251,191,36,.3)', borderRadius: 24, padding: '16px 32px' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(253,230,138,.8)', letterSpacing: 1.5, textTransform: 'uppercase' }}>🎉 Badge Earned!</div>
-          <BasketBadge animate={true}/>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#fde68a' }}>Basket Sorter</div>
+          {realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={90} /> : <BasketBadge animate={true}/>}
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#fde68a' }}>{realBadge ? realBadge.name : 'Basket Sorter'}</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>Unlocks new Customize items for Pao!</div>
         </div>
       )}

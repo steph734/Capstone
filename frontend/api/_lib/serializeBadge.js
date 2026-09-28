@@ -16,6 +16,7 @@ export function serializeBadge(doc) {
     criteriaValue: doc.criteria_value,
     unlockItemCode: doc.unlock_item_code,
     isActive: !!doc.is_active,
+    isArchived: !!doc.is_archived,
     earnedCount: doc.earned_count,
     sortOrder: doc.sort_order,
     createdAt: doc.created_at,

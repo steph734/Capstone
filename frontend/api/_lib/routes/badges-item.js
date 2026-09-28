@@ -1,9 +1,18 @@
 import mongoose from 'mongoose'
-import { getMongo } from '../mongo.js'
+import { getMongo, getDb } from '../mongo.js'
 import { Badge } from '../models/badge.js'
 import { serializeBadge } from '../serializeBadge.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
+const PURGE_DAYS = 30
+
+async function resolveAdminId(adminEmail) {
+  const email = str(adminEmail).toLowerCase()
+  if (!email) return null
+  const db = await getDb()
+  const u = await db.collection('users').findOne({ email })
+  return u ? u._id : null
+}
 
 // PATCH /api/badges/:id -> partial update. Used both for full edits (the
 // badge builder modal) and for the single-field "show/hide" toggle button
@@ -29,7 +38,7 @@ async function handlePatch(req, res) {
 
   const {
     name, description, art, badgeType, criteriaType, criteriaGameId,
-    criteriaValue, unlockItemCode, isActive,
+    criteriaValue, unlockItemCode, isActive, archive, softDelete, adminEmail,
   } = req.body || {}
 
   const update = {}
@@ -49,6 +58,30 @@ async function handlePatch(req, res) {
 
   try {
     await getMongo()
+
+    if (archive !== undefined || softDelete) {
+      const adminId = await resolveAdminId(adminEmail)
+      const now = new Date()
+      if (archive === true) {
+        update.is_archived = true
+        update.status = 'archived'
+        update.archived_at = now
+        update.archived_by = adminId
+      } else if (archive === false) {
+        update.is_archived = false
+        update.status = 'active'
+        update.restored_at = now
+        update.restored_by = adminId
+      }
+      if (softDelete) {
+        update.is_deleted = true
+        update.status = 'deleted'
+        update.deleted_at = now
+        update.deleted_by = adminId
+        update.purge_after = new Date(now.getTime() + PURGE_DAYS * 24 * 60 * 60 * 1000)
+      }
+    }
+
     const doc = await Badge.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true })
     if (!doc) {
       return res.status(404).json({ error: 'Badge not found.' })

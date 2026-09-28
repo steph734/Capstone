@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
 import { ECHO_GAME_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 import { pickBrowserVoiceForLang } from '../../utils/paoLanguage'
-import { reportGameCompletion } from '../../utils/gameProgress'
+import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Word bank, grouped by in-game level ──────────────────────────────────────
 
@@ -232,6 +233,7 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
   const [talking, setTalking] = useState(false)
   const [mouthOpen, setMouthOpen] = useState(false)
   const [displayText, setDisplayText] = useState('')
+  const [realBadge, setRealBadge] = useState(null)
   const mouthRef = useRef(null)
 
   useEffect(() => {
@@ -243,6 +245,7 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
   // Let the score sink in first, then reveal the badge — same beat as Word Wizard.
   useEffect(() => {
     if (!badgeEarned) return
+    fetchGameBadge('Slow-Motion Echo').then(setRealBadge)
     const t = setTimeout(() => setPhase('badge'), 1600)
     return () => clearTimeout(t)
   }, [badgeEarned])
@@ -305,10 +308,10 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, animation: 'seBadgeCardIn .6s cubic-bezier(.34,1.56,.64,1) both', background: 'rgba(20,184,166,.1)', border: '2px solid rgba(20,184,166,.35)', borderRadius: 24, padding: '16px 32px' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(94,234,212,.8)', letterSpacing: 1.5, textTransform: 'uppercase' }}>🎉 Badge Earned!</div>
           <div style={{ animation: 'seBadgeGlow 2s ease-in-out infinite' }}>
-            <EchoMasterBadge size={100} animate={true}/>
+            {realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={100} /> : <EchoMasterBadge size={100} animate={true}/>}
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: '#5eead4' }}>Echo Master</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#5eead4' }}>{realBadge ? realBadge.name : 'Echo Master'}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}>Every syllable, said clearly, across all {totalLevels} levels!</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,184,166,.12)', border: '1px solid rgba(20,184,166,.3)', borderRadius: 10, padding: '6px 14px', fontSize: 12, color: '#99f6e4', fontWeight: 600 }}>

@@ -8,10 +8,12 @@ import StoryBuilderGame from './games/StoryBuilderGame'
 import LittleRedRidingHoodGame from './games/LittleRedRidingHoodGame'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
+import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLanguage'
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
+import { fetchGameBadge } from '../utils/gameProgress'
 
 // ─── Intro stages ──────────────────────────────────────────────────────────────
 
@@ -198,6 +200,15 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 function GameInstructionsModal({ game, onStart, onClose }) {
+  const [realBadge, setRealBadge] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setRealBadge(null)
+    fetchGameBadge(game.title).then((b) => { if (!cancelled) setRealBadge(b) })
+    return () => { cancelled = true }
+  }, [game.title])
+
   return (
     <div style={{ position:'fixed', inset:0, zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', background:'rgba(60,50,90,0.45)', fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
       <style>{`@keyframes gfModalIn{from{opacity:0;transform:scale(.88) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
@@ -208,9 +219,13 @@ function GameInstructionsModal({ game, onStart, onClose }) {
 
         <div style={{ display:'flex', gap:10, marginBottom:16 }}>
           <div style={{ flex:1, background:`${game.color}1a`, border:`1.5px solid ${game.color}55`, borderRadius:16, padding:'12px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-            <span style={{ fontSize:26 }}>{game.badgeEmoji}</span>
+            {realBadge ? (
+              <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={44} />
+            ) : (
+              <span style={{ fontSize:26 }}>{game.badgeEmoji}</span>
+            )}
             <span style={{ fontSize:11, color:'rgba(58,46,107,.55)', fontWeight:700 }}>Badge</span>
-            <span style={{ fontSize:12.5, color:'#3a2e6b', fontWeight:800, textAlign:'center' }}>{game.badge}</span>
+            <span style={{ fontSize:12.5, color:'#3a2e6b', fontWeight:800, textAlign:'center' }}>{realBadge ? realBadge.name : game.badge}</span>
           </div>
           <div style={{ flex:1, background:`${game.color}1a`, border:`1.5px solid ${game.color}55`, borderRadius:16, padding:'12px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
             <span style={{ fontSize:26 }}>⭐</span>
@@ -520,10 +535,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'badges') {
-    let earnedBadges
-    try { earnedBadges = new Set(JSON.parse(localStorage.getItem('pao_badges') || '[]')) }
-    catch { earnedBadges = new Set() }
-    return <BadgeCasePage earnedBadges={earnedBadges} onBack={() => setPhase('profile')}/>
+    return <BadgeCasePage patientEmail={patientEmail} onBack={() => setPhase('profile')}/>
   }
 
   if (phase === 'customize') {

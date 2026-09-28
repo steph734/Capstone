@@ -64,6 +64,21 @@ const badgeSchema = new mongoose.Schema(
     earned_count: { type: Number, required: true, default: 0, min: 0 },
     sort_order: { type: Number, default: null },
     created_by: { type: mongoose.Schema.Types.ObjectId, default: null },
+
+    // Lifecycle: active -> archived (tucked away, still editable/restorable)
+    // -> deleted (soft-removed, recoverable only via direct DB access) ->
+    // gone for good on a permanent delete. Mirrors the same pattern used
+    // for speech_to_text_recordings/text_to_speech_messages.
+    status: { type: String, required: true, enum: ['active', 'archived', 'deleted'], default: 'active' },
+    is_archived: { type: Boolean, required: true, default: false },
+    archived_at: { type: Date, default: null },
+    archived_by: { type: mongoose.Schema.Types.ObjectId, default: null },
+    is_deleted: { type: Boolean, required: true, default: false },
+    deleted_at: { type: Date, default: null },
+    deleted_by: { type: mongoose.Schema.Types.ObjectId, default: null },
+    purge_after: { type: Date, default: null },
+    restored_at: { type: Date, default: null },
+    restored_by: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   {
     collection: 'badges',

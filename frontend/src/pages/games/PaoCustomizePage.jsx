@@ -4,8 +4,9 @@ import { OutfitThumbnail } from './PaoOutfits'
 import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
-import { fetchUnlockState } from '../../utils/gameProgress'
+import { fetchUnlockState, loadBadges } from '../../utils/gameProgress'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
+import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Badge definitions ────────────────────────────────────────────────────────
 
@@ -90,12 +91,28 @@ function tts(text, { onStart, onEnd, onWord } = {}) {
 
 const BADGE_PAGE_SIZE = 8
 
-export function BadgeCasePage({ earnedBadges, onBack }) {
-  const ALL_KEYS = Object.keys(BADGES)
+export function BadgeCasePage({ patientEmail, onBack }) {
+  const [badges, setBadges] = useState([])
+  const [earnedCodes, setEarnedCodes] = useState(() => new Set())
+  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
-  const pageCount = Math.ceil(ALL_KEYS.length / BADGE_PAGE_SIZE)
-  const pageKeys = ALL_KEYS.slice(page * BADGE_PAGE_SIZE, page * BADGE_PAGE_SIZE + BADGE_PAGE_SIZE)
-  const percent = Math.round((earnedBadges.size / ALL_KEYS.length) * 100)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([loadBadges(), fetchUnlockState(patientEmail)])
+      .then(([realBadges, unlockState]) => {
+        if (cancelled) return
+        setBadges(realBadges)
+        setEarnedCodes(new Set(unlockState.earnedBadgeCodes))
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [patientEmail])
+
+  const pageCount = Math.max(1, Math.ceil(badges.length / BADGE_PAGE_SIZE))
+  const pageBadges = badges.slice(page * BADGE_PAGE_SIZE, page * BADGE_PAGE_SIZE + BADGE_PAGE_SIZE)
+  const percent = badges.length ? Math.round((earnedCodes.size / badges.length) * 100) : 0
 
   const goPage = (p) => setPage(Math.max(0, Math.min(pageCount - 1, p)))
 
@@ -121,7 +138,7 @@ export function BadgeCasePage({ earnedBadges, onBack }) {
             <div>
               <h2 style={{ margin:0, fontSize:16, fontWeight:900, color:'#e2e8f0' }}>🏆 Pao's Badge Case</h2>
               <div style={{ fontSize:11, color:'rgba(96,165,250,.7)', marginTop:2, fontWeight:600 }}>
-                {earnedBadges.size} / {ALL_KEYS.length} badges collected
+                {earnedCodes.size} / {badges.length} badges collected
               </div>
             </div>
             {/* LED dots */}
@@ -153,49 +170,41 @@ export function BadgeCasePage({ earnedBadges, onBack }) {
         {/* ── Interior ── */}
         <div style={{ background:'linear-gradient(180deg,#090912 0%,#0d0d1c 100%)', border:'3px solid #1e3a5f', borderTop:'none', borderRadius:'0 0 16px 16px', padding:'16px 16px 14px', boxShadow:'inset 0 6px 28px rgba(0,0,0,.7), 0 20px 56px rgba(0,0,0,.7)' }}>
 
+          {loading ? (
+            <p style={{ textAlign:'center', color:'rgba(191,219,254,.7)', fontSize:12, fontWeight:600, padding:'20px 0' }}>Loading badges…</p>
+          ) : badges.length === 0 ? (
+            <p style={{ textAlign:'center', color:'rgba(191,219,254,.5)', fontSize:12, fontWeight:600, padding:'20px 0' }}>No badges yet — check back soon!</p>
+          ) : (
           <div key={page} style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-            {pageKeys.map((key, idx) => {
-              const b      = BADGES[key]
-              const earned = earnedBadges.has(key)
+            {pageBadges.map((b, idx) => {
+              const earned = earnedCodes.has(b.code)
               return (
-                <div key={key} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <div key={b.id} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                   {/* Slot */}
                   <div style={{
                     width:'100%', aspectRatio:'1', borderRadius:12,
-                    background: earned ? `${b.color}18` : 'rgba(255,255,255,.025)',
-                    border: `2px solid ${earned ? b.color+'50' : 'rgba(255,255,255,.06)'}`,
-                    display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column',
-                    position:'relative', overflow:'hidden',
-                    boxShadow: earned ? `0 0 20px ${b.color}28, inset 0 0 14px ${b.color}10` : 'none',
+                    background: earned ? 'rgba(96,165,250,.1)' : 'rgba(255,255,255,.025)',
+                    border: `2px solid ${earned ? 'rgba(96,165,250,.35)' : 'rgba(255,255,255,.06)'}`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    position:'relative', overflow:'hidden', padding:4,
+                    boxShadow: earned ? '0 0 20px rgba(96,165,250,.2)' : 'none',
+                    animation: earned ? `bcBadge .5s ${idx*.04}s cubic-bezier(.34,1.56,.64,1) both` : 'none',
                   }}>
-                    {earned ? (
-                      <>
-                        <div style={{ position:'absolute', inset:0, background:`radial-gradient(circle at 40% 30%,${b.color}25 0%,transparent 68%)`, pointerEvents:'none' }}/>
-                        <div style={{ fontSize:30, animation:`bcBadge .5s ${idx*.04}s cubic-bezier(.34,1.56,.64,1) both`, position:'relative', zIndex:1 }}>
-                          {b.emoji}
-                        </div>
-                        {/* Top shine */}
-                        <div style={{ position:'absolute', top:0, left:0, right:0, height:1, background:`linear-gradient(90deg,transparent,${b.color}55,transparent)` }}/>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ fontSize:24, filter:'grayscale(1)', opacity:.12 }}>{b.emoji}</div>
-                        <div style={{ fontSize:11, color:'rgba(255,255,255,.1)' }}>🔒</div>
-                      </>
-                    )}
+                    <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={56} muted={!earned} />
                   </div>
 
                   {/* Label */}
                   <div style={{ textAlign:'center' }}>
-                    <div style={{ fontSize:9.5, fontWeight:700, color: earned ? b.color : 'rgba(255,255,255,.18)', lineHeight:1.25 }}>{key}</div>
-                    <div style={{ fontSize:8.5, color: earned ? `${b.color}80` : 'rgba(255,255,255,.13)', lineHeight:1.25, marginTop:1 }}>
-                      {earned ? 'Collected!' : b.how}
+                    <div style={{ fontSize:9.5, fontWeight:700, color: earned ? '#93c5fd' : 'rgba(255,255,255,.18)', lineHeight:1.25 }}>{b.name}</div>
+                    <div style={{ fontSize:8.5, color: earned ? 'rgba(147,197,253,.7)' : 'rgba(255,255,255,.13)', lineHeight:1.25, marginTop:1 }}>
+                      {earned ? 'Collected!' : 'Locked'}
                     </div>
                   </div>
                 </div>
               )
             })}
           </div>
+          )}
 
           {/* Pagination */}
           {pageCount > 1 && (

@@ -49,3 +49,28 @@ export async function fetchUnlockState(patientEmail) {
     return empty
   }
 }
+
+// The real, admin-authored badge library — cached for the session since it
+// rarely changes and several games/screens all want it.
+let badgesPromise = null
+
+export function loadBadges() {
+  if (!badgesPromise) {
+    badgesPromise = fetch('/api/badges/list')
+      .then((r) => r.json())
+      .then((body) => (body.badges || []).filter((b) => b.isActive && !b.isArchived))
+      .catch(() => [])
+  }
+  return badgesPromise
+}
+
+// The real badge (if any) an admin has tied to this game finishing —
+// replaces the old hardcoded per-game placeholder badge once a matching one
+// exists in the database.
+export async function fetchGameBadge(gameName) {
+  if (!gameName) return null
+  const [map, badges] = await Promise.all([loadGameIdMap(), loadBadges()])
+  const gameId = map[gameName.trim().toLowerCase()]
+  if (!gameId) return null
+  return badges.find((b) => b.criteriaType === 'complete_specific_game' && b.criteriaGameId === gameId) || null
+}

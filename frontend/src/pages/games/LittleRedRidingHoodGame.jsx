@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { RED_RIDING_HOOD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion } from '../../utils/gameProgress'
+import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Little Red Riding Hood — an interactive branching story ─────────────────
 //
@@ -67,6 +68,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
   const [talking, setTalking]       = useState(false)
   const [mouthOpen, setMouthOpen]   = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
+  const [realBadge, setRealBadge] = useState(null)
   const mouthRef = useRef(null)
 
   useEffect(() => {
@@ -83,6 +85,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
       }
     } catch {}
     reportGameCompletion({ patientEmail, gameName: 'Story Builder', score: 1, maxScore: 1 })
+    fetchGameBadge('Story Builder').then(setRealBadge)
     const t = setTimeout(() => {
       setBadgeShown(true)
       speakPao(pickLine(RED_RIDING_HOOD_LINES.finish, lang), { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
@@ -105,8 +108,8 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
       {badgeShown && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, animation: 'lrFadeUp .5s both', background: 'rgba(167,139,250,.08)', border: '2px solid rgba(167,139,250,.3)', borderRadius: 24, padding: '16px 32px' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(196,181,253,.8)', letterSpacing: 1.5, textTransform: 'uppercase' }}>🎉 Badge Earned!</div>
-          <StoryBadge animate={true}/>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#c4b5fd' }}>Story Explorer</div>
+          {realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={90} /> : <StoryBadge animate={true}/>}
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#c4b5fd' }}>{realBadge ? realBadge.name : 'Story Explorer'}</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>Unlocks new Customize items for Pao!</div>
         </div>
       )}

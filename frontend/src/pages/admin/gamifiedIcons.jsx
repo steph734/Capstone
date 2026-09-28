@@ -64,6 +64,23 @@ export function TrashIcon(props) {
   )
 }
 
+export function ArchiveIcon(props) {
+  return (
+    <svg width={props?.size || 15} height={props?.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4h18v4H3V4zm1 6h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9zm5 3v2h6v-2H9z" />
+    </svg>
+  )
+}
+
+export function RestoreIcon(props) {
+  return (
+    <svg width={props?.size || 15} height={props?.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4h18v4H3V4zm1 6h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9z" />
+      <path d="m9 15 3-3 3 3M12 12v6" />
+    </svg>
+  )
+}
+
 export function CloseIcon(props) {
   return (
     <svg width={props?.size || 16} height={props?.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

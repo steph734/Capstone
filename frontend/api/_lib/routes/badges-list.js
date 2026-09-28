@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
-    const badges = await Badge.find({}).sort({ sort_order: 1, created_at: 1 }).lean()
+    const badges = await Badge.find({ is_deleted: { $ne: true } }).sort({ sort_order: 1, created_at: 1 }).lean()
     return res.status(200).json({ badges: badges.map(serializeBadge) })
   } catch (err) {
     console.error('badges/list error:', err)

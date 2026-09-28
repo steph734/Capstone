@@ -1,6 +1,8 @@
+import mongoose from 'mongoose'
 import { getMongo, getDb } from '../mongo.js'
 import { PaoHair } from '../models/paoHair.js'
 import { serializePaoHair } from '../serializePaoHair.js'
+import { unlockToDb } from '../serializeUnlock.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
 
@@ -16,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { name, description, emoji, theme, design, adminEmail } = req.body || {}
+  const { name, description, emoji, theme, unlock, design, adminEmail } = req.body || {}
 
   if (!str(name)) return res.status(400).json({ error: 'Hairstyle name is required.' })
   if (!design?.style || !design?.main || !design?.trim || !design?.pattern) {
@@ -48,6 +50,7 @@ export default async function handler(req, res) {
       description: str(description) || null,
       emoji: str(emoji) || null,
       theme_code: str(theme) || null,
+      unlock: unlockToDb(unlock, { mongoose }) ?? null,
       style: design.style,
       hair_color: design.main,
       tie_color: design.trim,

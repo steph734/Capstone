@@ -7,7 +7,48 @@ import {
 } from '../games/PaoDesignedOutfit'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
+import { initialGames } from './gamifiedLibraryData'
 import { ShirtIcon, ShuffleIcon } from './gamifiedIcons'
+
+// Same rule set a badge's criteria already uses (see GamifiedBadgesPage.jsx
+// CRITERIA_TYPES), plus 'free' (no gate) and the "linked_badge" sentinel
+// below representing unlock: null — reachable only through some badge's
+// own unlock_item_code, never directly.
+const UNLOCK_OPTIONS = [
+  { id: 'linked_badge', label: 'is only unlocked by a badge that lists it' },
+  { id: 'free', label: 'is available to everyone' },
+  { id: 'complete_any_game', label: 'finishes any game for the first time' },
+  { id: 'complete_specific_game', label: 'finishes a specific game', needsGame: true },
+  { id: 'perfect_score', label: 'gets every answer right on the first try' },
+  { id: 'reach_level', label: 'reaches a specific level', needsValue: true, valueLabel: 'Level', defaultValue: 5 },
+  { id: 'total_xp', label: 'earns a total amount of XP', needsValue: true, valueLabel: 'XP points', defaultValue: 500 },
+  { id: 'games_in_a_row', label: 'plays games on consecutive days', needsValue: true, valueLabel: 'Days in a row', defaultValue: 7 },
+  { id: 'all_categories', label: 'tries every therapy game category' },
+  { id: 'earn_badge', label: 'earns a specific badge', needsBadge: true },
+]
+
+// The "Patients see: 🔒 …" preview line under the picker — also used by
+// GamifiedBadgesPage.jsx for the wardrobe grid's unlock pill.
+export function describeUnlock(type, { gameId, value, badgeCode } = {}, games = initialGames, badges = []) {
+  const meta = UNLOCK_OPTIONS.find((u) => u.id === type)
+  if (!meta || type === 'linked_badge') return null
+  if (type === 'free') return 'Available to everyone'
+  if (type === 'complete_specific_game') {
+    const g = games.find((x) => x.mongoId === gameId)
+    return `Finish ${g ? g.name : 'a specific game'}`
+  }
+  if (type === 'complete_any_game') return 'Finish any game for the first time'
+  if (type === 'perfect_score') return 'Get every answer right on the first try'
+  if (type === 'reach_level') return `Reach level ${value ?? meta.defaultValue}`
+  if (type === 'total_xp') return `Earn ${value ?? meta.defaultValue} XP`
+  if (type === 'games_in_a_row') return `Play ${value ?? meta.defaultValue} days in a row`
+  if (type === 'all_categories') return 'Try every therapy game category'
+  if (type === 'earn_badge') {
+    const b = badges.find((x) => x.code === badgeCode)
+    return `Earn the "${b ? b.name : badgeCode || '…'}" badge`
+  }
+  return meta.label
+}
 
 const CATEGORY_ICONS = { Hair: '💇', Hats: '🎩', Clothes: '👕', Pants: '👖', Shoes: '👟' }
 
@@ -89,10 +130,14 @@ function Step({ number, title, children }) {
   )
 }
 
-export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', onSave, onClose }) {
+export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', badges = [], onSave, onClose }) {
   const [name, setName] = useState(item?.name || '')
   const [description, setDescription] = useState(item?.description || '')
   const [category, setCategory] = useState(item?.category || defaultCategory)
+  const [unlockType, setUnlockType] = useState(item?.unlock?.type || 'linked_badge')
+  const [unlockGameId, setUnlockGameId] = useState(item?.unlock?.gameId || null)
+  const [unlockValue, setUnlockValue] = useState(item?.unlock?.value ?? null)
+  const [unlockBadgeCode, setUnlockBadgeCode] = useState(item?.unlock?.badgeCode || '')
   // Built-in pieces keep their hand-drawn art until the admin chooses to
   // redesign them; `design` stays null for them until then.
   const [design, setDesign] = useState(
@@ -152,6 +197,8 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
     })
   }
 
+  const activeUnlock = UNLOCK_OPTIONS.find((u) => u.id === unlockType) || UNLOCK_OPTIONS[0]
+
   const submit = (event) => {
     event.preventDefault()
     const trimmedName = name.trim()
@@ -163,6 +210,12 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
       // Hair clips are drawn (their id isn't an emoji), so hair uses the slot/theme icon
       emoji: design ? ((cat !== 'hair' && design.decal) || theme?.icon || CATEGORY_ICONS[category]) : item?.emoji,
       theme: themeId,
+      unlock: unlockType === 'linked_badge' ? null : {
+        type: unlockType,
+        gameId: activeUnlock.needsGame ? unlockGameId : null,
+        value: activeUnlock.needsValue ? (unlockValue ?? activeUnlock.defaultValue) : null,
+        badgeCode: activeUnlock.needsBadge ? (unlockBadgeCode || null) : null,
+      },
       ...(design ? { design } : {}),
     })
   }
@@ -361,7 +414,62 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', on
               </>
             )}
 
-            <Step number={isBuiltIn ? 3 : 7} title="Description">
+            <Step number={isBuiltIn ? 3 : 7} title="How to unlock">
+              <label className="admin-field">
+                <span>Unlock when the patient…</span>
+                <select
+                  value={unlockType}
+                  onChange={(event) => {
+                    const nextType = event.target.value
+                    const meta = UNLOCK_OPTIONS.find((u) => u.id === nextType)
+                    setUnlockType(nextType)
+                    if (meta?.needsGame) setUnlockGameId((g) => g ?? initialGames[0]?.mongoId ?? null)
+                    if (meta?.needsValue) setUnlockValue((v) => v ?? meta.defaultValue)
+                  }}
+                >
+                  {UNLOCK_OPTIONS.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
+                </select>
+              </label>
+
+              {activeUnlock.needsGame && (
+                <label className="admin-field">
+                  <span>Which game</span>
+                  <select value={unlockGameId ?? ''} onChange={(event) => setUnlockGameId(event.target.value)}>
+                    {initialGames.map((g) => <option key={g.mongoId} value={g.mongoId}>{g.name}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {activeUnlock.needsValue && (
+                <label className="admin-field">
+                  <span>{activeUnlock.valueLabel}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={unlockValue ?? activeUnlock.defaultValue}
+                    onChange={(event) => setUnlockValue(Number(event.target.value))}
+                  />
+                </label>
+              )}
+
+              {activeUnlock.needsBadge && (
+                <label className="admin-field">
+                  <span>Which badge</span>
+                  <select value={unlockBadgeCode} onChange={(event) => setUnlockBadgeCode(event.target.value)}>
+                    <option value="">Select a badge…</option>
+                    {badges.map((b) => <option key={b.id} value={b.code}>{b.name}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, initialGames, badges) && (
+                <p className="pao-theme-hint">
+                  Patients see: 🔒 {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, initialGames, badges)}
+                </p>
+              )}
+            </Step>
+
+            <Step number={isBuiltIn ? 4 : 8} title="Description">
               <label className="admin-field">
                 <span>Shown to patients (optional)</span>
                 <textarea

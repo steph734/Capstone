@@ -290,6 +290,20 @@
 .wardrobe-card-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .wardrobe-card-actions { justify-content: flex-end; padding: 8px 12px 12px; }
 
+.wardrobe-unlock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 /* ── Clothing designer modal ─────────────────────────────── */
 .pao-designer-modal { max-width: 980px; width: 96vw; }
 .pao-designer-modal input,

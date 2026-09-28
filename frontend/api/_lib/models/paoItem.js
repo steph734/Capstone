@@ -2,6 +2,7 @@
 // hats, clothes, pants and shoes — real hairstyles live in the separate
 // `pao_hair` collection instead (see paoHair.js).
 import mongoose from 'mongoose'
+import { unlockSchema } from './unlockSchema.js'
 
 export const PAO_ITEM_CATEGORIES = ['hats', 'clothes', 'pants', 'shoes']
 export const PAO_ITEM_STYLES = [
@@ -36,6 +37,7 @@ const paoItemSchema = new mongoose.Schema(
     emoji: { type: String, default: null, maxlength: 16 },
     is_builtin: { type: Boolean, required: true, default: false },
     theme_code: { type: String, default: null, match: /^[a-z0-9_]+$/ },
+    unlock: { type: unlockSchema, default: null },
     design: { type: paoItemDesignSchema, default: null },
     is_active: { type: Boolean, required: true, default: true },
     sort_order: { type: Number, default: null },

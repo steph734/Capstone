@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import { getMongo } from '../mongo.js'
 import { PaoItem } from '../models/paoItem.js'
 import { serializePaoItem, dbCategoryFromUi } from '../serializePaoItem.js'
+import { unlockToDb } from '../serializeUnlock.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
 
@@ -18,7 +19,7 @@ async function handlePatch(req, res) {
   const id = req.params?.id
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'Invalid item id.' })
 
-  const { name, category, description, emoji, theme, design, isActive } = req.body || {}
+  const { name, category, description, emoji, theme, unlock, design, isActive } = req.body || {}
 
   const update = {}
   if (name !== undefined) update.name = str(name)
@@ -30,6 +31,10 @@ async function handlePatch(req, res) {
   if (description !== undefined) update.description = str(description) || null
   if (emoji !== undefined) update.emoji = str(emoji) || null
   if (theme !== undefined) update.theme_code = str(theme) || null
+  if (unlock !== undefined) {
+    const mapped = unlockToDb(unlock, { mongoose })
+    if (mapped !== undefined) update.unlock = mapped
+  }
   if (design !== undefined) {
     update.design = design ? {
       style: design.style,

@@ -4,7 +4,7 @@ import { adminMenuItems } from './adminSidebarConfig'
 import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
-import PaoClothingDesigner, { WardrobeItemThumb } from './PaoClothingDesigner'
+import PaoClothingDesigner, { WardrobeItemThumb, describeUnlock } from './PaoClothingDesigner'
 import PaoThemeSets from './PaoThemeSets'
 import {
   MedalIcon, PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, UsersIcon,
@@ -482,8 +482,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const saveClothing = async (data) => {
     const targetIsHair = data.category === 'Hair'
     const payload = targetIsHair
-      ? { name: data.name, description: data.description, emoji: data.emoji, theme: data.theme, design: data.design, adminEmail: user?.email }
-      : { name: data.name, category: data.category, description: data.description, emoji: data.emoji, theme: data.theme, design: data.design, adminEmail: user?.email }
+      ? { name: data.name, description: data.description, emoji: data.emoji, theme: data.theme, unlock: data.unlock, design: data.design, adminEmail: user?.email }
+      : { name: data.name, category: data.category, description: data.description, emoji: data.emoji, theme: data.theme, unlock: data.unlock, design: data.design, adminEmail: user?.email }
     // Editing may change slot from Hair to a hat/clothes/pants/shoes (or
     // back) — that's a move between collections, not a plain update, since
     // pao_hair and pao_items are separate. Create in the target, then drop
@@ -829,6 +829,11 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     {themeById(item.theme) && <span className="admin-pill wardrobe-theme-pill">{themeById(item.theme).icon} {themeById(item.theme).label}</span>}
                   </div>
                   <p>{item.description}</p>
+                  {item.unlock && (
+                    <div className="wardrobe-unlock-pill">
+                      🔒 {describeUnlock(item.unlock.type, item.unlock, initialGames, badges)}
+                    </div>
+                  )}
                 </div>
                 <div className="admin-item-actions wardrobe-card-actions">
                   <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>
@@ -983,6 +988,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
         <PaoClothingDesigner
           item={editingClothing}
           defaultCategory={clothesFilter !== 'All' ? clothesFilter : 'Hair'}
+          badges={badges}
           onSave={saveClothing}
           onClose={() => setShowClothingEditor(false)}
         />

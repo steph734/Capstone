@@ -1,6 +1,8 @@
+import mongoose from 'mongoose'
 import { getMongo, getDb } from '../mongo.js'
 import { PaoItem } from '../models/paoItem.js'
 import { serializePaoItem, dbCategoryFromUi } from '../serializePaoItem.js'
+import { unlockToDb } from '../serializeUnlock.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
 
@@ -18,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { name, category, description, emoji, theme, design, adminEmail } = req.body || {}
+  const { name, category, description, emoji, theme, unlock, design, adminEmail } = req.body || {}
 
   if (!str(name)) return res.status(400).json({ error: 'Item name is required.' })
   const dbCategory = dbCategoryFromUi(category)
@@ -54,6 +56,7 @@ export default async function handler(req, res) {
       emoji: str(emoji) || null,
       is_builtin: false,
       theme_code: str(theme) || null,
+      unlock: unlockToDb(unlock, { mongoose }) ?? null,
       design: {
         style: design.style,
         main_color: design.main,

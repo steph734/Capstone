@@ -1,4 +1,6 @@
 // Shared shape mapper for the pao_hair routes.
+import { serializeUnlock } from './serializeUnlock.js'
+
 export function serializePaoHair(doc) {
   return {
     id: String(doc._id),
@@ -8,6 +10,7 @@ export function serializePaoHair(doc) {
     description: doc.description,
     emoji: doc.emoji,
     theme: doc.theme_code || null,
+    unlock: serializeUnlock(doc.unlock),
     isBuiltin: false,
     design: {
       style: doc.style,

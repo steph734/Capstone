@@ -1,4 +1,6 @@
 // Shared shape mapper for the clothes (hats/clothes/pants/shoes) routes.
+import { serializeUnlock } from './serializeUnlock.js'
+
 const CATEGORY_TO_UI = { hats: 'Hats', clothes: 'Clothes', pants: 'Pants', shoes: 'Shoes' }
 const CATEGORY_TO_DB = { Hats: 'hats', Clothes: 'clothes', Pants: 'pants', Shoes: 'shoes' }
 
@@ -15,6 +17,7 @@ export function serializePaoItem(doc) {
     description: doc.description,
     emoji: doc.emoji,
     theme: doc.theme_code || null,
+    unlock: serializeUnlock(doc.unlock),
     isBuiltin: !!doc.is_builtin,
     design: doc.design ? {
       style: doc.design.style,

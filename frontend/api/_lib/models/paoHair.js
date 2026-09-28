@@ -4,6 +4,7 @@
 // cover every style/pattern the designer offers, so nothing here needs
 // hiding.
 import mongoose from 'mongoose'
+import { unlockSchema } from './unlockSchema.js'
 
 export const PAO_HAIR_STYLES = ['tuft', 'bangs', 'curly', 'spiky', 'bun', 'ponytail', 'pigtails', 'long']
 export const PAO_HAIR_PATTERNS = [
@@ -21,6 +22,7 @@ const paoHairSchema = new mongoose.Schema(
     description: { type: String, default: null, maxlength: 200 },
     emoji: { type: String, default: null, maxlength: 16 },
     theme_code: { type: String, default: null, match: /^[a-z0-9_]+$/ },
+    unlock: { type: unlockSchema, default: null },
     style: { type: String, required: true, enum: PAO_HAIR_STYLES },
     hair_color: { type: String, required: true, match: /^#[0-9a-fA-F]{6}$/ },
     tie_color: { type: String, required: true, match: /^#[0-9a-fA-F]{6}$/ },

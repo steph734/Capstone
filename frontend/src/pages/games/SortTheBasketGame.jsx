@@ -4,6 +4,7 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { SORT_BASKET_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
+import { reportGameCompletion } from '../../utils/gameProgress'
 
 // ─── Item pool by category ─────────────────────────────────────────────────────
 // Categorisation is the skill being taught here — a shirt and socks belong
@@ -100,7 +101,7 @@ function BasketBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
+function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmail = null }) {
   const pct      = score / total
   const stars    = pct >= 0.85 ? 3 : pct >= 0.55 ? 2 : 1
   const scoreMsg = pickLine(
@@ -134,6 +135,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
               localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Basket Sorter']))
             }
           } catch {}
+          reportGameCompletion({ patientEmail, gameName: 'Sort the Basket', score, maxScore: total })
           setBadgeShown(true)
           speak(pickLine(SORT_BASKET_LINES.badgeScript, lang))
         }, 700)
@@ -175,7 +177,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function SortTheBasketGame({ onExit, patientId = 'alvrin', exerciseId = 'sort-basket', domain = 'Cognitive', lang = 'en' }) {
+export default function SortTheBasketGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'sort-basket', domain = 'Cognitive', lang = 'en' }) {
   const [items]        = useState(buildSession)
   const [current,      setCurrent]      = useState(0)
   const [wrongCount,   setWrongCount]   = useState(0)
@@ -300,7 +302,7 @@ export default function SortTheBasketGame({ onExit, patientId = 'alvrin', exerci
     onExit()
   }
 
-  if (done) return <FinishScreen score={score} total={items.length} onReplay={handleReplay} onExit={handleExit} lang={lang}/>
+  if (done) return <FinishScreen score={score} total={items.length} onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail}/>
   if (!item) return null
 
   return (

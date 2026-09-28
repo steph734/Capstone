@@ -73,6 +73,8 @@ import speechPhrasesItem from './_lib/routes/speech-phrases-item.js'
 import speechMessagesCreate from './_lib/routes/speech-messages-create.js'
 import speechMessagesList from './_lib/routes/speech-messages-list.js'
 import speechMessagesItem from './_lib/routes/speech-messages-item.js'
+import gameProgressComplete from './_lib/routes/game-progress-complete.js'
+import gameProgressUnlocks from './_lib/routes/game-progress-unlocks.js'
 
 const app = express()
 
@@ -140,6 +142,8 @@ app.all('/api/speech-phrases/:id', speechPhrasesItem)
 app.all('/api/speech-messages/create', speechMessagesCreate)
 app.all('/api/speech-messages/list', speechMessagesList)
 app.all('/api/speech-messages/:id', speechMessagesItem)
+app.all('/api/game-progress/complete', gameProgressComplete)
+app.all('/api/game-progress/unlocks', gameProgressUnlocks)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

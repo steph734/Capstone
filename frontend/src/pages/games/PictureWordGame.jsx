@@ -4,6 +4,7 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { PICTURE_WORD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
+import { reportGameCompletion } from '../../utils/gameProgress'
 
 // ─── Questions by category ────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ function WordWizardBadge({ size = 120, animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
+function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmail = null }) {
   const pct        = score / total
   const stars      = pct >= 0.85 ? 3 : pct >= 0.55 ? 2 : 1
   const scoreMsg   = pickLine(
@@ -172,6 +173,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en' }) {
         localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Word Wizard']))
       }
     } catch {}
+    reportGameCompletion({ patientEmail, gameName: 'Picture-Word Matching', score, maxScore: total })
     setTimeout(() => speakWithDisplay(BADGE_SCRIPT), 600)
   }, [phase]) // eslint-disable-line
 
@@ -257,7 +259,7 @@ function pgSpeak(text, { onStart, onEnd, onWord } = {}) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function PictureWordGame({ onExit, category = 'fruits', patientId = 'alvrin', exerciseId = 'picture-word', domain = 'Cognitive', lang = 'en' }) {
+export default function PictureWordGame({ onExit, category = 'fruits', patientId = 'alvrin', patientEmail = null, exerciseId = 'picture-word', domain = 'Cognitive', lang = 'en' }) {
   const pool = QUESTIONS_BY_CATEGORY[category] || QUESTIONS_BY_CATEGORY.fruits
 
   const [questions]    = useState(() => shuffle(pool).slice(0, 6))
@@ -368,7 +370,7 @@ export default function PictureWordGame({ onExit, category = 'fruits', patientId
     onExit()
   }
 
-  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={handleExit} lang={lang}/>
+  if (done) return <FinishScreen score={score} total={questions.length} onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail}/>
 
   const q = questions[current]
 

@@ -382,7 +382,7 @@ function GamifiedProfileView({ progress, onBack, onViewAllBadges }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 'alvrin' }) {
+export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null }) {
   const navigate = useNavigate()
 
   const [phase,        setPhase]        = useState('intro')
@@ -527,7 +527,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'customize') {
-    return <PaoCustomizePage lang={lang} onDone={() => {
+    return <PaoCustomizePage lang={lang} patientEmail={patientEmail} onDone={() => {
       setDisplayText(''); setTalking(false)
       setPhase('games')
       setTimeout(() => setGamesIn(true), 60)
@@ -536,19 +536,19 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'picture-word') {
-    return <PictureWordGame category={selCategory} patientId={patientId} lang={lang} onExit={backToGames}/>
+    return <PictureWordGame category={selCategory} patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'echo') {
-    return <SlowMotionEchoGame patientId={patientId} lang={lang} onExit={backToGames}/>
+    return <SlowMotionEchoGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'puzzle-pieces') {
-    return <PuzzlePiecesGame patientId={patientId} lang={lang} onExit={backToGames}/>
+    return <PuzzlePiecesGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'sort-basket') {
-    return <SortTheBasketGame patientId={patientId} lang={lang} onExit={backToGames}/>
+    return <SortTheBasketGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'story-select') {
@@ -558,7 +558,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'story-red-riding-hood') {
-    return <LittleRedRidingHoodGame patientId={patientId} lang={lang} onExit={backToGames}/>
+    return <LittleRedRidingHoodGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
   return (

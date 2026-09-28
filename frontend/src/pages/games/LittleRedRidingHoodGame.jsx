@@ -4,6 +4,7 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { RED_RIDING_HOOD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
+import { reportGameCompletion } from '../../utils/gameProgress'
 
 // ─── Little Red Riding Hood — an interactive branching story ─────────────────
 //
@@ -62,7 +63,7 @@ function StoryBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ onReplay, onExit, lang = 'en' }) {
+function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
   const [talking, setTalking]       = useState(false)
   const [mouthOpen, setMouthOpen]   = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -81,6 +82,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en' }) {
         localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Story Explorer']))
       }
     } catch {}
+    reportGameCompletion({ patientEmail, gameName: 'Story Builder', score: 1, maxScore: 1 })
     const t = setTimeout(() => {
       setBadgeShown(true)
       speakPao(pickLine(RED_RIDING_HOOD_LINES.finish, lang), { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
@@ -118,7 +120,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en' }) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', exerciseId = 'story-red-riding-hood', domain = 'Cognitive', lang = 'en' }) {
+export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'story-red-riding-hood', domain = 'Cognitive', lang = 'en' }) {
   // intro | basket | path | obstacle | safewalk | wolf | wolfFeedback
   const [scene, setScene]               = useState('intro')
   const [basketTray, setBasketTray]     = useState(() => shuffle(BASKET_ITEMS))
@@ -271,7 +273,7 @@ export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', 
     onExit()
   }
 
-  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang}/>
+  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail}/>
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

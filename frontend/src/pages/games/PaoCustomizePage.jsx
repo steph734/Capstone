@@ -4,6 +4,8 @@ import { OutfitThumbnail } from './PaoOutfits'
 import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
+import { fetchUnlockState } from '../../utils/gameProgress'
+import { describeUnlock } from '../admin/PaoClothingDesigner'
 
 // ─── Badge definitions ────────────────────────────────────────────────────────
 
@@ -258,7 +260,7 @@ function Boat({ size = 46 }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function PaoCustomizePage({ onDone, lang = 'en' }) {
+export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = null }) {
   const [activeTab,     setActiveTab]     = useState('hair')
   const [equipped,      setEquipped]      = useState({ hair:'none', hats:'none', clothes:'none', pants:'none', shoes:'none' })
   const [talking,       setTalking]       = useState(false)
@@ -272,6 +274,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
   })
   const [wardrobeItems, setWardrobeItems] = useState([])
   const [wardrobeLoading, setWardrobeLoading] = useState(true)
+  const [games, setGames] = useState([])
+  const [unlockedItemCodes, setUnlockedItemCodes] = useState(() => new Set())
   const mouthRef = useRef(null)
 
   // The full wardrobe (hats/clothes/pants/shoes + hairstyles), straight
@@ -282,25 +286,41 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
     Promise.all([
       fetch('/api/pao-items/list').then((r) => r.json()),
       fetch('/api/pao-hair/list').then((r) => r.json()),
+      fetch('/api/games/list').then((r) => r.json()),
     ])
-      .then(([itemsBody, hairBody]) => {
+      .then(([itemsBody, hairBody, gamesBody]) => {
         if (cancelled) return
         setWardrobeItems([...(itemsBody.items || []), ...(hairBody.items || [])])
+        setGames(gamesBody.games || [])
       })
       .catch(() => { /* keep the "Natural" fallback for every slot */ })
       .finally(() => { if (!cancelled) setWardrobeLoading(false) })
     return () => { cancelled = true }
   }, [])
 
+  // Real, admin-authored unlock state (finish a specific game, perfect a
+  // score, earn a badge, …) — computed server-side from this patient's
+  // recorded game completions. Refreshed whenever the Badge Case is opened,
+  // same as the legacy localStorage badge set below, so a badge/item earned
+  // moments ago (right after finishing a game) shows up immediately.
+  useEffect(() => {
+    let cancelled = false
+    fetchUnlockState(patientEmail).then((state) => {
+      if (!cancelled) setUnlockedItemCodes(new Set(state.unlockedItemCodes))
+    })
+    return () => { cancelled = true }
+  }, [patientEmail, showBadgeCase])
+
   const categories = useMemo(() => CATEGORY_META.map((meta) => ({
     ...meta,
     items: [
-      { id: 'none', code: 'none', name: 'Natural', design: null, badge: null, desc: NATURAL_DESC[meta.id] },
+      { id: 'none', code: 'none', name: 'Natural', design: null, badge: null, unlock: null, desc: NATURAL_DESC[meta.id] },
       ...wardrobeItems
         .filter((i) => i.category === meta.label)
         .map((i) => ({
           id: i.code, code: i.code, name: i.name, design: i.design,
           badge: LEGACY_BADGE_BY_CODE[i.code] || null,
+          unlock: i.unlock || null,
           desc: i.description || '',
         })),
     ],
@@ -330,7 +350,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
     return () => clearInterval(mouthRef.current)
   }, [talking])
 
-  const isUnlocked = (item) => !item.badge || earnedBadges.has(item.badge)
+  const isUnlocked = (item) => {
+    if (item.unlock) return item.unlock.type === 'free' || unlockedItemCodes.has(item.code)
+    return !item.badge || earnedBadges.has(item.badge)
+  }
 
   const getEquippedName = (catId) =>
     categories.find(c => c.id === catId)?.items.find(i => i.id === equipped[catId])?.name ?? 'None'
@@ -539,6 +562,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
               const isEquipped = equipped[activeTab] === item.id
               const isLocked   = !unlocked
               const badge      = item.badge ? BADGES[item.badge] : null
+              const unlockLabel = !badge && item.unlock && item.unlock.type !== 'free'
+                ? describeUnlock(item.unlock.type, { gameId: item.unlock.gameId, value: item.unlock.value, badgeCode: item.unlock.badgeCode }, games, [])
+                : null
               return (
                 <button key={item.id}
                   onClick={() => equip(activeTab, item)}
@@ -592,6 +618,18 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
                       </div>
                     </div>
                   )}
+                  {isLocked && unlockLabel && (
+                    <div style={{ width:'100%' }}>
+                      <div style={{ height:'1px', background:'rgba(45,42,74,.12)', margin:'2px 0 6px' }}/>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3, alignItems:'center' }}>
+                        <div style={{ fontSize:10, color:'rgba(45,42,74,.5)', fontWeight:600 }}>Unlock by:</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:5, background:'rgba(124,79,224,.1)', border:'1px solid rgba(124,79,224,.3)', borderRadius:20, padding:'4px 10px' }}>
+                          <span style={{ fontSize:14 }}>🔒</span>
+                          <div style={{ fontSize:10.5, fontWeight:800, color:'#6d28d9' }}>{unlockLabel}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status label */}
                   {isEquipped && (
@@ -600,7 +638,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en' }) {
                   {!isEquipped && unlocked && item.badge && (
                     <div style={{ fontSize:11, color:'#16a34a', fontWeight:700 }}>🔓 Unlocked!</div>
                   )}
-                  {!isEquipped && !item.badge && (
+                  {!isEquipped && unlocked && !item.badge && item.unlock && item.unlock.type !== 'free' && (
+                    <div style={{ fontSize:11, color:'#16a34a', fontWeight:700 }}>🔓 Unlocked!</div>
+                  )}
+                  {!isEquipped && !item.badge && !unlockLabel && (
                     <div style={{ fontSize:11, color:'rgba(45,42,74,.45)' }}>Tap to wear</div>
                   )}
 

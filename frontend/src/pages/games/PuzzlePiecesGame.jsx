@@ -4,6 +4,7 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { PUZZLE_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
+import { reportGameCompletion } from '../../utils/gameProgress'
 
 // ─── Puzzle Pals ───────────────────────────────────────────────────────────────
 //
@@ -96,7 +97,7 @@ function PuzzleBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ onReplay, onExit, lang = 'en' }) {
+function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
   const [talking, setTalking]     = useState(false)
   const [mouthOpen, setMouthOpen] = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -115,6 +116,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en' }) {
         localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Puzzle Pro']))
       }
     } catch {}
+    reportGameCompletion({ patientEmail, gameName: 'Puzzle Pals', score: 1, maxScore: 1 })
     const t = setTimeout(() => {
       setBadgeShown(true)
       speakPao(pickLine(PUZZLE_LINES.finishLine, lang), { onStart: () => setTalking(true), onEnd: () => setTalking(false) })
@@ -152,7 +154,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en' }) {
 
 // ─── Main game ────────────────────────────────────────────────────────────────
 
-export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exerciseId = 'puzzle-pieces', domain = 'Cognitive', lang = 'en' }) {
+export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'puzzle-pieces', domain = 'Cognitive', lang = 'en' }) {
   const buildRound = () => {
     const picks = shuffle(ANIMAL_POOL).slice(0, 3)
     return STEP_ORDER.reduce((acc, step, i) => ({ ...acc, [step]: picks[i] }), {})
@@ -274,7 +276,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', exercis
     onExit()
   }
 
-  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang}/>
+  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail}/>
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

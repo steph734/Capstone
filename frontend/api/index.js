@@ -62,6 +62,11 @@ import paoHairCreate from './_lib/routes/pao-hair-create.js'
 import paoHairItem from './_lib/routes/pao-hair-item.js'
 import paoThemesList from './_lib/routes/pao-themes-list.js'
 import paoThemesItem from './_lib/routes/pao-themes-item.js'
+import gamesList from './_lib/routes/games-list.js'
+import recordingsCreate from './_lib/routes/recordings-create.js'
+import recordingsList from './_lib/routes/recordings-list.js'
+import recordingsItem from './_lib/routes/recordings-item.js'
+import recordingsSummarize from './_lib/routes/recordings-summarize.js'
 
 const app = express()
 
@@ -118,6 +123,11 @@ app.all('/api/pao-hair/create', paoHairCreate)
 app.all('/api/pao-hair/:id', paoHairItem)
 app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
+app.all('/api/games/list', gamesList)
+app.all('/api/recordings/create', recordingsCreate)
+app.all('/api/recordings/list', recordingsList)
+app.all('/api/recordings/:id/summarize', recordingsSummarize)
+app.all('/api/recordings/:id', recordingsItem)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

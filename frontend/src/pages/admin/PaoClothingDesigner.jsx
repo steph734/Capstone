@@ -7,7 +7,6 @@ import {
 } from '../games/PaoDesignedOutfit'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
-import { initialGames } from './gamifiedLibraryData'
 import { ShirtIcon, ShuffleIcon } from './gamifiedIcons'
 
 // Same rule set a badge's criteria already uses (see GamifiedBadgesPage.jsx
@@ -29,12 +28,12 @@ const UNLOCK_OPTIONS = [
 
 // The "Patients see: 🔒 …" preview line under the picker — also used by
 // GamifiedBadgesPage.jsx for the wardrobe grid's unlock pill.
-export function describeUnlock(type, { gameId, value, badgeCode } = {}, games = initialGames, badges = []) {
+export function describeUnlock(type, { gameId, value, badgeCode } = {}, games = [], badges = []) {
   const meta = UNLOCK_OPTIONS.find((u) => u.id === type)
   if (!meta || type === 'linked_badge') return null
   if (type === 'free') return 'Available to everyone'
   if (type === 'complete_specific_game') {
-    const g = games.find((x) => x.mongoId === gameId)
+    const g = games.find((x) => x.id === gameId)
     return `Finish ${g ? g.name : 'a specific game'}`
   }
   if (type === 'complete_any_game') return 'Finish any game for the first time'
@@ -130,7 +129,7 @@ function Step({ number, title, children }) {
   )
 }
 
-export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', badges = [], onSave, onClose }) {
+export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', badges = [], games = [], onSave, onClose }) {
   const [name, setName] = useState(item?.name || '')
   const [description, setDescription] = useState(item?.description || '')
   const [category, setCategory] = useState(item?.category || defaultCategory)
@@ -423,7 +422,7 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', ba
                     const nextType = event.target.value
                     const meta = UNLOCK_OPTIONS.find((u) => u.id === nextType)
                     setUnlockType(nextType)
-                    if (meta?.needsGame) setUnlockGameId((g) => g ?? initialGames[0]?.mongoId ?? null)
+                    if (meta?.needsGame) setUnlockGameId((g) => g ?? games[0]?.id ?? null)
                     if (meta?.needsValue) setUnlockValue((v) => v ?? meta.defaultValue)
                   }}
                 >
@@ -435,7 +434,7 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', ba
                 <label className="admin-field">
                   <span>Which game</span>
                   <select value={unlockGameId ?? ''} onChange={(event) => setUnlockGameId(event.target.value)}>
-                    {initialGames.map((g) => <option key={g.mongoId} value={g.mongoId}>{g.name}</option>)}
+                    {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </label>
               )}
@@ -462,9 +461,9 @@ export default function PaoClothingDesigner({ item, defaultCategory = 'Hair', ba
                 </label>
               )}
 
-              {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, initialGames, badges) && (
+              {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, games, badges) && (
                 <p className="pao-theme-hint">
-                  Patients see: 🔒 {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, initialGames, badges)}
+                  Patients see: 🔒 {describeUnlock(unlockType, { gameId: unlockGameId, value: unlockValue, badgeCode: unlockBadgeCode }, games, badges)}
                 </p>
               )}
             </Step>

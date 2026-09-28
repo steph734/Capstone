@@ -13,7 +13,7 @@ export default function OwnerSpeechFeaturesPage({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
       beta={betaTier === 'silver' || betaTier === 'gold'}
     >
-      <SpeechFeaturesUI />
+      <SpeechFeaturesUI user={user} />
     </OwnerPageShell>
   )
 }

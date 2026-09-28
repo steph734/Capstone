@@ -1,4 +1,22 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { jsPDF } from 'jspdf'
+import { saveAudioBlob, getAudioBlob, deleteAudioBlob, newAudioKey } from '../utils/recordingsDb'
+import { MicIcon as MicIconOutline, VolumeIcon, SwapIcon, FlaskIcon, DotIcon as DotIconOutline } from '../components/icons/SpeechIcons'
+
+const PATIENT_AVATAR_PALETTE = ['#7c3aed', '#2563eb', '#db2777', '#ea580c', '#059669', '#0891b2', '#9333ea', '#dc2626']
+
+function patientAvatarColor(id) {
+  const s = String(id || '')
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return PATIENT_AVATAR_PALETTE[h % PATIENT_AVATAR_PALETTE.length]
+}
+
+function patientInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
+}
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +84,14 @@ function CloseIcon() {
   )
 }
 
+function BigCheckIcon() {
+  return (
+    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5"/>
+    </svg>
+  )
+}
+
 // ─── Waveform ─────────────────────────────────────────────────────────────────
 
 const BAR_COLORS = [
@@ -94,7 +120,8 @@ function Waveform({ active }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(s) {
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+  const sec = Math.max(0, Math.floor(s || 0))
+  return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`
 }
 
 function formatDateTime(date) {
@@ -105,16 +132,368 @@ function formatDateTime(date) {
   )
 }
 
-// ─── Recordings Modal ─────────────────────────────────────────────────────────
+function statTimeParts(date) {
+  return {
+    time: date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    date: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
+  }
+}
 
-function RecordingsModal({ recordings, playingId, onPlay, onDelete, onClearAll, onClose }) {
-  // close on backdrop click
+function wordCount(text) {
+  const t = (text || '').trim()
+  return t ? t.split(/\s+/).length : 0
+}
+
+function defaultSessionTitle(date) {
+  return `Session – ${date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+}
+
+// ─── Recording Saved Modal ────────────────────────────────────────────────────
+
+function RecordingSavedModal({ recording, patients, onSaveMeta, onRecordAnother, onOpenRecordings }) {
+  const [title, setTitle] = useState(recording.title)
+  const [patientId, setPatientId] = useState(recording.patientId || '')
+  const savedRef = useRef({ title: recording.title, patientId: recording.patientId || '' })
+
+  // Auto-save the title/patient edits, debounced — no explicit save button.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (title !== savedRef.current.title || patientId !== savedRef.current.patientId) {
+        savedRef.current = { title, patientId }
+        onSaveMeta({ title, patientId })
+      }
+    }, 500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, patientId])
+
+  const created = new Date(recording.createdAt)
+  const { time, date } = statTimeParts(created)
+  const hasTranscript = !!recording.transcript?.trim()
+
+  return (
+    <div className="rec-modal-backdrop">
+      <div className="rsm-modal">
+        <div className="rsm-header">
+          <span className="rsm-sparkle rsm-sparkle-l">⭐</span>
+          <span className="rsm-sparkle rsm-sparkle-r">✨</span>
+          <div className="rsm-check-circle"><BigCheckIcon /></div>
+          <h2 className="rsm-title">Recording saved!</h2>
+          <p className="rsm-subtitle">
+            {hasTranscript ? 'Your therapy session was recorded successfully. 🎉' : '🤔 No speech detected — audio only'}
+          </p>
+        </div>
+
+        <div className="rsm-stats-card">
+          <div className="rsm-stat"><strong>{formatTime(recording.durationSec)}</strong><span>DURATION</span></div>
+          <div className="rsm-stat"><strong>{recording.wordCount}</strong><span>WORDS</span></div>
+          <div className="rsm-stat"><strong>{time}</strong><span>{date}</span></div>
+        </div>
+
+        <div className="rsm-body">
+          <div className="rsm-stored-box">
+            <span className="rsm-stored-icon">🗂️</span>
+            <div>
+              <strong>Stored in your Recordings folder</strong>
+              <p>Full recording + transcript saved · {hasTranscript ? 'Summary is being written' : 'No summary to write'}</p>
+            </div>
+          </div>
+
+          <div className="rsm-fields">
+            <label className="rsm-field">
+              <span>Session title</span>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} />
+            </label>
+            {patients.length > 0 && (
+              <label className="rsm-field">
+                <span>Patient</span>
+                <select value={patientId} onChange={(e) => setPatientId(e.target.value)}>
+                  <option value="">— None —</option>
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+
+          {hasTranscript && (
+            <div className={`rsm-status rsm-status-${recording.summaryStatus}`}>
+              {recording.summaryStatus === 'pending' && (
+                <><span className="rsm-dots"><span /><span /><span /></span> ✨ Creating the session summary…</>
+              )}
+              {recording.summaryStatus === 'ready' && '✅ Summary ready'}
+              {recording.summaryStatus === 'failed' && '⚠️ Summary unavailable — full recording is saved'}
+            </div>
+          )}
+
+          <div className="rsm-actions">
+            <button className="rsm-btn-secondary" onClick={onRecordAnother}>Record another</button>
+            <button className="rsm-btn-primary" onClick={onOpenRecordings}>🗂️ Open Recordings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Full Recording card (Full Recording tab) ────────────────────────────────
+
+function FullRecordingCard({ rec, index, total, cardRef, onDelete, onViewSummary }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [curTime, setCurTime] = useState(0)
+  const [rate, setRate] = useState(1)
+  const durSec = rec.durationSec || 0
+
+  const togglePlay = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) audio.pause()
+    else audio.play().catch(() => {})
+  }
+  const seek = (e) => {
+    const audio = audioRef.current
+    if (!audio || !durSec) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    audio.currentTime = pct * durSec
+    setCurTime(audio.currentTime)
+  }
+  const cycleRate = () => {
+    const next = rate === 1 ? 1.5 : rate === 1.5 ? 0.75 : 1
+    setRate(next)
+    if (audioRef.current) audioRef.current.playbackRate = next
+  }
+
+  const activeSegIdx = rec.segments?.length
+    ? rec.segments.reduce((best, s, i) => (s.t <= curTime ? i : best), -1)
+    : -1
+
+  const copyTranscript = () => navigator.clipboard?.writeText(rec.transcript || '').catch(() => {})
+  const downloadAudio = () => {
+    if (!rec.audioUrl) return
+    const a = document.createElement('a')
+    a.href = rec.audioUrl
+    a.download = `${rec.title || 'recording'}.webm`
+    a.click()
+  }
+
+  return (
+    <div className="rec-card-2" ref={cardRef} id={`rec-full-${rec.id}`}>
+      <div className="rec-card-2-top">
+        <span className="rec-index-badge">#{total - index}</span>
+        <div className="rec-card-2-heading">
+          <h4>{rec.title}</h4>
+          {rec.patientName && <span className="rec-patient-pill">👤 {rec.patientName}</span>}
+        </div>
+        <button className="rec-delete-btn" onClick={() => onDelete(rec)} title="Delete"><TrashIcon /></button>
+      </div>
+      <div className="rec-card-2-meta">🗓️ {formatDateTime(new Date(rec.createdAt))} · ⏱️ {formatTime(durSec)} · 📝 {rec.wordCount} words</div>
+
+      {rec.audioUrl ? (
+        <div className="rec-player">
+          <audio
+            ref={audioRef}
+            src={rec.audioUrl}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onTimeUpdate={(e) => setCurTime(e.currentTarget.currentTime)}
+            onEnded={() => setPlaying(false)}
+          />
+          <button className="rec-player-btn" onClick={togglePlay}>{playing ? <PauseIcon /> : <PlayIcon />}</button>
+          <div className="rec-player-bar" onClick={seek}>
+            <div className="rec-player-bar-fill" style={{ width: durSec ? `${Math.min(100, (curTime / durSec) * 100)}%` : '0%' }} />
+          </div>
+          <span className="rec-player-time">{formatTime(curTime)} / {formatTime(durSec)}</span>
+          <button className="rec-player-rate" onClick={cycleRate}>{rate}×</button>
+        </div>
+      ) : (
+        <p className="rec-no-transcript">Audio unavailable on this device</p>
+      )}
+
+      <div className="rec-transcript-box">
+        {rec.segments?.length ? (
+          rec.segments.map((s, i) => (
+            <p key={i} className={`rec-transcript-line ${i === activeSegIdx ? 'rec-transcript-line-active' : ''}`}>
+              <span className="rec-transcript-ts">{formatTime(s.t)}</span> {s.text}
+            </p>
+          ))
+        ) : rec.transcript ? (
+          <p className="rec-transcript-line">{rec.transcript}</p>
+        ) : (
+          <p className="rec-no-transcript">🤔 No speech detected</p>
+        )}
+      </div>
+
+      <div className="rec-card-actions">
+        <button className="rec-action-btn" onClick={onViewSummary}>✨ View summary</button>
+        <button className="rec-action-btn" onClick={copyTranscript}>📋 Copy transcript</button>
+        <button className="rec-action-btn" onClick={downloadAudio} disabled={!rec.audioUrl}>⬇ Download audio</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Summarized card (Summarized tab) ────────────────────────────────────────
+
+function exportSummaryPdf(rec) {
+  const doc = new jsPDF()
+  let y = 20
+  doc.setFontSize(16); doc.text(rec.title || 'Session', 14, y); y += 9
+  doc.setFontSize(10); doc.setTextColor(90)
+  if (rec.patientName) { doc.text(`Patient: ${rec.patientName}`, 14, y); y += 6 }
+  doc.text(`Date: ${formatDateTime(new Date(rec.createdAt))}`, 14, y); y += 6
+  doc.text(`Duration: ${formatTime(rec.durationSec)}`, 14, y); y += 10
+  doc.setTextColor(20)
+
+  const section = (label, body) => {
+    doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text(label, 14, y); y += 6
+    doc.setFont(undefined, 'normal'); doc.setFontSize(10)
+    body(); y += 6
+  }
+
+  if (rec.summary) {
+    section('Session Overview', () => {
+      const lines = doc.splitTextToSize(rec.summary.overview || '—', 180)
+      doc.text(lines, 14, y); y += lines.length * 5
+    })
+    section('Goals Worked On', () => {
+      (rec.summary.goals.length ? rec.summary.goals : ['—']).forEach((g) => { doc.text(`• ${g}`, 14, y); y += 5 })
+    })
+    section('Progress', () => {
+      (rec.summary.progress.length ? rec.summary.progress : ['—']).forEach((p) => { doc.text(`• ${p}`, 14, y); y += 5 })
+    })
+    section('Next Steps', () => {
+      (rec.summary.nextSteps.length ? rec.summary.nextSteps : ['—']).forEach((s) => { doc.text(`• ${s}`, 14, y); y += 5 })
+    })
+  }
+  doc.save(`${(rec.title || 'session').replace(/[^\w\- ]+/g, '')}.pdf`)
+}
+
+function SummarizedCard({ rec, index, total, cardRef, onDelete, onViewFull, onRetry, onPlay, isPlaying }) {
+  const copyToNotes = () => {
+    if (!rec.summary) return
+    const text = [
+      rec.title,
+      '',
+      'Overview:', rec.summary.overview,
+      '', 'Goals:', ...rec.summary.goals.map((g) => `- ${g}`),
+      '', 'Progress:', ...rec.summary.progress.map((p) => `- ${p}`),
+      '', 'Next steps:', ...rec.summary.nextSteps.map((s) => `- ${s}`),
+    ].join('\n')
+    navigator.clipboard?.writeText(text).catch(() => {})
+  }
+
+  return (
+    <div className="rec-card-2" ref={cardRef} id={`rec-sum-${rec.id}`}>
+      <div className="rec-card-2-top">
+        <span className="rec-index-badge">#{total - index}</span>
+        <div className="rec-card-2-heading">
+          <h4>{rec.title}</h4>
+          {rec.patientName && <span className="rec-patient-pill">👤 {rec.patientName}</span>}
+          {rec.summaryStatus === 'ready' && <span className="rec-ai-pill">✨ AI summary</span>}
+        </div>
+        <button className="rec-delete-btn" onClick={() => onDelete(rec)} title="Delete"><TrashIcon /></button>
+      </div>
+      <div className="rec-card-2-meta">🗓️ {formatDateTime(new Date(rec.createdAt))} · ⏱️ {formatTime(rec.durationSec)} · 📝 {rec.wordCount} words</div>
+
+      {rec.summaryStatus === 'ready' && rec.summary && (
+        <div className="rec-summary-grid">
+          <div className="rec-summary-box rec-summary-overview">
+            <span className="rec-summary-label">SESSION OVERVIEW</span>
+            <p>{rec.summary.overview}</p>
+          </div>
+          <div className="rec-summary-side">
+            <div className="rec-summary-box rec-summary-goals">
+              <span className="rec-summary-label">GOALS WORKED ON</span>
+              <ul>{rec.summary.goals.map((g, i) => <li key={i}>{g}</li>)}</ul>
+            </div>
+            <div className="rec-summary-box rec-summary-next">
+              <span className="rec-summary-label">NEXT STEPS</span>
+              <ul>{rec.summary.nextSteps.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rec.summaryStatus === 'pending' && (
+        <div className="rec-summary-skeleton">
+          <div className="rec-shimmer" /><div className="rec-shimmer" /><div className="rec-shimmer" style={{ width: '60%' }} />
+          <p>✨ Creating summary…</p>
+        </div>
+      )}
+
+      {rec.summaryStatus === 'failed' && (
+        <div className="rec-summary-failed">
+          <p>⚠️ Summary unavailable — full recording is saved</p>
+          <button className="rec-retry-btn" onClick={() => onRetry(rec.id)}>↻ Try again</button>
+        </div>
+      )}
+
+      {rec.summaryStatus === 'none' && (
+        <p className="rec-no-transcript">🤔 No speech detected — nothing to summarize</p>
+      )}
+
+      <div className="rec-card-actions">
+        <button className="rec-action-btn" onClick={() => onPlay(rec)}>{isPlaying ? '⏸ Pause' : '▶ Play'}</button>
+        <button className="rec-action-btn" onClick={() => onViewFull(rec.id)}>📄 View full recording</button>
+        <button className="rec-action-btn" onClick={copyToNotes} disabled={!rec.summary}>📋 Copy to Notes</button>
+        <button className="rec-action-btn" onClick={() => exportSummaryPdf(rec)} disabled={!rec.summary}>⬇ Export PDF</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Recordings Modal (Summarized / Full Recording tabs) ────────────────────
+
+const RECORDINGS_TAB_KEY = 'csf_recordings_tab'
+
+function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, onClearAll, onRetrySummary, onClose, initialTab, currentPatient }) {
+  const [tab, setTab] = useState(() => {
+    if (initialTab) return initialTab
+    try { return localStorage.getItem(RECORDINGS_TAB_KEY) || 'summarized' } catch { return 'summarized' }
+  })
+  const [search, setSearch] = useState('')
+  const [patientFilter, setPatientFilter] = useState('all')
+  const [sort, setSort] = useState('newest')
+  const [scope, setScope] = useState(currentPatient ? 'this' : 'all')
+
+  useEffect(() => { try { localStorage.setItem(RECORDINGS_TAB_KEY, tab) } catch { /* ignore */ } }, [tab])
+
   const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
+
+  const filtered = useMemo(() => {
+    let list = recordings.filter((r) => {
+      if (currentPatient && scope === 'this' && r.patientId !== currentPatient.id) return false
+      if (patientFilter !== 'all' && r.patientId !== patientFilter) return false
+      if (search.trim()) {
+        const q = search.trim().toLowerCase()
+        return (r.title || '').toLowerCase().includes(q)
+          || (r.patientName || '').toLowerCase().includes(q)
+          || (r.transcript || '').toLowerCase().includes(q)
+      }
+      return true
+    })
+    list = [...list].sort((a, b) => {
+      const diff = new Date(b.createdAt) - new Date(a.createdAt)
+      return sort === 'newest' ? diff : -diff
+    })
+    return list
+  }, [recordings, search, patientFilter, sort, scope, currentPatient])
+
+  const jumpTo = (id, targetTab) => {
+    setTab(targetTab)
+    setTimeout(() => {
+      const el = document.getElementById(`rec-${targetTab === 'full' ? 'full' : 'sum'}-${id}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('rec-card-flash')
+      setTimeout(() => el.classList.remove('rec-card-flash'), 1200)
+    }, 60)
+  }
 
   return (
     <div className="rec-modal-backdrop" onClick={handleBackdrop}>
-      <div className="rec-modal">
-        {/* Modal header */}
+      <div className="rec-modal rec-modal-wide">
         <div className="rec-modal-header">
           <div className="rec-modal-title">
             🗂️ My Recordings
@@ -128,57 +507,70 @@ function RecordingsModal({ recordings, playingId, onPlay, onDelete, onClearAll, 
           </div>
         </div>
 
-        {/* Modal body */}
+        <div className="rec-tabs-row">
+          <button className={`rec-tab-pill ${tab === 'summarized' ? 'rec-tab-pill-active' : ''}`} onClick={() => setTab('summarized')}>
+            <span className="rec-tab-pill-title">✨ Summarized</span>
+            <span className="rec-tab-pill-sub">Key points, goals &amp; next steps</span>
+          </button>
+          <button className={`rec-tab-pill ${tab === 'full' ? 'rec-tab-pill-active' : ''}`} onClick={() => setTab('full')}>
+            <span className="rec-tab-pill-title">📄 Full Recording</span>
+            <span className="rec-tab-pill-sub">Audio + complete transcript</span>
+          </button>
+        </div>
+
+        {currentPatient && (
+          <div className="rec-scope-row">
+            <button className={`rec-scope-pill ${scope === 'this' ? 'rec-scope-pill-active' : ''}`} onClick={() => setScope('this')}>
+              This patient · {currentPatient.name}
+            </button>
+            <button className={`rec-scope-pill ${scope === 'all' ? 'rec-scope-pill-active' : ''}`} onClick={() => setScope('all')}>
+              All patients
+            </button>
+          </div>
+        )}
+
+        <div className="rec-toolbar">
+          <input className="rec-search" placeholder="🔍 Search sessions or patients..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          {(!currentPatient || scope === 'all') && (
+            <select className="rec-toolbar-select" value={patientFilter} onChange={(e) => setPatientFilter(e.target.value)}>
+              <option value="all">👤 All patients</option>
+              {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          )}
+          <select className="rec-toolbar-select" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="newest">🗓️ Newest first</option>
+            <option value="oldest">🗓️ Oldest first</option>
+          </select>
+        </div>
+
         <div className="rec-modal-body">
-          {recordings.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="rec-empty">
-              <span className="rec-empty-icon">🎙️</span>
-              <p>No recordings yet!<br />Tap the mic to make your first recording.</p>
+              <span className="rec-empty-icon">{tab === 'summarized' ? '✨' : '🎙️'}</span>
+              <p>
+                {tab === 'summarized'
+                  ? 'No summaries yet — record a session and Pao will summarise it!'
+                  : <>No recordings yet!<br />Tap the mic to make your first recording.</>}
+              </p>
             </div>
           ) : (
             <div className="rec-list">
-              {recordings.map((rec, idx) => {
-                const isPlaying = playingId === rec.id
-                return (
-                  <div key={rec.id} className="rec-card">
-                    <div className="rec-card-top">
-                      <div className="rec-index-badge">#{recordings.length - idx}</div>
-                      <div className="rec-meta">
-                        <span className="rec-date">🗓️ {formatDateTime(rec.date)}</span>
-                        <span className="rec-duration">⏱️ {formatTime(rec.duration)}</span>
-                      </div>
-                      <button className="rec-delete-btn" onClick={() => onDelete(rec.id)} title="Delete">
-                        <TrashIcon />
-                      </button>
-                    </div>
-
-                    {rec.transcript ? (
-                      <div className="rec-transcript">
-                        <span className="rec-transcript-label">📝 Transcript</span>
-                        <p className="rec-transcript-text">"{rec.transcript}"</p>
-                      </div>
-                    ) : (
-                      <p className="rec-no-transcript">🤔 No speech detected</p>
-                    )}
-
-                    <div className="rec-audio-row">
-                      <button
-                        className={`rec-play-btn ${isPlaying ? 'rec-play-btn-active' : ''}`}
-                        onClick={() => onPlay(rec)}
-                      >
-                        {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                        <span>{isPlaying ? 'Pause' : 'Play Recording'}</span>
-                      </button>
-                      {isPlaying && (
-                        <div className="rec-playing-indicator">
-                          <span className="rec-dot" /><span className="rec-dot" /><span className="rec-dot" />
-                          <span style={{ marginLeft: 6, fontSize: 12, color: '#6366f1', fontWeight: 700 }}>Playing...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              {filtered.map((rec, idx) => (
+                tab === 'summarized' ? (
+                  <SummarizedCard
+                    key={rec.id} rec={rec} index={idx} total={filtered.length}
+                    cardRef={undefined}
+                    onDelete={onDelete} onViewFull={(id) => jumpTo(id, 'full')} onRetry={onRetrySummary}
+                    onPlay={onPlay} isPlaying={playingId === rec.id}
+                  />
+                ) : (
+                  <FullRecordingCard
+                    key={rec.id} rec={rec} index={idx} total={filtered.length}
+                    cardRef={undefined}
+                    onDelete={onDelete} onViewSummary={() => jumpTo(rec.id, 'summarized')}
+                  />
                 )
-              })}
+              ))}
             </div>
           )}
         </div>
@@ -189,8 +581,10 @@ function RecordingsModal({ recordings, playingId, onPlay, onDelete, onClearAll, 
 
 // ─── TTS History Modal ────────────────────────────────────────────────────────
 
-function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClearAll, onClose }) {
+function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClearAll, onClose, currentPatient }) {
   const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
+  const [scope, setScope] = useState(currentPatient ? 'this' : 'all')
+  const visible = currentPatient && scope === 'this' ? history.filter((item) => item.patientId === currentPatient.id) : history
 
   return (
     <div className="rec-modal-backdrop" onClick={handleBackdrop}>
@@ -198,7 +592,7 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
         <div className="rec-modal-header" style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>
           <div className="rec-modal-title">
             🗂️ Speech History
-            <span className="rec-count-badge">{history.length}</span>
+            <span className="rec-count-badge">{visible.length}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {history.length > 0 && (
@@ -208,21 +602,32 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
           </div>
         </div>
 
+        {currentPatient && (
+          <div className="rec-scope-row" style={{ padding: '14px 24px 0' }}>
+            <button className={`rec-scope-pill ${scope === 'this' ? 'rec-scope-pill-active' : ''}`} style={scope === 'this' ? { background: 'linear-gradient(135deg,#059669,#0d9488)' } : undefined} onClick={() => setScope('this')}>
+              This patient · {currentPatient.name}
+            </button>
+            <button className={`rec-scope-pill ${scope === 'all' ? 'rec-scope-pill-active' : ''}`} style={scope === 'all' ? { background: 'linear-gradient(135deg,#059669,#0d9488)' } : undefined} onClick={() => setScope('all')}>
+              All patients
+            </button>
+          </div>
+        )}
+
         <div className="rec-modal-body">
-          {history.length === 0 ? (
+          {visible.length === 0 ? (
             <div className="rec-empty">
               <span className="rec-empty-icon">🔊</span>
               <p>No saved speech yet!<br />Tap the speaker to save your first one.</p>
             </div>
           ) : (
             <div className="rec-list">
-              {history.map((item, idx) => {
+              {visible.map((item, idx) => {
                 const isPlaying = activeId === item.id
                 return (
                   <div key={item.id} className="rec-card">
                     <div className="rec-card-top">
                       <div className="rec-index-badge" style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>
-                        #{history.length - idx}
+                        #{visible.length - idx}
                       </div>
                       <div className="rec-meta">
                         <span className="rec-date">🗓️ {formatDateTime(item.date)}</span>
@@ -277,10 +682,17 @@ const TTS_HINTS = [
 const TTS_HISTORY_KEY = 'csf_tts_history'
 const TTS_HISTORY_LIMIT = 50
 
-export default function SpeechFeaturesUI() {
-  const [activeTab, setActiveTab] = useState('stt')
+export default function SpeechFeaturesUI({ user, patient = null, initialTab, onChangePatient, practiceMode = false }) {
+  const [activeTab, setActiveTab] = useState(initialTab === 'tts' ? 'tts' : 'stt')
   const [showModal, setShowModal] = useState(false)
+  const [recordingsModalTab, setRecordingsModalTab] = useState(null)
   const [showTtsModal, setShowTtsModal] = useState(false)
+
+  useEffect(() => { if (initialTab) setActiveTab(initialTab) }, [initialTab])
+
+  // Therapist flow only (onChangePatient is passed): tools stay locked until
+  // a patient is picked or practice mode is explicitly chosen.
+  const toolsLocked = !!onChangePatient && !patient && !practiceMode
 
   // ── STT state ──
   const [isListening, setIsListening] = useState(false)
@@ -289,6 +701,8 @@ export default function SpeechFeaturesUI() {
   const [elapsed, setElapsed] = useState(0)
   const [recordings, setRecordings] = useState([])
   const [playingId, setPlayingId] = useState(null)
+  const [patients, setPatients] = useState([])
+  const [savedRecording, setSavedRecording] = useState(null)
 
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -296,8 +710,11 @@ export default function SpeechFeaturesUI() {
   const audioChunksRef = useRef([])
   const timerRef = useRef(null)
   const transcriptRef = useRef('')
+  const segmentsRef = useRef([])
   const elapsedRef = useRef(0)
   const playingAudioRef = useRef(null)
+
+  const userEmail = (user?.email || '').trim().toLowerCase()
 
   // ── TTS state ──
   const [ttsText, setTtsText] = useState('')
@@ -338,15 +755,50 @@ export default function SpeechFeaturesUI() {
     return () => clearInterval(timerRef.current)
   }, [isListening])
 
+  // ── Load this user's recordings + rebuild audio blob URLs from IndexedDB ──
+  useEffect(() => {
+    if (!userEmail) return
+    let cancelled = false
+    fetch(`/api/recordings/list?therapistEmail=${encodeURIComponent(userEmail)}`)
+      .then((r) => r.json())
+      .then(async (body) => {
+        if (cancelled || !body.recordings) return
+        const withAudio = await Promise.all(body.recordings.map(async (rec) => {
+          try {
+            const blob = await getAudioBlob(rec.audioKey)
+            return { ...rec, audioUrl: blob ? URL.createObjectURL(blob) : null }
+          } catch {
+            return { ...rec, audioUrl: null }
+          }
+        }))
+        if (!cancelled) setRecordings(withAudio)
+      })
+      .catch(() => { /* recordings list just stays empty */ })
+    return () => { cancelled = true }
+  }, [userEmail])
+
+  // ── Load this therapist's patients (skipped entirely if none / not a therapist) ──
+  useEffect(() => {
+    if (!userEmail) return
+    let cancelled = false
+    fetch(`/api/patients/therapist-list?email=${encodeURIComponent(userEmail)}`)
+      .then((r) => (r.ok ? r.json() : { patients: [] }))
+      .then((body) => { if (!cancelled) setPatients(body.patients || []) })
+      .catch(() => { if (!cancelled) setPatients([]) })
+    return () => { cancelled = true }
+  }, [userEmail])
+
   useEffect(() => {
     return () => {
-      recordings.forEach(r => URL.revokeObjectURL(r.audioUrl))
+      recordings.forEach(r => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl) })
       playingAudioRef.current?.pause()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Start recording ──
   const startListening = async () => {
+    if (toolsLocked) return
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) { setSttError('❌ Use Google Chrome for speech recognition!'); return }
 
@@ -364,17 +816,69 @@ export default function SpeechFeaturesUI() {
     mediaRecorderRef.current = mediaRecorder
 
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
       const audioUrl = URL.createObjectURL(blob)
-      setRecordings(prev => [{
-        id: Date.now(),
-        date: new Date(),
-        transcript: transcriptRef.current,
-        audioUrl,
-        duration: elapsedRef.current,
-      }, ...prev])
+      const audioKey = newAudioKey()
+      const finalTranscript = transcriptRef.current
+      const durationSec = elapsedRef.current
+      const words = wordCount(finalTranscript)
       streamRef.current?.getTracks().forEach(t => t.stop())
+
+      try {
+        await saveAudioBlob(audioKey, blob)
+      } catch {
+        // IndexedDB unavailable — playback for this session still works via the blob URL
+      }
+
+      if (!userEmail) {
+        // No logged-in user context — keep the old local-only behaviour rather than losing the recording.
+        setRecordings(prev => [{
+          id: `local-${Date.now()}`, title: defaultSessionTitle(new Date()), transcript: finalTranscript,
+          segments: segmentsRef.current, audioUrl, durationSec, wordCount: words,
+          summaryStatus: 'none', summary: null, patientId: patient?.id || null, patientName: patient?.name || null, createdAt: new Date().toISOString(),
+        }, ...prev])
+        return
+      }
+
+      try {
+        const res = await fetch('/api/recordings/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            therapistEmail: userEmail,
+            title: defaultSessionTitle(new Date()),
+            transcript: finalTranscript,
+            segments: segmentsRef.current,
+            durationSec, wordCount: words, audioKey,
+            patientId: patient?.id || null,
+            patientName: patient?.name || null,
+          }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+
+        const saved = { ...body.recording, audioUrl }
+        setRecordings(prev => [saved, ...prev])
+        setSavedRecording(saved)
+
+        if (finalTranscript.trim()) {
+          fetch(`/api/recordings/${saved.id}/summarize`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ therapistEmail: userEmail }),
+          })
+            .then((r) => r.json())
+            .then((sBody) => {
+              if (!sBody.recording) return
+              const updated = { ...sBody.recording, audioUrl }
+              setRecordings(prev => prev.map(r => (r.id === updated.id ? updated : r)))
+              setSavedRecording(prev => (prev && prev.id === updated.id ? updated : prev))
+            })
+            .catch(() => {})
+        }
+      } catch (err) {
+        setSttError(err.message || 'Could not save the recording.')
+      }
     }
 
     const recognition = new SR()
@@ -382,6 +886,13 @@ export default function SpeechFeaturesUI() {
     recognition.onresult = (e) => {
       const text = Array.from(e.results).map(r => r[0].transcript).join('')
       setTranscript(text); transcriptRef.current = text
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const result = e.results[i]
+        if (result.isFinal) {
+          const t = result[0].transcript.trim()
+          if (t) segmentsRef.current.push({ t: elapsedRef.current, text: t })
+        }
+      }
     }
     recognition.onerror = (e) => { if (e.error !== 'no-speech') setSttError(`Oops! ${e.error} 😅`); setIsListening(false) }
     recognition.onend = () => setIsListening(false)
@@ -389,7 +900,7 @@ export default function SpeechFeaturesUI() {
 
     mediaRecorder.start(200); recognition.start()
     setIsListening(true); setElapsed(0); elapsedRef.current = 0
-    setTranscript(''); transcriptRef.current = ''; setSttError('')
+    setTranscript(''); transcriptRef.current = ''; segmentsRef.current = []; setSttError('')
   }
 
   const stopListening = () => {
@@ -402,19 +913,85 @@ export default function SpeechFeaturesUI() {
   const handlePlay = (rec) => {
     if (playingAudioRef.current) { playingAudioRef.current.pause(); playingAudioRef.current = null }
     if (playingId === rec.id) { setPlayingId(null); return }
+    if (!rec.audioUrl) return
     const audio = new Audio(rec.audioUrl)
     audio.play(); audio.onended = () => setPlayingId(null); audio.onerror = () => setPlayingId(null)
     playingAudioRef.current = audio; setPlayingId(rec.id)
   }
 
-  const handleDelete = (id) => {
-    if (playingId === id) { playingAudioRef.current?.pause(); setPlayingId(null) }
-    setRecordings(prev => { const r = prev.find(x => x.id === id); if (r) URL.revokeObjectURL(r.audioUrl); return prev.filter(x => x.id !== id) })
+  const handleDelete = async (rec) => {
+    if (playingId === rec.id) { playingAudioRef.current?.pause(); setPlayingId(null) }
+    setRecordings(prev => prev.filter(x => x.id !== rec.id))
+    if (rec.audioUrl) URL.revokeObjectURL(rec.audioUrl)
+    if (rec.audioKey) deleteAudioBlob(rec.audioKey).catch(() => {})
+    if (userEmail && !String(rec.id).startsWith('local-')) {
+      fetch(`/api/recordings/${rec.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+    }
   }
 
   const clearAll = () => {
     playingAudioRef.current?.pause(); setPlayingId(null)
-    recordings.forEach(r => URL.revokeObjectURL(r.audioUrl)); setRecordings([])
+    recordings.forEach((r) => {
+      if (r.audioUrl) URL.revokeObjectURL(r.audioUrl)
+      if (r.audioKey) deleteAudioBlob(r.audioKey).catch(() => {})
+      if (userEmail && !String(r.id).startsWith('local-')) {
+        fetch(`/api/recordings/${r.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+      }
+    })
+    setRecordings([])
+  }
+
+  const handleRetrySummary = (id) => {
+    if (!userEmail) return
+    setRecordings(prev => prev.map(r => (r.id === id ? { ...r, summaryStatus: 'pending' } : r)))
+    fetch(`/api/recordings/${id}/summarize`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ therapistEmail: userEmail }),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (!body.recording) return
+        setRecordings(prev => prev.map(r => (r.id === body.recording.id ? { ...body.recording, audioUrl: r.audioUrl } : r)))
+      })
+      .catch(() => {
+        setRecordings(prev => prev.map(r => (r.id === id ? { ...r, summaryStatus: 'failed' } : r)))
+      })
+  }
+
+  const handleSaveMeta = ({ title, patientId }) => {
+    if (!savedRecording) return
+    const patient = patients.find((p) => p.id === patientId)
+    const patientName = patient?.name || null
+    setRecordings(prev => prev.map(r => (r.id === savedRecording.id ? { ...r, title, patientId: patientId || null, patientName } : r)))
+    setSavedRecording(prev => (prev ? { ...prev, title, patientId: patientId || null, patientName } : prev))
+    if (userEmail && !String(savedRecording.id).startsWith('local-')) {
+      fetch(`/api/recordings/${savedRecording.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistEmail: userEmail, title, patientId: patientId || null, patientName }),
+      }).catch(() => {})
+    }
+  }
+
+  const handleRecordAnother = () => {
+    setSavedRecording(null)
+    setTranscript(''); transcriptRef.current = ''
+    setElapsed(0); elapsedRef.current = 0
+    segmentsRef.current = []
+  }
+
+  const handleOpenRecordingsFromSaved = () => {
+    setSavedRecording(null)
+    setRecordingsModalTab('summarized')
+    setShowModal(true)
+  }
+
+  const handleChangePatientClick = () => {
+    if (!onChangePatient) return
+    if (isListening) {
+      if (!window.confirm('Stop the current recording?')) return
+      stopListening()
+    }
+    onChangePatient()
   }
 
   // ── TTS ──
@@ -431,10 +1008,11 @@ export default function SpeechFeaturesUI() {
   }
 
   const handleSpeak = () => {
+    if (toolsLocked) return
     if (!ttsText.trim()) return
     setTtsActiveId(null)
     setTtsHistory(prev => [
-      { id: Date.now(), date: new Date(), text: ttsText.trim(), rate, pitch },
+      { id: Date.now(), date: new Date(), text: ttsText.trim(), rate, pitch, patientId: patient?.id || null, patientName: patient?.name || null },
       ...prev,
     ].slice(0, TTS_HISTORY_LIMIT))
     speak(ttsText, rate, pitch)
@@ -465,19 +1043,56 @@ export default function SpeechFeaturesUI() {
       {/* Tabs */}
       <div className="csf-tabs">
         <button className={`csf-tab ${activeTab === 'stt' ? 'csf-tab-active csf-tab-mic' : ''}`} onClick={() => setActiveTab('stt')}>
-          <span className="csf-tab-icon">🎤</span><span>Speech to Text</span>
+          <span className="csf-tab-icon"><MicIconOutline size={18} /></span><span>Speech to Text</span>
         </button>
         <button className={`csf-tab ${activeTab === 'tts' ? 'csf-tab-active csf-tab-speaker' : ''}`} onClick={() => setActiveTab('tts')}>
-          <span className="csf-tab-icon">🔊</span><span>Text to Speech</span>
+          <span className="csf-tab-icon"><VolumeIcon size={18} /></span><span>Text to Speech</span>
         </button>
       </div>
+
+      {/* Patient banner — therapist flow only */}
+      {onChangePatient && (
+        patient ? (
+          <div className="pb-banner">
+            <span className="pb-avatar" style={{ background: patientAvatarColor(patient.id) }}>{patientInitials(patient.name)}</span>
+            <div className="pb-info">
+              <div className="pb-title">Working with {patient.name}</div>
+              <div className="pb-sub">
+                {patient.age != null ? `${patient.age} yrs · ` : ''}
+                {patient.condition ? `${patient.condition} · ` : ''}
+                Recordings &amp; speech history save to {String(patient.name).split(' ')[0]}'s record
+              </div>
+            </div>
+            <span className="pb-pill"><DotIconOutline size={8} />Session active</span>
+            <button className="pb-swap-btn" onClick={handleChangePatientClick}><SwapIcon size={15} /><span>Change patient</span></button>
+          </div>
+        ) : practiceMode ? (
+          <div className="pb-banner pb-banner-practice">
+            <span className="pb-practice-icon"><FlaskIcon size={18} /></span>
+            <div className="pb-info">
+              <div className="pb-title">Practice mode</div>
+              <div className="pb-sub">Nothing is saved to a patient record</div>
+            </div>
+            <button className="pb-swap-btn" onClick={handleChangePatientClick}><SwapIcon size={15} /><span>Choose a patient</span></button>
+          </div>
+        ) : (
+          <div className="pb-banner pb-banner-practice">
+            <span className="pb-practice-icon"><SwapIcon size={18} /></span>
+            <div className="pb-info">
+              <div className="pb-title">No patient selected</div>
+              <div className="pb-sub">Choose a patient or continue in practice mode</div>
+            </div>
+            <button className="pb-swap-btn" onClick={handleChangePatientClick}><SwapIcon size={15} /><span>Choose a patient</span></button>
+          </div>
+        )
+      )}
 
       {/* ══════════ SPEECH TO TEXT ══════════ */}
       {activeTab === 'stt' && (
         <div className="csf-card" style={{ position: 'relative' }}>
 
           {/* Recordings button — top right */}
-          <button className="rec-trigger-btn" onClick={() => setShowModal(true)}>
+          <button className="rec-trigger-btn" onClick={() => { setRecordingsModalTab(null); setShowModal(true) }}>
             <FolderIcon />
             <span>Recordings</span>
             {recordings.length > 0 && (
@@ -492,7 +1107,7 @@ export default function SpeechFeaturesUI() {
               <span className="csf-star s3">🌟</span><span className="csf-star s4">⭐</span>
               <span className="csf-star s5">✨</span>
             </div>
-            <h2 className="csf-hero-title">🎙️ Voice Recorder</h2>
+            <h2 className="csf-hero-title"><MicIconOutline size={22} /> Voice Recorder</h2>
             <p className="csf-hero-sub">Tap the mic — your voice will be recorded and converted to text!</p>
           </div>
 
@@ -507,6 +1122,7 @@ export default function SpeechFeaturesUI() {
             <button
               className={`csf-main-btn ${isListening ? 'csf-btn-recording' : 'csf-btn-idle-mic'}`}
               onClick={isListening ? stopListening : startListening}
+              disabled={toolsLocked}
             >
               {isListening ? <StopIcon /> : <MicIcon />}
             </button>
@@ -514,7 +1130,7 @@ export default function SpeechFeaturesUI() {
 
           <div className={`csf-timer ${isListening ? 'csf-timer-live' : ''}`}>{formatTime(elapsed)}</div>
           <p className="csf-status-text">
-            {isListening ? '🔴 Recording... tap to stop!' : '👇 Tap the mic to start!'}
+            {toolsLocked ? 'Choose a patient to start' : (isListening ? '🔴 Recording... tap to stop!' : '👇 Tap the mic to start!')}
           </p>
 
           {sttError && <div className="csf-error-box">{sttError}</div>}
@@ -567,13 +1183,13 @@ export default function SpeechFeaturesUI() {
             <button
               className={`csf-main-btn ${isSpeaking ? 'csf-btn-speaking' : 'csf-btn-idle-speaker'}`}
               onClick={isSpeaking ? stopSpeaking : handleSpeak}
-              disabled={!ttsText.trim() && !isSpeaking}
+              disabled={toolsLocked || (!ttsText.trim() && !isSpeaking)}
             >
               {isSpeaking ? <StopIcon /> : <SpeakerIcon />}
             </button>
           </div>
 
-          <p className="csf-status-text">{isSpeaking ? '🟢 Speaking... tap to stop!' : '👇 Tap the speaker to listen!'}</p>
+          <p className="csf-status-text">{toolsLocked ? 'Choose a patient to start' : (isSpeaking ? '🟢 Speaking... tap to stop!' : '👇 Tap the speaker to listen!')}</p>
 
           <div className="csf-controls-row">
             <div className="csf-control-pill">
@@ -595,15 +1211,30 @@ export default function SpeechFeaturesUI() {
         </div>
       )}
 
+      {/* ══════════ RECORDING SAVED MODAL ══════════ */}
+      {savedRecording && (
+        <RecordingSavedModal
+          recording={savedRecording}
+          patients={patients}
+          onSaveMeta={handleSaveMeta}
+          onRecordAnother={handleRecordAnother}
+          onOpenRecordings={handleOpenRecordingsFromSaved}
+        />
+      )}
+
       {/* ══════════ RECORDINGS MODAL ══════════ */}
       {showModal && (
         <RecordingsModal
           recordings={recordings}
+          patients={patients}
           playingId={playingId}
           onPlay={handlePlay}
           onDelete={handleDelete}
           onClearAll={clearAll}
+          onRetrySummary={handleRetrySummary}
           onClose={() => setShowModal(false)}
+          initialTab={recordingsModalTab}
+          currentPatient={patient}
         />
       )}
 
@@ -617,6 +1248,7 @@ export default function SpeechFeaturesUI() {
           onDelete={handleHistoryDelete}
           onClearAll={clearTtsHistory}
           onClose={() => setShowTtsModal(false)}
+          currentPatient={patient}
         />
       )}
 
@@ -626,7 +1258,7 @@ export default function SpeechFeaturesUI() {
         .csf-tabs { display:flex; gap:10px; margin-bottom:20px; }
         .csf-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:13px 20px; border:2.5px solid #e2e8f0; border-radius:16px; background:#fff; color:#64748b; font-size:15px; font-weight:700; cursor:pointer; transition:all 0.25s; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
         .csf-tab:hover { border-color:#a78bfa; color:#7c3aed; transform:translateY(-1px); }
-        .csf-tab-icon { font-size:20px; }
+        .csf-tab-icon { display:flex; align-items:center; }
         .csf-tab-active { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.12); }
         .csf-tab-mic { background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff !important; border-color:transparent; }
         .csf-tab-speaker { background:linear-gradient(135deg,#059669,#0d9488); color:#fff !important; border-color:transparent; }
@@ -651,11 +1283,33 @@ export default function SpeechFeaturesUI() {
           margin-left:2px;
         }
 
+        /* ── Patient banner (therapist flow) ── */
+        .pb-banner {
+          display:flex; align-items:center; gap:12px;
+          background:linear-gradient(135deg,#f5f3ff,#ecfeff);
+          border:2px solid #a78bfa; border-radius:20px;
+          padding:12px 16px; margin-bottom:16px; flex-wrap:wrap;
+        }
+        .pb-banner-practice { background:#f8fafc; border-color:#cbd5e1; }
+        .pb-avatar { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:15px; flex-shrink:0; }
+        .pb-practice-icon { width:44px; height:44px; border-radius:14px; background:#e2e8f0; color:#475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .pb-info { flex:1; min-width:160px; }
+        .pb-title { font-size:14.5px; font-weight:800; color:#1e293b; }
+        .pb-sub { font-size:12px; font-weight:600; color:#64748b; margin-top:2px; line-height:1.5; }
+        .pb-pill { display:flex; align-items:center; gap:5px; background:#ecfdf5; color:#059669; border-radius:20px; padding:4px 11px; font-size:11.5px; font-weight:800; white-space:nowrap; flex-shrink:0; }
+        .pb-swap-btn { display:flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #ddd6fe; border-radius:12px; padding:8px 14px; font-size:12.5px; font-weight:800; color:#6d28d9; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+        .pb-swap-btn:hover { background:#f5f3ff; border-color:#c4b5fd; }
+
+        /* ── Recordings/History patient scope toggle ── */
+        .rec-scope-row { display:flex; gap:8px; padding:16px 24px 0; flex-wrap:wrap; }
+        .rec-scope-pill { padding:8px 14px; border-radius:20px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .rec-scope-pill-active { background:linear-gradient(135deg,#7c3aed,#6366f1); border-color:transparent; color:#fff; }
+
         /* ── Hero ── */
         .csf-hero { padding:28px 24px 24px; text-align:center; position:relative; overflow:hidden; }
         .csf-hero-mic { background:linear-gradient(135deg,#7c3aed 0%,#6366f1 50%,#38bdf8 100%); }
         .csf-hero-speaker { background:linear-gradient(135deg,#059669 0%,#0d9488 50%,#38bdf8 100%); }
-        .csf-hero-title { font-size:26px; font-weight:800; color:#fff; margin:0 0 6px; text-shadow:0 2px 8px rgba(0,0,0,0.15); }
+        .csf-hero-title { font-size:26px; font-weight:800; color:#fff; margin:0 0 6px; text-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; justify-content:center; gap:8px; }
         .csf-hero-sub { font-size:14px; color:rgba(255,255,255,0.9); margin:0; font-weight:500; }
         .csf-hero-stars { position:absolute; inset:0; pointer-events:none; }
         .csf-star { position:absolute; font-size:18px; animation:sfFloat 3s ease-in-out infinite; opacity:0.8; }
@@ -712,12 +1366,13 @@ export default function SpeechFeaturesUI() {
         /* ── Modal ── */
         .rec-modal {
           background:#fff; border-radius:28px;
-          width:100%; max-width:560px; max-height:80vh;
+          width:100%; max-width:560px; max-height:86vh;
           display:flex; flex-direction:column;
           box-shadow:0 24px 80px rgba(0,0,0,0.25);
           animation:modalSlideUp 0.25s ease;
           overflow:hidden;
         }
+        .rec-modal-wide { max-width:760px; }
         @keyframes modalSlideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
 
         .rec-modal-header {
@@ -735,15 +1390,31 @@ export default function SpeechFeaturesUI() {
 
         .rec-modal-body { overflow-y:auto; padding:20px 24px; flex:1; }
 
-        /* ── Recording cards ── */
+        /* ── Tabs row (Summarized / Full Recording) ── */
+        .rec-tabs-row { display:flex; gap:10px; padding:16px 24px 0; flex-shrink:0; }
+        .rec-tab-pill { flex:1; text-align:left; display:flex; flex-direction:column; gap:2px; padding:11px 16px; border-radius:16px; border:1.5px solid #e0e7ff; background:#fff; cursor:pointer; transition:all 0.2s; }
+        .rec-tab-pill:hover { border-color:#c4b5fd; }
+        .rec-tab-pill-title { font-size:14px; font-weight:800; color:#4338ca; }
+        .rec-tab-pill-sub { font-size:11px; color:#818cf8; font-weight:600; }
+        .rec-tab-pill-active { background:linear-gradient(135deg,#7c3aed,#6366f1); border-color:transparent; box-shadow:0 6px 18px rgba(124,58,237,0.3); }
+        .rec-tab-pill-active .rec-tab-pill-title { color:#fff; }
+        .rec-tab-pill-active .rec-tab-pill-sub { color:rgba(255,255,255,0.85); }
+
+        /* ── Toolbar ── */
+        .rec-toolbar { display:flex; gap:8px; padding:14px 24px 0; flex-shrink:0; flex-wrap:wrap; }
+        .rec-search { flex:2; min-width:160px; padding:10px 14px; border-radius:12px; border:1.5px solid #e2e8f0; font-size:13px; font-family:inherit; outline:none; }
+        .rec-search:focus { border-color:#a78bfa; }
+        .rec-toolbar-select { flex:1; min-width:130px; padding:10px 12px; border-radius:12px; border:1.5px solid #e2e8f0; font-size:13px; font-family:inherit; background:#fff; color:#475569; cursor:pointer; }
+
+        /* ── Recording cards (legacy TTS history layout) ── */
         .rec-list { display:flex; flex-direction:column; gap:14px; }
         .rec-card { background:#f8fafc; border-radius:18px; padding:16px 18px; border:1.5px solid #e2e8f0; }
         .rec-card-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-        .rec-index-badge { background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; border-radius:10px; padding:4px 12px; font-size:13px; font-weight:800; white-space:nowrap; }
+        .rec-index-badge { background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; border-radius:10px; padding:4px 12px; font-size:13px; font-weight:800; white-space:nowrap; flex-shrink:0; }
         .rec-meta { flex:1; display:flex; flex-direction:column; gap:2px; }
         .rec-date { font-size:12px; font-weight:600; color:#475569; }
         .rec-duration { font-size:11px; color:#94a3b8; font-weight:500; }
-        .rec-delete-btn { background:#fef2f2; border:1.5px solid #fca5a5; color:#ef4444; border-radius:10px; padding:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        .rec-delete-btn { background:#fef2f2; border:1.5px solid #fca5a5; color:#ef4444; border-radius:10px; padding:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .rec-delete-btn:hover { background:#fee2e2; }
         .rec-transcript { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:12px; border:1px solid #e0e7ff; }
         .rec-transcript-label { font-size:11px; font-weight:800; color:#6366f1; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:5px; }
@@ -759,10 +1430,106 @@ export default function SpeechFeaturesUI() {
         .rec-dot { width:6px; height:6px; background:#f59e0b; border-radius:50%; margin-right:3px; animation:csfBounce 0.6s ease-in-out infinite; }
         .rec-dot:nth-child(2){animation-delay:0.15s} .rec-dot:nth-child(3){animation-delay:0.3s}
 
+        /* ── New recording cards (card-2, Summarized / Full tabs) ── */
+        .rec-card-2 { background:#f8fafc; border-radius:18px; padding:16px 18px; border:1.5px solid #e2e8f0; transition:box-shadow 0.3s, border-color 0.3s; }
+        .rec-card-2.rec-card-flash { border-color:#a78bfa; box-shadow:0 0 0 4px rgba(167,139,250,0.35); }
+        .rec-card-2-top { display:flex; align-items:flex-start; gap:10px; }
+        .rec-card-2-heading { flex:1; display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+        .rec-card-2-heading h4 { margin:0; font-size:15px; font-weight:800; color:#1e293b; }
+        .rec-patient-pill { background:#fff7ed; color:#c2410c; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:700; white-space:nowrap; }
+        .rec-ai-pill { background:#ecfdf5; color:#059669; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:700; white-space:nowrap; }
+        .rec-card-2-meta { font-size:12px; color:#94a3b8; font-weight:600; margin:6px 0 12px; }
+
+        /* Summary grid */
+        .rec-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+        .rec-summary-box { border-radius:12px; padding:12px 14px; }
+        .rec-summary-overview { background:#f5f3ff; }
+        .rec-summary-side { display:flex; flex-direction:column; gap:10px; }
+        .rec-summary-goals { background:#ecfeff; }
+        .rec-summary-next { background:#fefce8; }
+        .rec-summary-label { display:block; font-size:10.5px; font-weight:800; letter-spacing:0.4px; color:#6366f1; text-transform:uppercase; margin-bottom:6px; }
+        .rec-summary-box p { margin:0; font-size:13px; color:#334155; line-height:1.6; }
+        .rec-summary-box ul { margin:0; padding-left:18px; font-size:13px; color:#334155; line-height:1.7; }
+        @media (max-width:520px) { .rec-summary-grid { grid-template-columns:1fr; } }
+
+        .rec-summary-skeleton { padding:14px; background:#fff; border-radius:12px; margin-bottom:12px; }
+        .rec-shimmer { height:11px; border-radius:6px; margin-bottom:8px; background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size:200% 100%; animation:recShimmer 1.4s ease-in-out infinite; }
+        @keyframes recShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .rec-summary-skeleton p { margin:6px 0 0; font-size:12px; color:#7c3aed; font-weight:700; }
+        .rec-summary-failed { padding:12px 14px; background:#fff7ed; border-radius:12px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+        .rec-summary-failed p { margin:0; font-size:12.5px; color:#9a3412; font-weight:600; }
+        .rec-retry-btn { background:#fff; border:1.5px solid #fdba74; color:#c2410c; border-radius:10px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .rec-retry-btn:hover { background:#fff7ed; }
+
+        /* Audio player row */
+        .rec-player { display:flex; align-items:center; gap:10px; background:#fff; border-radius:14px; padding:10px 14px; margin-bottom:12px; border:1px solid #e2e8f0; }
+        .rec-player-btn { flex-shrink:0; width:36px; height:36px; border-radius:50%; border:none; background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .rec-player-bar { flex:1; height:6px; border-radius:4px; background:#e2e8f0; cursor:pointer; position:relative; }
+        .rec-player-bar-fill { position:absolute; inset:0; width:0; border-radius:4px; background:linear-gradient(90deg,#7c3aed,#6366f1); }
+        .rec-player-time { font-size:11px; color:#64748b; font-weight:700; white-space:nowrap; font-family:'Courier New',monospace; }
+        .rec-player-rate { flex-shrink:0; background:#f1f5f9; border:none; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:800; color:#475569; cursor:pointer; }
+        .rec-player-rate:hover { background:#e2e8f0; }
+
+        /* Transcript box */
+        .rec-transcript-box { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:12px; border:1px solid #e0e7ff; max-height:180px; overflow-y:auto; }
+        .rec-transcript-line { margin:0 0 8px; font-size:13px; color:#334155; line-height:1.6; padding:3px 6px; border-radius:6px; }
+        .rec-transcript-line:last-child { margin-bottom:0; }
+        .rec-transcript-line-active { background:#f5f3ff; color:#1e293b; font-weight:600; }
+        .rec-transcript-ts { font-family:'Courier New',monospace; font-size:11px; font-weight:800; color:#7c3aed; margin-right:6px; }
+
+        .rec-card-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .rec-action-btn { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 13px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; transition:all 0.15s; }
+        .rec-action-btn:hover:not(:disabled) { border-color:#a78bfa; color:#7c3aed; }
+        .rec-action-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
         /* ── Empty state ── */
         .rec-empty { text-align:center; padding:40px 20px; color:#94a3b8; }
         .rec-empty-icon { font-size:56px; display:block; margin-bottom:14px; }
         .rec-empty p { font-size:15px; font-weight:500; line-height:1.7; margin:0; }
+
+        /* ── Recording Saved Modal ── */
+        .rsm-modal { background:#fff; border-radius:28px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(0,0,0,0.3); animation:modalSlideUp 0.3s ease; }
+        .rsm-header { position:relative; background:linear-gradient(135deg,#7c3aed 0%,#6366f1 50%,#38bdf8 100%); padding:32px 24px 44px; text-align:center; overflow:hidden; }
+        .rsm-sparkle { position:absolute; font-size:22px; animation:sfFloat 3s ease-in-out infinite; opacity:0.85; }
+        .rsm-sparkle-l { top:18px; left:20px; }
+        .rsm-sparkle-r { top:16px; right:22px; animation-delay:0.6s; }
+        .rsm-check-circle { width:78px; height:78px; margin:0 auto 14px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(0,0,0,0.18); animation:rsmPop 0.5s cubic-bezier(.34,1.56,.64,1) both; }
+        @keyframes rsmPop{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+        .rsm-title { margin:0 0 6px; font-size:24px; font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.15); }
+        .rsm-subtitle { margin:0; font-size:13.5px; color:rgba(255,255,255,0.92); font-weight:600; }
+
+        .rsm-stats-card { position:relative; margin:-30px 20px 0; background:#fff; border-radius:20px; box-shadow:0 10px 28px rgba(0,0,0,0.14); display:flex; padding:16px 8px; }
+        .rsm-stat { flex:1; text-align:center; display:flex; flex-direction:column; gap:3px; border-right:1.5px solid #f1f5f9; }
+        .rsm-stat:last-child { border-right:none; }
+        .rsm-stat strong { font-size:17px; font-weight:900; color:#4338ca; }
+        .rsm-stat span { font-size:9.5px; font-weight:800; color:#94a3b8; letter-spacing:0.5px; }
+
+        .rsm-body { padding:20px 24px 24px; }
+        .rsm-stored-box { display:flex; gap:10px; background:#faf5ff; border:2px dashed #c4b5fd; border-radius:16px; padding:12px 14px; margin-bottom:16px; }
+        .rsm-stored-icon { font-size:20px; flex-shrink:0; }
+        .rsm-stored-box strong { font-size:13px; color:#4338ca; display:block; }
+        .rsm-stored-box p { margin:3px 0 0; font-size:11.5px; color:#6b7280; line-height:1.5; }
+
+        .rsm-fields { display:flex; flex-direction:column; gap:12px; margin-bottom:14px; }
+        .rsm-field { display:flex; flex-direction:column; gap:5px; }
+        .rsm-field span { font-size:10.5px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; }
+        .rsm-field input, .rsm-field select { padding:10px 12px; border-radius:12px; border:1.5px solid #e2e8f0; font-size:14px; font-weight:700; color:#1e293b; font-family:inherit; outline:none; }
+        .rsm-field input:focus, .rsm-field select:focus { border-color:#a78bfa; }
+
+        .rsm-status { display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; font-size:12.5px; font-weight:700; margin-bottom:16px; }
+        .rsm-status-pending { background:#ecfdf5; color:#059669; }
+        .rsm-status-ready { background:#ecfdf5; color:#059669; }
+        .rsm-status-failed { background:#fff7ed; color:#c2410c; }
+        .rsm-dots { display:inline-flex; gap:3px; }
+        .rsm-dots span { width:5px; height:5px; border-radius:50%; background:#059669; animation:csfBounce 0.6s ease-in-out infinite; }
+        .rsm-dots span:nth-child(2){animation-delay:0.15s} .rsm-dots span:nth-child(3){animation-delay:0.3s}
+
+        .rsm-actions { display:flex; gap:10px; }
+        .rsm-btn-secondary, .rsm-btn-primary { flex:1; border:none; border-radius:14px; padding:13px; font-size:14px; font-weight:800; cursor:pointer; transition:transform 0.15s; }
+        .rsm-btn-secondary { background:#f1f5f9; color:#475569; }
+        .rsm-btn-secondary:hover { background:#e2e8f0; }
+        .rsm-btn-primary { background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; box-shadow:0 6px 18px rgba(124,58,237,0.3); }
+        .rsm-btn-primary:hover { transform:translateY(-1px); }
 
         /* ── TTS controls ── */
         .csf-input-area { padding:20px 24px 0; }

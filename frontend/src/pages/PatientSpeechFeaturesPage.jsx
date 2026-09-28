@@ -30,7 +30,7 @@ export default function PatientSpeechFeaturesPage({ user, onLogout, betaTier }) 
           <p style={{ color: '#8a9e96', margin: '6px 0 0', fontSize: 14, fontWeight: 500 }}>Voice recorder and text-to-speech tools</p>
         </div>
 
-        <SpeechFeaturesUI />
+        <SpeechFeaturesUI user={currentUser} />
       </div>
     </div>
   )

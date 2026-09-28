@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialGames } from './gamifiedLibraryData'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
 import { PAO_THEMES, themeById } from '../../data/paoThemes'
 import PaoClothingDesigner, { WardrobeItemThumb, describeUnlock } from './PaoClothingDesigner'
@@ -139,10 +138,10 @@ const CRITERIA_TYPES = [
   { id: 'all_categories',         label: 'tries every therapy game category',        badgeType: 'milestone',       needsGame: false, needsValue: false },
 ]
 
-function ruleClause(form) {
+function ruleClause(form, games = []) {
   const c = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
   if (c.id === 'complete_specific_game') {
-    const game = initialGames.find((g) => g.mongoId === form.criteriaGameId)
+    const game = games.find((g) => g.id === form.criteriaGameId)
     return `Finishes ${game ? game.name : 'a specific game'}`
   }
   if (c.id === 'complete_any_game') return 'Finishes any game for the first time'
@@ -153,8 +152,8 @@ function ruleClause(form) {
   if (c.id === 'all_categories') return 'Tries every therapy game category'
   return c.label
 }
-function describeForSave(form, clothesList) {
-  const base = ruleClause(form)
+function describeForSave(form, clothesList, games) {
+  const base = ruleClause(form, games)
   const item = clothesList.find((i) => i.code === form.unlockItemCode)
   return item ? `${base} · unlocks ${item.name}` : base
 }
@@ -244,6 +243,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [badges, setBadges] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [games, setGames] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -286,6 +286,21 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
       })
       .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load badges.') })
       .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Real games, for the "which game" pickers in both badge criteria and
+  // wardrobe-item unlock conditions — replaces the old local placeholder
+  // catalog now that a real `games` collection exists.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/games/list')
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        if (!cancelled) setGames(body.games || [])
+      })
+      .catch(() => { /* "which game" pickers just show empty until this loads */ })
     return () => { cancelled = true }
   }, [])
 
@@ -378,7 +393,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     const meta = CRITERIA_TYPES.find((t) => t.id === form.criteriaType) || CRITERIA_TYPES[0]
     const payload = {
       name: form.name,
-      description: describeForSave(form, clothes),
+      description: describeForSave(form, clothes, games),
       art: { shape: form.shape, color: form.colour, symbol: form.symbol },
       badgeType: meta.badgeType,
       criteriaType: form.criteriaType,
@@ -831,7 +846,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                   <p>{item.description}</p>
                   {item.unlock && (
                     <div className="wardrobe-unlock-pill">
-                      🔒 {describeUnlock(item.unlock.type, item.unlock, initialGames, badges)}
+                      🔒 {describeUnlock(item.unlock.type, item.unlock, games, badges)}
                     </div>
                   )}
                 </div>
@@ -870,7 +885,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
               <div className="badge-preview-card">
                 <BadgeMedal shape={form.shape} colour={form.colour} symbol={form.symbol} size={72} muted={!form.isActive} />
                 <div className="badge-preview-name">{form.name || 'Untitled badge'}</div>
-                <div className="badge-preview-rule">{ruleClause(form)}</div>
+                <div className="badge-preview-rule">{ruleClause(form, games)}</div>
                 <button type="button" className="badge-shuffle-btn" onClick={shuffleAppearance}>
                   <ShuffleIcon size={13} /> Shuffle
                 </button>
@@ -913,7 +928,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                       setForm((f) => ({
                         ...f,
                         criteriaType: nextType,
-                        criteriaGameId: meta.needsGame ? (f.criteriaGameId ?? initialGames[0]?.mongoId ?? null) : null,
+                        criteriaGameId: meta.needsGame ? (f.criteriaGameId ?? games[0]?.id ?? null) : null,
                         criteriaValue: meta.needsValue ? (f.criteriaValue ?? meta.defaultValue) : null,
                       }))
                     }}
@@ -929,7 +944,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                       value={form.criteriaGameId ?? ''}
                       onChange={(event) => setForm((f) => ({ ...f, criteriaGameId: event.target.value }))}
                     >
-                      {initialGames.map((g) => <option key={g.mongoId} value={g.mongoId}>{g.name}</option>)}
+                      {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </label>
                 )}
@@ -989,6 +1004,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           item={editingClothing}
           defaultCategory={clothesFilter !== 'All' ? clothesFilter : 'Hair'}
           badges={badges}
+          games={games}
           onSave={saveClothing}
           onClose={() => setShowClothingEditor(false)}
         />

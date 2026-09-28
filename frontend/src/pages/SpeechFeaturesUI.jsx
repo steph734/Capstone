@@ -104,6 +104,31 @@ function TrashIcon() {
   )
 }
 
+function ArchiveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 4h18v4H3V4zm1 6h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9zm5 3v2h6v-2H9z" />
+    </svg>
+  )
+}
+
+function UnarchiveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 4h18v4H3V4zm1 6h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9zm7 2-4 4h2.5v2h3v-2H15l-4-4z" />
+    </svg>
+  )
+}
+
+function WarningIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  )
+}
+
 function FolderIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -182,6 +207,40 @@ function wordCount(text) {
 
 function defaultSessionTitle(date) {
   return `Session – ${date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+}
+
+// ─── Confirm / Success dialogs (delete, archive, clear all) ─────────────────
+
+function ConfirmDialog({ icon, title, message, confirmLabel, danger, onConfirm, onCancel }) {
+  const handleBackdrop = (e) => { if (e.target === e.currentTarget) onCancel() }
+  return (
+    <div className="rec-modal-backdrop confirm-backdrop" onClick={handleBackdrop}>
+      <div className="confirm-dialog">
+        <div className={`confirm-icon ${danger ? 'confirm-icon-danger' : 'confirm-icon-neutral'}`}>{icon}</div>
+        <h3 className="confirm-title">{title}</h3>
+        <p className="confirm-message">{message}</p>
+        <div className="confirm-actions">
+          <button className="confirm-cancel-btn" onClick={onCancel} type="button">Cancel</button>
+          <button className={`confirm-ok-btn ${danger ? 'confirm-ok-btn-danger' : ''}`} onClick={onConfirm} type="button">{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SuccessDialog({ message, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 1900)
+    return () => clearTimeout(t)
+  }, [onClose])
+  return (
+    <div className="rec-modal-backdrop confirm-backdrop" onClick={onClose}>
+      <div className="success-dialog">
+        <div className="success-check"><BigCheckIcon /></div>
+        <p className="success-message">{message}</p>
+      </div>
+    </div>
+  )
 }
 
 // ─── Recording Saved Modal ────────────────────────────────────────────────────
@@ -273,7 +332,7 @@ function RecordingSavedModal({ recording, patients, onSaveMeta, onRecordAnother,
 
 // ─── Full Recording card (Full Recording tab) ────────────────────────────────
 
-function FullRecordingCard({ rec, index, total, cardRef, onDelete, onViewSummary }) {
+function FullRecordingCard({ rec, index, total, cardRef, onRequestDelete, onRequestArchive, onViewSummary }) {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [curTime, setCurTime] = useState(0)
@@ -320,8 +379,12 @@ function FullRecordingCard({ rec, index, total, cardRef, onDelete, onViewSummary
         <div className="rec-card-2-heading">
           <h4>{rec.title}</h4>
           {rec.patientName && <span className="rec-patient-pill">👤 {rec.patientName}</span>}
+          {rec.isArchived && <span className="rec-archived-pill"><ArchiveIcon />Archived</span>}
         </div>
-        <button className="rec-delete-btn" onClick={() => onDelete(rec)} title="Delete"><TrashIcon /></button>
+        <button className="rec-archive-btn" onClick={() => onRequestArchive(rec)} title={rec.isArchived ? 'Restore' : 'Archive'}>
+          {rec.isArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
+        </button>
+        <button className="rec-delete-btn" onClick={() => onRequestDelete(rec)} title="Delete"><TrashIcon /></button>
       </div>
       <div className="rec-card-2-meta">🗓️ {formatDateTime(new Date(rec.createdAt))} · ⏱️ {formatTime(durSec)} · 📝 {rec.wordCount} words</div>
 
@@ -405,7 +468,7 @@ function exportSummaryPdf(rec) {
   doc.save(`${(rec.title || 'session').replace(/[^\w\- ]+/g, '')}.pdf`)
 }
 
-function SummarizedCard({ rec, index, total, cardRef, onDelete, onViewFull, onRetry, onPlay, isPlaying }) {
+function SummarizedCard({ rec, index, total, cardRef, onRequestDelete, onRequestArchive, onViewFull, onRetry, onPlay, isPlaying }) {
   const copyToNotes = () => {
     if (!rec.summary) return
     const text = [
@@ -427,8 +490,12 @@ function SummarizedCard({ rec, index, total, cardRef, onDelete, onViewFull, onRe
           <h4>{rec.title}</h4>
           {rec.patientName && <span className="rec-patient-pill">👤 {rec.patientName}</span>}
           {rec.summaryStatus === 'ready' && <span className="rec-ai-pill">✨ AI summary</span>}
+          {rec.isArchived && <span className="rec-archived-pill"><ArchiveIcon />Archived</span>}
         </div>
-        <button className="rec-delete-btn" onClick={() => onDelete(rec)} title="Delete"><TrashIcon /></button>
+        <button className="rec-archive-btn" onClick={() => onRequestArchive(rec)} title={rec.isArchived ? 'Restore' : 'Archive'}>
+          {rec.isArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
+        </button>
+        <button className="rec-delete-btn" onClick={() => onRequestDelete(rec)} title="Delete"><TrashIcon /></button>
       </div>
       <div className="rec-card-2-meta">🗓️ {formatDateTime(new Date(rec.createdAt))} · ⏱️ {formatTime(rec.durationSec)} · 📝 {rec.wordCount} words</div>
 
@@ -483,7 +550,7 @@ function SummarizedCard({ rec, index, total, cardRef, onDelete, onViewFull, onRe
 
 const RECORDINGS_TAB_KEY = 'csf_recordings_tab'
 
-function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, onClearAll, onRetrySummary, onClose, initialTab, currentPatient }) {
+function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, onArchive, onRetrySummary, onClose, initialTab, currentPatient }) {
   const [tab, setTab] = useState(() => {
     if (initialTab) return initialTab
     try { return localStorage.getItem(RECORDINGS_TAB_KEY) || 'summarized' } catch { return 'summarized' }
@@ -492,13 +559,20 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
   const [patientFilter, setPatientFilter] = useState('all')
   const [sort, setSort] = useState('newest')
   const [scope, setScope] = useState(currentPatient ? 'this' : 'all')
+  const [archiveView, setArchiveView] = useState('active')
+  const [confirm, setConfirm] = useState(null)
+  const [success, setSuccess] = useState('')
 
   useEffect(() => { try { localStorage.setItem(RECORDINGS_TAB_KEY, tab) } catch { /* ignore */ } }, [tab])
 
   const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
 
+  const activeCount = recordings.filter((r) => !r.isArchived).length
+  const archivedCount = recordings.filter((r) => r.isArchived).length
+
   const filtered = useMemo(() => {
     let list = recordings.filter((r) => {
+      if (!!r.isArchived !== (archiveView === 'archived')) return false
       if (currentPatient && scope === 'this' && r.patientId !== currentPatient.id) return false
       if (patientFilter !== 'all' && r.patientId !== patientFilter) return false
       if (search.trim()) {
@@ -514,7 +588,7 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
       return sort === 'newest' ? diff : -diff
     })
     return list
-  }, [recordings, search, patientFilter, sort, scope, currentPatient])
+  }, [recordings, search, patientFilter, sort, scope, currentPatient, archiveView])
 
   const jumpTo = (id, targetTab) => {
     setTab(targetTab)
@@ -527,17 +601,46 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
     }, 60)
   }
 
+  const requestDelete = (rec) => setConfirm({ type: 'delete', rec })
+  const requestArchive = (rec) => setConfirm({ type: rec.isArchived ? 'unarchive' : 'archive', rec })
+  const requestClearAll = () => setConfirm({ type: 'clearAll' })
+
+  const runConfirmed = () => {
+    if (!confirm) return
+    if (confirm.type === 'delete') {
+      onDelete(confirm.rec)
+      setSuccess('Recording deleted.')
+    } else if (confirm.type === 'archive') {
+      onArchive(confirm.rec, true)
+      setSuccess('Recording archived.')
+    } else if (confirm.type === 'unarchive') {
+      onArchive(confirm.rec, false)
+      setSuccess('Recording restored.')
+    } else if (confirm.type === 'clearAll') {
+      filtered.forEach((rec) => onDelete(rec))
+      setSuccess(archiveView === 'archived' ? 'Archived recordings cleared.' : 'All recordings cleared.')
+    }
+    setConfirm(null)
+  }
+
+  const confirmCopy = confirm && {
+    delete: { icon: <TrashIcon />, title: 'Delete this recording?', message: `"${confirm.rec?.title}" and its audio will be permanently removed.`, confirmLabel: 'Delete', danger: true },
+    unarchive: { icon: <UnarchiveIcon />, title: 'Restore this recording?', message: `"${confirm.rec?.title}" will move back to your active Recordings.`, confirmLabel: 'Restore', danger: false },
+    archive: { icon: <ArchiveIcon />, title: 'Archive this recording?', message: `"${confirm.rec?.title}" will be tucked away in the Archived tab — nothing is deleted.`, confirmLabel: 'Archive', danger: false },
+    clearAll: { icon: <TrashIcon />, title: archiveView === 'archived' ? 'Delete all archived recordings?' : 'Delete all recordings?', message: `This permanently removes ${filtered.length} recording${filtered.length === 1 ? '' : 's'} shown here.`, confirmLabel: 'Delete all', danger: true },
+  }[confirm.type]
+
   return (
     <div className="rec-modal-backdrop" onClick={handleBackdrop}>
       <div className="rec-modal rec-modal-wide">
         <div className="rec-modal-header">
           <div className="rec-modal-title">
             🗂️ My Recordings
-            <span className="rec-count-badge">{recordings.length}</span>
+            <span className="rec-count-badge">{archiveView === 'archived' ? archivedCount : activeCount}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {recordings.length > 0 && (
-              <button className="rec-clear-all-btn" onClick={onClearAll}>🗑️ Clear All</button>
+            {filtered.length > 0 && (
+              <button className="rec-clear-all-btn" onClick={requestClearAll}>🗑️ Clear All</button>
             )}
             <button className="rec-modal-close" onClick={onClose}><CloseIcon /></button>
           </div>
@@ -551,6 +654,15 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
           <button className={`rec-tab-pill ${tab === 'full' ? 'rec-tab-pill-active' : ''}`} onClick={() => setTab('full')}>
             <span className="rec-tab-pill-title">📄 Full Recording</span>
             <span className="rec-tab-pill-sub">Audio + complete transcript</span>
+          </button>
+        </div>
+
+        <div className="rec-archive-row">
+          <button className={`rec-archive-pill ${archiveView === 'active' ? 'rec-archive-pill-active' : ''}`} onClick={() => setArchiveView('active')}>
+            Active <span className="rec-archive-pill-count">{activeCount}</span>
+          </button>
+          <button className={`rec-archive-pill ${archiveView === 'archived' ? 'rec-archive-pill-active' : ''}`} onClick={() => setArchiveView('archived')}>
+            <ArchiveIcon /> Archived <span className="rec-archive-pill-count">{archivedCount}</span>
           </button>
         </div>
 
@@ -582,11 +694,13 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
         <div className="rec-modal-body">
           {filtered.length === 0 ? (
             <div className="rec-empty">
-              <span className="rec-empty-icon">{tab === 'summarized' ? '✨' : '🎙️'}</span>
+              <span className="rec-empty-icon">{archiveView === 'archived' ? '🗄️' : (tab === 'summarized' ? '✨' : '🎙️')}</span>
               <p>
-                {tab === 'summarized'
-                  ? 'No summaries yet — record a session and Pao will summarise it!'
-                  : <>No recordings yet!<br />Tap the mic to make your first recording.</>}
+                {archiveView === 'archived'
+                  ? 'No archived recordings.'
+                  : tab === 'summarized'
+                    ? 'No summaries yet — record a session and Pao will summarise it!'
+                    : <>No recordings yet!<br />Tap the mic to make your first recording.</>}
               </p>
             </div>
           ) : (
@@ -596,14 +710,16 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
                   <SummarizedCard
                     key={rec.id} rec={rec} index={idx} total={filtered.length}
                     cardRef={undefined}
-                    onDelete={onDelete} onViewFull={(id) => jumpTo(id, 'full')} onRetry={onRetrySummary}
+                    onRequestDelete={requestDelete} onRequestArchive={requestArchive}
+                    onViewFull={(id) => jumpTo(id, 'full')} onRetry={onRetrySummary}
                     onPlay={onPlay} isPlaying={playingId === rec.id}
                   />
                 ) : (
                   <FullRecordingCard
                     key={rec.id} rec={rec} index={idx} total={filtered.length}
                     cardRef={undefined}
-                    onDelete={onDelete} onViewSummary={() => jumpTo(rec.id, 'summarized')}
+                    onRequestDelete={requestDelete} onRequestArchive={requestArchive}
+                    onViewSummary={() => jumpTo(rec.id, 'summarized')}
                   />
                 )
               ))}
@@ -611,16 +727,65 @@ function RecordingsModal({ recordings, patients, playingId, onPlay, onDelete, on
           )}
         </div>
       </div>
+
+      {confirm && (
+        <ConfirmDialog
+          icon={confirmCopy.icon}
+          title={confirmCopy.title}
+          message={confirmCopy.message}
+          confirmLabel={confirmCopy.confirmLabel}
+          danger={confirmCopy.danger}
+          onConfirm={runConfirmed}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {success && <SuccessDialog message={success} onClose={() => setSuccess('')} />}
     </div>
   )
 }
 
 // ─── TTS History Modal ────────────────────────────────────────────────────────
 
-function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClearAll, onClose, currentPatient }) {
+function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onArchive, onClose, currentPatient }) {
   const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
   const [scope, setScope] = useState(currentPatient ? 'this' : 'all')
-  const visible = currentPatient && scope === 'this' ? history.filter((item) => item.patientId === currentPatient.id) : history
+  const [archiveView, setArchiveView] = useState('active')
+  const [confirm, setConfirm] = useState(null)
+  const [success, setSuccess] = useState('')
+
+  const byPatient = currentPatient && scope === 'this' ? history.filter((item) => item.patientId === currentPatient.id) : history
+  const activeCount = byPatient.filter((i) => !i.isArchived).length
+  const archivedCount = byPatient.filter((i) => i.isArchived).length
+  const visible = byPatient.filter((item) => !!item.isArchived === (archiveView === 'archived'))
+
+  const requestDelete = (item) => setConfirm({ type: 'delete', item })
+  const requestArchive = (item) => setConfirm({ type: item.isArchived ? 'unarchive' : 'archive', item })
+  const requestClearAll = () => setConfirm({ type: 'clearAll' })
+
+  const runConfirmed = () => {
+    if (!confirm) return
+    if (confirm.type === 'delete') {
+      onDelete(confirm.item.id)
+      setSuccess('Message deleted.')
+    } else if (confirm.type === 'archive') {
+      onArchive(confirm.item, true)
+      setSuccess('Message archived.')
+    } else if (confirm.type === 'unarchive') {
+      onArchive(confirm.item, false)
+      setSuccess('Message restored.')
+    } else if (confirm.type === 'clearAll') {
+      visible.forEach((item) => onDelete(item.id))
+      setSuccess(archiveView === 'archived' ? 'Archived messages cleared.' : 'All messages cleared.')
+    }
+    setConfirm(null)
+  }
+
+  const confirmCopy = confirm && {
+    delete: { icon: <TrashIcon />, title: 'Delete this message?', message: `"${confirm.item?.text}" will be permanently removed.`, confirmLabel: 'Delete', danger: true },
+    unarchive: { icon: <UnarchiveIcon />, title: 'Restore this message?', message: `"${confirm.item?.text}" will move back to your active history.`, confirmLabel: 'Restore', danger: false },
+    archive: { icon: <ArchiveIcon />, title: 'Archive this message?', message: `"${confirm.item?.text}" will be tucked away in the Archived tab — nothing is deleted.`, confirmLabel: 'Archive', danger: false },
+    clearAll: { icon: <TrashIcon />, title: archiveView === 'archived' ? 'Delete all archived messages?' : 'Delete all messages?', message: `This permanently removes ${visible.length} message${visible.length === 1 ? '' : 's'} shown here.`, confirmLabel: 'Delete all', danger: true },
+  }[confirm.type]
 
   return (
     <div className="rec-modal-backdrop" onClick={handleBackdrop}>
@@ -628,18 +793,27 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
         <div className="rec-modal-header" style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>
           <div className="rec-modal-title">
             🗂️ Speech History
-            <span className="rec-count-badge">{visible.length}</span>
+            <span className="rec-count-badge">{archiveView === 'archived' ? archivedCount : activeCount}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {history.length > 0 && (
-              <button className="rec-clear-all-btn" onClick={onClearAll}>🗑️ Clear All</button>
+            {visible.length > 0 && (
+              <button className="rec-clear-all-btn" onClick={requestClearAll}>🗑️ Clear All</button>
             )}
             <button className="rec-modal-close" onClick={onClose}><CloseIcon /></button>
           </div>
         </div>
 
+        <div className="rec-archive-row" style={{ padding: '14px 24px 0' }}>
+          <button className={`rec-archive-pill ${archiveView === 'active' ? 'rec-archive-pill-active' : ''}`} style={archiveView === 'active' ? { background: '#334155' } : undefined} onClick={() => setArchiveView('active')}>
+            Active <span className="rec-archive-pill-count">{activeCount}</span>
+          </button>
+          <button className={`rec-archive-pill ${archiveView === 'archived' ? 'rec-archive-pill-active' : ''}`} style={archiveView === 'archived' ? { background: '#334155' } : undefined} onClick={() => setArchiveView('archived')}>
+            <ArchiveIcon /> Archived <span className="rec-archive-pill-count">{archivedCount}</span>
+          </button>
+        </div>
+
         {currentPatient && (
-          <div className="rec-scope-row" style={{ padding: '14px 24px 0' }}>
+          <div className="rec-scope-row" style={{ padding: '10px 24px 0' }}>
             <button className={`rec-scope-pill ${scope === 'this' ? 'rec-scope-pill-active' : ''}`} style={scope === 'this' ? { background: 'linear-gradient(135deg,#059669,#0d9488)' } : undefined} onClick={() => setScope('this')}>
               This patient · {currentPatient.name}
             </button>
@@ -652,8 +826,8 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
         <div className="rec-modal-body">
           {visible.length === 0 ? (
             <div className="rec-empty">
-              <span className="rec-empty-icon">🔊</span>
-              <p>No saved speech yet!<br />Tap the speaker to save your first one.</p>
+              <span className="rec-empty-icon">{archiveView === 'archived' ? '🗄️' : '🔊'}</span>
+              <p>{archiveView === 'archived' ? 'No archived messages.' : <>No saved speech yet!<br />Tap the speaker to save your first one.</>}</p>
             </div>
           ) : (
             <div className="rec-list">
@@ -666,13 +840,19 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
                         #{visible.length - idx}
                       </div>
                       <div className="rec-meta">
-                        <span className="rec-date">🗓️ {formatDateTime(item.date)}{item.patientName ? ` · 👤 ${item.patientName}` : ''}</span>
+                        <span className="rec-date">
+                          🗓️ {formatDateTime(item.date)}{item.patientName ? ` · 👤 ${item.patientName}` : ''}
+                          {item.isArchived && <span className="rec-archived-pill" style={{ marginLeft: 6 }}><ArchiveIcon />Archived</span>}
+                        </span>
                         <span className="rec-duration">
                           {item.rate <= 0.8 ? '🐢 Slow' : '🐇 Normal'}
                           {item.cue ? ` · ${CUE_MAP[item.cue]?.emoji || ''} ${CUE_MAP[item.cue]?.label || ''}` : ''}
                         </span>
                       </div>
-                      <button className="rec-delete-btn" onClick={() => onDelete(item.id)} title="Delete">
+                      <button className="rec-archive-btn" onClick={() => requestArchive(item)} title={item.isArchived ? 'Restore' : 'Archive'}>
+                        {item.isArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
+                      </button>
+                      <button className="rec-delete-btn" onClick={() => requestDelete(item)} title="Delete">
                         <TrashIcon />
                       </button>
                     </div>
@@ -706,6 +886,19 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
           )}
         </div>
       </div>
+
+      {confirm && (
+        <ConfirmDialog
+          icon={confirmCopy.icon}
+          title={confirmCopy.title}
+          message={confirmCopy.message}
+          confirmLabel={confirmCopy.confirmLabel}
+          danger={confirmCopy.danger}
+          onConfirm={runConfirmed}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {success && <SuccessDialog message={success} onClose={() => setSuccess('')} />}
     </div>
   )
 }
@@ -1005,7 +1198,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       .then((body) => {
         setTtsHistory((body.messages || []).map((m) => ({
           id: m.id, date: new Date(m.createdAt), text: m.text, rate: m.speed, cue: m.cue,
-          patientId: m.patientId, patientName: m.patientName,
+          patientId: m.patientId, patientName: m.patientName, isArchived: !!m.isArchived,
         })))
       })
       .catch(() => {})
@@ -1159,7 +1352,8 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         setRecordings(prev => [{
           id: `local-${Date.now()}`, title: defaultSessionTitle(new Date()), transcript: finalTranscript,
           segments: segmentsRef.current, audioUrl, durationSec, wordCount: words,
-          summaryStatus: 'none', summary: null, patientId: patient?.id || null, patientName: patient?.name || null, createdAt: new Date().toISOString(),
+          summaryStatus: 'none', summary: null, patientId: patient?.id || null, patientName: patient?.name || null,
+          isArchived: false, createdAt: new Date().toISOString(),
         }, ...prev])
         return
       }
@@ -1253,16 +1447,14 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     }
   }
 
-  const clearAll = () => {
-    playingAudioRef.current?.pause(); setPlayingId(null)
-    recordings.forEach((r) => {
-      if (r.audioUrl) URL.revokeObjectURL(r.audioUrl)
-      if (r.audioKey) deleteAudioBlob(r.audioKey).catch(() => {})
-      if (userEmail && !String(r.id).startsWith('local-')) {
-        fetch(`/api/speech-recordings/${r.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
-      }
-    })
-    setRecordings([])
+  const handleArchiveRecording = (rec, archived) => {
+    setRecordings(prev => prev.map(r => (r.id === rec.id ? { ...r, isArchived: archived } : r)))
+    if (userEmail && !String(rec.id).startsWith('local-')) {
+      fetch(`/api/speech-recordings/${rec.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistEmail: userEmail, archive: archived }),
+      }).catch(() => {})
+    }
   }
 
   const handleRetrySummary = (id) => {
@@ -1332,7 +1524,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       const entry = { id: `local-${Date.now()}`, time: new Date().toISOString(), text, speed: spokenSpeed, cue }
       setSessionLog(prev => [...prev, entry])
       setTtsHistory(prev => [
-        { id: entry.id, date: new Date(), text, rate: spokenSpeed, cue, patientId: patient?.id || null, patientName: patient?.name || null },
+        { id: entry.id, date: new Date(), text, rate: spokenSpeed, cue, patientId: patient?.id || null, patientName: patient?.name || null, isArchived: false },
         ...prev,
       ].slice(0, TTS_HISTORY_LIMIT))
       return null
@@ -1350,7 +1542,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       const m = body.message
       setSessionLog(prev => [...prev, { id: m.id, time: m.createdAt, text: m.text, speed: m.speed, cue: m.cue }])
       setTtsHistory(prev => [
-        { id: m.id, date: new Date(m.createdAt), text: m.text, rate: m.speed, cue: m.cue, patientId: m.patientId, patientName: m.patientName },
+        { id: m.id, date: new Date(m.createdAt), text: m.text, rate: m.speed, cue: m.cue, patientId: m.patientId, patientName: m.patientName, isArchived: false },
         ...prev,
       ].slice(0, TTS_HISTORY_LIMIT))
       return m.id
@@ -1502,16 +1694,14 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     }
   }
 
-  const clearTtsHistory = () => {
-    stopPaoVoice(); setTtsActiveId(null)
-    if (userEmail) {
-      ttsHistory.forEach((item) => {
-        if (!String(item.id).startsWith('local-')) {
-          fetch(`/api/speech-messages/${item.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
-        }
-      })
+  const handleArchiveMessage = (item, archived) => {
+    setTtsHistory(prev => prev.map(x => (x.id === item.id ? { ...x, isArchived: archived } : x)))
+    if (userEmail && !String(item.id).startsWith('local-')) {
+      fetch(`/api/speech-messages/${item.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistEmail: userEmail, archive: archived }),
+      }).catch(() => {})
     }
-    setTtsHistory([])
   }
 
   return (
@@ -1572,8 +1762,8 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
           <button className="rec-trigger-btn" onClick={() => { setRecordingsModalTab(null); setShowModal(true) }}>
             <FolderIcon />
             <span>Recordings</span>
-            {recordings.length > 0 && (
-              <span className="rec-trigger-badge">{recordings.length}</span>
+            {recordings.filter((r) => !r.isArchived).length > 0 && (
+              <span className="rec-trigger-badge">{recordings.filter((r) => !r.isArchived).length}</span>
             )}
           </button>
 
@@ -1654,7 +1844,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
               onReplayLog={replayLogEntry}
               onCopyToNotes={handleCopyToNotes}
               onOpenHistory={() => setShowTtsModal(true)}
-              historyCount={ttsHistory.length}
+              historyCount={ttsHistory.filter((m) => !m.isArchived).length}
               ttsError={ttsError}
               toast={ttsToast}
             />
@@ -1667,7 +1857,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
               onBack={handleBackToTherapist}
               onReplay={replayCurrent}
               onOpenHistory={() => setShowTtsModal(true)}
-              historyCount={ttsHistory.length}
+              historyCount={ttsHistory.filter((m) => !m.isArchived).length}
             />
           )}
         </div>
@@ -1692,7 +1882,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
           playingId={playingId}
           onPlay={handlePlay}
           onDelete={handleDelete}
-          onClearAll={clearAll}
+          onArchive={handleArchiveRecording}
           onRetrySummary={handleRetrySummary}
           onClose={() => setShowModal(false)}
           initialTab={recordingsModalTab}
@@ -1708,7 +1898,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
           onPlay={handleHistoryPlay}
           onReuse={handleHistoryReuse}
           onDelete={handleHistoryDelete}
-          onClearAll={clearTtsHistory}
+          onArchive={handleArchiveMessage}
           onClose={() => setShowTtsModal(false)}
           currentPatient={patient}
         />
@@ -1766,6 +1956,14 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         .rec-scope-row { display:flex; gap:8px; padding:16px 24px 0; flex-wrap:wrap; }
         .rec-scope-pill { padding:8px 14px; border-radius:20px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
         .rec-scope-pill-active { background:linear-gradient(135deg,#7c3aed,#6366f1); border-color:transparent; color:#fff; }
+
+        /* ── Recordings Active/Archived toggle ── */
+        .rec-archive-row { display:flex; gap:8px; padding:14px 24px 0; flex-wrap:wrap; }
+        .rec-archive-pill { display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:20px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .rec-archive-pill-active { background:#334155; border-color:transparent; color:#fff; }
+        .rec-archive-pill-count { background:rgba(0,0,0,0.08); border-radius:20px; padding:1px 7px; font-size:11px; font-weight:800; }
+        .rec-archive-pill-active .rec-archive-pill-count { background:rgba(255,255,255,0.2); }
+        .rec-archived-pill { display:inline-flex; align-items:center; gap:4px; background:#f1f5f9; color:#475569; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:700; white-space:nowrap; }
 
         /* ── Hero ── */
         .csf-hero { padding:28px 24px 24px; text-align:center; position:relative; overflow:hidden; }
@@ -1878,6 +2076,8 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         .rec-duration { font-size:11px; color:#94a3b8; font-weight:500; }
         .rec-delete-btn { background:#fef2f2; border:1.5px solid #fca5a5; color:#ef4444; border-radius:10px; padding:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .rec-delete-btn:hover { background:#fee2e2; }
+        .rec-archive-btn { background:#f8fafc; border:1.5px solid #e2e8f0; color:#64748b; border-radius:10px; padding:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-right:6px; }
+        .rec-archive-btn:hover { background:#f1f5f9; color:#334155; }
         .rec-transcript { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:12px; border:1px solid #e0e7ff; }
         .rec-transcript-label { font-size:11px; font-weight:800; color:#6366f1; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:5px; }
         .rec-transcript-text { font-size:14px; color:#1e293b; line-height:1.6; margin:0; font-style:italic; }
@@ -2122,6 +2322,33 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         .talk-replay-btn:hover { transform:scale(1.06); }
         .talk-replay-btn:active { transform:scale(0.96); }
         .talk-replay-label { font-size:15px; font-weight:800; color:#0d9488; }
+
+        /* ── Confirm / Success dialogs ── */
+        .confirm-backdrop { z-index:1300; }
+        .confirm-dialog {
+          background:#fff; border-radius:24px; width:100%; max-width:380px;
+          padding:28px 26px 24px; text-align:center;
+          box-shadow:0 24px 70px rgba(0,0,0,0.28); animation:modalSlideUp 0.2s ease;
+        }
+        .confirm-icon { width:56px; height:56px; border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; }
+        .confirm-icon-danger { background:#fef2f2; color:#ef4444; }
+        .confirm-icon-neutral { background:#f1f5f9; color:#475569; }
+        .confirm-title { margin:0 0 8px; font-size:18px; font-weight:800; color:#1e293b; }
+        .confirm-message { margin:0 0 22px; font-size:13.5px; color:#64748b; line-height:1.6; }
+        .confirm-actions { display:flex; gap:10px; }
+        .confirm-cancel-btn, .confirm-ok-btn { flex:1; border:none; border-radius:14px; padding:12px; font-size:14px; font-weight:800; cursor:pointer; transition:transform 0.15s; }
+        .confirm-cancel-btn { background:#f1f5f9; color:#475569; }
+        .confirm-cancel-btn:hover { background:#e2e8f0; }
+        .confirm-ok-btn { background:linear-gradient(135deg,#7c3aed,#6366f1); color:#fff; }
+        .confirm-ok-btn:hover { transform:translateY(-1px); }
+        .confirm-ok-btn-danger { background:linear-gradient(135deg,#ef4444,#dc2626); }
+
+        .success-dialog {
+          background:#fff; border-radius:24px; padding:32px 30px; text-align:center;
+          box-shadow:0 24px 70px rgba(0,0,0,0.28); animation:modalSlideUp 0.2s ease;
+        }
+        .success-check { width:64px; height:64px; border-radius:50%; background:#ecfdf5; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; animation:rsmPop 0.4s cubic-bezier(.34,1.56,.64,1) both; }
+        .success-message { margin:0; font-size:15px; font-weight:800; color:#1e293b; }
       `}</style>
     </div>
   )

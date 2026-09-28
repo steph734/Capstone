@@ -27,14 +27,28 @@ async function ownedMessage(id, therapistEmail) {
 
 async function handlePatch(req, res) {
   const id = req.params?.id
-  const { therapistEmail, incrementReplay } = req.body || {}
+  const { therapistEmail, incrementReplay, archive } = req.body || {}
 
   try {
     await getMongo()
-    const { doc, error, status } = await ownedMessage(id, therapistEmail)
+    const { doc, error, status, creator } = await ownedMessage(id, therapistEmail)
     if (error) return res.status(status).json({ error })
 
     if (incrementReplay) doc.replay_count = (doc.replay_count || 0) + 1
+
+    if (archive === true) {
+      const now = new Date()
+      doc.is_archived = true
+      doc.status = 'archived'
+      doc.archived_at = now
+      doc.archived_by = creator.id
+    } else if (archive === false) {
+      doc.is_archived = false
+      doc.status = 'active'
+      doc.restored_at = new Date()
+      doc.restored_by = creator.id
+    }
+
     await doc.save()
     return res.status(200).json({ message: serializeSpeechMessage(doc) })
   } catch (err) {

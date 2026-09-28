@@ -31,11 +31,11 @@ async function ownedRecording(id, therapistEmail) {
 
 async function handlePatch(req, res) {
   const id = req.params?.id
-  const { therapistEmail, title, patientId, patientName, summary, summaryStatus } = req.body || {}
+  const { therapistEmail, title, patientId, patientName, summary, summaryStatus, archive } = req.body || {}
 
   try {
     await getMongo()
-    const { doc, error, status } = await ownedRecording(id, therapistEmail)
+    const { doc, error, status, creator } = await ownedRecording(id, therapistEmail)
     if (error) return res.status(status).json({ error })
 
     if (title !== undefined) doc.title = str(title) || doc.title
@@ -51,6 +51,19 @@ async function handlePatch(req, res) {
       } : null
     }
     if (summaryStatus !== undefined) doc.summary_status = summaryStatus
+
+    if (archive === true) {
+      const now = new Date()
+      doc.is_archived = true
+      doc.status = 'archived'
+      doc.archived_at = now
+      doc.archived_by = creator.id
+    } else if (archive === false) {
+      doc.is_archived = false
+      doc.status = 'active'
+      doc.restored_at = new Date()
+      doc.restored_by = creator.id
+    }
 
     await doc.save()
     return res.status(200).json({ recording: serializeSttRecording(doc) })

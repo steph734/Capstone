@@ -20,6 +20,7 @@ export function serializeSttRecording(doc) {
     } : null,
     summaryStatus: doc.summary_status,
     audioKey: doc.file_path && doc.file_path.startsWith(AUDIO_PREFIX) ? doc.file_path.slice(AUDIO_PREFIX.length) : null,
+    isArchived: !!doc.is_archived,
     createdAt: doc.created_at,
     updatedAt: doc.updated_at,
   }

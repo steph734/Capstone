@@ -13,6 +13,7 @@ export function serializeSpeechMessage(doc) {
     repeatCount: doc.repeat_count ?? 1,
     cue: doc.picture_cue ? (CUE_DB_TO_FRONTEND[doc.picture_cue] || null) : null,
     replayCount: doc.replay_count ?? 0,
+    isArchived: !!doc.is_archived,
     createdAt: doc.created_at,
   }
 }

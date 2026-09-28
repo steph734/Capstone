@@ -31,6 +31,7 @@ import appointmentsTherapists from './_lib/routes/appointments-therapists.js'
 import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slots.js'
 import appointmentsTherapistList from './_lib/routes/appointments-therapist-list.js'
 import patientsTherapistList from './_lib/routes/patients-therapist-list.js'
+import patientPhotosItem from './_lib/routes/patient-photos-item.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
 import authResendOtp from './_lib/routes/auth-resend-otp.js'
@@ -45,6 +46,7 @@ import attendanceMe from './_lib/routes/attendance-me.js'
 import attendanceAvailability from './_lib/routes/attendance-availability.js'
 import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
+import attendanceRemind from './_lib/routes/attendance-remind.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
 import notesCreate from './_lib/routes/notes-create.js'
 import notesShare from './_lib/routes/notes-share.js'
@@ -80,7 +82,10 @@ const app = express()
 
 // Each handler reads `req.body` the way Vercel's built-in Node functions
 // populated it — express.json() reproduces that for JSON requests.
-app.use(express.json())
+// Default express.json() limit (100kb) is too small for a booking that
+// includes a compressed profile photo (a base64 data URL, ~30-160KB) — see
+// the photo upload box on step 1 of the booking form.
+app.use(express.json({ limit: '3mb' }))
 
 app.all('/api/create-payment-intent', createPaymentIntent)
 app.all('/api/create-setup-intent', createSetupIntent)
@@ -100,6 +105,7 @@ app.all('/api/appointments/therapists', appointmentsTherapists)
 app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)
 app.all('/api/appointments/therapist-list', appointmentsTherapistList)
 app.all('/api/patients/therapist-list', patientsTherapistList)
+app.all('/api/patient-photos/:publicId', patientPhotosItem)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)
@@ -114,6 +120,7 @@ app.all('/api/attendance/me', attendanceMe)
 app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
+app.all('/api/attendance/remind', attendanceRemind)
 app.all('/api/notes/therapist-list', notesTherapistList)
 app.all('/api/notes/create', notesCreate)
 app.all('/api/notes/:id/share', notesShare)

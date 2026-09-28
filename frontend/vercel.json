@@ -11,5 +11,9 @@
         { "key": "Service-Worker-Allowed", "value": "/" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/attendance/remind?type=time_in", "schedule": "55 23 * * *" },
+    { "path": "/api/attendance/remind?type=time_out", "schedule": "55 8 * * *" }
   ]
 }

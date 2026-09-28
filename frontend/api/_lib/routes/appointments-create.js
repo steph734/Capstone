@@ -1,7 +1,32 @@
 import mongoose from 'mongoose'
+import crypto from 'crypto'
 import { getDb } from '../mongo.js'
 
 const { ObjectId } = mongoose.Types
+
+const PHOTO_MIME_TYPES = ['image/webp', 'image/jpeg', 'image/png']
+const MAX_PHOTO_BYTES = 1 * 1024 * 1024 // generous ceiling — the client sends a 512×512 compressed image, normally 30–120KB
+
+// `photo` arrives as a data URL (already center-cropped to 512×512 and
+// compressed client-side — see the photo upload box on step 1 of the
+// booking form). Returns { buffer, contentType } or null if there's nothing
+// usable to store, so a booking never fails just because the photo was bad.
+function decodePhoto(photo) {
+  const dataUrl = String(photo || '').trim()
+  if (!dataUrl) return null
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return null
+  const [, mimeType, base64] = match
+  if (!PHOTO_MIME_TYPES.includes(mimeType)) return null
+  let buffer
+  try {
+    buffer = Buffer.from(base64, 'base64')
+  } catch {
+    return null
+  }
+  if (!buffer.length || buffer.length > MAX_PHOTO_BYTES) return null
+  return { buffer, contentType: mimeType }
+}
 
 // Maps the booking form's single "session mode" dropdown onto the schema's two
 // axes (delivery mode + therapy focus).
@@ -54,7 +79,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { patient = {}, therapist = {}, session = {}, payment = {}, bookedBy = {} } = req.body || {}
+  const { patient = {}, therapist = {}, session = {}, payment = {}, bookedBy = {}, photo = null } = req.body || {}
 
   if (!str(patient.firstName) || !str(patient.lastName)) {
     return res.status(400).json({ error: 'Patient first and last name are required.' })
@@ -72,6 +97,30 @@ export default async function handler(req, res) {
     if (!bookedById && str(bookedBy.email)) {
       const u = await db.collection('users').findOne({ email: str(bookedBy.email).toLowerCase() })
       if (u) bookedById = u._id
+    }
+
+    // 1b. Photo, if the parent uploaded one — stored before the patient doc
+    // so profile_photo can be set on insert rather than a follow-up update.
+    // Best-effort: a decode/insert failure must not fail the whole booking.
+    let photoRecord = null
+    const decodedPhoto = decodePhoto(photo)
+    if (decodedPhoto) {
+      try {
+        const publicId = crypto.randomBytes(16).toString('hex')
+        const photoRes = await db.collection('patient_photos').insertOne({
+          public_id: publicId,
+          patient_id: null, // backfilled just below once the patient exists
+          content_type: decodedPhoto.contentType,
+          data: decodedPhoto.buffer,
+          size_bytes: decodedPhoto.buffer.length,
+          width: 512,
+          height: 512,
+          created_at: now,
+        })
+        photoRecord = { id: photoRes.insertedId, publicId, url: `/api/patient-photos/${publicId}` }
+      } catch (err) {
+        console.error('appointments/create: failed to store the photo:', err)
+      }
     }
 
     // 2. Patient record (created straight from the booking; user_id may be null).
@@ -96,11 +145,20 @@ export default async function handler(req, res) {
         .includes(patient.relationship) ? patient.relationship : 'Guardian',
       guardian_contact_number: str(patient.contactNumber) || null,
       guardian_email: str(patient.email) || null,
+      profile_photo: photoRecord ? { photo_id: photoRecord.id, url: photoRecord.url, uploaded_at: now } : null,
       created_at: now,
       updated_at: now,
     }
     const patientRes = await db.collection('patients').insertOne(patientDoc)
     const patientId = patientRes.insertedId
+
+    if (photoRecord) {
+      try {
+        await db.collection('patient_photos').updateOne({ _id: photoRecord.id }, { $set: { patient_id: patientId } })
+      } catch (err) {
+        console.error('appointments/create: failed to link the photo to the patient:', err)
+      }
+    }
 
     // 2b. Best-effort: register the condition as a disorder + link it.
     if (str(patient.condition)) {
@@ -143,6 +201,8 @@ export default async function handler(req, res) {
       booked_by: bookedById || null,
 
       patient_name: `${patientDoc.first_name} ${patientDoc.last_name}`.trim(),
+      patient_photo_id: photoRecord?.id || null,
+      patient_photo_url: photoRecord?.url || null,
       therapist_name: str(therapist.name) || null,
       therapist_role: str(therapist.role) || null,
       guardian_name: `${patientDoc.guardian_first_name} ${patientDoc.guardian_last_name}`.trim() || null,

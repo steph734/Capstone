@@ -176,6 +176,7 @@
   color: #16a34a;
 }
 .sim-status.error { color: #dc2626; }
+.sim-status.warn { color: #b45309; }
 .sim-status.centered { margin-top: 12px; }
 
 .sim-status-dot {
@@ -187,6 +188,7 @@
   flex-shrink: 0;
 }
 .sim-status-dot.error { background: #dc2626; box-shadow: 0 0 0 3px #fee2e2; }
+.sim-status-dot.warn { background: #b45309; box-shadow: 0 0 0 3px #fef3c7; }
 
 .sim-retry-btn {
   margin-top: 14px;

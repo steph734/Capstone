@@ -19,6 +19,10 @@ const ArrowRight  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="
 const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
 const ChevronIcon = ({ open }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9"/></svg>
 const CheckLgIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+const UploadIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+const CameraIcon  = ({ size = 15 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+const TrashSmIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6h14z"/><path d="M10 11v6M14 11v6"/></svg>
+const UserCircleIcon = () => <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></svg>
 
 /* ─── Constants ─── */
 const STEPS = [
@@ -43,6 +47,55 @@ const SERVICE_CHARGE = 50
 const TOTAL_DUE = SESSION_FEE + SERVICE_CHARGE
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+/* ─── Child's photo: pick/drop → validate → center-crop to a square →
+   resize to 512×512 → compress to WebP (JPEG if the browser can't encode
+   WebP) — all before anything is sent, so the upload is normally 30–120KB. ─── */
+const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+const MAX_PHOTO_SOURCE_BYTES = 5 * 1024 * 1024
+
+function canEncodeWebp() {
+  try {
+    const c = document.createElement('canvas')
+    c.width = 1; c.height = 1
+    return c.toDataURL('image/webp').startsWith('data:image/webp')
+  } catch {
+    return false
+  }
+}
+
+async function processPhotoFile(file) {
+  if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+    throw new Error('Please choose a JPG, PNG, WEBP, or HEIC photo.')
+  }
+  if (file.size > MAX_PHOTO_SOURCE_BYTES) {
+    throw new Error('That photo is larger than 5 MB — please choose a smaller one.')
+  }
+
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new Error("This device can't read that photo format. Try a JPG, PNG, or WEBP instead.")
+  }
+
+  const side = Math.min(bitmap.width, bitmap.height)
+  const sx = (bitmap.width - side) / 2
+  const sy = (bitmap.height - side) / 2
+
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, 512, 512)
+  bitmap.close?.()
+
+  const mimeType = canEncodeWebp() ? 'image/webp' : 'image/jpeg'
+  const dataUrl = canvas.toDataURL(mimeType, 0.85)
+  const blob = await (await fetch(dataUrl)).blob()
+
+  return { dataUrl, blob, mimeType }
+}
 
 /* ─── Component ─── */
 export default function BookAppointmentPage({ user }) {
@@ -84,6 +137,41 @@ export default function BookAppointmentPage({ user }) {
   // and email, which shouldn't be case-mangled.
   const capitalizeFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
   const setF1Cap = (k, v) => setF1(k, capitalizeFirst(v))
+
+  /* Child's profile photo — optional, processed entirely client-side. */
+  const [photo, setPhoto] = useState(null) // { dataUrl, previewUrl, mimeType, sizeBytes, fileName }
+  const [photoError, setPhotoError] = useState('')
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoDragOver, setPhotoDragOver] = useState(false)
+  const uploadInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+
+  useEffect(() => () => { if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl) }, []) // eslint-disable-line
+
+  const handlePhotoFile = async (file) => {
+    if (!file) return
+    setPhotoError('')
+    setPhotoBusy(true)
+    try {
+      const { dataUrl, blob, mimeType } = await processPhotoFile(file)
+      const previewUrl = URL.createObjectURL(blob)
+      setPhoto((prev) => {
+        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl)
+        return { dataUrl, previewUrl, mimeType, sizeBytes: blob.size, fileName: file.name }
+      })
+    } catch (err) {
+      setPhotoError(err.message || 'Could not use that photo.')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  const clearPhoto = () => {
+    setPhoto((prev) => { if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl); return null })
+    setPhotoError('')
+    if (uploadInputRef.current) uploadInputRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+  }
 
   /* ── Step 2: Summary & Payment ── */
   const [payMethod, setPayMethod] = useState(null)
@@ -211,6 +299,7 @@ export default function BookAppointmentPage({ user }) {
           amountReceived: payMethod === 'cash' ? cashReceived : undefined,
         },
         bookedBy: { id: user?.id, email: user?.email },
+        photo: photo?.dataUrl || null,
       }),
     })
       .then(async (r) => {
@@ -406,6 +495,69 @@ export default function BookAppointmentPage({ user }) {
 
               <h3 className="book-section-title">Personal Details</h3>
 
+              <div
+                className={`photo-upload-box ${photoDragOver ? 'drag-over' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setPhotoDragOver(true) }}
+                onDragLeave={() => setPhotoDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault(); setPhotoDragOver(false)
+                  const file = e.dataTransfer.files?.[0]
+                  if (file) handlePhotoFile(file)
+                }}
+              >
+                <div className="photo-avatar-wrap">
+                  <div className="photo-avatar">
+                    {photo ? <img src={photo.previewUrl} alt="Child's photo preview" /> : <UserCircleIcon />}
+                  </div>
+                  <span className="photo-avatar-badge"><CameraIcon size={13} /></span>
+                </div>
+
+                <div className="photo-upload-info">
+                  <div className="photo-upload-title">Child's Photo <span className="opt">(Optional)</span></div>
+                  {photo ? (
+                    <div className="photo-upload-filename">
+                      <CheckIcon /> {photo.fileName} · {Math.max(1, Math.round(photo.sizeBytes / 1024))} KB
+                    </div>
+                  ) : (
+                    <div className="photo-upload-hint">Drag and drop a photo here, or use a button below.</div>
+                  )}
+
+                  <div className="photo-upload-actions">
+                    {!photo ? (
+                      <>
+                        <button type="button" className="photo-btn" onClick={() => uploadInputRef.current?.click()} disabled={photoBusy}>
+                          <UploadIcon /> {photoBusy ? 'Processing…' : 'Upload photo'}
+                        </button>
+                        <button type="button" className="photo-btn" onClick={() => cameraInputRef.current?.click()} disabled={photoBusy}>
+                          <CameraIcon /> Take photo
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="photo-btn" onClick={() => uploadInputRef.current?.click()} disabled={photoBusy}>
+                          <UploadIcon /> Change photo
+                        </button>
+                        <button type="button" className="photo-btn photo-btn-danger" onClick={clearPhoto} disabled={photoBusy}>
+                          <TrashSmIcon /> Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {photoError && <span className="field-err">{photoError}</span>}
+                </div>
+
+                <input
+                  ref={uploadInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+                />
+                <input
+                  ref={cameraInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+                />
+              </div>
+
               <div className="book-row">
                 <div className="book-field">
                   <label>Child's First Name <span className="req">*</span></label>
@@ -531,6 +683,11 @@ export default function BookAppointmentPage({ user }) {
 
               <div className="summary-block">
                 <div className="summary-block-title">Patient Information</div>
+                {photo && (
+                  <div className="summary-photo-row">
+                    <img src={photo.previewUrl} alt={fullName} className="summary-photo-thumb" />
+                  </div>
+                )}
                 <div className="summary-row"><span>Full Name</span><strong>{fullName}</strong></div>
                 <div className="summary-row"><span>Birthdate</span><strong>{form1.birthdate || '—'}</strong></div>
                 <div className="summary-row"><span>Gender</span><strong>{form1.gender}</strong></div>
@@ -672,6 +829,11 @@ export default function BookAppointmentPage({ user }) {
 
               <div className="summary-block">
                 <div className="summary-block-title">Appointment Summary</div>
+                {photo && (
+                  <div className="summary-photo-row">
+                    <img src={photo.previewUrl} alt={fullName} className="summary-photo-thumb" />
+                  </div>
+                )}
                 <div className="summary-row"><span>Patient</span><strong>{fullName}</strong></div>
                 <div className="summary-row"><span>Condition</span><strong>{form1.condition}</strong></div>
                 <div className="summary-row"><span>Therapist</span><strong>{therapistObj?.name || '—'}</strong></div>

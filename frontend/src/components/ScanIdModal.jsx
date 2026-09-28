@@ -19,7 +19,11 @@ async function apiPost(path, body) {
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
+  if (!res.ok) {
+    const err = new Error(data.error || `POST ${path} failed: ${res.status}`)
+    err.reason = data.reason || null
+    throw err
+  }
   return data
 }
 
@@ -61,6 +65,8 @@ function CameraOffIcon() {
 // 'scanning'  — live feed, decoding every frame
 // 'checking'  — a barcode was decoded, awaiting the backend lookup
 // 'not-found' — decoded fine, but no employee matches that badge
+// 'duplicate' — already timed in/out (within the cooldown, or the day is done)
+// 'invalid'   — decoded fine, but it isn't a BrickPath-issued badge at all
 // 'denied'    — camera permission was refused
 // 'no-camera' — no camera device is available on this machine
 //
@@ -115,8 +121,13 @@ function ScanIdModal({ onClose, onLogged }) {
       })
       .catch((apiErr) => {
         if (!mountedRef.current) return
+        const nextPhase = apiErr.reason === 'duplicate' || apiErr.reason === 'completed'
+          ? 'duplicate'
+          : apiErr.reason === 'invalid_badge'
+            ? 'invalid'
+            : 'not-found'
         setNotFoundCode(apiErr.message || `No staff member matches badge "${code}".`)
-        setPhase('not-found')
+        setPhase(nextPhase)
         // Give the owner a moment to read the message, then let the
         // still-running camera try again on the next held-up badge.
         setTimeout(() => {
@@ -137,9 +148,10 @@ function ScanIdModal({ onClose, onLogged }) {
     setScanKey((k) => k + 1)
   }
 
-  const showCamera = phase === 'starting' || phase === 'scanning' || phase === 'checking' || phase === 'not-found'
+  const showCamera = phase === 'starting' || phase === 'scanning' || phase === 'checking' || phase === 'not-found' || phase === 'duplicate' || phase === 'invalid'
   const showPermissionError = phase === 'denied' || phase === 'no-camera'
-  const scanningPaused = phase === 'checking' || phase === 'not-found'
+  const scanningPaused = phase === 'checking' || phase === 'not-found' || phase === 'duplicate' || phase === 'invalid'
+  const isWarnPhase = phase === 'duplicate' || phase === 'invalid'
 
   return (
     <div className="sim-backdrop" onClick={onClose}>
@@ -173,12 +185,12 @@ function ScanIdModal({ onClose, onLogged }) {
                 )}
               </div>
 
-              <div className={`sim-status ${phase === 'not-found' ? 'error' : ''}`}>
-                <span className={`sim-status-dot ${phase === 'not-found' ? 'error' : ''}`} />
+              <div className={`sim-status ${phase === 'not-found' ? 'error' : isWarnPhase ? 'warn' : ''}`}>
+                <span className={`sim-status-dot ${phase === 'not-found' ? 'error' : isWarnPhase ? 'warn' : ''}`} />
                 {phase === 'starting' && 'Connecting to camera…'}
                 {phase === 'scanning' && 'Waiting for scan…'}
                 {phase === 'checking' && 'Checking badge…'}
-                {phase === 'not-found' && notFoundCode}
+                {(phase === 'not-found' || phase === 'duplicate' || phase === 'invalid') && notFoundCode}
               </div>
             </>
           )}

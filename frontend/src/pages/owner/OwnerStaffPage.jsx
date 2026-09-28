@@ -718,9 +718,16 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }
 
+// Every badge this app prints carries this prefix ahead of the employeeId,
+// so /api/attendance/scan can tell a genuine BrickPath card apart from any
+// other barcode/QR code someone might hold up to the camera — see the same
+// constant in api/_lib/routes/attendance-scan.js.
+const BRICKPATH_BARCODE_PREFIX = 'BRICKPATH-'
+
 // A genuine, scannable Code128 barcode encoding `value` — which must be the
-// exact same employeeId string POST /api/attendance/scan looks up, since
-// ScanIdModal hands the camera's decoded text straight to that endpoint.
+// exact same "BRICKPATH-<employeeId>" string POST /api/attendance/scan
+// expects, since ScanIdModal hands the camera's decoded text straight to
+// that endpoint.
 // Rendered onto its own canvas at JsBarcode's natural size, then scaled into
 // the (x, y, w, h) box on the card — safe for a 1D barcode since decoding
 // only cares about each bar's width *relative* to its neighbors, which a
@@ -831,7 +838,7 @@ function drawIdCard(ctx, staff, { logoImg, photoImg }) {
   ctx.fillText(`PHONE: ${staff.phone || '—'}`, infoX, nameY + 170)
 
   // A full-width barcode strip anchors the bottom of the card.
-  drawBarcode(ctx, padding, contentBottom - 56, W - padding * 2, 48, String(staff.employeeId || staff.name || 'ID'))
+  drawBarcode(ctx, padding, contentBottom - 56, W - padding * 2, 48, staff.employeeId ? `${BRICKPATH_BARCODE_PREFIX}${staff.employeeId}` : '')
 
   ctx.restore()
   ctx.strokeStyle = '#e5e7eb'

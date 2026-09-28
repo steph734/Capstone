@@ -1,105 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import './PageWithSidebar.css'
 import './NotesPage.css'
 
-// ── Mock SOAP Notes ───────────────────────────────────────────────────────────
-const MOCK_NOTES = [
-  {
-    id: 1, pinned: true,
-    title: 'Session SOAP Note – Jun 30',
-    date: 'Jun 30, 2026',
-    shortDate: 'Jun 30',
-    preview: 'Patient reports improved motor function and energy levels this week.',
+// ── API mapping ──────────────────────────────────────────────────────────────
+// Turns a backend note (see GET /api/notes/patient-list) into the shape this
+// page's list/detail UI already expects.
+function formatFullDate(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+function formatShortDate(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+function mapNote(n) {
+  return {
+    id: n.id,
+    pinned: false,
+    title: n.domain ? `${n.domain} Session Note` : `Session Note – ${formatShortDate(n.date)}`,
+    date: n.date,
+    shortDate: formatShortDate(n.date),
+    preview: n.assessment || n.subjective || '',
     soap: {
-      name: 'Alvrin Santos', date: 'June 30, 2026',
-      diagnosis: 'Developmental delay – F82, Specific developmental disorder of motor function',
-      subjective: 'Patient reports feeling more energetic this week. Completed all assigned home exercises. States "I feel stronger now." Parents confirm daily exercise compliance and improved mood.',
-      objective: 'ROM improved by 15%. Left-hand grasp maintained for 3 seconds consistently. Single-leg balance: 8 seconds (up from 6). Fine motor task accuracy: 72%.',
-      assessment: 'Patient is progressing well. Motor skills showing measurable improvement across all domains. Motivation is high. No adverse effects noted.',
-      plan: 'Continue current exercise regimen. Add fine motor bead-threading activity. Schedule follow-up in 2 weeks. Monitor fatigue levels during sessions.',
+      name: n.patientName,
+      date: formatFullDate(n.date),
+      diagnosis: n.diagnosis,
+      subjective: n.subjective,
+      objective: n.objective,
+      assessment: n.assessment,
+      plan: n.plan,
+      therapistName: n.therapistName,
     },
-  },
-  {
-    id: 2, pinned: false,
-    title: 'Session SOAP Note – Jul 2',
-    date: 'Jul 2, 2026',
-    shortDate: 'Jul 2',
-    preview: 'Session focused on fine motor coordination and coin sorting tasks.',
-    soap: {
-      name: 'Alvrin Santos', date: 'July 2, 2026',
-      diagnosis: 'Developmental delay – F82, ongoing OT',
-      subjective: 'Patient arrived on time. Reports completing all home exercises. States thumb-and-index pinch feels easier. Good energy today.',
-      objective: 'Coin sorting task completed in 45 sec (down from 62 sec). Balance: 9 seconds. Grip strength: 13 kg. Fine motor accuracy: 75%.',
-      assessment: 'Continued steady improvement. Fine motor coordination responding well to current plan. Patient building confidence.',
-      plan: 'Introduce scissor activities next session. Continue balance exercises. Home program: 15 min daily fine motor tasks.',
-    },
-  },
-  {
-    id: 3, pinned: false,
-    title: 'Session SOAP Note – Jun 23',
-    date: 'Jun 23, 2026',
-    shortDate: 'Jun 23',
-    preview: 'Some difficulty noted with wrist rotation. Fatigue observed.',
-    soap: {
-      name: 'Alvrin Santos', date: 'June 23, 2026',
-      diagnosis: 'Developmental delay, motor dysfunction',
-      subjective: 'Patient attended session on time. Reports some difficulty with wrist rotation exercises. States fatigue after prolonged activity. Slept well.',
-      objective: 'Fine motor accuracy: 68%. Grip strength: 12 kg. Balance: 7 seconds. Wrist ROM slightly limited bilaterally.',
-      assessment: 'Mild progress. Fatigue may be affecting performance. Duration of exercise sets may need adjustment.',
-      plan: 'Reduce exercise sets to 3x each. Introduce rest intervals. Reassess wrist rotation next session. Check sleep schedule with parents.',
-    },
-  },
-  {
-    id: 4, pinned: false,
-    title: 'Initial Assessment',
-    date: 'Jun 16, 2026',
-    shortDate: 'Jun 16',
-    preview: 'Initial evaluation completed. Therapy recommended 2× per week.',
-    soap: {
-      name: 'Alvrin Santos', date: 'June 16, 2026',
-      diagnosis: 'Developmental delay – referral from Dr. Cruz (pediatrician)',
-      subjective: 'Referred for motor development delays. Parent reports difficulty with fine motor tasks and balance issues noticed since age 4. No known medical contraindications.',
-      objective: 'Single-leg balance: 2 seconds. Grip strength: 8 kg. Fine motor accuracy: 40%. Unable to fasten buttons or use scissors independently.',
-      assessment: 'Moderate motor skill delays across all domains. Good patient motivation and parent engagement. Prognosis is favorable with consistent therapy.',
-      plan: 'Begin OT program 2×/week for 12 weeks. Focus: balance, grip strength, fine motor development. Establish 3-month functional goals with family.',
-    },
-  },
-  {
-    id: 5, pinned: false,
-    title: 'Progress Report – May',
-    date: 'May 31, 2026',
-    shortDate: 'May 31',
-    preview: 'Monthly summary. Good overall improvement. Patient can button shirt.',
-    soap: {
-      name: 'Alvrin Santos', date: 'May 31, 2026',
-      diagnosis: 'Motor dysfunction, ongoing therapy',
-      subjective: 'Patient and family report visible improvement in ADLs. Patient can now button shirt independently. Reports feeling proud of progress.',
-      objective: 'Grip: 10 kg. Balance: 5 seconds. Fine motor accuracy: 58%. Improved button, zipper, and cup-stacking tasks.',
-      assessment: 'Good progress over the month. Patient responding well to OT intervention. ADL independence improving.',
-      plan: 'Continue plan. Introduce more complex fine motor tasks (lacing board). Increase to 3 sessions/week next month.',
-    },
-  },
-  {
-    id: 6, pinned: false,
-    title: 'Session SOAP Note – Apr 28',
-    date: 'Apr 28, 2026',
-    shortDate: 'Apr 28',
-    preview: 'Early sessions going well. Patient engaging positively with program.',
-    soap: {
-      name: 'Alvrin Santos', date: 'April 28, 2026',
-      diagnosis: 'Developmental delay, motor dysfunction',
-      subjective: 'Patient eager to participate. Reports enjoying exercises. Parent notes improved confidence at home. No complaints of pain.',
-      objective: 'Grip: 9 kg. Balance: 3 seconds. Fine motor: 48%. Completing stacking tasks with fewer errors than Week 1.',
-      assessment: 'Early positive response to therapy. Good therapeutic rapport. Parent actively reinforcing home program.',
-      plan: 'Continue introductory program. Begin graduated difficulty in stacking tasks. Home program firmly established.',
-    },
-  },
-]
+  }
+}
 
 // ── Grouping ──────────────────────────────────────────────────────────────────
 function groupNotes(notes) {
-  const today = new Date('2026-07-03')
+  const today = new Date()
   const pinned = notes.filter(n => n.pinned)
   const unpinned = notes.filter(n => !n.pinned)
   const prev7 = [], prev30 = [], byMonth = {}
@@ -283,7 +223,7 @@ function SoapDetail({ note, onBack, onTogglePin }) {
               <div className="nd-sig-cheer">✨ Great session today! ✨</div>
               <div className="nd-sig-right">
                 <div className="nd-sig-line" />
-                <span className="nd-sig-text">Therapist Signature</span>
+                <span className="nd-sig-text">{s.therapistName || 'Therapist Signature'}</span>
               </div>
             </div>
           </div>
@@ -306,11 +246,42 @@ function EmptyDetail() {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function NotesPage({ user, onLogout, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [notes, setNotes] = useState(MOCK_NOTES)
+  const [notes, setNotes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [pinnedOpen, setPinnedOpen] = useState(true)
   const [search, setSearch] = useState('')
   const [mobileView, setMobileView] = useState('list') // 'list' | 'detail'
+
+  useEffect(() => {
+    const email = user?.email
+    if (!email) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetch(`/api/notes/patient-list?email=${encodeURIComponent(email)}`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(data.error || 'Could not load your session notes.')
+        return data
+      })
+      .then((data) => {
+        if (cancelled) return
+        setNotes((data.notes || []).map(mapNote))
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.message || 'Could not load your session notes.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [user?.email])
 
   const togglePin = (id) => {
     setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n))
@@ -422,8 +393,12 @@ export default function NotesPage({ user, onLogout, betaTier }) {
                 </div>
               ))}
 
-              {pinned.length === 0 && groups.length === 0 && (
-                <p className="nl-no-results">No notes found</p>
+              {loading && <p className="nl-no-results">Loading your notes…</p>}
+              {!loading && error && <p className="nl-no-results">{error}</p>}
+              {!loading && !error && pinned.length === 0 && groups.length === 0 && (
+                <p className="nl-no-results">
+                  {notes.length === 0 ? 'No session notes yet.' : 'No notes found'}
+                </p>
               )}
             </div>
 

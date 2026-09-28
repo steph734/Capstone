@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import { getMongo, getDb } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { TherapyNote } from '../models/therapyNote.js'
+import { sendNoteCreatedEmail } from '../noteEmail.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const str = (v) => (v == null ? '' : String(v).trim())
@@ -48,7 +49,10 @@ export default async function handler(req, res) {
     // modeled via Mongoose anywhere in this app yet).
     const db = await getDb()
     const patientObjId = new mongoose.Types.ObjectId(patientId)
-    const patient = await db.collection('patients').findOne({ _id: patientObjId }, { projection: { _id: 1 } })
+    const patient = await db.collection('patients').findOne(
+      { _id: patientObjId },
+      { projection: { _id: 1, email: 1, guardian_first_name: 1, guardian_last_name: 1 } }
+    )
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found.' })
     }
@@ -79,10 +83,31 @@ export default async function handler(req, res) {
       is_archived: false,
     })
 
+    // Best-effort: let the patient/guardian know a new note was written. Must
+    // never fail the note save — the note is already persisted at this point.
+    let emailSent = false
+    if (patient.email) {
+      try {
+        const guardianName = [patient.guardian_first_name, patient.guardian_last_name].filter(Boolean).join(' ')
+        await sendNoteCreatedEmail({
+          email: patient.email,
+          guardianName,
+          patientName: str(patientName),
+          therapistName: employeeName,
+          sessionDate,
+          summary: share ? str(parentSummary) : '',
+        })
+        emailSent = true
+      } catch (err) {
+        console.error('notes/create: failed to send note notification email:', err)
+      }
+    }
+
     return res.status(201).json({
       id: String(doc._id),
       date: doc.session_date,
       createdAt: doc.created_at,
+      emailSent,
     })
   } catch (err) {
     console.error('notes/create error:', err)

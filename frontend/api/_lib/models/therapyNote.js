@@ -3,6 +3,10 @@ import mongoose from 'mongoose'
 
 const therapyNoteSchema = new mongoose.Schema(
   {
+    // Legacy unique key the collection still indexes on (the app never reads
+    // it) — must be set on every insert or a second note collides on null,
+    // same class of bug fixed on the `payments` collection.
+    NoteID: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
     appointment_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment', default: null },
     employee_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Employee' },
     employee_name: { type: String, default: null },

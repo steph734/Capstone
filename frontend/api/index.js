@@ -48,6 +48,7 @@ import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-m
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 import attendanceRemind from './_lib/routes/attendance-remind.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
+import notesPatientList from './_lib/routes/notes-patient-list.js'
 import notesCreate from './_lib/routes/notes-create.js'
 import notesShare from './_lib/routes/notes-share.js'
 import exercisesTherapistList from './_lib/routes/exercises-therapist-list.js'
@@ -122,6 +123,7 @@ app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/attendance/remind', attendanceRemind)
 app.all('/api/notes/therapist-list', notesTherapistList)
+app.all('/api/notes/patient-list', notesPatientList)
 app.all('/api/notes/create', notesCreate)
 app.all('/api/notes/:id/share', notesShare)
 app.all('/api/exercises/therapist-list', exercisesTherapistList)

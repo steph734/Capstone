@@ -1,7 +1,43 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
 import { saveAudioBlob, getAudioBlob, deleteAudioBlob, newAudioKey } from '../utils/recordingsDb'
-import { MicIcon as MicIconOutline, VolumeIcon, SwapIcon, FlaskIcon, DotIcon as DotIconOutline } from '../components/icons/SpeechIcons'
+import { speakPao, stopPaoVoice } from '../utils/paoVoice'
+import PandaMascot from './games/PandaMascot'
+import {
+  MicIcon as MicIconOutline, VolumeIcon, SwapIcon, FlaskIcon, DotIcon as DotIconOutline,
+  MessageIcon, PenIcon, PlusIcon, ClockIcon, RepeatIcon, TurtleIcon, SaveIcon, ArrowLeftIcon,
+} from '../components/icons/SpeechIcons'
+
+// ─── "Talk to {patient}" — phrase groups, picture cues ────────────────────────
+
+const PHRASE_GROUPS = [
+  { key: 'start', label: 'Start', bg: '#e0f2fe', fg: '#0369a1', phrases: ['Hello {name}!', "Let's begin", 'Sit down please'] },
+  { key: 'instructions', label: 'Instructions', bg: '#f5f3ff', fg: '#6d28d9', phrases: ['Look at me', 'Listen', 'Your turn', 'Say it again'] },
+  { key: 'praise', label: 'Praise', bg: '#ecfdf5', fg: '#047857', phrases: ['Good job!', 'Great trying!', "I'm proud of you"] },
+  { key: 'end', label: 'End', bg: '#fff7ed', fg: '#9a3412', phrases: ['Break time', 'All done', 'See you next time'] },
+]
+
+const CUE_MAP = {
+  look: { emoji: '👀', label: 'Look' },
+  listen: { emoji: '👂', label: 'Listen' },
+  turn: { emoji: '🗣️', label: 'Your turn' },
+  wait: { emoji: '✋', label: 'Wait' },
+  great: { emoji: '⭐', label: 'Great job' },
+}
+
+function suggestCue(text) {
+  const t = String(text || '').toLowerCase()
+  if (t.includes('look')) return 'look'
+  if (t.includes('listen')) return 'listen'
+  if (t.includes('your turn') || t.includes('say')) return 'turn'
+  if (t.includes('stop') || t.includes('wait')) return 'wait'
+  if (t.includes('good') || t.includes('great') || t.includes('proud')) return 'great'
+  return null
+}
+
+function fillName(phrase, firstName) {
+  return phrase.replace(/\{name\}/g, firstName)
+}
 
 const PATIENT_AVATAR_PALETTE = ['#7c3aed', '#2563eb', '#db2777', '#ea580c', '#059669', '#0891b2', '#9333ea', '#dc2626']
 
@@ -630,8 +666,11 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
                         #{visible.length - idx}
                       </div>
                       <div className="rec-meta">
-                        <span className="rec-date">🗓️ {formatDateTime(item.date)}</span>
-                        <span className="rec-duration">🐢 {item.rate.toFixed(1)}x · 🔊 {item.pitch.toFixed(1)}</span>
+                        <span className="rec-date">🗓️ {formatDateTime(item.date)}{item.patientName ? ` · 👤 ${item.patientName}` : ''}</span>
+                        <span className="rec-duration">
+                          {item.rate <= 0.8 ? '🐢 Slow' : '🐇 Normal'}
+                          {item.cue ? ` · ${CUE_MAP[item.cue]?.emoji || ''} ${CUE_MAP[item.cue]?.label || ''}` : ''}
+                        </span>
                       </div>
                       <button className="rec-delete-btn" onClick={() => onDelete(item.id)} title="Delete">
                         <TrashIcon />
@@ -671,16 +710,217 @@ function TtsHistoryModal({ history, activeId, onPlay, onReuse, onDelete, onClear
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Talk to {patient} — therapist screen ────────────────────────────────────
 
-const TTS_HINTS = [
-  'Write something and I\'ll say it! 🗣️',
-  'Your words, out loud! 🎶',
-  'Write words, hear them come alive! 🌈',
-]
+function TalkTherapistView({
+  toolsLocked, patientFirstName, customPhrases, onPhraseTap,
+  addingPhrase, setAddingPhrase, newPhraseGroup, setNewPhraseGroup, newPhraseText, setNewPhraseText,
+  onAddCustomPhrase, onRemoveCustomPhrase,
+  messageText, setMessageText, onSayIt,
+  speed, setSpeed, repeat, setRepeat,
+  cueKey, onSetCue,
+  sessionLog, sessionStart, onReplayLog, onCopyToNotes,
+  onOpenHistory, historyCount, ttsError, toast,
+}) {
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSayIt() }
+  }
+
+  return (
+    <div className="talk-view">
+      <div className="talk-hero">
+        <div className="talk-hero-text">
+          <h2><MessageIcon size={22} /> Talk to {patientFirstName}</h2>
+          <p>Type a message — Pao says it out loud</p>
+        </div>
+        <button className="talk-history-btn" onClick={onOpenHistory}>
+          <ClockIcon size={16} /><span>History</span>
+          {historyCount > 0 && <span className="rec-trigger-badge">{historyCount}</span>}
+        </button>
+      </div>
+
+      <div className="talk-body">
+        <div className="talk-columns">
+          <div className="talk-col-left">
+            {PHRASE_GROUPS.map((group) => (
+              <div className="talk-phrase-group" key={group.key}>
+                <div className="talk-phrase-label" style={{ color: group.fg }}><MessageIcon size={13} />{group.label.toUpperCase()}</div>
+                <div className="talk-phrase-row">
+                  {group.phrases.map((p) => (
+                    <button key={p} className="talk-phrase-pill" style={{ background: group.bg, color: group.fg }}
+                      onClick={() => onPhraseTap(p)} disabled={toolsLocked} type="button">
+                      {fillName(p, patientFirstName)}
+                    </button>
+                  ))}
+                  {(customPhrases[group.key] || []).map((p) => (
+                    <span key={p} className="talk-phrase-pill talk-phrase-pill-custom" style={{ background: group.bg, color: group.fg }}>
+                      <button className="talk-phrase-pill-text" onClick={() => onPhraseTap(p)} disabled={toolsLocked} type="button">{p}</button>
+                      <button className="talk-phrase-remove" onClick={() => onRemoveCustomPhrase(group.key, p)} title="Remove" type="button">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {addingPhrase ? (
+              <div className="talk-add-form">
+                <select value={newPhraseGroup} onChange={(e) => setNewPhraseGroup(e.target.value)}>
+                  {PHRASE_GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                </select>
+                <input placeholder="Type a phrase…" value={newPhraseText} onChange={(e) => setNewPhraseText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && onAddCustomPhrase()} autoFocus />
+                <button className="talk-add-confirm" onClick={onAddCustomPhrase} type="button"><PlusIcon size={14} /> Add</button>
+                <button className="talk-add-cancel" onClick={() => { setAddingPhrase(false); setNewPhraseText('') }} type="button">Cancel</button>
+              </div>
+            ) : (
+              <button className="talk-add-pill" onClick={() => setAddingPhrase(true)} type="button"><PlusIcon size={14} /> Add phrase</button>
+            )}
+
+            <div className="talk-message-block">
+              <div className="talk-message-label"><PenIcon size={14} />YOUR MESSAGE</div>
+              <textarea
+                className="talk-textarea"
+                value={messageText}
+                maxLength={200}
+                onChange={(e) => setMessageText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type what you want Pao to say…"
+                rows={3}
+              />
+              <div className="talk-char-count">{messageText.length}/200</div>
+            </div>
+
+            <div className="talk-options-row">
+              <div className="talk-option-group">
+                <button className={`talk-opt-chip ${speed === 0.75 ? 'talk-opt-chip-active' : ''}`} onClick={() => setSpeed(0.75)} type="button"><TurtleIcon size={14} /> Slow</button>
+                <button className={`talk-opt-chip ${speed === 1 ? 'talk-opt-chip-active' : ''}`} onClick={() => setSpeed(1)} type="button">Normal</button>
+              </div>
+              <div className="talk-option-group">
+                <button className={`talk-opt-chip ${repeat === 1 ? 'talk-opt-chip-active' : ''}`} onClick={() => setRepeat(1)} type="button"><RepeatIcon size={14} /> ×1</button>
+                <button className={`talk-opt-chip ${repeat === 2 ? 'talk-opt-chip-active' : ''}`} onClick={() => setRepeat(2)} type="button">×2</button>
+              </div>
+              <div className="talk-option-group talk-cue-group">
+                {Object.entries(CUE_MAP).map(([key, c]) => (
+                  <button key={key} className={`talk-opt-chip ${cueKey === key ? 'talk-opt-chip-active' : ''}`} onClick={() => onSetCue(key)} type="button">
+                    {c.emoji} {c.label}
+                  </button>
+                ))}
+                {cueKey && <button className="talk-cue-clear" onClick={() => onSetCue(null)} type="button">✕ Clear cue</button>}
+              </div>
+            </div>
+
+            {ttsError && <div className="csf-error-box">{ttsError}</div>}
+
+            <button className="talk-say-btn" onClick={onSayIt} disabled={toolsLocked || !messageText.trim()} type="button">
+              <VolumeIcon size={20} /> Say it
+            </button>
+          </div>
+
+          <div className="talk-col-right">
+            <div className="talk-session-card">
+              <div className="talk-session-title"><ClockIcon size={15} /> TODAY'S SESSION · {sessionStart.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="talk-session-log">
+                {sessionLog.length === 0 ? (
+                  <p className="talk-session-empty">Nothing said yet.</p>
+                ) : (
+                  sessionLog.map((entry) => (
+                    <div key={entry.id} className="talk-log-row">
+                      <span className="talk-log-time">{new Date(entry.time).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="talk-log-text">{entry.text}</span>
+                      <button className="talk-log-replay" onClick={() => onReplayLog(entry)} title="Play again" type="button"><RepeatIcon size={13} /></button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <button className="talk-copy-btn" onClick={onCopyToNotes} disabled={!sessionLog.length} type="button">
+                <SaveIcon size={15} /> Copy to session notes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {toast && <div className="talk-toast">{toast}</div>}
+    </div>
+  )
+}
+
+// ─── Talk to {patient} — patient screen ──────────────────────────────────────
+
+function TalkPatientView({ patientFirstName, currentSpoken, spokenWordText, isSpeaking, onBack, onReplay, onOpenHistory, historyCount }) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.code === 'Space') { e.preventDefault(); onReplay() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onReplay])
+
+  const text = currentSpoken?.text || ''
+  const words = text.trim() ? text.trim().split(/\s+/) : []
+  const spokenWords = spokenWordText.trim() ? spokenWordText.trim().split(/\s+/) : []
+  const finished = !isSpeaking && spokenWordText === text && text.length > 0
+  const currentIndex = spokenWords.length - 1
+  const cue = currentSpoken?.cue ? CUE_MAP[currentSpoken.cue] : null
+
+  return (
+    <div className="talk-view">
+      <div className="talk-hero">
+        <div className="talk-hero-text">
+          <h2><MessageIcon size={22} /> Pao is talking to {patientFirstName}</h2>
+          <p>Tap the speaker to hear it again</p>
+        </div>
+        <button className="talk-history-btn" onClick={onOpenHistory}>
+          <ClockIcon size={16} /><span>History</span>
+          {historyCount > 0 && <span className="rec-trigger-badge">{historyCount}</span>}
+        </button>
+      </div>
+
+      <div className="talk-body">
+        <div className="talk-patient-topbar">
+          <button className="talk-back-btn" onClick={onBack} type="button"><ArrowLeftIcon size={16} /> Back to therapist</button>
+          <span className="talk-speed-chip"><TurtleIcon size={13} /> {currentSpoken?.speed === 0.75 ? 'Slow' : 'Normal'}</span>
+        </div>
+
+        <div className="talk-stage">
+          <div className="talk-mascot">
+            <PandaMascot mouthOpen={isSpeaking} pxWidth={200} pandaState="happy" />
+          </div>
+          <div className="talk-bubble">
+            <p className="talk-bubble-text">
+              {words.map((w, i) => {
+                let cls = 'talk-word-pending'
+                if (finished || i < currentIndex) cls = 'talk-word-said'
+                else if (i === currentIndex && isSpeaking) cls = 'talk-word-current'
+                return <span key={i} className={cls}>{w}{i < words.length - 1 ? ' ' : ''}</span>
+              })}
+            </p>
+          </div>
+        </div>
+
+        {cue && (
+          <div className="talk-cue-pill">
+            <span className="talk-cue-emoji">{cue.emoji}</span>
+            <span>{cue.label}</span>
+          </div>
+        )}
+
+        <div className="talk-replay-area">
+          <button className="talk-replay-btn" onClick={onReplay} aria-label="Hear it again" type="button">
+            <VolumeIcon size={40} />
+          </button>
+          <span className="talk-replay-label">Hear it again</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const TTS_HISTORY_KEY = 'csf_tts_history'
 const TTS_HISTORY_LIMIT = 50
+const EMPTY_PHRASE_GROUPS = { start: [], instructions: [], praise: [], end: [] }
 
 export default function SpeechFeaturesUI({ user, patient = null, initialTab, onChangePatient, practiceMode = false }) {
   const [activeTab, setActiveTab] = useState(initialTab === 'tts' ? 'tts' : 'stt')
@@ -716,14 +956,31 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
 
   const userEmail = (user?.email || '').trim().toLowerCase()
 
-  // ── TTS state ──
-  const [ttsText, setTtsText] = useState('')
-  const [rate, setRate] = useState(1)
-  const [pitch, setPitch] = useState(1.2)
+  // ── "Talk to {patient}" (TTS) state ──
+  const patientKey = patient?.id || '_general'
+  const patientFirstName = patient?.name ? String(patient.name).split(' ')[0] : 'the patient'
+
+  const [ttsView, setTtsView] = useState('therapist') // 'therapist' | 'patient'
+  const [messageText, setMessageText] = useState('')
+  const [speed, setSpeed] = useState(1)
+  const [repeat, setRepeat] = useState(1)
+  const [cueKey, setCueKey] = useState(null)
+  const [cueManuallySet, setCueManuallySet] = useState(false)
+  const [customPhrases, setCustomPhrases] = useState(EMPTY_PHRASE_GROUPS)
+  const [addingPhrase, setAddingPhrase] = useState(false)
+  const [newPhraseGroup, setNewPhraseGroup] = useState('start')
+  const [newPhraseText, setNewPhraseText] = useState('')
+  const [sessionLog, setSessionLog] = useState([])
+  const [sessionStart] = useState(() => new Date())
+  const [currentSpoken, setCurrentSpoken] = useState(null)
+  const [spokenWordText, setSpokenWordText] = useState('')
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [ttsError, setTtsError] = useState('')
   const [ttsHistory, setTtsHistory] = useState([])
   const [ttsActiveId, setTtsActiveId] = useState(null)
+  const [ttsToast, setTtsToast] = useState('')
+
+  const repeatTimerRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -741,6 +998,41 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       // storage unavailable (e.g. private browsing quota) — skip persisting
     }
   }, [ttsHistory])
+
+  // Custom phrases + speed/repeat settings are kept per patient.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`therapypro_talk_phrases_${patientKey}`) || 'null')
+      setCustomPhrases(saved || EMPTY_PHRASE_GROUPS)
+    } catch {
+      setCustomPhrases(EMPTY_PHRASE_GROUPS)
+    }
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem(`therapypro_talk_settings_${patientKey}`) || 'null')
+      if (savedSettings) { setSpeed(savedSettings.speed || 1); setRepeat(savedSettings.repeat || 1) }
+    } catch {
+      // keep defaults
+    }
+    try {
+      const savedLog = JSON.parse(sessionStorage.getItem(`therapypro_talk_log_${patientKey}`) || '[]')
+      setSessionLog(savedLog)
+    } catch {
+      setSessionLog([])
+    }
+    setMessageText(''); setCueKey(null); setCueManuallySet(false)
+    setCurrentSpoken(null); setSpokenWordText(''); setTtsView('therapist')
+    stopPaoVoice()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientKey])
+
+  useEffect(() => {
+    try { localStorage.setItem(`therapypro_talk_settings_${patientKey}`, JSON.stringify({ speed, repeat })) } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speed, repeat])
+
+  useEffect(() => {
+    if (!cueManuallySet) setCueKey(suggestCue(messageText))
+  }, [messageText, cueManuallySet])
 
   useEffect(() => { transcriptRef.current = transcript }, [transcript])
 
@@ -804,7 +1096,18 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
 
     let stream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Ask the browser's own audio pipeline to suppress steady background
+      // noise (fans, hum, hallway chatter) and normalise volume, so the
+      // recording stays focused on the therapist/patient conversation
+      // instead of the room around them.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      })
     } catch {
       setSttError('🎤 Microphone denied! Click the 🔒 lock icon in the address bar and allow microphone.')
       return
@@ -994,48 +1297,151 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     onChangePatient()
   }
 
-  // ── TTS ──
-  const speak = (text, speakRate, speakPitch, { onStop } = {}) => {
-    if (!text.trim()) return
-    if (!window.speechSynthesis) { setTtsError('🔇 Not supported. Use Chrome!'); return }
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(text)
-    u.rate = speakRate; u.pitch = speakPitch
-    u.onstart = () => setIsSpeaking(true)
-    u.onend = () => { setIsSpeaking(false); setTtsActiveId(null); onStop?.() }
-    u.onerror = () => { setIsSpeaking(false); setTtsActiveId(null); setTtsError('Something went wrong! 😅'); onStop?.() }
-    window.speechSynthesis.speak(u); setTtsError('')
+  // ── "Talk to {patient}" (TTS) ──
+  const persistSessionLog = (log) => {
+    try { sessionStorage.setItem(`therapypro_talk_log_${patientKey}`, JSON.stringify(log)) } catch { /* ignore */ }
   }
 
-  const handleSpeak = () => {
-    if (toolsLocked) return
-    if (!ttsText.trim()) return
-    setTtsActiveId(null)
+  const logSpokenMessage = (text, spokenSpeed, cue) => {
+    const entry = { id: Date.now(), time: new Date().toISOString(), text, speed: spokenSpeed, cue }
+    setSessionLog(prev => { const next = [...prev, entry]; persistSessionLog(next); return next })
     setTtsHistory(prev => [
-      { id: Date.now(), date: new Date(), text: ttsText.trim(), rate, pitch, patientId: patient?.id || null, patientName: patient?.name || null },
+      { id: entry.id, date: new Date(), text, rate: spokenSpeed, cue, patientId: patient?.id || null, patientName: patient?.name || null },
       ...prev,
     ].slice(0, TTS_HISTORY_LIMIT))
-    speak(ttsText, rate, pitch)
   }
 
-  const stopSpeaking = () => { window.speechSynthesis?.cancel(); setIsSpeaking(false); setTtsActiveId(null) }
+  const speakMessage = (rawText, { cueOverride } = {}) => {
+    if (toolsLocked) return
+    const text = String(rawText || '').trim()
+    if (!text) return
+    if (!window.speechSynthesis) { setTtsError('🔇 Not supported. Use Google Chrome!'); return }
+    const cue = cueOverride !== undefined ? cueOverride : suggestCue(text)
+    const spokenSpeed = speed
+    clearTimeout(repeatTimerRef.current)
+    stopPaoVoice()
+    setTtsActiveId(null)
+    setCurrentSpoken({ text, cue, speed: spokenSpeed })
+    setSpokenWordText('')
+    setTtsView('patient')
+    setTtsError('')
+
+    let remaining = repeat
+    const runOnce = () => {
+      speakPao(text, {
+        rate: spokenSpeed,
+        onStart: () => setIsSpeaking(true),
+        onWord: (partial) => setSpokenWordText(partial),
+        onEnd: () => {
+          setSpokenWordText(text)
+          remaining -= 1
+          if (remaining > 0) {
+            repeatTimerRef.current = setTimeout(runOnce, 500)
+          } else {
+            setIsSpeaking(false)
+          }
+        },
+      })
+    }
+    runOnce()
+    logSpokenMessage(text, spokenSpeed, cue)
+  }
+
+  const handleSayIt = () => {
+    if (!messageText.trim()) return
+    speakMessage(messageText, { cueOverride: cueKey })
+  }
+
+  const handlePhraseTap = (phraseText) => {
+    speakMessage(fillName(phraseText, patientFirstName))
+  }
+
+  const replayCurrent = () => {
+    if (!currentSpoken) return
+    clearTimeout(repeatTimerRef.current)
+    stopPaoVoice()
+    setSpokenWordText('')
+    speakPao(currentSpoken.text, {
+      rate: currentSpoken.speed,
+      onStart: () => setIsSpeaking(true),
+      onWord: (partial) => setSpokenWordText(partial),
+      onEnd: () => { setSpokenWordText(currentSpoken.text); setIsSpeaking(false) },
+    })
+  }
+
+  const replayLogEntry = (entry) => {
+    clearTimeout(repeatTimerRef.current)
+    stopPaoVoice()
+    setCurrentSpoken({ text: entry.text, cue: entry.cue, speed: entry.speed })
+    setSpokenWordText('')
+    setTtsView('patient')
+    speakPao(entry.text, {
+      rate: entry.speed,
+      onStart: () => setIsSpeaking(true),
+      onWord: (partial) => setSpokenWordText(partial),
+      onEnd: () => { setSpokenWordText(entry.text); setIsSpeaking(false) },
+    })
+  }
+
+  const handleBackToTherapist = () => {
+    clearTimeout(repeatTimerRef.current)
+    stopPaoVoice()
+    setIsSpeaking(false)
+    setTtsView('therapist')
+  }
+
+  const handleAddCustomPhrase = () => {
+    const text = newPhraseText.trim()
+    if (!text) return
+    setCustomPhrases(prev => {
+      const next = { ...prev, [newPhraseGroup]: [...(prev[newPhraseGroup] || []), text] }
+      try { localStorage.setItem(`therapypro_talk_phrases_${patientKey}`, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+    setNewPhraseText(''); setAddingPhrase(false)
+  }
+
+  const handleRemoveCustomPhrase = (group, text) => {
+    setCustomPhrases(prev => {
+      const next = { ...prev, [group]: (prev[group] || []).filter((p) => p !== text) }
+      try { localStorage.setItem(`therapypro_talk_phrases_${patientKey}`, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  const showTtsToast = (msg) => {
+    setTtsToast(msg)
+    setTimeout(() => setTtsToast(''), 2200)
+  }
+
+  const handleCopyToNotes = () => {
+    if (!sessionLog.length) return
+    const lines = sessionLog
+      .map((e) => `${new Date(e.time).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })} — ${e.text}`)
+      .join('\n')
+    navigator.clipboard?.writeText(lines).then(() => showTtsToast('📋 Copied to clipboard!')).catch(() => showTtsToast('Could not copy.'))
+  }
 
   const handleHistoryPlay = (item) => {
-    if (ttsActiveId === item.id) { stopSpeaking(); return }
+    if (ttsActiveId === item.id) { stopPaoVoice(); setTtsActiveId(null); return }
     setTtsActiveId(item.id)
-    speak(item.text, item.rate, item.pitch)
+    speakPao(item.text, { rate: item.rate, onEnd: () => setTtsActiveId(null) })
   }
 
   const handleHistoryReuse = (item) => {
-    setTtsText(item.text); setRate(item.rate); setPitch(item.pitch); setShowTtsModal(false)
+    setMessageText(item.text)
+    setCueKey(item.cue || null)
+    setCueManuallySet(!!item.cue)
+    setTtsView('therapist')
+    setShowTtsModal(false)
   }
 
   const handleHistoryDelete = (id) => {
-    if (ttsActiveId === id) stopSpeaking()
+    if (ttsActiveId === id) { stopPaoVoice(); setTtsActiveId(null) }
     setTtsHistory(prev => prev.filter(x => x.id !== id))
   }
 
-  const clearTtsHistory = () => { stopSpeaking(); setTtsHistory([]) }
+  const clearTtsHistory = () => { stopPaoVoice(); setTtsActiveId(null); setTtsHistory([]) }
 
   return (
     <div className="csf-root">
@@ -1146,68 +1552,53 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         </div>
       )}
 
-      {/* ══════════ TEXT TO SPEECH ══════════ */}
+      {/* ══════════ TALK TO {PATIENT} (TEXT TO SPEECH) ══════════ */}
       {activeTab === 'tts' && (
-        <div className="csf-card" style={{ position: 'relative' }}>
-
-          {/* History button — top right */}
-          <button className="rec-trigger-btn" onClick={() => setShowTtsModal(true)}>
-            <FolderIcon />
-            <span>History</span>
-            {ttsHistory.length > 0 && (
-              <span className="rec-trigger-badge">{ttsHistory.length}</span>
-            )}
-          </button>
-
-          <div className="csf-hero csf-hero-speaker">
-            <div className="csf-hero-stars">
-              <span className="csf-star s1">🎵</span><span className="csf-star s2">🎶</span>
-              <span className="csf-star s3">🎵</span><span className="csf-star s4">🎶</span>
-              <span className="csf-star s5">🎵</span>
-            </div>
-            <h2 className="csf-hero-title">🔊 Voice Magic</h2>
-            <p className="csf-hero-sub">{TTS_HINTS[0]}</p>
-          </div>
-
-          <div className="csf-input-area">
-            <textarea className="csf-textarea" value={ttsText} onChange={e => setTtsText(e.target.value)}
-              placeholder="✏️  Write something here and I will read it out loud for you!" rows={4} />
-          </div>
-
-          <div className="csf-wave-area"><Waveform active={isSpeaking} /></div>
-
-          <div className="csf-btn-area">
-            {isSpeaking && (
-              <><span className="csf-ring csf-ring1 csf-ring-green"/><span className="csf-ring csf-ring2 csf-ring-green"/><span className="csf-ring csf-ring3 csf-ring-green"/></>
-            )}
-            <button
-              className={`csf-main-btn ${isSpeaking ? 'csf-btn-speaking' : 'csf-btn-idle-speaker'}`}
-              onClick={isSpeaking ? stopSpeaking : handleSpeak}
-              disabled={toolsLocked || (!ttsText.trim() && !isSpeaking)}
-            >
-              {isSpeaking ? <StopIcon /> : <SpeakerIcon />}
-            </button>
-          </div>
-
-          <p className="csf-status-text">{toolsLocked ? 'Choose a patient to start' : (isSpeaking ? '🟢 Speaking... tap to stop!' : '👇 Tap the speaker to listen!')}</p>
-
-          <div className="csf-controls-row">
-            <div className="csf-control-pill">
-              <span className="csf-ctl-emoji">🐢</span>
-              <input type="range" min="0.5" max="2" step="0.1" value={rate} onChange={e => setRate(parseFloat(e.target.value))} />
-              <span className="csf-ctl-emoji">🐇</span>
-              <span className="csf-ctl-badge">{rate.toFixed(1)}x</span>
-            </div>
-            <div className="csf-control-pill">
-              <span className="csf-ctl-emoji">🔉</span>
-              <input type="range" min="0" max="2" step="0.1" value={pitch} onChange={e => setPitch(parseFloat(e.target.value))} />
-              <span className="csf-ctl-emoji">🔊</span>
-              <span className="csf-ctl-badge">{pitch.toFixed(1)}</span>
-            </div>
-          </div>
-
-          {ttsError && <div className="csf-error-box">{ttsError}</div>}
-          {ttsText && <button className="csf-action-btn csf-btn-clear" onClick={() => setTtsText('')} style={{marginTop:12}}>🗑️ Clear</button>}
+        <div className="csf-card talk-card">
+          {ttsView === 'therapist' ? (
+            <TalkTherapistView
+              toolsLocked={toolsLocked}
+              patientFirstName={patientFirstName}
+              customPhrases={customPhrases}
+              onPhraseTap={handlePhraseTap}
+              addingPhrase={addingPhrase}
+              setAddingPhrase={setAddingPhrase}
+              newPhraseGroup={newPhraseGroup}
+              setNewPhraseGroup={setNewPhraseGroup}
+              newPhraseText={newPhraseText}
+              setNewPhraseText={setNewPhraseText}
+              onAddCustomPhrase={handleAddCustomPhrase}
+              onRemoveCustomPhrase={handleRemoveCustomPhrase}
+              messageText={messageText}
+              setMessageText={setMessageText}
+              onSayIt={handleSayIt}
+              speed={speed}
+              setSpeed={setSpeed}
+              repeat={repeat}
+              setRepeat={setRepeat}
+              cueKey={cueKey}
+              onSetCue={(k) => { setCueKey(k); setCueManuallySet(true) }}
+              sessionLog={sessionLog}
+              sessionStart={sessionStart}
+              onReplayLog={replayLogEntry}
+              onCopyToNotes={handleCopyToNotes}
+              onOpenHistory={() => setShowTtsModal(true)}
+              historyCount={ttsHistory.length}
+              ttsError={ttsError}
+              toast={ttsToast}
+            />
+          ) : (
+            <TalkPatientView
+              patientFirstName={patientFirstName}
+              currentSpoken={currentSpoken}
+              spokenWordText={spokenWordText}
+              isSpeaking={isSpeaking}
+              onBack={handleBackToTherapist}
+              onReplay={replayCurrent}
+              onOpenHistory={() => setShowTtsModal(true)}
+              historyCount={ttsHistory.length}
+            />
+          )}
         </div>
       )}
 
@@ -1544,6 +1935,122 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         .csf-action-btn { border:none; border-radius:12px; padding:10px 24px; font-size:14px; font-weight:700; cursor:pointer; transition:transform 0.15s; display:block; margin:0 auto; }
         .csf-action-btn:hover { transform:translateY(-2px); }
         .csf-btn-clear { background:#fef2f2; color:#ef4444; border:1.5px solid #fca5a5; }
+
+        /* ── Talk to {patient} ── */
+        .talk-card { padding-bottom:0; }
+        .talk-view { display:flex; flex-direction:column; }
+        .talk-hero {
+          background:linear-gradient(135deg,#059669 0%,#0d9488 55%,#38bdf8 100%);
+          padding:20px 24px; display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;
+        }
+        .talk-hero-text h2 { margin:0 0 4px; font-size:20px; font-weight:800; color:#fff; display:flex; align-items:center; gap:9px; }
+        .talk-hero-text p { margin:0; font-size:13px; color:rgba(255,255,255,0.9); font-weight:600; }
+        .talk-history-btn {
+          display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.22); backdrop-filter:blur(8px);
+          border:1.5px solid rgba(255,255,255,0.5); border-radius:20px; color:#fff; font-size:13px; font-weight:700;
+          cursor:pointer; padding:8px 15px; flex-shrink:0; transition:all 0.2s;
+        }
+        .talk-history-btn:hover { background:rgba(255,255,255,0.35); transform:scale(1.03); }
+
+        .talk-body { padding:20px 24px 24px; }
+        .talk-columns { display:flex; gap:22px; align-items:flex-start; }
+        .talk-col-left { flex:1; min-width:0; }
+        .talk-col-right { width:330px; flex-shrink:0; }
+        @media (max-width:760px) { .talk-columns { flex-direction:column; } .talk-col-right { width:100%; } }
+
+        .talk-phrase-group { margin-bottom:14px; }
+        .talk-phrase-label { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:0.5px; margin-bottom:8px; }
+        .talk-phrase-row { display:flex; flex-wrap:wrap; gap:8px; }
+        .talk-phrase-pill { border:none; border-radius:20px; padding:9px 16px; font-size:13.5px; font-weight:700; cursor:pointer; transition:transform 0.15s; font-family:inherit; }
+        .talk-phrase-pill:hover:not(:disabled) { transform:translateY(-1px) scale(1.02); }
+        .talk-phrase-pill:disabled { opacity:0.5; cursor:not-allowed; }
+        .talk-phrase-pill-custom { display:inline-flex; align-items:center; gap:4px; padding:0; border-radius:20px; }
+        .talk-phrase-pill-text { border:none; background:none; padding:9px 6px 9px 16px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; color:inherit; }
+        .talk-phrase-remove { border:none; background:rgba(0,0,0,0.08); color:inherit; width:20px; height:20px; border-radius:50%; margin-right:8px; cursor:pointer; font-size:14px; line-height:1; display:flex; align-items:center; justify-content:center; font-family:inherit; }
+        .talk-phrase-remove:hover { background:rgba(0,0,0,0.18); }
+
+        .talk-add-pill { display:inline-flex; align-items:center; gap:6px; background:none; border:2px dashed #cbd5e1; border-radius:20px; padding:8px 16px; font-size:13px; font-weight:700; color:#64748b; cursor:pointer; margin-top:2px; margin-bottom:18px; }
+        .talk-add-pill:hover { border-color:#0d9488; color:#0d9488; }
+        .talk-add-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:18px; background:#f0fdfa; border:1.5px solid #99f6e4; border-radius:16px; padding:10px 12px; }
+        .talk-add-form select { border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; background:#fff; }
+        .talk-add-form input { flex:1; min-width:140px; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; outline:none; }
+        .talk-add-form input:focus { border-color:#0d9488; }
+        .talk-add-confirm { display:flex; align-items:center; gap:4px; border:none; border-radius:10px; padding:8px 14px; background:linear-gradient(135deg,#059669,#0d9488); color:#fff; font-size:13px; font-weight:800; cursor:pointer; }
+        .talk-add-cancel { border:none; background:none; color:#94a3b8; font-size:13px; font-weight:700; cursor:pointer; padding:8px 6px; }
+
+        .talk-message-block { margin-bottom:16px; }
+        .talk-message-label { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:0.5px; margin-bottom:8px; }
+        .talk-textarea {
+          width:100%; box-sizing:border-box; border:3px solid #0d9488; border-radius:18px; padding:16px;
+          font-size:22px; font-weight:700; color:#134e4a; font-family:inherit; resize:none; outline:none;
+          transition:box-shadow 0.2s; background:#f0fdfa;
+        }
+        .talk-textarea:focus { box-shadow:0 0 0 5px rgba(13,148,136,0.18); }
+        .talk-char-count { text-align:right; font-size:11px; color:#94a3b8; font-weight:700; margin-top:4px; }
+
+        .talk-options-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center; }
+        .talk-option-group { display:flex; gap:6px; background:#f8fafc; border-radius:14px; padding:5px; border:1.5px solid #e2e8f0; }
+        .talk-cue-group { flex-wrap:wrap; background:none; border:none; padding:0; gap:8px; }
+        .talk-opt-chip { display:flex; align-items:center; gap:5px; border:none; background:none; border-radius:10px; padding:7px 12px; font-size:12.5px; font-weight:700; color:#64748b; cursor:pointer; font-family:inherit; white-space:nowrap; }
+        .talk-cue-group .talk-opt-chip { background:#fff; border:1.5px solid #e2e8f0; }
+        .talk-opt-chip-active { background:linear-gradient(135deg,#059669,#0d9488); color:#fff; }
+        .talk-cue-group .talk-opt-chip-active { border-color:transparent; }
+        .talk-cue-clear { border:none; background:none; color:#94a3b8; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline; }
+
+        .talk-say-btn { display:flex; align-items:center; justify-content:center; gap:9px; width:100%; border:none; border-radius:18px; padding:17px; background:linear-gradient(135deg,#059669,#0d9488); color:#fff; font-size:17px; font-weight:800; cursor:pointer; box-shadow:0 10px 26px rgba(5,150,105,0.32); transition:transform 0.15s; }
+        .talk-say-btn:hover:not(:disabled) { transform:translateY(-2px); }
+        .talk-say-btn:disabled { opacity:0.4; cursor:not-allowed; box-shadow:none; }
+
+        .talk-session-card { background:#f0fdfa; border-radius:20px; border:1.5px solid #ccfbf1; padding:16px; position:sticky; top:16px; }
+        .talk-session-title { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#0d9488; letter-spacing:0.4px; margin-bottom:12px; }
+        .talk-session-log { display:flex; flex-direction:column; gap:10px; max-height:340px; overflow-y:auto; margin-bottom:14px; }
+        .talk-session-empty { font-size:12.5px; color:#94a3b8; font-style:italic; margin:0; }
+        .talk-log-row { display:flex; align-items:flex-start; gap:8px; font-size:12.5px; }
+        .talk-log-time { color:#0d9488; font-weight:800; font-family:'Courier New',monospace; flex-shrink:0; }
+        .talk-log-text { flex:1; color:#334155; font-weight:600; line-height:1.5; }
+        .talk-log-replay { flex-shrink:0; border:none; background:#ccfbf1; color:#0d9488; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .talk-log-replay:hover { background:#99f6e4; }
+        .talk-copy-btn { width:100%; display:flex; align-items:center; justify-content:center; gap:7px; border:none; border-radius:12px; padding:11px; background:#fff; color:#0d9488; border:1.5px solid #99f6e4; font-size:13px; font-weight:800; cursor:pointer; }
+        .talk-copy-btn:hover:not(:disabled) { background:#ccfbf1; }
+        .talk-copy-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+        .talk-toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:#134e4a; color:#fff; padding:11px 22px; border-radius:14px; font-size:13.5px; font-weight:700; box-shadow:0 10px 30px rgba(0,0,0,0.25); z-index:1300; animation:modalFadeIn 0.2s ease; }
+
+        /* ── Talk to {patient} — patient screen ── */
+        .talk-patient-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+        .talk-back-btn { display:flex; align-items:center; gap:7px; border:1.5px solid #e2e8f0; background:#fff; border-radius:12px; padding:9px 15px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+        .talk-back-btn:hover { border-color:#99f6e4; color:#0d9488; }
+        .talk-speed-chip { display:flex; align-items:center; gap:5px; background:#f0fdfa; border:1.5px solid #ccfbf1; border-radius:20px; padding:6px 13px; font-size:12px; font-weight:800; color:#0d9488; }
+
+        .talk-stage { display:flex; align-items:center; gap:24px; flex-wrap:wrap; justify-content:center; margin-bottom:20px; }
+        .talk-mascot { flex-shrink:0; }
+        .talk-bubble {
+          flex:1; min-width:260px; max-width:480px; position:relative;
+          background:linear-gradient(135deg,#ffffff,#f0fdfa); border:4px solid #99f6e4; border-radius:32px;
+          padding:28px 30px;
+        }
+        .talk-bubble::before {
+          content:''; position:absolute; left:-22px; top:50%; transform:translateY(-50%);
+          border:12px solid transparent; border-right-color:#99f6e4;
+        }
+        .talk-bubble::after {
+          content:''; position:absolute; left:-16px; top:50%; transform:translateY(-50%);
+          border:10px solid transparent; border-right-color:#f0fdfa;
+        }
+        .talk-bubble-text { margin:0; font-size:32px; font-weight:800; line-height:1.5; }
+        @media (max-width:600px) { .talk-bubble-text { font-size:24px; } .talk-bubble::before, .talk-bubble::after { display:none; } }
+        .talk-word-pending { color:#cbd5e1; }
+        .talk-word-said { color:#0d9488; }
+        .talk-word-current { background:#fde68a; box-shadow:0 3px 0 #f59e0b; border-radius:6px; padding:0 2px; color:#1e293b; }
+
+        .talk-cue-pill { display:flex; align-items:center; gap:10px; justify-content:center; margin:0 auto 20px; width:fit-content; background:#f5f3ff; color:#6d28d9; border-radius:24px; padding:12px 26px; font-size:19px; font-weight:800; }
+        .talk-cue-emoji { font-size:34px; }
+
+        .talk-replay-area { display:flex; flex-direction:column; align-items:center; gap:10px; }
+        .talk-replay-btn { width:120px; height:120px; border-radius:50%; border:none; background:linear-gradient(135deg,#059669,#0d9488); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 12px 32px rgba(5,150,105,0.4); transition:transform 0.15s; }
+        .talk-replay-btn:hover { transform:scale(1.06); }
+        .talk-replay-btn:active { transform:scale(0.96); }
+        .talk-replay-label { font-size:15px; font-weight:800; color:#0d9488; }
       `}</style>
     </div>
   )

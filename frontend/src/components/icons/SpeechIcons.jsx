@@ -146,3 +146,67 @@ export function SwapIcon(props) {
     </Icon>
   )
 }
+
+export function MessageIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </Icon>
+  )
+}
+
+export function PenIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+      <path d="m15 5 4 4" />
+    </Icon>
+  )
+}
+
+export function PlusIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  )
+}
+
+export function RepeatIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="m17 2 4 4-4 4" />
+      <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+      <path d="m7 22-4-4 4-4" />
+      <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+    </Icon>
+  )
+}
+
+export function TurtleIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M10 3c1.5 1 2.5 1 4 0M12 3v4" />
+      <path d="M4.5 12.5C4.5 9 8 6 12 6s7.5 3 7.5 6.5c0 1-1 2-2 2h-.5a2 2 0 0 0-2 2v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2h-.5c-1 0-2-1-2-2z" />
+      <circle cx="8" cy="12" r="1" />
+      <path d="M2 9c1 0 2 1 2 2M22 9c-1 0-2 1-2 2M9 19l-1.5 2M15 19l1.5 2" />
+    </Icon>
+  )
+}
+
+export function SaveIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <path d="M17 21v-8H7v8M7 3v5h8" />
+    </Icon>
+  )
+}
+
+export function ArrowLeftIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </Icon>
+  )
+}

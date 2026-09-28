@@ -63,10 +63,16 @@ import paoHairItem from './_lib/routes/pao-hair-item.js'
 import paoThemesList from './_lib/routes/pao-themes-list.js'
 import paoThemesItem from './_lib/routes/pao-themes-item.js'
 import gamesList from './_lib/routes/games-list.js'
-import recordingsCreate from './_lib/routes/recordings-create.js'
-import recordingsList from './_lib/routes/recordings-list.js'
-import recordingsItem from './_lib/routes/recordings-item.js'
-import recordingsSummarize from './_lib/routes/recordings-summarize.js'
+import speechRecordingsCreate from './_lib/routes/speech-recordings-create.js'
+import speechRecordingsList from './_lib/routes/speech-recordings-list.js'
+import speechRecordingsItem from './_lib/routes/speech-recordings-item.js'
+import speechRecordingsSummarize from './_lib/routes/speech-recordings-summarize.js'
+import speechPhrasesCreate from './_lib/routes/speech-phrases-create.js'
+import speechPhrasesList from './_lib/routes/speech-phrases-list.js'
+import speechPhrasesItem from './_lib/routes/speech-phrases-item.js'
+import speechMessagesCreate from './_lib/routes/speech-messages-create.js'
+import speechMessagesList from './_lib/routes/speech-messages-list.js'
+import speechMessagesItem from './_lib/routes/speech-messages-item.js'
 
 const app = express()
 
@@ -124,10 +130,16 @@ app.all('/api/pao-hair/:id', paoHairItem)
 app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
 app.all('/api/games/list', gamesList)
-app.all('/api/recordings/create', recordingsCreate)
-app.all('/api/recordings/list', recordingsList)
-app.all('/api/recordings/:id/summarize', recordingsSummarize)
-app.all('/api/recordings/:id', recordingsItem)
+app.all('/api/speech-recordings/create', speechRecordingsCreate)
+app.all('/api/speech-recordings/list', speechRecordingsList)
+app.all('/api/speech-recordings/:id/summarize', speechRecordingsSummarize)
+app.all('/api/speech-recordings/:id', speechRecordingsItem)
+app.all('/api/speech-phrases/create', speechPhrasesCreate)
+app.all('/api/speech-phrases/list', speechPhrasesList)
+app.all('/api/speech-phrases/:id', speechPhrasesItem)
+app.all('/api/speech-messages/create', speechMessagesCreate)
+app.all('/api/speech-messages/list', speechMessagesList)
+app.all('/api/speech-messages/:id', speechMessagesItem)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

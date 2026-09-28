@@ -1,17 +1,17 @@
 import mongoose from 'mongoose'
 import { getMongo } from '../mongo.js'
-import { SessionRecording } from '../models/sessionRecording.js'
-import { serializeRecording } from '../serializeRecording.js'
+import { SpeechToTextRecording } from '../models/speechToTextRecording.js'
+import { SpeechDeletion } from '../models/speechDeletion.js'
+import { resolveSpeechCreator } from '../resolveSpeechCreator.js'
+import { serializeSttRecording } from '../serializeSttRecording.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
+const PURGE_DAYS = 30
 
-// PATCH /api/recordings/:id -> rename, re-assign patient, or update the
-// summary (used by the "Try again" retry and by /summarize itself).
-// DELETE /api/recordings/:id -> removes the Mongo document; the caller is
-// responsible for also deleting the IndexedDB audio blob (the browser owns
-// that store, not this API).
-// Both require `therapistEmail` so one account can never touch another's
-// recording, even by guessing an id.
+// PATCH /api/speech-recordings/:id -> rename, re-assign patient, or update
+// the summary. DELETE /api/speech-recordings/:id -> soft delete (moves to
+// Trash: is_deleted/status flip, purge_after set 30 days out) and logs a
+// speech_deletions entry; the caller also deletes the IndexedDB audio blob.
 export default async function handler(req, res) {
   if (req.method === 'PATCH') return handlePatch(req, res)
   if (req.method === 'DELETE') return handleDelete(req, res)
@@ -21,12 +21,12 @@ export default async function handler(req, res) {
 
 async function ownedRecording(id, therapistEmail) {
   if (!mongoose.isValidObjectId(id)) return { error: 'Invalid recording id.', status: 400 }
-  const email = str(therapistEmail).toLowerCase()
-  if (!email) return { error: 'Missing therapistEmail.', status: 400 }
-  const doc = await SessionRecording.findById(id)
+  const creator = await resolveSpeechCreator(therapistEmail)
+  if (!creator) return { error: 'Recording not found.', status: 404 }
+  const doc = await SpeechToTextRecording.findOne({ _id: id, is_deleted: false })
   if (!doc) return { error: 'Recording not found.', status: 404 }
-  if (doc.therapist_email !== email) return { error: 'Recording not found.', status: 404 }
-  return { doc }
+  if (String(doc.created_by) !== String(creator.id)) return { error: 'Recording not found.', status: 404 }
+  return { doc, creator }
 }
 
 async function handlePatch(req, res) {
@@ -53,9 +53,9 @@ async function handlePatch(req, res) {
     if (summaryStatus !== undefined) doc.summary_status = summaryStatus
 
     await doc.save()
-    return res.status(200).json({ recording: serializeRecording(doc) })
+    return res.status(200).json({ recording: serializeSttRecording(doc) })
   } catch (err) {
-    console.error('recordings/update error:', err)
+    console.error('speech-recordings/update error:', err)
     return res.status(500).json({ error: err.message || 'Could not update the recording.' })
   }
 }
@@ -66,13 +66,34 @@ async function handleDelete(req, res) {
 
   try {
     await getMongo()
-    const { doc, error, status } = await ownedRecording(id, therapistEmail)
+    const { doc, error, status, creator } = await ownedRecording(id, therapistEmail)
     if (error) return res.status(status).json({ error })
-    const audioKey = doc.audio_key
-    await SessionRecording.findByIdAndDelete(id)
+
+    const now = new Date()
+    doc.is_deleted = true
+    doc.status = 'deleted'
+    doc.deleted_at = now
+    doc.deleted_by = creator.id
+    doc.purge_after = new Date(now.getTime() + PURGE_DAYS * 24 * 60 * 60 * 1000)
+    await doc.save()
+
+    await SpeechDeletion.create({
+      collection_name: 'speech_to_text_recordings',
+      record_id: doc._id,
+      patient_id: doc.patient_id,
+      branch_id: doc.branch_id,
+      label: doc.title || null,
+      method: 'manual',
+      deleted_by: creator.id,
+      deleted_by_role: creator.role,
+      had_audio_file: !!doc.file_path,
+      deleted_at: now,
+    })
+
+    const audioKey = doc.file_path && doc.file_path.startsWith('indexeddb:') ? doc.file_path.slice('indexeddb:'.length) : null
     return res.status(200).json({ id, audioKey })
   } catch (err) {
-    console.error('recordings/delete error:', err)
+    console.error('speech-recordings/delete error:', err)
     return res.status(500).json({ error: err.message || 'Could not delete the recording.' })
   }
 }

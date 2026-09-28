@@ -1,15 +1,16 @@
-// Shared shape mapper for the recordings routes.
-export function serializeRecording(doc) {
+const AUDIO_PREFIX = 'indexeddb:'
+
+export function serializeSttRecording(doc) {
   return {
     id: String(doc._id),
-    therapistEmail: doc.therapist_email,
     patientId: doc.patient_id ? String(doc.patient_id) : null,
     patientName: doc.patient_name || null,
-    title: doc.title,
+    sessionId: doc.session_id || null,
+    title: doc.title || 'Untitled session',
     transcript: doc.transcript || '',
     segments: (doc.segments || []).map((s) => ({ t: s.t, text: s.text })),
-    durationSec: doc.duration_sec,
-    wordCount: doc.word_count,
+    durationSec: doc.duration_seconds ?? 0,
+    wordCount: doc.word_count ?? 0,
     summary: doc.summary ? {
       overview: doc.summary.overview || '',
       goals: doc.summary.goals || [],
@@ -18,8 +19,12 @@ export function serializeRecording(doc) {
       generatedAt: doc.summary.generated_at,
     } : null,
     summaryStatus: doc.summary_status,
-    audioKey: doc.audio_key,
+    audioKey: doc.file_path && doc.file_path.startsWith(AUDIO_PREFIX) ? doc.file_path.slice(AUDIO_PREFIX.length) : null,
     createdAt: doc.created_at,
     updatedAt: doc.updated_at,
   }
+}
+
+export function audioKeyToFilePath(audioKey) {
+  return audioKey ? `${AUDIO_PREFIX}${audioKey}` : null
 }

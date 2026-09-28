@@ -748,13 +748,13 @@ function TalkTherapistView({
                 <div className="talk-phrase-row">
                   {group.phrases.map((p) => (
                     <button key={p} className="talk-phrase-pill" style={{ background: group.bg, color: group.fg }}
-                      onClick={() => onPhraseTap(p)} disabled={toolsLocked} type="button">
+                      onClick={() => onPhraseTap(p, group.key)} disabled={toolsLocked} type="button">
                       {fillName(p, patientFirstName)}
                     </button>
                   ))}
                   {(customPhrases[group.key] || []).map((p) => (
-                    <span key={p} className="talk-phrase-pill talk-phrase-pill-custom" style={{ background: group.bg, color: group.fg }}>
-                      <button className="talk-phrase-pill-text" onClick={() => onPhraseTap(p)} disabled={toolsLocked} type="button">{p}</button>
+                    <span key={p.id} className="talk-phrase-pill talk-phrase-pill-custom" style={{ background: group.bg, color: group.fg }}>
+                      <button className="talk-phrase-pill-text" onClick={() => onPhraseTap(p.text, group.key, { isCustom: true, phraseId: p.id })} disabled={toolsLocked} type="button">{fillName(p.text, patientFirstName)}</button>
                       <button className="talk-phrase-remove" onClick={() => onRemoveCustomPhrase(group.key, p)} title="Remove" type="button">×</button>
                     </span>
                   ))}
@@ -918,7 +918,6 @@ function TalkPatientView({ patientFirstName, currentSpoken, spokenWordText, isSp
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const TTS_HISTORY_KEY = 'csf_tts_history'
 const TTS_HISTORY_LIMIT = 50
 const EMPTY_PHRASE_GROUPS = { start: [], instructions: [], praise: [], end: [] }
 
@@ -956,6 +955,21 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
 
   const userEmail = (user?.email || '').trim().toLowerCase()
 
+  // One id per browser tab, reused across a refresh (sessionStorage) so both
+  // "today's session" panels and STT recordings can be grouped by visit.
+  const [sessionId] = useState(() => {
+    try {
+      let id = sessionStorage.getItem('therapypro_talk_session_id')
+      if (!id) {
+        id = (window.crypto?.randomUUID ? window.crypto.randomUUID() : `s_${Date.now()}_${Math.random().toString(36).slice(2)}`)
+        sessionStorage.setItem('therapypro_talk_session_id', id)
+      }
+      return id
+    } catch {
+      return `s_${Date.now()}`
+    }
+  })
+
   // ── "Talk to {patient}" (TTS) state ──
   const patientKey = patient?.id || '_general'
   const patientFirstName = patient?.name ? String(patient.name).split(' ')[0] : 'the patient'
@@ -982,48 +996,54 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
 
   const repeatTimerRef = useRef(null)
 
+  // Full "Speech History" (all-time, all patients) for the History modal —
+  // backed by text_to_speech_messages rather than localStorage now.
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(TTS_HISTORY_KEY) || '[]')
-      setTtsHistory(saved.map(item => ({ ...item, date: new Date(item.date) })))
-    } catch {
-      // ignore corrupted storage
-    }
-  }, [])
+    if (!userEmail) { setTtsHistory([]); return }
+    fetch(`/api/speech-messages/list?therapistEmail=${encodeURIComponent(userEmail)}`)
+      .then((r) => r.json())
+      .then((body) => {
+        setTtsHistory((body.messages || []).map((m) => ({
+          id: m.id, date: new Date(m.createdAt), text: m.text, rate: m.speed, cue: m.cue,
+          patientId: m.patientId, patientName: m.patientName,
+        })))
+      })
+      .catch(() => {})
+  }, [userEmail])
 
+  // Speed/repeat are a UI preference (no DB field for it), kept per patient.
+  // Custom phrases and "today's session" are DB-backed per patient.
   useEffect(() => {
-    try {
-      localStorage.setItem(TTS_HISTORY_KEY, JSON.stringify(ttsHistory))
-    } catch {
-      // storage unavailable (e.g. private browsing quota) — skip persisting
-    }
-  }, [ttsHistory])
-
-  // Custom phrases + speed/repeat settings are kept per patient.
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(`therapypro_talk_phrases_${patientKey}`) || 'null')
-      setCustomPhrases(saved || EMPTY_PHRASE_GROUPS)
-    } catch {
-      setCustomPhrases(EMPTY_PHRASE_GROUPS)
-    }
     try {
       const savedSettings = JSON.parse(localStorage.getItem(`therapypro_talk_settings_${patientKey}`) || 'null')
       if (savedSettings) { setSpeed(savedSettings.speed || 1); setRepeat(savedSettings.repeat || 1) }
     } catch {
       // keep defaults
     }
-    try {
-      const savedLog = JSON.parse(sessionStorage.getItem(`therapypro_talk_log_${patientKey}`) || '[]')
-      setSessionLog(savedLog)
-    } catch {
-      setSessionLog([])
-    }
     setMessageText(''); setCueKey(null); setCueManuallySet(false)
     setCurrentSpoken(null); setSpokenWordText(''); setTtsView('therapist')
     stopPaoVoice()
+
+    if (!userEmail) { setCustomPhrases(EMPTY_PHRASE_GROUPS); setSessionLog([]); return }
+    const patientQuery = patient?.id ? `&patientId=${encodeURIComponent(patient.id)}` : ''
+
+    fetch(`/api/speech-phrases/list?therapistEmail=${encodeURIComponent(userEmail)}${patientQuery}`)
+      .then((r) => r.json())
+      .then((body) => {
+        const grouped = { start: [], instructions: [], praise: [], end: [] }
+        ;(body.phrases || []).forEach((p) => { if (grouped[p.group]) grouped[p.group].push(p) })
+        setCustomPhrases(grouped)
+      })
+      .catch(() => setCustomPhrases(EMPTY_PHRASE_GROUPS))
+
+    fetch(`/api/speech-messages/list?therapistEmail=${encodeURIComponent(userEmail)}&sessionId=${encodeURIComponent(sessionId)}${patientQuery}`)
+      .then((r) => r.json())
+      .then((body) => {
+        setSessionLog((body.messages || []).map((m) => ({ id: m.id, time: m.createdAt, text: m.text, speed: m.speed, cue: m.cue })))
+      })
+      .catch(() => setSessionLog([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientKey])
+  }, [patientKey, userEmail])
 
   useEffect(() => {
     try { localStorage.setItem(`therapypro_talk_settings_${patientKey}`, JSON.stringify({ speed, repeat })) } catch { /* ignore */ }
@@ -1051,7 +1071,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   useEffect(() => {
     if (!userEmail) return
     let cancelled = false
-    fetch(`/api/recordings/list?therapistEmail=${encodeURIComponent(userEmail)}`)
+    fetch(`/api/speech-recordings/list?therapistEmail=${encodeURIComponent(userEmail)}`)
       .then((r) => r.json())
       .then(async (body) => {
         if (cancelled || !body.recordings) return
@@ -1145,15 +1165,16 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       }
 
       try {
-        const res = await fetch('/api/recordings/create', {
+        const res = await fetch('/api/speech-recordings/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             therapistEmail: userEmail,
+            sessionId,
             title: defaultSessionTitle(new Date()),
             transcript: finalTranscript,
             segments: segmentsRef.current,
-            durationSec, wordCount: words, audioKey,
+            durationSec, wordCount: words, audioKey, fileSize: blob.size,
             patientId: patient?.id || null,
             patientName: patient?.name || null,
           }),
@@ -1166,7 +1187,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         setSavedRecording(saved)
 
         if (finalTranscript.trim()) {
-          fetch(`/api/recordings/${saved.id}/summarize`, {
+          fetch(`/api/speech-recordings/${saved.id}/summarize`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ therapistEmail: userEmail }),
           })
@@ -1228,7 +1249,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     if (rec.audioUrl) URL.revokeObjectURL(rec.audioUrl)
     if (rec.audioKey) deleteAudioBlob(rec.audioKey).catch(() => {})
     if (userEmail && !String(rec.id).startsWith('local-')) {
-      fetch(`/api/recordings/${rec.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+      fetch(`/api/speech-recordings/${rec.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
     }
   }
 
@@ -1238,7 +1259,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       if (r.audioUrl) URL.revokeObjectURL(r.audioUrl)
       if (r.audioKey) deleteAudioBlob(r.audioKey).catch(() => {})
       if (userEmail && !String(r.id).startsWith('local-')) {
-        fetch(`/api/recordings/${r.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+        fetch(`/api/speech-recordings/${r.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
       }
     })
     setRecordings([])
@@ -1247,7 +1268,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   const handleRetrySummary = (id) => {
     if (!userEmail) return
     setRecordings(prev => prev.map(r => (r.id === id ? { ...r, summaryStatus: 'pending' } : r)))
-    fetch(`/api/recordings/${id}/summarize`, {
+    fetch(`/api/speech-recordings/${id}/summarize`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ therapistEmail: userEmail }),
     })
@@ -1268,7 +1289,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     setRecordings(prev => prev.map(r => (r.id === savedRecording.id ? { ...r, title, patientId: patientId || null, patientName } : r)))
     setSavedRecording(prev => (prev ? { ...prev, title, patientId: patientId || null, patientName } : prev))
     if (userEmail && !String(savedRecording.id).startsWith('local-')) {
-      fetch(`/api/recordings/${savedRecording.id}`, {
+      fetch(`/api/speech-recordings/${savedRecording.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ therapistEmail: userEmail, title, patientId: patientId || null, patientName }),
       }).catch(() => {})
@@ -1298,20 +1319,48 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   }
 
   // ── "Talk to {patient}" (TTS) ──
-  const persistSessionLog = (log) => {
-    try { sessionStorage.setItem(`therapypro_talk_log_${patientKey}`, JSON.stringify(log)) } catch { /* ignore */ }
+  const bumpReplayCount = (id) => {
+    if (!id || String(id).startsWith('local-') || !userEmail) return
+    fetch(`/api/speech-messages/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ therapistEmail: userEmail, incrementReplay: true }),
+    }).catch(() => {})
   }
 
-  const logSpokenMessage = (text, spokenSpeed, cue) => {
-    const entry = { id: Date.now(), time: new Date().toISOString(), text, speed: spokenSpeed, cue }
-    setSessionLog(prev => { const next = [...prev, entry]; persistSessionLog(next); return next })
-    setTtsHistory(prev => [
-      { id: entry.id, date: new Date(), text, rate: spokenSpeed, cue, patientId: patient?.id || null, patientName: patient?.name || null },
-      ...prev,
-    ].slice(0, TTS_HISTORY_LIMIT))
+  const logSpokenMessage = async (text, spokenSpeed, cue, phraseGroup, phraseId) => {
+    if (!userEmail) {
+      const entry = { id: `local-${Date.now()}`, time: new Date().toISOString(), text, speed: spokenSpeed, cue }
+      setSessionLog(prev => [...prev, entry])
+      setTtsHistory(prev => [
+        { id: entry.id, date: new Date(), text, rate: spokenSpeed, cue, patientId: patient?.id || null, patientName: patient?.name || null },
+        ...prev,
+      ].slice(0, TTS_HISTORY_LIMIT))
+      return null
+    }
+    try {
+      const res = await fetch('/api/speech-messages/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          therapistEmail: userEmail, patientId: patient?.id || null, patientName: patient?.name || null,
+          sessionId, text, phraseGroup, phraseId, speed: spokenSpeed, repeatCount: repeat, cue,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      const m = body.message
+      setSessionLog(prev => [...prev, { id: m.id, time: m.createdAt, text: m.text, speed: m.speed, cue: m.cue }])
+      setTtsHistory(prev => [
+        { id: m.id, date: new Date(m.createdAt), text: m.text, rate: m.speed, cue: m.cue, patientId: m.patientId, patientName: m.patientName },
+        ...prev,
+      ].slice(0, TTS_HISTORY_LIMIT))
+      return m.id
+    } catch (err) {
+      setTtsError(err.message || 'Could not save the message.')
+      return null
+    }
   }
 
-  const speakMessage = (rawText, { cueOverride } = {}) => {
+  const speakMessage = (rawText, { cueOverride, phraseGroup = 'typed', phraseId = null } = {}) => {
     if (toolsLocked) return
     const text = String(rawText || '').trim()
     if (!text) return
@@ -1321,7 +1370,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     clearTimeout(repeatTimerRef.current)
     stopPaoVoice()
     setTtsActiveId(null)
-    setCurrentSpoken({ text, cue, speed: spokenSpeed })
+    setCurrentSpoken({ text, cue, speed: spokenSpeed, id: null })
     setSpokenWordText('')
     setTtsView('patient')
     setTtsError('')
@@ -1344,16 +1393,17 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       })
     }
     runOnce()
-    logSpokenMessage(text, spokenSpeed, cue)
+    logSpokenMessage(text, spokenSpeed, cue, phraseGroup, phraseId)
+      .then((id) => { if (id) setCurrentSpoken((prev) => (prev && prev.text === text ? { ...prev, id } : prev)) })
   }
 
   const handleSayIt = () => {
     if (!messageText.trim()) return
-    speakMessage(messageText, { cueOverride: cueKey })
+    speakMessage(messageText, { cueOverride: cueKey, phraseGroup: 'typed' })
   }
 
-  const handlePhraseTap = (phraseText) => {
-    speakMessage(fillName(phraseText, patientFirstName))
+  const handlePhraseTap = (phraseText, group, { isCustom, phraseId } = {}) => {
+    speakMessage(fillName(phraseText, patientFirstName), { phraseGroup: isCustom ? 'custom' : group, phraseId })
   }
 
   const replayCurrent = () => {
@@ -1361,6 +1411,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     clearTimeout(repeatTimerRef.current)
     stopPaoVoice()
     setSpokenWordText('')
+    bumpReplayCount(currentSpoken.id)
     speakPao(currentSpoken.text, {
       rate: currentSpoken.speed,
       onStart: () => setIsSpeaking(true),
@@ -1372,9 +1423,10 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   const replayLogEntry = (entry) => {
     clearTimeout(repeatTimerRef.current)
     stopPaoVoice()
-    setCurrentSpoken({ text: entry.text, cue: entry.cue, speed: entry.speed })
+    setCurrentSpoken({ text: entry.text, cue: entry.cue, speed: entry.speed, id: entry.id })
     setSpokenWordText('')
     setTtsView('patient')
+    bumpReplayCount(entry.id)
     speakPao(entry.text, {
       rate: entry.speed,
       onStart: () => setIsSpeaking(true),
@@ -1390,23 +1442,29 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     setTtsView('therapist')
   }
 
-  const handleAddCustomPhrase = () => {
+  const handleAddCustomPhrase = async () => {
     const text = newPhraseText.trim()
-    if (!text) return
-    setCustomPhrases(prev => {
-      const next = { ...prev, [newPhraseGroup]: [...(prev[newPhraseGroup] || []), text] }
-      try { localStorage.setItem(`therapypro_talk_phrases_${patientKey}`, JSON.stringify(next)) } catch { /* ignore */ }
-      return next
-    })
+    if (!text) { setAddingPhrase(false); return }
+    if (!userEmail) { setNewPhraseText(''); setAddingPhrase(false); return }
+    try {
+      const res = await fetch('/api/speech-phrases/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistEmail: userEmail, patientId: patient?.id || null, group: newPhraseGroup, text }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      setCustomPhrases(prev => ({ ...prev, [newPhraseGroup]: [...(prev[newPhraseGroup] || []), body.phrase] }))
+    } catch (err) {
+      setTtsError(err.message || 'Could not save the phrase.')
+    }
     setNewPhraseText(''); setAddingPhrase(false)
   }
 
-  const handleRemoveCustomPhrase = (group, text) => {
-    setCustomPhrases(prev => {
-      const next = { ...prev, [group]: (prev[group] || []).filter((p) => p !== text) }
-      try { localStorage.setItem(`therapypro_talk_phrases_${patientKey}`, JSON.stringify(next)) } catch { /* ignore */ }
-      return next
-    })
+  const handleRemoveCustomPhrase = (group, phrase) => {
+    setCustomPhrases(prev => ({ ...prev, [group]: (prev[group] || []).filter((p) => p.id !== phrase.id) }))
+    if (userEmail) {
+      fetch(`/api/speech-phrases/${phrase.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+    }
   }
 
   const showTtsToast = (msg) => {
@@ -1439,9 +1497,22 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   const handleHistoryDelete = (id) => {
     if (ttsActiveId === id) { stopPaoVoice(); setTtsActiveId(null) }
     setTtsHistory(prev => prev.filter(x => x.id !== id))
+    if (userEmail && !String(id).startsWith('local-')) {
+      fetch(`/api/speech-messages/${id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+    }
   }
 
-  const clearTtsHistory = () => { stopPaoVoice(); setTtsActiveId(null); setTtsHistory([]) }
+  const clearTtsHistory = () => {
+    stopPaoVoice(); setTtsActiveId(null)
+    if (userEmail) {
+      ttsHistory.forEach((item) => {
+        if (!String(item.id).startsWith('local-')) {
+          fetch(`/api/speech-messages/${item.id}?therapistEmail=${encodeURIComponent(userEmail)}`, { method: 'DELETE' }).catch(() => {})
+        }
+      })
+    }
+    setTtsHistory([])
+  }
 
   return (
     <div className="csf-root">

@@ -1,8 +1,9 @@
 import mongoose from 'mongoose'
 import Anthropic from '@anthropic-ai/sdk'
 import { getMongo } from '../mongo.js'
-import { SessionRecording } from '../models/sessionRecording.js'
-import { serializeRecording } from '../serializeRecording.js'
+import { SpeechToTextRecording } from '../models/speechToTextRecording.js'
+import { resolveSpeechCreator } from '../resolveSpeechCreator.js'
+import { serializeSttRecording } from '../serializeSttRecording.js'
 
 const str = (v) => (v == null ? '' : String(v).trim())
 
@@ -18,10 +19,9 @@ Reply with JSON ONLY (no markdown fences, no commentary) in exactly this shape:
   "next_steps": ["short phrase per next step, including at least one home-practice suggestion if the transcript supports one"]
 }`
 
-// POST /api/recordings/:id/summarize -> read the saved transcript and ask
-// Claude for a short session summary. Safe to call with no transcript (a
-// no-op) or no ANTHROPIC_API_KEY configured (marks the summary failed
-// rather than crashing — the recording itself is unaffected either way).
+// POST /api/speech-recordings/:id/summarize -> same behaviour as before,
+// just pointed at speech_to_text_recordings: safe with no transcript (a
+// no-op) or no ANTHROPIC_API_KEY configured (marks the summary failed).
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -34,24 +34,27 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
-    const doc = await SessionRecording.findById(id)
+    const creator = await resolveSpeechCreator(therapistEmail)
+    if (!creator) return res.status(404).json({ error: 'Recording not found.' })
+
+    const doc = await SpeechToTextRecording.findOne({ _id: id, is_deleted: false })
     if (!doc) return res.status(404).json({ error: 'Recording not found.' })
-    if (str(therapistEmail).toLowerCase() !== doc.therapist_email) return res.status(404).json({ error: 'Recording not found.' })
+    if (String(doc.created_by) !== String(creator.id)) return res.status(404).json({ error: 'Recording not found.' })
 
     if (!doc.transcript?.trim()) {
       doc.summary_status = 'none'
       await doc.save()
-      return res.status(200).json({ recording: serializeRecording(doc) })
+      return res.status(200).json({ recording: serializeSttRecording(doc) })
     }
 
     doc.summary_status = 'pending'
     await doc.save()
 
     if (!process.env.ANTHROPIC_API_KEY) {
-      console.warn('recordings/summarize: ANTHROPIC_API_KEY not set — marking summary failed.')
+      console.warn('speech-recordings/summarize: ANTHROPIC_API_KEY not set — marking summary failed.')
       doc.summary_status = 'failed'
       await doc.save()
-      return res.status(200).json({ recording: serializeRecording(doc) })
+      return res.status(200).json({ recording: serializeSttRecording(doc) })
     }
 
     try {
@@ -81,14 +84,14 @@ export default async function handler(req, res) {
       doc.summary_status = 'ready'
       await doc.save()
     } catch (aiErr) {
-      console.error('recordings/summarize AI error:', aiErr)
+      console.error('speech-recordings/summarize AI error:', aiErr)
       doc.summary_status = 'failed'
       await doc.save()
     }
 
-    return res.status(200).json({ recording: serializeRecording(doc) })
+    return res.status(200).json({ recording: serializeSttRecording(doc) })
   } catch (err) {
-    console.error('recordings/summarize error:', err)
+    console.error('speech-recordings/summarize error:', err)
     return res.status(500).json({ error: err.message || 'Could not summarize the recording.' })
   }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   UsersIcon, XIcon, SearchIcon, CalendarIcon, ChevronDownIcon, CakeIcon,
   StethoscopeIcon, DotIcon, ClockIcon, MicIcon, VolumeIcon, CheckIcon,
@@ -45,6 +45,8 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
   const [tool, setTool] = useState(initialTool)
   const [remember, setRemember] = useState(true)
   const listRef = useRef(null)
+  const selectedRef = useRef(null)
+  const VISIBLE = 3
 
   const load = () => {
     setLoading(true); setError('')
@@ -82,6 +84,28 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
   }, [patients, search, sort])
 
   const selectedPatient = filtered.find((p) => p.id === selectedId) || patients.find((p) => p.id === selectedId) || null
+
+  // Size the list to exactly VISIBLE whole cards, and resize when the window or the list changes.
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const fit = () => {
+      const rows = [...list.children]
+      if (rows.length <= VISIBLE) { list.style.maxHeight = ''; return }
+      const last = rows[VISIBLE - 1]
+      list.style.maxHeight = `${last.offsetTop + last.offsetHeight - rows[0].offsetTop + 4}px`
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(list)
+    window.addEventListener('resize', fit)
+    return () => { ro.disconnect(); window.removeEventListener('resize', fit) }
+  }, [filtered.length])
+
+  // Keep the selected card fully in view (↑/↓ keys, preselected "today" patient).
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
 
   const handleKeyDown = (e) => {
     if (!filtered.length) return
@@ -158,7 +182,7 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
 
               <div className="ppm-list-label">YOUR PATIENTS · {filtered.length}</div>
 
-              <div className="ppm-list" ref={listRef}>
+              <div className="pp-list" ref={listRef} role="radiogroup" aria-label="Your patients">
                 {filtered.map((p) => {
                   const selected = p.id === selectedId
                   const color = avatarColorFor(p.id)
@@ -167,28 +191,36 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
                     <button
                       key={p.id}
                       id={`ppm-card-${p.id}`}
-                      className={`ppm-card ${selected ? 'ppm-card-selected' : ''}`}
-                      onClick={() => setSelectedId(p.id)}
                       type="button"
+                      className={`pp-row${selected ? ' sel' : ''}`}
+                      onClick={() => setSelectedId(p.id)}
+                      role="radio"
+                      aria-checked={selected}
+                      ref={selected ? selectedRef : null}
                     >
-                      <span className={`ppm-radio ${selected ? 'ppm-radio-on' : ''}`} />
-                      <span className="ppm-avatar" style={{ background: color }}>{initials(p.name)}</span>
-                      <span className="ppm-card-main">
-                        <span className="ppm-card-name">{p.name}</span>
-                        <span className="ppm-card-tags">
-                          {p.age != null && <span className="ppm-tag ppm-tag-age"><CakeIcon size={13} />{p.age} yrs</span>}
-                          {p.condition && <span className="ppm-tag ppm-tag-condition"><StethoscopeIcon size={13} />{p.condition}</span>}
-                          {isToday(p.lastSessionDate) && <span className="ppm-tag ppm-tag-today"><DotIcon size={8} />Session today</span>}
+                      <span className="pp-radio" aria-hidden="true" />
+                      <span className="pp-av" style={{ background: color }}>{initials(p.name)}</span>
+
+                      <span className="pp-info">
+                        <span className="pp-name" title={p.name}>{p.name}</span>
+                        <span className="pp-tags">
+                          {p.age != null && <span className="pp-tag"><CakeIcon size={14} /> {p.age} yrs</span>}
+                          {p.condition && <span className="pp-tag cond"><StethoscopeIcon size={14} /> {p.condition}</span>}
+                          {isToday(p.lastSessionDate) && <span className="pp-tag today"><DotIcon size={10} /> Session today</span>}
                         </span>
                       </span>
-                      <span className="ppm-card-side">
-                        <span className="ppm-side-label"><ClockIcon size={13} />Last session</span>
-                        <span className="ppm-side-date">{lastLabel || 'No sessions yet'}</span>
+
+                      <span className="pp-last">
+                        <small><ClockIcon size={13} /> Last session</small>
+                        <b>{lastLabel || 'No sessions yet'}</b>
                       </span>
                     </button>
                   )
                 })}
               </div>
+              {filtered.length > VISIBLE && (
+                <div className="pp-more"><ChevronDownIcon size={15} /> Scroll for {filtered.length - VISIBLE} more patients</div>
+              )}
 
               <div className="ppm-openwith-label">OPEN WITH</div>
               <div className="ppm-openwith-row">
@@ -273,29 +305,70 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
         .ppm-sort-menu button:hover { background:#f5f3ff; color:#6d28d9; }
 
         .ppm-list-label { font-size:11.5px; font-weight:800; color:#94a3b8; letter-spacing:0.5px; margin:16px 0 8px; }
-        .ppm-list { display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; padding-right:2px; }
 
-        .ppm-card {
-          display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:16px;
-          border:2px solid #e2e8f0; background:#fff; cursor:pointer; text-align:left; width:100%;
-          font-family:inherit; transition:all 0.15s;
+        /* ── Patient list ── */
+        .pp-list{
+          display:flex;flex-direction:column;gap:10px;
+          overflow-y:auto;overscroll-behavior:contain;
+          padding:2px 6px 2px 2px;          /* room for the selected card's border and shadow */
+          scroll-snap-type:y mandatory;      /* scrolling always stops on a whole card */
+          scrollbar-width:thin;
         }
-        .ppm-card:hover { border-color:#c4b5fd; }
-        .ppm-card-selected { border-color:#7c3aed; background:#faf5ff; box-shadow:0 4px 16px rgba(124,58,237,0.15); }
-        .ppm-radio { width:18px; height:18px; border-radius:50%; border:2px solid #cbd5e1; flex-shrink:0; position:relative; }
-        .ppm-radio-on { border-color:#7c3aed; }
-        .ppm-radio-on::after { content:''; position:absolute; inset:3px; border-radius:50%; background:#7c3aed; }
-        .ppm-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:14px; flex-shrink:0; }
-        .ppm-card-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
-        .ppm-card-name { font-size:14.5px; font-weight:800; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
-        .ppm-card-tags { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
-        .ppm-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap; }
-        .ppm-tag-age { background:#f1f5f9; color:#475569; }
-        .ppm-tag-condition { background:#ecfeff; color:#0e7490; }
-        .ppm-tag-today { background:#ecfdf5; color:#059669; }
-        .ppm-card-side { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex-shrink:0; }
-        .ppm-side-label { display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#94a3b8; white-space:nowrap; }
-        .ppm-side-date { font-size:12.5px; font-weight:700; color:#334155; white-space:nowrap; }
+
+        /* ── Patient card ── */
+        .pp-row{
+          flex-shrink:0;                     /* the list may never squash a card */
+          scroll-snap-align:start;
+          display:grid;
+          grid-template-columns:auto auto minmax(0,1fr) auto;   /* radio | avatar | info | last session */
+          align-items:center;column-gap:14px;
+          width:100%;text-align:left;font:inherit;cursor:pointer;
+          padding:14px 16px;min-height:84px;
+          border:2px solid #eef2f7;border-radius:18px;background:#fff;
+          transition:border-color .15s,background .15s,box-shadow .15s;
+        }
+        .pp-row:hover{border-color:#ddd6fe}
+        .pp-row:focus-visible{outline:3px solid #c4b5fd;outline-offset:2px}
+        .pp-row.sel{border-color:#7c3aed;background:#faf5ff;box-shadow:0 6px 18px rgba(124,58,237,.15)}
+
+        .pp-radio{width:24px;height:24px;border-radius:50%;border:3px solid #cbd5e1;flex-shrink:0}
+        .pp-row.sel .pp-radio{border-color:#7c3aed;background:radial-gradient(circle,#7c3aed 42%,#fff 47%)}
+
+        .pp-av{position:relative;width:50px;height:50px;border-radius:50%;flex-shrink:0;
+          display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:17px}
+
+        .pp-info{min-width:0;display:flex;flex-direction:column}  /* min-width:0 lets the name shrink and show "…" */
+        .pp-name{font-size:17px;font-weight:900;color:#1e1b4b;line-height:1.25;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .pp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+        .pp-tag{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1.2;
+          font-size:12.5px;font-weight:800;border-radius:999px;padding:4px 10px;background:#f1f5f9;color:#475569}
+        .pp-tag.cond{background:#ecfeff;color:#0e7490}
+        .pp-tag.today{background:#dcfce7;color:#15803d}
+
+        .pp-last{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right;white-space:nowrap}
+        .pp-last small{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#6b7280}
+        .pp-last b{font-size:14.5px;color:#1f2937}
+
+        /* "Scroll for N more patients" hint */
+        .pp-more{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;
+          font-size:12.5px;font-weight:800;color:#7c3aed}
+
+        /* ── Phones ── */
+        @media (max-width:600px){
+          .pp-row{grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:12px;min-height:0}
+          .pp-radio{display:none}
+          .pp-av{width:42px;height:42px;font-size:15px}
+          .pp-row.sel .pp-av::after{            /* ✓ badge on the selected avatar */
+            content:'';position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;
+            border:2px solid #fff;background:#7c3aed center/11px no-repeat
+              url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")}
+          .pp-name{font-size:15.5px}
+          .pp-tags{gap:5px;margin-top:5px}
+          .pp-tag{font-size:11.5px;padding:3px 8px;gap:4px}
+          .pp-last{grid-column:2;flex-direction:row;align-items:center;gap:6px;margin-top:6px}
+          .pp-last b{font-size:12.5px}
+        }
 
         .ppm-openwith-label { font-size:11.5px; font-weight:800; color:#94a3b8; letter-spacing:0.5px; margin:18px 0 8px; }
         .ppm-openwith-row { display:flex; gap:10px; flex-wrap:wrap; }

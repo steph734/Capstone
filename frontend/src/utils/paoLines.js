@@ -12,6 +12,8 @@
 // intentionally stays in English regardless of the selected language — only
 // Pao's own narration, coaching, and cheer lines change language.
 
+import { SHAPE_NAMES } from '../data/puzzlePals'
+
 export function pickLine(line, lang, ...args) {
   const resolved = typeof line === 'function' ? line(...args) : line
   return resolved[lang] || resolved.en
@@ -169,8 +171,16 @@ export const PUZZLE_COLOR_NAMES = {
   'Blue':              { en: 'Blue',              tl: 'Asul',             ceb: 'Asul' },
   'Yellow':            { en: 'Yellow',            tl: 'Dilaw',            ceb: 'Dalag' },
   'Brown':             { en: 'Brown',              tl: 'Kayumanggi',      ceb: 'Kolor-Kape' },
+  'Red':               { en: 'Red',                tl: 'Pula',            ceb: 'Pula' },
+  'Green':             { en: 'Green',              tl: 'Berde',           ceb: 'Berde' },
+  'Purple':            { en: 'Purple',             tl: 'Lila',            ceb: 'Lila' },
+  'Pink':              { en: 'Pink',               tl: 'Rosas',           ceb: 'Rosas' },
+  'Grey':              { en: 'Grey',               tl: 'Abo',             ceb: 'Abuhon' },
 }
 
+// Kept only as a fallback for any old caller still passing an animal-shaped
+// object without a `names` map — new code should rely on `localItem` below,
+// which reads item.names[lang] and works for every picture set.
 export const PUZZLE_ANIMAL_NAMES = {
   'Lion':     { en: 'Lion',     tl: 'Leon',     ceb: 'Leon' },
   'Zebra':    { en: 'Zebra',    tl: 'Sebra',    ceb: 'Sebra' },
@@ -185,11 +195,17 @@ export const PUZZLE_POSITION_WORDS = {
   nextTo: { en: 'next to', tl: 'sa tabi',   ceb: 'sa kilid' },
 }
 
-function localAnimal(animal, lang) {
+function localItem(item, lang) {
+  const names = item.names || PUZZLE_ANIMAL_NAMES[item.name] || { en: item.name, tl: item.name, ceb: item.name }
   return {
-    name: pickLine(PUZZLE_ANIMAL_NAMES[animal.name] || { en: animal.name, tl: animal.name, ceb: animal.name }, lang),
-    colorName: pickLine(PUZZLE_COLOR_NAMES[animal.colorName] || { en: animal.colorName, tl: animal.colorName, ceb: animal.colorName }, lang),
+    name: names[lang] || names.en,
+    colorName: pickLine(PUZZLE_COLOR_NAMES[item.colorName] || { en: item.colorName, tl: item.colorName, ceb: item.colorName }, lang),
   }
+}
+
+function shapeNameFor(item, lang) {
+  const names = SHAPE_NAMES[item.shape]
+  return names ? (names[lang] || names.en) : ''
 }
 
 export const PUZZLE_LINES = {
@@ -204,37 +220,62 @@ export const PUZZLE_LINES = {
     tl: `Wow, natapos mo ang buong puzzle! Ang galing mong problem solver! High five!`,
     ceb: `Wow, nahuman nimo ang tibuok puzzle! Kaayo ka kamaayo mo-solve og problema! High five!`,
   },
-  praiseFor: (animal, stepKey) => {
-    const a = { en: localAnimal(animal, 'en'), tl: localAnimal(animal, 'tl'), ceb: localAnimal(animal, 'ceb') }
-    const word = { en: PUZZLE_POSITION_WORDS[stepKey].en, tl: PUZZLE_POSITION_WORDS[stepKey].tl, ceb: PUZZLE_POSITION_WORDS[stepKey].ceb }
+  praiseFor: (item, stepKey) => {
+    const a = { en: localItem(item, 'en'), tl: localItem(item, 'tl'), ceb: localItem(item, 'ceb') }
+    const shape = { en: shapeNameFor(item, 'en'), tl: shapeNameFor(item, 'tl'), ceb: shapeNameFor(item, 'ceb') }
+    const word = PUZZLE_POSITION_WORDS[stepKey]
     return {
-      en: `Yay! ${a.en.colorName} ${a.en.name}! Right ${word.en}!`,
-      tl: `Yehey! ${a.tl.colorName} na ${a.tl.name}! Nasa ${word.tl}!`,
-      ceb: `Yehey! ${a.ceb.colorName} nga ${a.ceb.name}! Naa sa ${word.ceb}!`,
+      en: `Yay! ${a.en.colorName} ${a.en.name}! It's a ${shape.en}! Right ${word.en}!`,
+      tl: `Yehey! ${a.tl.colorName} na ${a.tl.name}! Isang ${shape.tl}! Nasa ${word.tl}!`,
+      ceb: `Yehey! ${a.ceb.colorName} nga ${a.ceb.name}! Usa ka ${shape.ceb}! Naa sa ${word.ceb}!`,
     }
   },
-  promptFor: (stepKey, animal, refAnimal) => {
-    const a = { en: localAnimal(animal, 'en'), tl: localAnimal(animal, 'tl'), ceb: localAnimal(animal, 'ceb') }
-    const r = refAnimal ? { en: localAnimal(refAnimal, 'en'), tl: localAnimal(refAnimal, 'tl'), ceb: localAnimal(refAnimal, 'ceb') } : null
+  promptFor: (stepKey, item, refItem) => {
+    const a = { en: localItem(item, 'en'), tl: localItem(item, 'tl'), ceb: localItem(item, 'ceb') }
+    const shape = { en: shapeNameFor(item, 'en'), tl: shapeNameFor(item, 'tl'), ceb: shapeNameFor(item, 'ceb') }
+    const r = refItem ? { en: localItem(refItem, 'en'), tl: localItem(refItem, 'tl'), ceb: localItem(refItem, 'ceb') } : null
     if (stepKey === 'top') {
       return {
-        en: `Let's find this one together! Look for the ${a.en.colorName} ${a.en.name} piece — it goes right ON TOP!`,
-        tl: `Hanapin natin ito nang magkasama! Hanapin ang ${a.tl.colorName} na piraso ng ${a.tl.name} — ito ay nasa IBABAW!`,
-        ceb: `Pangitaon nato ni og duyog! Pangitaa ang ${a.ceb.colorName} nga piraso sa ${a.ceb.name} — ni naa sa TAAS!`,
+        en: `Let's find this one together! Look for the ${a.en.colorName} ${a.en.name} — it's a ${shape.en}! It goes right ON TOP!`,
+        tl: `Hanapin natin ito nang magkasama! Hanapin ang ${a.tl.colorName} na ${a.tl.name} — isang ${shape.tl}! Ito ay nasa IBABAW!`,
+        ceb: `Pangitaon nato ni og duyog! Pangitaa ang ${a.ceb.colorName} nga ${a.ceb.name} — usa ka ${shape.ceb}! Ni naa sa TAAS!`,
       }
     }
     if (stepKey === 'under') {
       return {
-        en: `Now let's find the ${a.en.colorName} ${a.en.name}! This piece goes right UNDER the ${r.en.name}!`,
-        tl: `Ngayon hanapin natin ang ${a.tl.colorName} na ${a.tl.name}! Ang pirasong ito ay nasa ILALIM ng ${r.tl.name}!`,
-        ceb: `Karon pangitaon nato ang ${a.ceb.colorName} nga ${a.ceb.name}! Kining piraso naa sa UBOS sa ${r.ceb.name}!`,
+        en: `Now let's find the ${a.en.colorName} ${a.en.name} — it's a ${shape.en}! This piece goes right UNDER the ${r.en.name}!`,
+        tl: `Ngayon hanapin natin ang ${a.tl.colorName} na ${a.tl.name} — isang ${shape.tl}! Ang pirasong ito ay nasa ILALIM ng ${r.tl.name}!`,
+        ceb: `Karon pangitaon nato ang ${a.ceb.colorName} nga ${a.ceb.name} — usa ka ${shape.ceb}! Kining piraso naa sa UBOS sa ${r.ceb.name}!`,
       }
     }
     return {
-      en: `Last piece! Find the ${a.en.colorName} ${a.en.name} — it goes right NEXT TO the ${r.en.name}!`,
-      tl: `Huling piraso! Hanapin ang ${a.tl.colorName} na ${a.tl.name} — ito ay nasa TABI ng ${r.tl.name}!`,
-      ceb: `Kataposang piraso! Pangitaa ang ${a.ceb.colorName} nga ${a.ceb.name} — ni naa sa KILID sa ${r.ceb.name}!`,
+      en: `Last piece! Find the ${a.en.colorName} ${a.en.name} — it's a ${shape.en}! It goes right NEXT TO the ${r.en.name}!`,
+      tl: `Huling piraso! Hanapin ang ${a.tl.colorName} na ${a.tl.name} — isang ${shape.tl}! Ito ay nasa TABI ng ${r.tl.name}!`,
+      ceb: `Kataposang piraso! Pangitaa ang ${a.ceb.colorName} nga ${a.ceb.name} — usa ka ${shape.ceb}! Ni naa sa KILID sa ${r.ceb.name}!`,
     }
+  },
+  hint: (stepKey, item, refItem) => {
+    const a = { en: localItem(item, 'en'), tl: localItem(item, 'tl'), ceb: localItem(item, 'ceb') }
+    const word = PUZZLE_POSITION_WORDS[stepKey]
+    const upper = { en: word.en.toUpperCase(), tl: word.tl.toUpperCase(), ceb: word.ceb.toUpperCase() }
+    if (!refItem) {
+      return {
+        en: `Here it is! The ${a.en.colorName} ${a.en.name} goes ${upper.en}!`,
+        tl: `Heto na! Ang ${a.tl.colorName} na ${a.tl.name} ay nasa ${upper.tl}!`,
+        ceb: `Ania na! Ang ${a.ceb.colorName} nga ${a.ceb.name} naa sa ${upper.ceb}!`,
+      }
+    }
+    const r = { en: localItem(refItem, 'en'), tl: localItem(refItem, 'tl'), ceb: localItem(refItem, 'ceb') }
+    return {
+      en: `Here it is! The ${a.en.colorName} ${a.en.name} goes ${upper.en} the ${r.en.name}!`,
+      tl: `Heto na! Ang ${a.tl.colorName} na ${a.tl.name} ay nasa ${upper.tl} ng ${r.tl.name}!`,
+      ceb: `Ania na! Ang ${a.ceb.colorName} nga ${a.ceb.name} naa sa ${upper.ceb} sa ${r.ceb.name}!`,
+    }
+  },
+  pickPuzzle: {
+    en: `Which puzzle do you want to play today? Tap a picture!`,
+    tl: `Anong puzzle ang gusto mong laruin ngayon? I-tap ang larawan!`,
+    ceb: `Unsang puzzle ang gusto nimong dulaon karon? I-tap ang hulagway!`,
   },
 }
 

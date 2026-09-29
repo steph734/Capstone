@@ -329,6 +329,56 @@ export default function PatientPickerModal({ therapistEmail, initialTool = 'stt'
 
         .ppm-empty { text-align:center; padding:28px 12px; }
         .ppm-empty p { color:#64748b; font-size:14px; font-weight:500; line-height:1.7; margin:0; }
+
+        /* ── Phone layout ── */
+        @media (max-width: 560px) {
+          .ppm-backdrop { padding:0; align-items:flex-end; }
+          .ppm-modal { max-width:100%; width:100%; max-height:94vh; border-radius:24px 24px 0 0; animation:ppmSlideUpMobile 0.25s ease; }
+          @keyframes ppmSlideUpMobile{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+          .ppm-header { padding:18px 16px 16px; }
+          .ppm-header-top { gap:12px; }
+          .ppm-header-icon { width:42px; height:42px; border-radius:13px; }
+          .ppm-header-text h2 { font-size:17.5px; }
+          .ppm-close { padding:6px; }
+          .ppm-subtitle { font-size:12px; margin-top:10px; line-height:1.55; }
+
+          .ppm-body { padding:16px 16px 18px; }
+
+          .ppm-toolbar { flex-direction:column; }
+          .ppm-search { min-width:0; flex:none; }
+          .ppm-sort-wrap { width:100%; }
+          .ppm-sort-chip { width:100%; justify-content:space-between; }
+          .ppm-sort-menu { left:0; right:0; }
+
+          .ppm-list-label { margin:14px 0 7px; }
+          .ppm-list { max-height:none; flex:1; min-height:0; }
+
+          .ppm-card { flex-wrap:wrap; padding:11px 12px; gap:10px 8px; }
+          .ppm-avatar { width:36px; height:36px; font-size:13px; }
+          .ppm-card-name { font-size:14px; }
+          .ppm-card-main { flex-basis:0; }
+          .ppm-card-side {
+            flex-direction:row; align-items:center; justify-content:space-between;
+            width:100%; margin-top:2px; padding-top:8px; border-top:1px dashed #eef0f4;
+          }
+
+          .ppm-openwith-label { margin:16px 0 7px; }
+          .ppm-openwith-row { flex-direction:column; }
+          .ppm-tool-card { min-width:0; padding:13px 14px; }
+
+          .ppm-footer { flex-direction:column; align-items:stretch; gap:12px; margin-top:18px; }
+          .ppm-remember { justify-content:center; }
+          .ppm-start-btn { justify-content:center; width:100%; }
+
+          .ppm-practice-link { font-size:11.5px; text-align:center; line-height:1.5; }
+        }
+
+        @media (max-width: 360px) {
+          .ppm-header-text h2 { font-size:16.5px; }
+          .ppm-avatar { width:32px; height:32px; font-size:12px; }
+          .ppm-tag { font-size:11px; padding:2px 7px; }
+        }
       `}</style>
     </div>
   )

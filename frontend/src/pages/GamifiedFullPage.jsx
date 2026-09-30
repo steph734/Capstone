@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, useRef } from 'react'
-import PictureWordGame from './games/PictureWordGame'
+import PictureWordGame from '../components/picture-word-game/PictureWordGame'
 import SlowMotionEchoGame from './games/SlowMotionEchoGame'
 import PuzzlePiecesGame from './games/PuzzlePiecesGame'
 import SortTheBasketGame from './games/SortTheBasketGame'
@@ -445,6 +445,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   const startGame = (game) => {
     setPreviewGame(null)
     if (game.id === 'echo') { stopPaoVoice(); setPhase('echo') }
+    else if (game.id === 'picture-word') { stopPaoVoice(); setPhase('picture-word') }
     else if (game.id === 'puzzle-pieces') { stopPaoVoice(); setPuzzlePicker(true) }
     else if (game.id === 'sort-basket') { stopPaoVoice(); setPhase('sort-basket') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
@@ -474,7 +475,16 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'picture-word') {
-    return <PictureWordGame category={selCategory} patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
+    return (
+      <PictureWordGame
+        Mascot={PandaMascot}
+        readAloud={true}
+        questionCount={6}
+        patientId={patientId}
+        patientEmail={patientEmail}
+        onExit={backToGames}
+      />
+    )
   }
 
   if (phase === 'echo') {

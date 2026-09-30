@@ -90,11 +90,11 @@ export default function GameScreen({
   if (!question) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-y-auto overscroll-contain" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
       <SkyBackground/>
 
-      {/* Top bar */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
+      {/* Top bar — pinned, never scrolls away */}
+      <div className="relative z-10 flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
         <button
           type="button"
           onClick={onBack}
@@ -126,8 +126,8 @@ export default function GameScreen({
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 flex flex-1 flex-wrap items-center justify-center gap-6 px-4 pb-8 sm:gap-10 sm:px-6">
+      {/* Main content — the only part that scrolls, so the top bar and Pao stay visible */}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-wrap items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-4 sm:gap-10 sm:px-6">
 
         {/* Picture card */}
         <div className="relative flex w-[min(440px,92vw)] min-h-[360px] flex-col items-center gap-5 rounded-[36px] bg-white p-6 shadow-xl sm:min-h-[440px] sm:gap-6 sm:rounded-[48px] sm:p-8 md:min-h-[480px]">
@@ -200,10 +200,10 @@ export default function GameScreen({
         </div>
       </div>
 
-      {/* Buddy bar */}
-      <div className="relative z-10 flex items-center px-4 pb-4 sm:px-6 sm:pb-6">
-        <div className="scale-90 origin-bottom-left sm:scale-100">
-          <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={110}/>
+      {/* Buddy bar — pinned to the bottom, always visible, never scrolled out of view */}
+      <div className="relative z-10 flex flex-shrink-0 items-center bg-gradient-to-t from-[#B8E4F8]/70 to-transparent px-3 pb-3 pt-2 sm:px-6 sm:pb-4">
+        <div className="scale-[.8] origin-bottom-left sm:scale-100">
+          <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={100}/>
         </div>
       </div>
     </div>

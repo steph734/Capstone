@@ -49,11 +49,11 @@ export function StartModal({ onStart, onCancel, onOpenSettings }) {
           <span className="rounded-full bg-[#FFF0CC] px-4 py-2 text-[13px] font-bold text-[#C97A00]">+100 XP</span>
         </div>
 
-        <PressableButton onClick={onStart} className="mt-8 h-24 w-full text-[22px]">
-          <PlayIcon size={26}/> Let&apos;s play!
+        <PressableButton onClick={onStart} className="mt-8 h-24 w-full text-[24px] sm:h-28 sm:text-[28px]">
+          <PlayIcon size={30}/> Let&apos;s play!
         </PressableButton>
 
-        <GhostButton onClick={onCancel} className="mt-3 h-14 w-full text-[15px]">Cancel</GhostButton>
+        <GhostButton onClick={onCancel} className="mt-3 h-16 w-full text-[17px] sm:h-[72px] sm:text-[19px]">Cancel</GhostButton>
 
         <p className="mt-5 max-w-[420px] text-[13px] leading-relaxed text-[#5A5670]">
           Builds receptive vocabulary and picture-word association. Three choices, no timer, and a helper glow after two tries.
@@ -92,7 +92,7 @@ export function CategoryModal({ onSelect, onClose }) {
         ))}
       </div>
 
-      <GhostButton onClick={onClose} className="mt-6 h-14 w-full text-[15px]">Cancel</GhostButton>
+      <GhostButton onClick={onClose} className="mt-6 h-16 w-full text-[17px] sm:h-[72px] sm:text-[19px]">Cancel</GhostButton>
     </ModalShell>
   )
 }
@@ -114,9 +114,9 @@ export function ResultsModal({ categoryLabel, stars, badgeLabel = 'Word Picture 
           <span className="rounded-full bg-[#E3F4E8] px-4 py-2 text-[13px] font-bold text-[#2F8A4C]">+{xp} XP</span>
         </div>
 
-        <div className="mt-8 flex w-full gap-3">
-          <PressableButton onClick={onReplay} className="h-20 flex-1 text-[17px]">Play again</PressableButton>
-          <GhostButton onClick={onNewGroup} className="h-20 flex-1 text-[17px]">New group</GhostButton>
+        <div className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
+          <PressableButton onClick={onReplay} className="h-20 flex-1 text-[19px] sm:h-24 sm:text-[22px]">Play again</PressableButton>
+          <GhostButton onClick={onNewGroup} className="h-20 flex-1 text-[19px] sm:h-24 sm:text-[22px]">New group</GhostButton>
         </div>
       </div>
     </ModalShell>

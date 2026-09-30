@@ -109,7 +109,7 @@ export function ModalShell({ onClose, children, maxWidth = 'max-w-[560px]', labe
     >
       <div
         ref={ref}
-        className={`pwg-modal-in relative w-full ${maxWidth} max-h-[92vh] overflow-y-auto rounded-[40px] bg-[#FFFDF8] p-9 shadow-2xl`}
+        className={`pwg-modal-in relative w-full ${maxWidth} max-h-[92vh] overflow-y-auto rounded-[28px] bg-[#FFFDF8] p-5 shadow-2xl sm:rounded-[40px] sm:p-9`}
         style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}
       >
         {children}

@@ -90,58 +90,58 @@ export default function GameScreen({
   if (!question) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-y-auto overscroll-contain" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
       <SkyBackground/>
 
       {/* Top bar */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-4">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
         <button
           type="button"
           onClick={onBack}
-          className="pwg-pressable flex h-14 items-center gap-2 rounded-full bg-white px-5 text-[15px] font-extrabold text-[#2B2A4C] shadow focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+          className="pwg-pressable flex h-14 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-extrabold text-[#2B2A4C] shadow focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:h-16 sm:px-5 sm:text-[15px]"
           style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}
         >
           <BackArrowIcon size={20}/> Back
         </button>
 
-        <div className="flex h-14 items-center gap-2.5 rounded-full bg-white px-5 shadow">
+        <div className="flex h-14 items-center gap-1.5 rounded-full bg-white px-3 shadow sm:h-16 sm:gap-2.5 sm:px-5">
           {questions.map((_, i) => (
             <span
               key={i}
               aria-hidden="true"
-              className="flex h-6 w-6 items-center justify-center"
+              className="flex h-5 w-5 items-center justify-center sm:h-6 sm:w-6"
             >
               {i < current || (i === current && correctPicked)
-                ? <StarIcon size={20} className="text-[#F59E0B]"/>
+                ? <StarIcon size={18} className="text-[#F59E0B] sm:!h-5 sm:!w-5"/>
                 : i === current
-                  ? <span className="block h-4 w-4 rounded-full border-[3px] border-[#F59E0B]"/>
-                  : <span className="block h-2.5 w-2.5 rounded-full bg-[#D8D4E6]"/>
+                  ? <span className="block h-3.5 w-3.5 rounded-full border-[3px] border-[#F59E0B] sm:h-4 sm:w-4"/>
+                  : <span className="block h-2 w-2 rounded-full bg-[#D8D4E6] sm:h-2.5 sm:w-2.5"/>
               }
             </span>
           ))}
         </div>
 
-        <div className="flex h-14 items-center gap-2 rounded-full bg-white px-5 text-[17px] font-extrabold text-[#C97A00] shadow" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
-          <StarIcon size={20} className="text-[#F59E0B]"/> {stars}
+        <div className="flex h-14 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-extrabold text-[#C97A00] shadow sm:h-16 sm:px-5 sm:text-[17px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+          <StarIcon size={18} className="text-[#F59E0B]"/> {stars}
         </div>
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 flex flex-1 flex-wrap items-center justify-center gap-10 px-6 pb-8">
+      <div className="relative z-10 flex flex-1 flex-wrap items-center justify-center gap-6 px-4 pb-8 sm:gap-10 sm:px-6">
 
         {/* Picture card */}
-        <div className="relative flex w-[min(440px,90vw)] flex-col items-center gap-6 rounded-[48px] bg-white p-8 shadow-xl" style={{ minHeight: 480 }}>
+        <div className="relative flex w-[min(440px,92vw)] min-h-[360px] flex-col items-center gap-5 rounded-[36px] bg-white p-6 shadow-xl sm:min-h-[440px] sm:gap-6 sm:rounded-[48px] sm:p-8 md:min-h-[480px]">
           {showBanner && (
-            <div className="pwg-pop absolute -top-6 left-1/2 -translate-x-1/2 rounded-full bg-[#E3F4E8] px-5 py-2 text-[15px] font-extrabold text-[#2F8A4C] shadow" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+            <div className="pwg-pop absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#E3F4E8] px-4 py-1.5 text-[13px] font-extrabold text-[#2F8A4C] shadow sm:-top-6 sm:px-5 sm:py-2 sm:text-[15px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
               🎉 Great job!
             </div>
           )}
-          <EmojiPicture emoji={question.item.emoji} tint={question.item.tint} size={220}/>
+          <EmojiPicture emoji={question.item.emoji} tint={question.item.tint} size={180} className="!h-[min(180px,38vw)] !w-[min(180px,38vw)] sm:!h-[220px] sm:!w-[220px]"/>
           <button
             type="button"
             onClick={handleHearIt}
             aria-label={`Hear the word ${question.item.word}`}
-            className="pwg-pressable flex h-16 items-center gap-2 rounded-full bg-[#F59E0B] px-7 text-[17px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+            className="pwg-pressable flex h-16 items-center gap-2 rounded-full bg-[#F59E0B] px-6 text-[16px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:px-7 sm:text-[17px]"
             style={{ boxShadow: '0 6px 0 #C97A00', fontFamily: "'Baloo 2', system-ui, sans-serif" }}
           >
             <SpeakerIcon size={22}/> Hear it
@@ -149,8 +149,8 @@ export default function GameScreen({
         </div>
 
         {/* Word choices */}
-        <div className="flex w-[min(420px,90vw)] flex-col gap-4">
-          <h2 className="text-center text-[28px] font-extrabold text-[#2B2A4C]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+        <div className="flex w-[min(420px,92vw)] flex-col gap-3 sm:gap-4">
+          <h2 className="text-center text-[22px] font-extrabold text-[#2B2A4C] sm:text-[26px] md:text-[28px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
             Which word is this?
           </h2>
 
@@ -160,8 +160,8 @@ export default function GameScreen({
             const isChosenCorrect = correctPicked && isCorrectWord
             const isGlowing = hintOn && !correctPicked && isCorrectWord
 
-            let cls = 'pwg-pressable flex h-[104px] items-center justify-center gap-3 rounded-[28px] border-[3px] px-6 text-center font-extrabold transition-all focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]'
-            let style = { fontFamily: "'Baloo 2', system-ui, sans-serif", fontSize: 'clamp(22px, 4vw, 40px)' }
+            let cls = 'pwg-pressable flex h-20 items-center justify-center gap-3 rounded-[24px] border-[3px] px-5 text-center font-extrabold transition-all focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:h-24 sm:rounded-[28px] sm:px-6 md:h-[104px]'
+            let style = { fontFamily: "'Baloo 2', system-ui, sans-serif", fontSize: 'clamp(20px, 4.2vw, 40px)' }
 
             if (isChosenCorrect) {
               style = { ...style, background: '#2F8A4C', borderColor: '#256E3C', color: '#fff', boxShadow: '0 6px 0 #1F5C33' }
@@ -193,7 +193,7 @@ export default function GameScreen({
             type="button"
             onClick={handleNeedHelp}
             disabled={correctPicked || hintOn}
-            className="mx-auto mt-1 h-12 rounded-full px-6 text-[14px] font-bold text-[#5A5670] underline decoration-dotted underline-offset-4 disabled:opacity-40 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+            className="mx-auto mt-1 flex h-16 items-center rounded-full px-6 text-[14px] font-bold text-[#5A5670] underline decoration-dotted underline-offset-4 disabled:opacity-40 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
           >
             Need help?
           </button>
@@ -201,8 +201,10 @@ export default function GameScreen({
       </div>
 
       {/* Buddy bar */}
-      <div className="relative z-10 flex items-center px-6 pb-6">
-        <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={110}/>
+      <div className="relative z-10 flex items-center px-4 pb-4 sm:px-6 sm:pb-6">
+        <div className="scale-90 origin-bottom-left sm:scale-100">
+          <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={110}/>
+        </div>
       </div>
     </div>
   )

@@ -1,0 +1,1618 @@
+
+
+========== badges ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "code",
+   "name",
+   "criteria",
+   "is_active",
+   "created_at",
+   "updated_at"
+  ],
+  "properties": {
+   "code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Stable key slugified from the name, e.g. \"word_picture\". Referenced by pao_items.unlock.badge_code, pao_hair.unlock.badge_code and patient_badges.badge_code."
+   },
+   "name": {
+    "bsonType": "string",
+    "maxLength": 60,
+    "description": "Badge name shown to the patient, e.g. \"Word Picture\"."
+   },
+   "description": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 200,
+    "description": "What the patient did to earn the badge."
+   },
+   "emoji": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 16,
+    "description": "Small icon for lists and the badge shelf."
+   },
+   "icon_url": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "description": "Optional badge image. Falls back to emoji when null."
+   },
+   "theme_code": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Theme it belongs to (pao_themes.code). Null for everyday."
+   },
+   "criteria": {
+    "bsonType": "object",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "type": {
+      "bsonType": "string",
+      "enum": [
+       "complete_any_game",
+       "complete_specific_game",
+       "perfect_score",
+       "reach_level",
+       "total_xp",
+       "games_in_a_row",
+       "all_categories"
+      ],
+      "description": "What the patient must do to earn this badge. Same rules as pao_items.unlock."
+     },
+     "game_id": {
+      "bsonType": [
+       "objectId",
+       "null"
+      ],
+      "description": "Required game when type is complete_specific_game."
+     },
+     "value": {
+      "bsonType": [
+       "int",
+       "null"
+      ],
+      "minimum": 1,
+      "description": "Threshold: how many games (complete_any_game, complete_specific_game, perfect_score), level (reach_level), XP (total_xp) or games without quitting (games_in_a_row). Null means 1."
+     }
+    },
+    "description": "Achievement that earns this badge."
+   },
+   "unlock_item_type": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "enum": [
+     "item",
+     "hair",
+     null
+    ],
+    "description": "Where unlock_item_code lives: item = pao_items, hair = pao_hair. Null when the badge unlocks nothing."
+   },
+   "unlock_item_code": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^[a-z0-9_]+$",
+    "description": "pao_items.code or pao_hair.code unlocked together with this badge."
+   },
+   "is_active": {
+    "bsonType": "bool",
+    "description": "Can be earned by patients."
+   },
+   "sort_order": {
+    "bsonType": [
+     "int",
+     "null"
+    ],
+    "description": "Display order on the badge shelf."
+   },
+   "created_by": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Superadmin who created it."
+   },
+   "created_at": {
+    "bsonType": "date"
+   },
+   "updated_at": {
+    "bsonType": "date"
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"code":1},"unique":true}]
+
+
+========== clothes ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "code",
+   "name",
+   "category",
+   "is_builtin",
+   "is_active",
+   "created_at",
+   "updated_at"
+  ],
+  "properties": {
+   "code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Stable key slugified from the name, e.g. \"starry_beanie\". Referenced by badges.unlock_item_code and pao_themes.set_items."
+   },
+   "name": {
+    "bsonType": "string",
+    "maxLength": 60,
+    "description": "Item name shown to the patient."
+   },
+   "category": {
+    "bsonType": "string",
+    "enum": [
+     "hats",
+     "clothes",
+     "pants",
+     "shoes"
+    ],
+    "description": "Which slot on Pao the item is worn in. Hairstyles live in pao_hair."
+   },
+   "description": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 200,
+    "description": "Short description of the item."
+   },
+   "emoji": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 16,
+    "description": "Small icon for lists and pickers."
+   },
+   "is_builtin": {
+    "bsonType": "bool",
+    "description": "True for the original hand-drawn items. Their design stays null until redesigned."
+   },
+   "theme_code": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Theme it belongs to (pao_themes.code), e.g. \"halloween\". Null for everyday."
+   },
+   "unlock": {
+    "bsonType": [
+     "object",
+     "null"
+    ],
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "type": {
+      "bsonType": "string",
+      "enum": [
+       "free",
+       "complete_any_game",
+       "complete_specific_game",
+       "perfect_score",
+       "reach_level",
+       "total_xp",
+       "games_in_a_row",
+       "all_categories",
+       "earn_badge"
+      ],
+      "description": "What the patient must do to unlock this item."
+     },
+     "game_id": {
+      "bsonType": [
+       "objectId",
+       "null"
+      ],
+      "description": "Required game when type is complete_specific_game."
+     },
+     "value": {
+      "bsonType": [
+       "int",
+       "null"
+      ],
+      "minimum": 1,
+      "description": "Threshold for reach_level, total_xp or games_in_a_row."
+     },
+     "badge_code": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Badge to earn (badges.code) when type is earn_badge."
+     }
+    },
+    "description": "Achievement that unlocks this item, same rules as badges. Null = unlocked only by a badge's unlock_item_code."
+   },
+   "design": {
+    "bsonType": [
+     "object",
+     "null"
+    ],
+    "required": [
+     "style",
+     "main_color",
+     "trim_color",
+     "pattern",
+     "pattern_color"
+    ],
+    "properties": {
+     "style": {
+      "bsonType": "string",
+      "enum": [
+       "beanie",
+       "cap",
+       "tophat",
+       "crown",
+       "bow",
+       "headband",
+       "witch",
+       "santa",
+       "antlers",
+       "bunny",
+       "party",
+       "tee",
+       "sweater",
+       "hoodie",
+       "vest",
+       "scarf",
+       "cape",
+       "pants",
+       "shorts",
+       "skirt",
+       "joggers",
+       "sneakers",
+       "boots",
+       "slippers",
+       "sandals"
+      ],
+      "description": "Base template. Must belong to the item category (checked by the API)."
+     },
+     "main_color": {
+      "bsonType": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Main fabric colour, e.g. \"#3b82f6\"."
+     },
+     "trim_color": {
+      "bsonType": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Cuffs, collars, brims, bands and soles."
+     },
+     "pattern": {
+      "bsonType": "string",
+      "enum": [
+       "solid",
+       "stripes",
+       "dots",
+       "stars",
+       "hearts",
+       "checks",
+       "zigzag",
+       "snowflakes",
+       "candycane",
+       "bats",
+       "flowers",
+       "confetti"
+      ]
+     },
+     "pattern_color": {
+      "bsonType": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+     },
+     "decal": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "maxLength": 16,
+      "description": "Optional emoji sticker, e.g. \"🚀\"."
+     }
+    },
+    "description": "Composed outfit art from the clothes designer, rendered client-side."
+   },
+   "is_active": {
+    "bsonType": "bool",
+    "description": "Available to patients."
+   },
+   "sort_order": {
+    "bsonType": [
+     "int",
+     "null"
+    ],
+    "description": "Display order within the category."
+   },
+   "created_by": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Superadmin who created it."
+   },
+   "created_at": {
+    "bsonType": "date"
+   },
+   "updated_at": {
+    "bsonType": "date"
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"code":1},"unique":true}]
+
+
+========== pao_hair ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "code",
+   "name",
+   "style",
+   "hair_color",
+   "tie_color",
+   "pattern",
+   "is_active",
+   "created_at",
+   "updated_at"
+  ],
+  "properties": {
+   "code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Stable key slugified from the name, e.g. \"sweetheart_pigtails\". Referenced by badges.unlock_item_code and pao_themes.set_items.hair."
+   },
+   "name": {
+    "bsonType": "string",
+    "maxLength": 60,
+    "description": "Hairstyle name shown to the patient."
+   },
+   "description": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 200,
+    "description": "Short description of the hairstyle."
+   },
+   "emoji": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "maxLength": 16,
+    "description": "Small icon for lists and pickers."
+   },
+   "theme_code": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Theme it belongs to (pao_themes.code), e.g. \"halloween\". Null for everyday."
+   },
+   "unlock": {
+    "bsonType": [
+     "object",
+     "null"
+    ],
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "type": {
+      "bsonType": "string",
+      "enum": [
+       "free",
+       "complete_any_game",
+       "complete_specific_game",
+       "perfect_score",
+       "reach_level",
+       "total_xp",
+       "games_in_a_row",
+       "all_categories",
+       "earn_badge"
+      ],
+      "description": "What the patient must do to unlock this hairstyle."
+     },
+     "game_id": {
+      "bsonType": [
+       "objectId",
+       "null"
+      ],
+      "description": "Required game when type is complete_specific_game."
+     },
+     "value": {
+      "bsonType": [
+       "int",
+       "null"
+      ],
+      "minimum": 1,
+      "description": "Threshold for reach_level, total_xp or games_in_a_row."
+     },
+     "badge_code": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Badge to earn (badges.code) when type is earn_badge."
+     }
+    },
+    "description": "Achievement that unlocks this hairstyle, same rules as badges. Null = unlocked only by a badge's unlock_item_code."
+   },
+   "style": {
+    "bsonType": "string",
+    "enum": [
+     "tuft",
+     "bangs",
+     "curly",
+     "spiky",
+     "bun",
+     "ponytail",
+     "pigtails",
+     "long"
+    ],
+    "description": "Base hairstyle template, rendered client-side."
+   },
+   "hair_color": {
+    "bsonType": "string",
+    "pattern": "^#[0-9a-fA-F]{6}$",
+    "description": "Hair colour, e.g. \"#5b3a1e\"."
+   },
+   "tie_color": {
+    "bsonType": "string",
+    "pattern": "^#[0-9a-fA-F]{6}$",
+    "description": "Hair tie and clip colour. The drawn clip is painted in this colour."
+   },
+   "pattern": {
+    "bsonType": "string",
+    "enum": [
+     "solid",
+     "stripes",
+     "dots",
+     "stars",
+     "hearts",
+     "checks",
+     "zigzag",
+     "snowflakes",
+     "candycane",
+     "bats",
+     "flowers",
+     "confetti"
+    ],
+    "description": "Pattern over the hair, e.g. stripes for highlights."
+   },
+   "pattern_color": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^#[0-9a-fA-F]{6}$",
+    "description": "Colour of the pattern. Null when solid."
+   },
+   "clip": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "enum": [
+     "bow",
+     "heart",
+     "star",
+     "flower",
+     "butterfly",
+     "barrette",
+     "snap",
+     "pearls",
+     "bobby",
+     null
+    ],
+    "description": "Drawn hair clip, painted in tie_color, e.g. \"bow\". Null for no clip."
+   },
+   "is_active": {
+    "bsonType": "bool",
+    "description": "Available to patients."
+   },
+   "sort_order": {
+    "bsonType": [
+     "int",
+     "null"
+    ],
+    "description": "Display order in the hair list."
+   },
+   "created_by": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Superadmin who created it."
+   },
+   "created_at": {
+    "bsonType": "date"
+   },
+   "updated_at": {
+    "bsonType": "date"
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"code":1},"unique":true}]
+
+
+========== pao_themes ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "code",
+   "name",
+   "icon",
+   "colors",
+   "stickers",
+   "is_active",
+   "created_at",
+   "updated_at"
+  ],
+  "properties": {
+   "code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "Stable key, e.g. \"halloween\". Referenced by pao_items.theme_code and pao_hair.theme_code."
+   },
+   "name": {
+    "bsonType": "string",
+    "maxLength": 40,
+    "description": "Theme title shown in the designer, e.g. \"Halloween\"."
+   },
+   "icon": {
+    "bsonType": "string",
+    "maxLength": 16,
+    "description": "Emoji shown on the theme chip, e.g. \"🎃\"."
+   },
+   "background_color": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "pattern": "^#[0-9a-fA-F]{6}$",
+    "description": "Soft backdrop colour for the theme card."
+   },
+   "colors": {
+    "bsonType": "array",
+    "minItems": 1,
+    "maxItems": 12,
+    "items": {
+     "bsonType": "string",
+     "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "description": "Theme palette, listed first in the designer."
+   },
+   "stickers": {
+    "bsonType": "array",
+    "maxItems": 20,
+    "items": {
+     "bsonType": "string",
+     "maxLength": 16
+    },
+    "description": "Theme emoji stickers, listed first in the designer."
+   },
+   "set_items": {
+    "bsonType": [
+     "object",
+     "null"
+    ],
+    "properties": {
+     "hair": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "pao_hair.code in the theme set."
+     },
+     "hats": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "pao_items.code (category hats) in the theme set."
+     },
+     "clothes": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "pao_items.code (category clothes) in the theme set."
+     },
+     "pants": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "pao_items.code (category pants) in the theme set."
+     },
+     "shoes": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "pao_items.code (category shoes) in the theme set."
+     }
+    },
+    "description": "The pieces that make up the one-click theme set."
+   },
+   "starts_on": {
+    "bsonType": [
+     "date",
+     "null"
+    ],
+    "description": "Optional: when the theme becomes available, e.g. Oct 1."
+   },
+   "ends_on": {
+    "bsonType": [
+     "date",
+     "null"
+    ],
+    "description": "Optional: when the theme is hidden again."
+   },
+   "is_active": {
+    "bsonType": "bool",
+    "description": "Visible in the designer and to patients."
+   },
+   "sort_order": {
+    "bsonType": [
+     "int",
+     "null"
+    ],
+    "description": "Display order of the theme chips."
+   },
+   "created_by": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Superadmin who created it."
+   },
+   "created_at": {
+    "bsonType": "date"
+   },
+   "updated_at": {
+    "bsonType": "date"
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"code":1},"unique":true}]
+
+
+========== games ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "name",
+   "therapy_type",
+   "game_type",
+   "status",
+   "created_by",
+   "created_at"
+  ],
+  "properties": {
+   "name": {
+    "bsonType": "string",
+    "minLength": 1,
+    "maxLength": 80,
+    "description": "Name of the game shown to patients and admins."
+   },
+   "description": {
+    "bsonType": "string",
+    "maxLength": 500,
+    "description": "Short description of what the patient does in the game."
+   },
+   "therapy_type": {
+    "bsonType": "string",
+    "enum": [
+     "cognitive",
+     "speech",
+     "physical",
+     "occupational"
+    ],
+    "description": "Therapy area the game supports."
+   },
+   "difficulty": {
+    "bsonType": "string",
+    "enum": [
+     "easy",
+     "medium",
+     "hard"
+    ],
+    "description": "Overall difficulty of the game."
+   },
+   "age_range": {
+    "bsonType": "object",
+    "description": "Recommended patient age range.",
+    "properties": {
+     "min": {
+      "bsonType": "int",
+      "minimum": 0,
+      "maximum": 99,
+      "description": "Minimum recommended age."
+     },
+     "max": {
+      "bsonType": "int",
+      "minimum": 0,
+      "maximum": 99,
+      "description": "Maximum recommended age."
+     }
+    }
+   },
+   "points_per_play": {
+    "bsonType": "int",
+    "minimum": 0,
+    "description": "Points a patient earns for completing the game."
+   },
+   "unlocks_badge_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "References the badge unlocked by this game, if any."
+   },
+   "therapist_note": {
+    "bsonType": "string",
+    "maxLength": 1000,
+    "description": "Guidance for therapists on how to introduce the game."
+   },
+   "game_type": {
+    "bsonType": "string",
+    "enum": [
+     "picture_match",
+     "sort_place",
+     "choose_picture",
+     "step_by_step",
+     "say_it",
+     "move_with_me"
+    ],
+    "description": "Template used to build the game in the editor."
+   },
+   "type_settings": {
+    "bsonType": "object",
+    "description": "Toolbar settings for the selected game type.",
+    "properties": {
+     "picture_match": {
+      "bsonType": "object",
+      "description": "Settings for Picture Match games.",
+      "properties": {
+       "grid_size": {
+        "bsonType": "string",
+        "enum": [
+         "2x2",
+         "2x3",
+         "3x4"
+        ],
+        "description": "Number of cards shown."
+       },
+       "card_face": {
+        "bsonType": "string",
+        "enum": [
+         "picture",
+         "picture_word"
+        ],
+        "description": "Whether cards show a picture only or a picture with a word."
+       }
+      }
+     },
+     "sort_place": {
+      "bsonType": "object",
+      "description": "Settings for Sort & Place games.",
+      "properties": {
+       "snap_help": {
+        "bsonType": "string",
+        "enum": [
+         "gentle",
+         "strong"
+        ],
+        "description": "How strongly items snap into the target zone."
+       },
+       "show_target_outlines": {
+        "bsonType": "bool",
+        "description": "Whether target zones show a dashed outline."
+       },
+       "zones": {
+        "bsonType": "array",
+        "description": "Target zones items are sorted into.",
+        "items": {
+         "bsonType": "object",
+         "required": [
+          "zone_key",
+          "label"
+         ],
+         "properties": {
+          "zone_key": {
+           "bsonType": "string",
+           "description": "Unique key for the zone, e.g. red."
+          },
+          "label": {
+           "bsonType": "string",
+           "description": "Zone label, e.g. Red basket."
+          },
+          "color": {
+           "bsonType": "string",
+           "description": "Display color of the zone."
+          }
+         }
+        }
+       }
+      }
+     },
+     "choose_picture": {
+      "bsonType": "object",
+      "description": "Settings for Choose the Picture games.",
+      "properties": {
+       "choices": {
+        "bsonType": "int",
+        "enum": [
+         2,
+         3
+        ],
+        "description": "Number of picture choices per question."
+       }
+      }
+     },
+     "step_by_step": {
+      "bsonType": "object",
+      "description": "Settings for Step by Step games.",
+      "properties": {
+       "show_step_numbers": {
+        "bsonType": "bool",
+        "description": "Whether steps are numbered."
+       }
+      }
+     },
+     "say_it": {
+      "bsonType": "object",
+      "description": "Settings for Say It games.",
+      "properties": {
+       "acceptance": {
+        "bsonType": "string",
+        "enum": [
+         "very_flexible",
+         "flexible",
+         "exact"
+        ],
+        "description": "How closely speech must match the target word."
+       },
+       "sign_support": {
+        "bsonType": "bool",
+        "description": "Whether a sign support video is shown."
+       }
+      }
+     },
+     "move_with_me": {
+      "bsonType": "object",
+      "description": "Settings for Move With Me games.",
+      "properties": {
+       "reps": {
+        "bsonType": "int",
+        "enum": [
+         3,
+         5,
+         8
+        ],
+        "description": "Number of repetitions per action."
+       },
+       "hold_seconds": {
+        "bsonType": "int",
+        "enum": [
+         2,
+         3,
+         5
+        ],
+        "description": "Seconds to hold each position."
+       }
+      }
+     }
+    }
+   },
+   "levels": {
+    "bsonType": "array",
+    "description": "Levels of the game, in order.",
+    "items": {
+     "bsonType": "object",
+     "required": [
+      "level_order",
+      "level_name",
+      "items"
+     ],
+     "properties": {
+      "level_order": {
+       "bsonType": "int",
+       "minimum": 1,
+       "description": "Position of the level, starting at 1."
+      },
+      "level_name": {
+       "bsonType": "string",
+       "description": "Name of the level, e.g. Warm-up."
+      },
+      "prompt_level": {
+       "bsonType": "string",
+       "enum": [
+        "full_model",
+        "partial",
+        "none"
+       ],
+       "description": "Amount of hinting given in this level."
+      },
+      "items": {
+       "bsonType": "array",
+       "description": "Content of the level: pairs, items, questions, steps, words or actions.",
+       "items": {
+        "bsonType": "object",
+        "properties": {
+         "label": {
+          "bsonType": "string",
+          "maxLength": 80,
+          "description": "Word or name for the item."
+         },
+         "text": {
+          "bsonType": "string",
+          "maxLength": 200,
+          "description": "Short caption for the item."
+         },
+         "image_url": {
+          "bsonType": "string",
+          "description": "URL of the item picture."
+         },
+         "audio_url": {
+          "bsonType": "string",
+          "description": "URL of the recorded voice for the item."
+         },
+         "zone_key": {
+          "bsonType": "string",
+          "description": "Correct zone for Sort & Place items."
+         },
+         "step_order": {
+          "bsonType": "int",
+          "minimum": 1,
+          "description": "Correct position for Step by Step items."
+         },
+         "question": {
+          "bsonType": "string",
+          "description": "Question text for Choose the Picture items."
+         },
+         "choices": {
+          "bsonType": "array",
+          "description": "Answer choices for Choose the Picture items.",
+          "items": {
+           "bsonType": "object",
+           "required": [
+            "label",
+            "is_correct"
+           ],
+           "properties": {
+            "label": {
+             "bsonType": "string",
+             "description": "Name of the choice."
+            },
+            "image_url": {
+             "bsonType": "string",
+             "description": "URL of the choice picture."
+            },
+            "audio_url": {
+             "bsonType": "string",
+             "description": "URL of the choice audio."
+            },
+            "is_correct": {
+             "bsonType": "bool",
+             "description": "Whether this is the correct answer."
+            }
+           }
+          }
+         },
+         "syllables": {
+          "bsonType": "array",
+          "description": "Syllables of the word for Say It items.",
+          "items": {
+           "bsonType": "string"
+          }
+         },
+         "sign_video_url": {
+          "bsonType": "string",
+          "description": "URL of the sign support video for Say It items."
+         },
+         "video_url": {
+          "bsonType": "string",
+          "description": "URL of the demo video for Move With Me items."
+         },
+         "reps": {
+          "bsonType": "int",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Repetitions for Move With Me items."
+         },
+         "hold_seconds": {
+          "bsonType": "int",
+          "minimum": 0,
+          "maximum": 30,
+          "description": "Hold time for Move With Me items."
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "support": {
+    "bsonType": "object",
+    "description": "Accessibility and support settings for patients with Down syndrome.",
+    "properties": {
+     "target_size": {
+      "bsonType": "string",
+      "enum": [
+       "large",
+       "extra_large"
+      ],
+      "description": "Size of touch targets."
+     },
+     "pace": {
+      "bsonType": "string",
+      "enum": [
+       "no_timer",
+       "relaxed",
+       "timed"
+      ],
+      "description": "Time pressure in the game."
+     },
+     "prompt_level": {
+      "bsonType": "string",
+      "enum": [
+       "full_model",
+       "partial",
+       "none"
+      ],
+      "description": "Default amount of hinting."
+     },
+     "read_aloud": {
+      "bsonType": "bool",
+      "description": "Whether instructions are spoken aloud."
+     },
+     "picture_cues": {
+      "bsonType": "bool",
+      "description": "Whether every word is paired with a picture."
+     },
+     "simple_words": {
+      "bsonType": "bool",
+      "description": "Whether instructions use short, concrete words."
+     },
+     "errorless_learning": {
+      "bsonType": "bool",
+      "description": "Whether mistakes get a gentle retry instead of a wrong sound."
+     },
+     "fade_prompts": {
+      "bsonType": "bool",
+      "description": "Whether hints reduce as the patient succeeds."
+     },
+     "calm_visuals": {
+      "bsonType": "bool",
+      "description": "Whether flashing and animation are reduced."
+     },
+     "reward_style": {
+      "bsonType": "string",
+      "enum": [
+       "stars",
+       "confetti",
+       "calm"
+      ],
+      "description": "How success is celebrated."
+     },
+     "session_minutes": {
+      "bsonType": "int",
+      "enum": [
+       5,
+       10,
+       15
+      ],
+      "description": "Length of a play session in minutes."
+     }
+    }
+   },
+   "status": {
+    "bsonType": "string",
+    "enum": [
+     "draft",
+     "published",
+     "archived"
+    ],
+    "description": "Publishing status of the game."
+   },
+   "source_request_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "References the owner request this game was built from, if any."
+   },
+   "test_played": {
+    "bsonType": "bool",
+    "description": "Whether the game has been test played before publishing."
+   },
+   "created_by": {
+    "bsonType": "objectId",
+    "description": "References the super admin who created the game."
+   },
+   "updated_by": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "References the user who last updated the game."
+   },
+   "published_at": {
+    "bsonType": [
+     "date",
+     "null"
+    ],
+    "description": "Date when the game was published."
+   },
+   "created_at": {
+    "bsonType": "date",
+    "description": "Date when the game was created."
+   },
+   "updated_at": {
+    "bsonType": "date",
+    "description": "Date when the game was last updated."
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"status":1,"therapy_type":1}}]
+
+
+========== employees ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "user_id",
+   "branch_id",
+   "first_name",
+   "middle_name",
+   "last_name",
+   "employee_id"
+  ],
+  "properties": {
+   "user_id": {
+    "bsonType": "objectId",
+    "description": "References the associated User account."
+   },
+   "branch_id": {
+    "bsonType": "objectId",
+    "description": "References the Branch."
+   },
+   "first_name": {
+    "bsonType": "string",
+    "description": "Employee's first name."
+   },
+   "middle_name": {
+    "bsonType": "string",
+    "description": "Employee's middle name."
+   },
+   "last_name": {
+    "bsonType": "string",
+    "description": "Employee's last name."
+   },
+   "email": {
+    "bsonType": "string",
+    "pattern": "^.+@.+\\..+$",
+    "description": "Employee's email address."
+   },
+   "phone": {
+    "bsonType": "object",
+    "required": [
+     "country_code",
+     "number"
+    ],
+    "properties": {
+     "country_code": {
+      "bsonType": "string",
+      "description": "Phone country code, e.g. \"+63\"."
+     },
+     "number": {
+      "bsonType": "string",
+      "description": "Phone number without country code."
+     }
+    },
+    "description": "Employee's contact number with country code."
+   },
+   "dob": {
+    "bsonType": "date",
+    "description": "Employee's date of birth."
+   },
+   "gender": {
+    "bsonType": "string",
+    "enum": [
+     "male",
+     "female",
+     "other",
+     "prefer_not_to_say"
+    ],
+    "description": "Employee's gender."
+   },
+   "address": {
+    "bsonType": "string",
+    "description": "Employee's residential address."
+   },
+   "emergency_contact": {
+    "bsonType": "string",
+    "description": "Name of emergency contact person."
+   },
+   "emergency_phone": {
+    "bsonType": "string",
+    "description": "Phone number of emergency contact."
+   },
+   "profile_picture": {
+    "bsonType": "object",
+    "properties": {
+     "url": {
+      "bsonType": "string",
+      "description": "File path/URL to the employee's profile photo."
+     },
+     "storage_key": {
+      "bsonType": "string",
+      "description": "Storage bucket key/path used to reference or delete the file (e.g. S3 key, Cloudinary public_id)."
+     },
+     "uploaded_at": {
+      "bsonType": "date",
+      "description": "Timestamp when the profile photo was uploaded."
+     }
+    },
+    "description": "Employee's profile picture metadata, uploaded during staff onboarding."
+   },
+   "specialty": {
+    "bsonType": "string",
+    "description": "Employee's medical/clinical specialty (e.g. Therapy Specialty from the Add Staff form)."
+   },
+   "employee_id": {
+    "bsonType": "string",
+    "pattern": "^T-\\d{6}$",
+    "description": "Unique staff ID, format \"T-######\" (6 digits), e.g. \"T-247550\". Auto-generated at hire time. Encoded in full in the ID card barcode; the \"T-\" is stripped only for on-card display text."
+   },
+   "prc_number": {
+    "bsonType": "string",
+    "description": "PRC license number."
+   },
+   "experience": {
+    "bsonType": [
+     "int",
+     "double"
+    ],
+    "minimum": 0,
+    "description": "Years of professional experience."
+   },
+   "employment_type": {
+    "bsonType": "string",
+    "enum": [
+     "Full-time",
+     "Part-time",
+     "Contract",
+     "Locum"
+    ],
+    "description": "Type of employment."
+   },
+   "license_expiry": {
+    "bsonType": "date",
+    "description": "Expiry date of professional license."
+   },
+   "status": {
+    "bsonType": "string",
+    "enum": [
+     "for_review",
+     "active",
+     "inactive",
+     "on_leave",
+     "terminated"
+    ],
+    "description": "Current employment status."
+   },
+   "documents": {
+    "bsonType": "object",
+    "properties": {
+     "ptr": {
+      "bsonType": "string",
+      "description": "File path/URL to PTR document."
+     },
+     "prc": {
+      "bsonType": "string",
+      "description": "File path/URL to PRC document."
+     },
+     "diploma": {
+      "bsonType": "string",
+      "description": "File path/URL to diploma document."
+     },
+     "id": {
+      "bsonType": "string",
+      "description": "File path/URL to government-issued ID."
+     }
+    },
+    "description": "Uploaded document references for compliance/verification."
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}}]
+
+
+========== activity_sessions ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "therapist_id",
+   "branch_id",
+   "mode",
+   "language",
+   "status",
+   "started_at",
+   "last_active_at"
+  ],
+  "properties": {
+   "therapist_id": {
+    "bsonType": "objectId",
+    "description": "References employees._id of the therapist running the activities (found from the logged-in user via employees.user_id)."
+   },
+   "branch_id": {
+    "bsonType": "objectId",
+    "description": "References the Branch, copied from employees.branch_id. Used for branch reports."
+   },
+   "patient_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "References the patient picked in Who is playing today?. Null in practice mode."
+   },
+   "mode": {
+    "bsonType": "string",
+    "enum": [
+     "patient",
+     "practice"
+    ],
+    "description": "patient = progress is saved to the patient. practice = nothing is saved."
+   },
+   "language": {
+    "bsonType": "string",
+    "enum": [
+     "en",
+     "tl",
+     "ceb"
+    ],
+    "description": "Language picked in Choose Pao's Voice."
+   },
+   "remember": {
+    "bsonType": "bool",
+    "description": "Remember for this session: skip the picker until the session ends."
+   },
+   "status": {
+    "bsonType": "string",
+    "enum": [
+     "active",
+     "ended"
+    ],
+    "description": "Ended when the therapist changes player, closes the activities or the session times out."
+   },
+   "appointment_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "References today's appointment for this patient, if any."
+   },
+   "games_started": {
+    "bsonType": "int",
+    "minimum": 0,
+    "description": "Games started in this session."
+   },
+   "games_completed": {
+    "bsonType": "int",
+    "minimum": 0,
+    "description": "Games finished in this session."
+   },
+   "xp_earned": {
+    "bsonType": "int",
+    "minimum": 0,
+    "description": "Total XP Pao earned in this session."
+   },
+   "started_at": {
+    "bsonType": "date",
+    "description": "When the player was picked."
+   },
+   "last_active_at": {
+    "bsonType": "date",
+    "description": "Last time a game was started or finished. Used for the timeout."
+   },
+   "ended_at": {
+    "bsonType": [
+     "date",
+     "null"
+    ],
+    "description": "When the session ended."
+   },
+   "end_reason": {
+    "bsonType": [
+     "string",
+     "null"
+    ],
+    "enum": [
+     "changed_player",
+     "closed",
+     "timeout",
+     "logout",
+     null
+    ],
+    "description": "Why the session ended."
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}}]
+
+
+========== patient_badges ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "patient_id",
+   "badge_id",
+   "badge_code",
+   "earned_at"
+  ],
+  "properties": {
+   "patient_id": {
+    "bsonType": "objectId",
+    "description": "References the patient who earned the badge."
+   },
+   "badge_id": {
+    "bsonType": "objectId",
+    "description": "References badges._id (the same id games.unlocks_badge_id uses)."
+   },
+   "badge_code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "badges.code, kept for fast lookups by pao_items.unlock.badge_code."
+   },
+   "game_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Game that triggered the badge, if any."
+   },
+   "session_id": {
+    "bsonType": [
+     "objectId",
+     "null"
+    ],
+    "description": "Game session that triggered the badge, if any."
+   },
+   "seen": {
+    "bsonType": "bool",
+    "description": "Whether the patient has seen the badge reward screen."
+   },
+   "earned_at": {
+    "bsonType": "date",
+    "description": "Date when the badge was earned."
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"patient_id":1,"badge_id":1},"unique":true}]
+
+
+========== patient_unlocks ==========
+{
+ "$jsonSchema": {
+  "bsonType": "object",
+  "required": [
+   "patient_id",
+   "item_type",
+   "item_code",
+   "source",
+   "unlocked_at"
+  ],
+  "properties": {
+   "patient_id": {
+    "bsonType": "objectId",
+    "description": "References the patient who unlocked the item."
+   },
+   "item_type": {
+    "bsonType": "string",
+    "enum": [
+     "item",
+     "hair"
+    ],
+    "description": "item = pao_items, hair = pao_hair."
+   },
+   "item_code": {
+    "bsonType": "string",
+    "pattern": "^[a-z0-9_]+$",
+    "description": "pao_items.code or pao_hair.code."
+   },
+   "source": {
+    "bsonType": "object",
+    "required": [
+     "type"
+    ],
+    "description": "Why it was unlocked.",
+    "properties": {
+     "type": {
+      "bsonType": "string",
+      "enum": [
+       "free",
+       "achievement",
+       "badge"
+      ],
+      "description": "free = everyone gets it, achievement = the item's own unlock rule, badge = a badge's unlock_item_code."
+     },
+     "badge_code": {
+      "bsonType": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Badge that unlocked it, when type is badge."
+     },
+     "session_id": {
+      "bsonType": [
+       "objectId",
+       "null"
+      ],
+      "description": "Game session that unlocked it, if any."
+     }
+    }
+   },
+   "seen": {
+    "bsonType": "bool",
+    "description": "False until the \"New outfit\" screen was shown. Use for a \"New!\" tag in the wardrobe."
+   },
+   "unlocked_at": {
+    "bsonType": "date",
+    "description": "Date when the item was unlocked."
+   }
+  }
+ }
+}
+INDEXES: [{"key":{"_id":1}},{"key":{"patient_id":1,"item_type":1,"item_code":1},"unique":true}]

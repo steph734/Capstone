@@ -1,6 +1,13 @@
-// Thin wrapper around the Express backend (backend/server.js).
-// Base URL comes from VITE_API_URL; falls back to localhost:5000 in dev.
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Thin wrapper around this app's /api/* endpoints. Historically these hit a
+// separate Express server (backend/server.js on :5000) via VITE_API_URL, but
+// that var is only ever set in a developer's local, gitignored .env — the
+// deployed Vercel site never has it, so every request silently fell back to
+// http://localhost:5000 and only worked on a machine happening to run that
+// server locally (everyone else, including the same site opened on a phone,
+// got nothing). The matching endpoints have since been ported to this app's
+// own Vercel serverless functions under api/_lib/routes/, so same-origin
+// (relative path, no host) is now the correct default.
+export const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`)

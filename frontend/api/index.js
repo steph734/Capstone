@@ -78,6 +78,26 @@ import speechMessagesList from './_lib/routes/speech-messages-list.js'
 import speechMessagesItem from './_lib/routes/speech-messages-item.js'
 import gameProgressComplete from './_lib/routes/game-progress-complete.js'
 import gameProgressUnlocks from './_lib/routes/game-progress-unlocks.js'
+import employeesCollection from './_lib/routes/employees-collection.js'
+import employeesSendIdCard from './_lib/routes/employees-send-id-card.js'
+import employeesApprove from './_lib/routes/employees-approve.js'
+import employeesDocumentFile from './_lib/routes/employees-document-file.js'
+import employeesPhoto from './_lib/routes/employees-photo.js'
+import employeesItem from './_lib/routes/employees-item.js'
+import branchesList from './_lib/routes/branches-list.js'
+import paoProfile from './_lib/routes/pao-profile.js'
+import paoBadges from './_lib/routes/pao-badges.js'
+import paoWardrobe from './_lib/routes/pao-wardrobe.js'
+import paoEquip from './_lib/routes/pao-equip.js'
+import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
+import paoSeen from './_lib/routes/pao-seen.js'
+import gameSessionsStart from './_lib/routes/game-sessions-start.js'
+import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
+import gameSessionsComplete from './_lib/routes/game-sessions-complete.js'
+import activitiesPlayers from './_lib/routes/activities-players.js'
+import activitiesSessionCurrent from './_lib/routes/activities-session-current.js'
+import activitiesSessionStart from './_lib/routes/activities-session-start.js'
+import activitiesSessionEnd from './_lib/routes/activities-session-end.js'
 
 const app = express()
 
@@ -153,6 +173,33 @@ app.all('/api/speech-messages/list', speechMessagesList)
 app.all('/api/speech-messages/:id', speechMessagesItem)
 app.all('/api/game-progress/complete', gameProgressComplete)
 app.all('/api/game-progress/unlocks', gameProgressUnlocks)
+
+// More specific literal paths registered before the `:id` catch-all below,
+// so e.g. POST /api/employees/send-id-card can't be swallowed by it.
+app.all('/api/employees/send-id-card', employeesSendIdCard)
+app.all('/api/employees/:id/approve', employeesApprove)
+app.all('/api/employees/:id/documents/:key/file', employeesDocumentFile)
+app.all('/api/employees/:id/photo', employeesPhoto)
+app.all('/api/employees/:id', employeesItem)
+app.all('/api/employees', employeesCollection)
+app.all('/api/branches', branchesList)
+
+// Pao progression (XP, levels, stats, badges, wardrobe unlocks).
+app.all('/api/pao', paoProfile)
+app.all('/api/pao/badges', paoBadges)
+app.all('/api/pao/wardrobe', paoWardrobe)
+app.all('/api/pao/equip', paoEquip)
+app.all('/api/pao/equip-theme', paoEquipTheme)
+app.all('/api/pao/seen', paoSeen)
+app.all('/api/games/:gameId/sessions', gameSessionsStart)
+app.all('/api/sessions/:id/abandon', gameSessionsAbandon)
+app.all('/api/sessions/:id/complete', gameSessionsComplete)
+
+// "Who is playing today?" activity sessions.
+app.all('/api/activities/players', activitiesPlayers)
+app.all('/api/activities/session/current', activitiesSessionCurrent)
+app.all('/api/activities/session', activitiesSessionStart)
+app.all('/api/activities/session/:id/end', activitiesSessionEnd)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 

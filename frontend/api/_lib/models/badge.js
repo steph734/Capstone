@@ -1,74 +1,61 @@
-// Matches the `badges` collection's $jsonSchema validator.
+// Matches the LIVE `badges` collection's $jsonSchema validator exactly (this
+// collection was migrated to this shape — nested `criteria`, no more
+// art/badge_type/criteria_type-flat/archival-lifecycle fields — as part of
+// the Pao-progression schema rollout; this model replaces the pre-migration
+// version that the admin badge UI was still built against).
 import mongoose from 'mongoose'
 
+// Not part of the live $jsonSchema validator (which only requires `emoji`),
+// but kept as an additional field — $jsonSchema without
+// `additionalProperties:false` allows extra properties, and the whole app's
+// existing BadgeMedal rendering (GamifiedFullPage, every game's finish
+// screen, BadgeCasePage, the admin badge builder) depends on shape/colour/
+// symbol. Dropping it would silently blank out every badge medal in the app.
 const badgeArtSchema = new mongoose.Schema(
   {
-    shape: {
+    shape: { type: String, enum: ['circle', 'octagon', 'hexagon', 'scallop', 'shield', 'star', 'diamond', 'flower', 'rounded', 'gear'], default: 'circle' },
+    color: { type: String, enum: ['gold', 'silver', 'bronze', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink'], default: 'gold' },
+    symbol: { type: String, default: 'star' },
+    banner: { type: Boolean, default: false },
+  },
+  { _id: false }
+)
+
+const criteriaSchema = new mongoose.Schema(
+  {
+    type: {
       type: String,
       required: true,
-      enum: ['circle', 'octagon', 'hexagon', 'scallop', 'shield', 'star', 'diamond', 'flower', 'rounded', 'gear'],
+      enum: ['complete_any_game', 'complete_specific_game', 'perfect_score', 'reach_level', 'total_xp', 'games_in_a_row', 'all_categories'],
     },
-    color: {
-      type: String,
-      required: true,
-      enum: ['gold', 'silver', 'bronze', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink'],
-    },
-    symbol: {
-      type: String,
-      required: true,
-      // Kept as a literal list (rather than importing from src/data/badgeSymbols.js)
-      // so this Vercel function bundle never depends on reaching outside api/ —
-      // must stay in sync with SYMBOL_IDS there.
-      enum: [
-        'puzzle', 'picture', 'echo', 'magnifier', 'blocks', 'rhyme', 'scroll', 'abc', 'basket', 'cards',
-        'soundwave', 'balance', 'stretch', 'grab', 'shirt', 'tap', 'red_hood', 'mic', 'speaker', 'ear',
-        'chat', 'music', 'book', 'drum', 'bell', 'smile', 'heart', 'thumbs_up', 'wave', 'check',
-        'star', 'sparkles', 'trophy', 'medal', 'crown', 'gem', 'gift', 'key', 'flag', 'target',
-        'brain', 'idea', 'pencil', 'palette', 'ball', 'balloon', 'gamepad', 'backpack', 'grad_cap', 'glasses',
-        'paw', 'cat', 'dog', 'fish', 'bird', 'rabbit', 'turtle', 'bug', 'apple', 'carrot',
-        'cookie', 'ice_cream', 'pizza', 'cake', 'car', 'bike', 'plane', 'rocket', 'footprints', 'home',
-        'clock', 'calendar', 'sun', 'moon', 'cloud', 'rainbow', 'umbrella', 'flake', 'blossom', 'leaf',
-        'tree', 'drop', 'flame', 'bolt', 'shield',
-      ],
-    },
-    banner: { type: Boolean, default: null },
+    game_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+    value: { type: mongoose.Schema.Types.Int32, default: null, min: 1 },
   },
   { _id: false }
 )
 
 const badgeSchema = new mongoose.Schema(
   {
-    code: {
-      type: String,
-      required: true,
-      trim: true,
-      lowercase: true,
-      match: /^[a-z0-9_]+$/,
-    },
+    code: { type: String, required: true, trim: true, lowercase: true, match: /^[a-z0-9_]+$/ },
     name: { type: String, required: true, trim: true, maxlength: 60 },
-    description: { type: String, default: null, maxlength: 150 },
-    art: { type: badgeArtSchema, required: true },
-    badge_type: { type: String, required: true, enum: ['game_completion', 'milestone'] },
-    criteria_type: {
-      type: String,
-      required: true,
-      enum: [
-        'complete_specific_game', 'complete_any_game', 'perfect_score',
-        'reach_level', 'total_xp', 'games_in_a_row', 'all_categories',
-      ],
-    },
-    criteria_game_id: { type: mongoose.Schema.Types.ObjectId, default: null },
-    criteria_value: { type: Number, default: null },
-    unlock_item_code: { type: String, default: null },
+    description: { type: String, default: null, maxlength: 200 },
+    emoji: { type: String, default: null, maxlength: 16 },
+    icon_url: { type: String, default: null },
+    theme_code: { type: String, default: null, match: /^[a-z0-9_]+$/ },
+    art: { type: badgeArtSchema, default: () => ({}) },
+    criteria: { type: criteriaSchema, required: true },
+    unlock_item_type: { type: String, default: null, enum: ['item', 'hair', null] },
+    unlock_item_code: { type: String, default: null, match: /^[a-z0-9_]+$/ },
     is_active: { type: Boolean, required: true, default: true },
-    earned_count: { type: Number, required: true, default: 0, min: 0 },
-    sort_order: { type: Number, default: null },
+    sort_order: { type: mongoose.Schema.Types.Int32, default: null },
     created_by: { type: mongoose.Schema.Types.ObjectId, default: null },
 
-    // Lifecycle: active -> archived (tucked away, still editable/restorable)
-    // -> deleted (soft-removed, recoverable only via direct DB access) ->
-    // gone for good on a permanent delete. Mirrors the same pattern used
-    // for speech_to_text_recordings/text_to_speech_messages.
+    // Also not part of the live validator, also kept as additional fields —
+    // the admin Badges page's archive/restore/soft-delete lifecycle and its
+    // "can't delete, N patients already earned this" guard both depend on
+    // these (mirrors the same pattern other lifecycle-tracked collections in
+    // this app already use, e.g. speech_to_text_recordings).
+    earned_count: { type: mongoose.Schema.Types.Int32, required: true, default: 0, min: 0 },
     status: { type: String, required: true, enum: ['active', 'archived', 'deleted'], default: 'active' },
     is_archived: { type: Boolean, required: true, default: false },
     archived_at: { type: Date, default: null },
@@ -87,9 +74,6 @@ const badgeSchema = new mongoose.Schema(
   }
 )
 
-// `code` is the badge's stable natural key (slugified from the name) — one
-// per code, same spirit as a username/slug uniqueness constraint elsewhere
-// in this app.
 badgeSchema.index({ code: 1 }, { unique: true })
 
 export const Badge = mongoose.models.Badge || mongoose.model('Badge', badgeSchema)

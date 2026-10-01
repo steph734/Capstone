@@ -1,7 +1,7 @@
 import { getMongo, getDb } from '../mongo.js'
-import { GameCompletion } from '../models/gameCompletion.js'
 import { resolvePatientId } from '../resolvePatient.js'
 import { evaluateCriteria } from '../evaluateUnlock.js'
+import { buildUnlockContext } from '../unlockContext.js'
 
 // GET /api/game-progress/unlocks?patientEmail= -> which badge codes and
 // wardrobe item codes this patient has actually earned, computed fresh from
@@ -23,20 +23,13 @@ export default async function handler(req, res) {
     const patientId = await resolvePatientId(patientEmail)
     if (!patientId) return res.status(200).json({ unlockedItemCodes: [], earnedBadgeCodes: [] })
 
-    const completions = await GameCompletion.find({ patient_id: patientId }).lean()
-
-    const ctx = {
-      completedGameIds: new Set(completions.map((c) => String(c.game_id))),
-      perfectGameIds: new Set(completions.filter((c) => c.perfect_score_achieved).map((c) => String(c.game_id))),
-      anyPerfect: completions.some((c) => c.perfect_score_achieved),
-      earnedBadgeCodes: new Set(),
-    }
+    const ctx = await buildUnlockContext(patientId)
 
     const badges = await db.collection('badges').find({ is_active: true }).toArray()
     const earnedBadgeCodes = []
     const itemCodesFromBadges = []
     for (const b of badges) {
-      const met = evaluateCriteria({ type: b.criteria_type, gameId: b.criteria_game_id, value: b.criteria_value }, ctx)
+      const met = evaluateCriteria({ type: b.criteria?.type, gameId: b.criteria?.game_id, value: b.criteria?.value }, ctx)
       if (met) {
         earnedBadgeCodes.push(b.code)
         ctx.earnedBadgeCodes.add(b.code)

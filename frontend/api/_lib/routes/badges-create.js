@@ -24,13 +24,12 @@ export default async function handler(req, res) {
   }
 
   const {
-    name, description, art, badgeType, criteriaType, criteriaGameId,
-    criteriaValue, unlockItemCode, isActive, adminEmail,
+    name, description, art, emoji, criteriaType, criteriaGameId,
+    criteriaValue, unlockItemType, unlockItemCode, themeCode, isActive, adminEmail,
   } = req.body || {}
 
   if (!str(name)) return res.status(400).json({ error: 'Badge name is required.' })
   if (!art?.shape || !art?.color || !art?.symbol) return res.status(400).json({ error: 'Badge art (shape/colour/symbol) is required.' })
-  if (!badgeType) return res.status(400).json({ error: 'Missing badge type.' })
   if (!criteriaType) return res.status(400).json({ error: 'Missing criteria type.' })
 
   try {
@@ -52,19 +51,22 @@ export default async function handler(req, res) {
       n += 1
     }
 
+    const unlockCode = str(unlockItemCode) || null
     const doc = await Badge.create({
       code: candidate,
       name: str(name),
       description: str(description) || null,
+      emoji: str(emoji) || null,
+      theme_code: str(themeCode) || null,
       art: { shape: art.shape, color: art.color, symbol: art.symbol, banner: !!art.banner },
-      badge_type: badgeType,
-      criteria_type: criteriaType,
-      criteria_game_id: mongoose.isValidObjectId(criteriaGameId) ? new mongoose.Types.ObjectId(criteriaGameId) : null,
-      criteria_value: Number.isFinite(criteriaValue) ? criteriaValue : null,
-      unlock_item_code: str(unlockItemCode) || null,
+      criteria: {
+        type: criteriaType,
+        game_id: mongoose.isValidObjectId(criteriaGameId) ? new mongoose.Types.ObjectId(criteriaGameId) : null,
+        value: Number.isFinite(criteriaValue) ? criteriaValue : null,
+      },
+      unlock_item_type: unlockCode ? (unlockItemType === 'hair' ? 'hair' : 'item') : null,
+      unlock_item_code: unlockCode,
       is_active: !!isActive,
-      earned_count: 0,
-      sort_order: null,
       created_by: createdBy,
     })
 

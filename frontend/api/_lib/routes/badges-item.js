@@ -37,23 +37,30 @@ async function handlePatch(req, res) {
   }
 
   const {
-    name, description, art, badgeType, criteriaType, criteriaGameId,
-    criteriaValue, unlockItemCode, isActive, archive, softDelete, adminEmail,
+    name, description, art, emoji, themeCode, criteriaType, criteriaGameId,
+    criteriaValue, unlockItemType, unlockItemCode, isActive, archive, softDelete, adminEmail,
   } = req.body || {}
 
   const update = {}
   if (name !== undefined) update.name = str(name)
   if (description !== undefined) update.description = str(description) || null
+  if (emoji !== undefined) update.emoji = str(emoji) || null
+  if (themeCode !== undefined) update.theme_code = str(themeCode) || null
   if (art !== undefined && art?.shape && art?.color && art?.symbol) {
     update.art = { shape: art.shape, color: art.color, symbol: art.symbol, banner: !!art.banner }
   }
-  if (badgeType !== undefined) update.badge_type = badgeType
-  if (criteriaType !== undefined) update.criteria_type = criteriaType
-  if (criteriaGameId !== undefined) {
-    update.criteria_game_id = mongoose.isValidObjectId(criteriaGameId) ? new mongoose.Types.ObjectId(criteriaGameId) : null
+  if (criteriaType !== undefined) {
+    update.criteria = {
+      type: criteriaType,
+      game_id: mongoose.isValidObjectId(criteriaGameId) ? new mongoose.Types.ObjectId(criteriaGameId) : null,
+      value: Number.isFinite(criteriaValue) ? criteriaValue : null,
+    }
   }
-  if (criteriaValue !== undefined) update.criteria_value = Number.isFinite(criteriaValue) ? criteriaValue : null
-  if (unlockItemCode !== undefined) update.unlock_item_code = str(unlockItemCode) || null
+  if (unlockItemCode !== undefined) {
+    const code = str(unlockItemCode) || null
+    update.unlock_item_code = code
+    update.unlock_item_type = code ? (unlockItemType === 'hair' ? 'hair' : 'item') : null
+  }
   if (isActive !== undefined) update.is_active = !!isActive
 
   try {

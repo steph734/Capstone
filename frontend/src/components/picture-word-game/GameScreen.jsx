@@ -3,6 +3,8 @@ import { SkyBackground, useSpeech } from './ui'
 import { BuddyBubble } from './Modals'
 import { EmojiPicture, SpeakerIcon, CheckIcon, HandTapIcon, StarIcon, BackArrowIcon } from './illustrations'
 
+const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" }
+
 function article(word) {
   return /^[aeiou]/i.test(word) ? 'an' : 'a'
 }
@@ -93,64 +95,60 @@ export default function GameScreen({
     <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
       <SkyBackground/>
 
-      {/* Top bar — pinned, never scrolls away */}
-      <div className="relative z-10 flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
+      {/* Top bar */}
+      <div className="relative z-10 flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onBack}
-          className="pwg-pressable flex h-14 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-extrabold text-[#2B2A4C] shadow focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:h-16 sm:px-5 sm:text-[15px]"
-          style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}
+          className="pwg-pressable flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-extrabold text-[#2B2A4C] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+          style={HEADING}
         >
-          <BackArrowIcon size={20}/> Back
+          <BackArrowIcon size={18}/> Back
         </button>
 
-        <div className="flex h-14 items-center gap-1.5 rounded-full bg-white px-3 shadow sm:h-16 sm:gap-2.5 sm:px-5">
+        <div className="flex h-12 items-center gap-2 rounded-full bg-white px-4 shadow-md">
           {questions.map((_, i) => (
-            <span
-              key={i}
-              aria-hidden="true"
-              className="flex h-5 w-5 items-center justify-center sm:h-6 sm:w-6"
-            >
+            <span key={i} aria-hidden="true" className="flex h-5 w-5 items-center justify-center">
               {i < current || (i === current && correctPicked)
-                ? <StarIcon size={18} className="text-[#F59E0B] sm:!h-5 sm:!w-5"/>
+                ? <StarIcon size={18} className="text-[#F59E0B]"/>
                 : i === current
-                  ? <span className="block h-3.5 w-3.5 rounded-full border-[3px] border-[#F59E0B] sm:h-4 sm:w-4"/>
-                  : <span className="block h-2 w-2 rounded-full bg-[#D8D4E6] sm:h-2.5 sm:w-2.5"/>
+                  ? <span className="block h-3.5 w-3.5 rounded-full border-[3px] border-[#F59E0B]"/>
+                  : <span className="block h-2.5 w-2.5 rounded-full bg-[#D8D4E6]"/>
               }
             </span>
           ))}
         </div>
 
-        <div className="flex h-14 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-extrabold text-[#C97A00] shadow sm:h-16 sm:px-5 sm:text-[17px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+        <div className="flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[17px] font-extrabold text-[#C97A00] shadow-md" style={HEADING}>
           <StarIcon size={18} className="text-[#F59E0B]"/> {stars}
         </div>
       </div>
 
       {/* Main content — the only part that scrolls, so the top bar and Pao stay visible */}
-      <div className="relative z-10 flex min-h-0 flex-1 flex-wrap items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-4 sm:gap-10 sm:px-6">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-wrap items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-3 md:gap-10">
 
-        {/* Picture card */}
-        <div className="relative flex w-[min(440px,92vw)] min-h-[360px] flex-col items-center gap-5 rounded-[36px] bg-white p-6 shadow-xl sm:min-h-[440px] sm:gap-6 sm:rounded-[48px] sm:p-8 md:min-h-[480px]">
+        {/* Picture card — max 380px wide, 200px picture circle */}
+        <div className="relative flex w-[min(380px,92vw)] flex-col items-center gap-4 rounded-[28px] bg-white p-6 shadow-lg">
           {showBanner && (
-            <div className="pwg-pop absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#E3F4E8] px-4 py-1.5 text-[13px] font-extrabold text-[#2F8A4C] shadow sm:-top-6 sm:px-5 sm:py-2 sm:text-[15px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+            <div className="pwg-pop absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#E3F4E8] px-4 py-1.5 text-[14px] font-extrabold text-[#2F8A4C] shadow-md" style={HEADING}>
               🎉 Great job!
             </div>
           )}
-          <EmojiPicture emoji={question.item.emoji} tint={question.item.tint} size={180} className="!h-[min(180px,38vw)] !w-[min(180px,38vw)] sm:!h-[220px] sm:!w-[220px]"/>
+          <EmojiPicture emoji={question.item.emoji} tint={question.item.tint} size={200}/>
           <button
             type="button"
             onClick={handleHearIt}
             aria-label={`Hear the word ${question.item.word}`}
-            className="pwg-pressable flex h-16 items-center gap-2 rounded-full bg-[#F59E0B] px-6 text-[16px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:px-7 sm:text-[17px]"
-            style={{ boxShadow: '0 6px 0 #C97A00', fontFamily: "'Baloo 2', system-ui, sans-serif" }}
+            className="pwg-pressable flex h-14 items-center gap-2 rounded-full bg-[#F59E0B] px-6 text-[17px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+            style={{ boxShadow: '0 4px 10px rgba(201,122,0,.35)', ...HEADING }}
           >
-            <SpeakerIcon size={22}/> Hear it
+            <SpeakerIcon size={20}/> Hear it
           </button>
         </div>
 
-        {/* Word choices */}
-        <div className="flex w-[min(420px,92vw)] flex-col gap-3 sm:gap-4">
-          <h2 className="text-center text-[22px] font-extrabold text-[#2B2A4C] sm:text-[26px] md:text-[28px]" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+        {/* Word choices — 3 buttons, 68px tall, 26px text */}
+        <div className="flex w-[min(400px,92vw)] flex-col gap-2.5">
+          <h2 className="text-center text-[26px] font-extrabold text-[#2B2A4C]" style={HEADING}>
             Which word is this?
           </h2>
 
@@ -160,17 +158,15 @@ export default function GameScreen({
             const isChosenCorrect = correctPicked && isCorrectWord
             const isGlowing = hintOn && !correctPicked && isCorrectWord
 
-            let cls = 'pwg-pressable flex h-20 items-center justify-center gap-3 rounded-[24px] border-[3px] px-5 text-center font-extrabold transition-all focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] sm:h-24 sm:rounded-[28px] sm:px-6 md:h-[104px]'
-            let style = { fontFamily: "'Baloo 2', system-ui, sans-serif", fontSize: 'clamp(20px, 4.2vw, 40px)' }
-
+            let style = { ...HEADING, fontSize: 26 }
             if (isChosenCorrect) {
-              style = { ...style, background: '#2F8A4C', borderColor: '#256E3C', color: '#fff', boxShadow: '0 6px 0 #1F5C33' }
+              style = { ...style, background: '#2F8A4C', borderColor: '#256E3C', color: '#fff', boxShadow: '0 3px 8px rgba(47,138,76,.35)' }
             } else if (isFaded) {
-              style = { ...style, background: '#F4F2EA', borderColor: '#E4DFCE', color: '#B7B2A0', opacity: 0.55 }
+              style = { ...style, background: '#F4F2EA', borderColor: '#E4DFCE', color: '#8A8578', opacity: 0.6 }
             } else if (isGlowing) {
-              style = { ...style, background: '#FFF0CC', borderColor: '#F59E0B', color: '#7A4E00', boxShadow: '0 0 0 6px rgba(245,158,11,.25), 0 6px 0 #F3D284' }
+              style = { ...style, background: '#FFF0CC', borderColor: '#F59E0B', color: '#7A4E00', boxShadow: '0 0 0 4px rgba(245,158,11,.3)' }
             } else {
-              style = { ...style, background: '#fff', borderColor: '#E4DFCE', color: '#2B2A4C', boxShadow: '0 6px 0 #E4DFCE' }
+              style = { ...style, background: '#fff', borderColor: '#E4DFCE', color: '#2B2A4C', boxShadow: '0 2px 6px rgba(43,42,76,.10)' }
             }
 
             return (
@@ -179,11 +175,11 @@ export default function GameScreen({
                 type="button"
                 onClick={() => handleSelect(word)}
                 disabled={isFaded || correctPicked}
-                className={`${cls} ${isFaded ? 'pwg-fade-out cursor-not-allowed' : 'cursor-pointer'}`}
+                className={`pwg-pressable flex h-[68px] items-center justify-center gap-2.5 rounded-2xl border-2 px-5 text-center font-extrabold transition-all focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] ${isFaded ? 'pwg-fade-out cursor-not-allowed' : 'cursor-pointer'}`}
                 style={style}
               >
-                {isChosenCorrect && <CheckIcon size={30}/>}
-                {isGlowing && <HandTapIcon size={26}/>}
+                {isChosenCorrect && <CheckIcon size={24}/>}
+                {isGlowing && <HandTapIcon size={22}/>}
                 {word}
               </button>
             )
@@ -193,18 +189,16 @@ export default function GameScreen({
             type="button"
             onClick={handleNeedHelp}
             disabled={correctPicked || hintOn}
-            className="mx-auto mt-1 flex h-16 items-center rounded-full px-6 text-[14px] font-bold text-[#5A5670] underline decoration-dotted underline-offset-4 disabled:opacity-40 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+            className="mx-auto mt-1 flex h-11 items-center rounded-full px-5 text-[15px] font-bold text-[#5A5670] underline decoration-dotted underline-offset-4 disabled:opacity-40 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
           >
             Need help?
           </button>
         </div>
       </div>
 
-      {/* Buddy bar — pinned to the bottom, always visible, never scrolled out of view */}
-      <div className="relative z-10 flex flex-shrink-0 items-center bg-gradient-to-t from-[#B8E4F8]/70 to-transparent px-3 pb-3 pt-2 sm:px-6 sm:pb-4">
-        <div className="scale-[.8] origin-bottom-left sm:scale-100">
-          <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={100}/>
-        </div>
+      {/* Buddy bar — pinned to the bottom, always visible */}
+      <div className="relative z-10 flex flex-shrink-0 items-center px-4 pb-3 pt-1 sm:px-6">
+        <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={96}/>
       </div>
     </div>
   )

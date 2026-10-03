@@ -61,13 +61,14 @@ function Cloud({ className = '', size = 100, delay = 0, dur = 8 }) {
 
 // ─── Buttons ───────────────────────────────────────────────────────────────
 
-// The "pressable 3D" button — a solid top face with a darker bottom shadow
-// slab that reads as depth, and a small press-down animation on click.
+// Primary button — the accent colour with a soft shadow in its darker tone
+// (the accent/shadow pair is unchanged; the depth is a light glow, not a
+// thick block) and a small press-down on click.
 export function PressableButton({ as: As = 'button', color = '#F59E0B', shadow = '#C97A00', textColor = '#fff', className = '', style = {}, children, ...rest }) {
   return (
     <As
-      className={`pwg-pressable inline-flex items-center justify-center gap-2 rounded-3xl font-extrabold transition-transform active:translate-y-[3px] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] focus-visible:outline-offset-2 ${className}`}
-      style={{ background: color, color: textColor, boxShadow: `0 6px 0 ${shadow}`, fontFamily: "'Baloo 2', system-ui, sans-serif", ...style }}
+      className={`pwg-pressable inline-flex items-center justify-center gap-2 rounded-2xl font-extrabold transition-transform active:translate-y-[2px] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] focus-visible:outline-offset-2 ${className}`}
+      style={{ background: color, color: textColor, boxShadow: `0 4px 10px ${shadow}55`, fontFamily: "'Baloo 2', system-ui, sans-serif", ...style }}
       {...rest}
     >
       {children}
@@ -78,7 +79,7 @@ export function PressableButton({ as: As = 'button', color = '#F59E0B', shadow =
 export function GhostButton({ className = '', children, ...rest }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-3xl border-2 border-[#E4DFCE] bg-white font-bold text-[#5A5670] transition-colors hover:bg-[#FBF8EF] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] focus-visible:outline-offset-2 ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E4DFCE] bg-white font-bold text-[#5A5670] transition-colors hover:bg-[#FBF8EF] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] focus-visible:outline-offset-2 ${className}`}
       style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}
       {...rest}
     >
@@ -89,7 +90,7 @@ export function GhostButton({ className = '', children, ...rest }) {
 
 // ─── Modal shell ─────────────────────────────────────────────────────────────
 
-export function ModalShell({ onClose, children, maxWidth = 'max-w-[560px]', label }) {
+export function ModalShell({ onClose, children, maxWidth = 'max-w-[520px]', label }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -109,7 +110,7 @@ export function ModalShell({ onClose, children, maxWidth = 'max-w-[560px]', labe
     >
       <div
         ref={ref}
-        className={`pwg-modal-in relative w-full ${maxWidth} max-h-[92vh] overflow-y-auto rounded-[28px] bg-[#FFFDF8] p-5 shadow-2xl sm:rounded-[40px] sm:p-9`}
+        className={`pwg-modal-in relative w-full ${maxWidth} max-h-[92vh] overflow-y-auto rounded-[28px] bg-[#FFFDF8] p-6 shadow-xl sm:p-8`}
         style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}
       >
         {children}
@@ -124,9 +125,9 @@ export function CloseButton({ onClose, label = 'Close' }) {
       type="button"
       onClick={onClose}
       aria-label={label}
-      className="absolute right-6 top-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#F1EEDF] text-[#5A5670] transition-colors hover:bg-[#E7E2CC] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+      className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#F1EEDF] text-[#5A5670] transition-colors hover:bg-[#E7E2CC] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
     >
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   )
 }

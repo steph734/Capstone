@@ -6,7 +6,8 @@ import { ModalShell, PressableButton } from './ui'
 import GameScreen from './GameScreen'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
-import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import { fetchGameBadge } from '../../utils/gameProgress'
+import { useGameSession } from '../../hooks/useGameSession'
 
 // ─── Optional therapist settings panel (hidden by default; only reachable
 // via the gear icon on the start card) ─────────────────────────────────────
@@ -74,6 +75,8 @@ export default function PictureWordGame({
   Mascot, readAloud = true, questionCount = 6, onExit, onComplete,
   patientId = 'alvrin', patientEmail = null, exerciseId = 'picture-word', domain = 'Cognitive',
 }) {
+  const gameSession = useGameSession({ gameName: 'Picture-Word Matching' })
+  const wrongTriesRef = useRef(0)
   const [phase, setPhase] = useState('start') // start | settings | category | game | results
   const [categoryId, setCategoryId] = useState(null)
   const [questions, setQuestions] = useState([])
@@ -91,6 +94,7 @@ export default function PictureWordGame({
     setCategoryId(id)
     setQuestions(buildQuestions(id, settings.questionsPerRound, settings.choices))
     setStars(0)
+    wrongTriesRef.current = 0
     setRealBadge(null)
     sessionIdRef.current = createSessionId()
     loggerRef.current = createEventLogger({ patientId, exerciseId, sessionId: sessionIdRef.current, domain, onFlush: submitEventBatch })
@@ -109,7 +113,10 @@ export default function PictureWordGame({
       }
     } catch { /* no-op */ }
 
-    reportGameCompletion({ patientEmail, gameName: 'Picture-Word Matching', score: finalStars, maxScore: questions.length })
+    gameSession.finish({
+      correct: finalStars, attempts: questions.length + wrongTriesRef.current, hints_used: 0, stars: finalStars,
+      detail: { categoryId, wrongTries: wrongTriesRef.current },
+    })
     fetchGameBadge('Picture-Word Matching').then(setRealBadge)
 
     await onComplete?.({ categoryId, stars: finalStars, total: questions.length, xp: 100, badge: 'Word Wizard' })
@@ -132,6 +139,7 @@ export default function PictureWordGame({
       )}
       {phase === 'game' && questions.length > 0 && (
         <GameScreen
+          onWrongTry={() => { wrongTriesRef.current += 1 }}
           questions={questions}
           categoryLabel={category?.label}
           Mascot={Mascot}

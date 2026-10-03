@@ -4,7 +4,7 @@
 import { getMongo, getDb } from '../mongo.js'
 import { PaoProfile } from '../models/paoProfile.js'
 import { PatientUnlock } from '../models/patientUnlock.js'
-import { resolvePatientId } from '../resolvePatient.js'
+import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializePaoProfile } from '../serializePaoProfile.js'
 
 const SLOTS = ['hair', 'hats', 'clothes', 'pants', 'shoes']
@@ -17,14 +17,16 @@ export default async function handler(req, res) {
 
   const body = req.body || {}
   const patientEmail = String(body.patientEmail || '').trim()
+  const activitySessionId = String(body.activitySessionId || '').trim() || null
   const themeCode = String(body.themeCode || '').trim()
   if (!themeCode) return res.status(400).json({ error: 'Missing themeCode.' })
 
   try {
     await getMongo()
     const db = await getDb()
-    const patientId = await resolvePatientId(patientEmail)
-    if (!patientId) return res.status(404).json({ error: 'No patient record is linked to this account yet.' })
+    const resolved = await resolveRequestPatient({ activitySessionId, patientEmail })
+    if (resolved.error) return res.status(resolved.error.status).json({ error: resolved.error.message })
+    const patientId = resolved.patientId
 
     const theme = await db.collection('pao_themes').findOne({ code: themeCode })
     if (!theme) return res.status(404).json({ error: 'Theme not found.' })

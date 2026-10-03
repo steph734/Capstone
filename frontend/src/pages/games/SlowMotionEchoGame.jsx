@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
 import { ECHO_GAME_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 import { pickBrowserVoiceForLang } from '../../utils/paoLanguage'
-import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import { fetchGameBadge } from '../../utils/gameProgress'
+import { useGameSession } from '../../hooks/useGameSession'
 import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Word bank, grouped by in-game level ──────────────────────────────────────
@@ -336,6 +337,7 @@ function FinishScreen({ tally, total, onReplay, onExit, badgeEarned, levelsMaste
 // ─── Main game ────────────────────────────────────────────────────────────────
 
 export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'slow-motion-echo', domain = 'Speech', lang = 'en' }) {
+  const gameSession = useGameSession({ gameName: 'Slow-Motion Echo' })
   const [settings, setSettings] = useState(null) // { levelId, paceId, scaffold }
   const [words, setWords]       = useState([])
   const [current, setCurrent]   = useState(0)
@@ -566,7 +568,13 @@ export default function SlowMotionEchoGame({ onExit, patientId = 'alvrin', patie
         }
       }
 
-      reportGameCompletion({ patientEmail, gameName: 'Slow-Motion Echo', score: tallyRef.current.full, maxScore: words.length })
+      {
+        const t = tallyRef.current
+        gameSession.finish({
+          correct: t.full, attempts: t.full + t.close + t.none, hints_used: 0, stars: t.full,
+          detail: { wordsAttempted: words.length, closeMatches: t.close, noMatches: t.none },
+        })
+      }
     } catch {}
 
     setDone(true)

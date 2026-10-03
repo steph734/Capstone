@@ -5,6 +5,8 @@ import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
 import { fetchUnlockState, loadBadges } from '../../utils/gameProgress'
+import { usePao } from '../../context/PaoContext'
+import { getWardrobe } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 
@@ -271,6 +273,8 @@ function Boat({ size = 46 }) {
 
 export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = null }) {
   const [activeTab,     setActiveTab]     = useState('hair')
+  const pao = usePao()
+  const [howToUnlockByCode, setHowToUnlockByCode] = useState({})
   const [equipped,      setEquipped]      = useState({ hair:'none', hats:'none', clothes:'none', pants:'none', shoes:'none' })
   const [talking,       setTalking]       = useState(false)
   const [mouthOpen,     setMouthOpen]     = useState(false)
@@ -312,13 +316,32 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   // recorded game completions. Refreshed whenever the Badge Case is opened,
   // same as the legacy localStorage badge set below, so a badge/item earned
   // moments ago (right after finishing a game) shows up immediately.
+  const identKey = pao.ident?.activitySessionId || pao.ident?.patientEmail || ''
   useEffect(() => {
     let cancelled = false
-    fetchUnlockState(patientEmail).then((state) => {
-      if (!cancelled) setUnlockedItemCodes(new Set(state.unlockedItemCodes))
-    })
+    if (!identKey) return undefined
+    getWardrobe(pao.ident).then((w) => {
+      if (cancelled) return
+      const codes = new Set()
+      const howTo = {}
+      const all = [...Object.values(w.items || {}).flat(), ...(w.hair || [])]
+      for (const i of all) {
+        if (i.unlocked) codes.add(i.code)
+        else if (i.howToUnlock) howTo[i.code] = i.howToUnlock
+      }
+      setUnlockedItemCodes(codes)
+      setHowToUnlockByCode(howTo)
+    }).catch(() => { /* keep whatever was last shown */ })
     return () => { cancelled = true }
-  }, [patientEmail, showBadgeCase])
+  }, [identKey, showBadgeCase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mirror the server's equipped outfit (codes) into the on-screen slots.
+  useEffect(() => {
+    const eq = pao.profile?.equipped
+    if (!eq) return
+    const code = (v) => ((v && typeof v === 'object') ? v.code : v) || 'none'
+    setEquipped({ hair: code(eq.hair), hats: code(eq.hats), clothes: code(eq.clothes), pants: code(eq.pants), shoes: code(eq.shoes) })
+  }, [pao.profile])
 
   const categories = useMemo(() => CATEGORY_META.map((meta) => ({
     ...meta,
@@ -330,10 +353,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           id: i.code, code: i.code, name: i.name, design: i.design,
           badge: LEGACY_BADGE_BY_CODE[i.code] || null,
           unlock: i.unlock || null,
-          desc: i.description || '',
+          desc: (!unlockedItemCodes.has(i.code) && howToUnlockByCode[i.code]) || i.description || '',
         })),
     ],
-  })), [wardrobeItems])
+  })), [wardrobeItems, unlockedItemCodes, howToUnlockByCode])
 
   // refresh when badge case opens (badge may have just been earned)
   useEffect(() => {
@@ -370,6 +393,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const equip = (catId, item) => {
     if (!isUnlocked(item)) return
     setEquipped(e => ({ ...e, [catId]: item.id }))
+    pao.equip(catId, item.id === 'none' ? null : item.code).catch(() => { /* server keeps the last good outfit */ })
     tts(item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : pickLine(CUSTOMIZE_LINES.loveTheItem, lang, item.name), {})
   }
 

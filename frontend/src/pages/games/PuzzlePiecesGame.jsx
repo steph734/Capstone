@@ -5,7 +5,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { PUZZLE_LINES, PUZZLE_COLOR_NAMES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import { fetchGameBadge } from '../../utils/gameProgress'
+import { useGameSession } from '../../hooks/useGameSession'
 import { buildPuzzleRound, SHAPE_NAMES, SHAPE_FACTS, LEVELS } from '../../data/puzzlePals'
 import { PuzzlePiece, PuzzleHole } from './PuzzleShapes'
 import { HandIcon, ArrowUpIcon, ArrowDownIcon, ArrowRightIcon } from '../../components/icons/SpeechIcons'
@@ -104,7 +105,7 @@ function PuzzleBadge({ animate = false }) {
 
 const CONFETTI = ['🎉', '⭐', '🧩', '🎊', '✨']
 
-function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null, round }) {
+function FinishScreen({ onReplay, onExit, lang = 'en', onRecord, round }) {
   const [talking, setTalking]     = useState(false)
   const [mouthOpen, setMouthOpen] = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -127,7 +128,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null, roun
         localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Puzzle Pro']))
       }
     } catch {}
-    reportGameCompletion({ patientEmail, gameName: 'Puzzle Pals', score: 1, maxScore: 1 })
+    onRecord?.()
     fetchGameBadge('Puzzle Pals').then(setRealBadge)
     const t = setTimeout(() => {
       setBadgeShown(true)
@@ -226,6 +227,15 @@ function BoardCell({ cellRef, stepKey, item, filled, justFilled, isCurrent, hint
 // ─── Main game ────────────────────────────────────────────────────────────────
 
 export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'puzzle-pieces', domain = 'Cognitive', lang = 'en', setId = 'animals', level = 'easy' }) {
+  const gameSession = useGameSession({ gameName: 'Puzzle Pals' })
+  const tallyRef = useRef({ wrong: 0, hints: 0 })
+  const recordFinish = () => gameSession.finish({
+    correct: STEP_ORDER.length,
+    attempts: STEP_ORDER.length + tallyRef.current.wrong,
+    hints_used: tallyRef.current.hints,
+    stars: STEP_ORDER.length,
+    detail: { setId, level },
+  })
   const buildRound = () => buildPuzzleRound(setId, level)
 
   const [round, setRound]           = useState(buildRound)
@@ -335,6 +345,8 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
       clearTimeout(shakeTimerRef.current)
       shakeTimerRef.current = setTimeout(() => setShakeId(null), 450)
       const nextMiss = missCount + 1
+      tallyRef.current.wrong += 1
+      if (nextMiss === 2) tallyRef.current.hints += 1
       setMissCount(nextMiss)
       if (nextMiss >= 2) {
         setHint(true)
@@ -430,7 +442,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
     onExit()
   }
 
-  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail} round={round}/>
+  if (done) return <FinishScreen onReplay={handleReplay} onExit={handleExit} lang={lang} round={round} onRecord={recordFinish}/>
 
   const levelMeta = LEVELS.find((l) => l.id === round.level) || LEVELS[0]
 

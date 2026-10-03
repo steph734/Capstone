@@ -1,12 +1,16 @@
 import GamifiedFullPage from '../GamifiedFullPage'
+import { ActivitySessionProvider } from '../../context/ActivitySessionContext'
 
-// The therapist's "Games" tab shows the exact same Pao-the-panda game hub
-// patients play from (see PatientGamifiedActivitiesPage.jsx) — same mascot,
-// same game grid, same level-gating — so a therapist can see precisely what
-// their patients see. It's a full-screen overlay (fixed/inset:0) by design,
-// same as the patient version, so it isn't wrapped in TherapistPageShell —
-// the "back" button below returns to the therapist's own Stats tab instead
-// of the patient dashboard the default targets.
-export default function TherapistActivityLibraryPage() {
-  return <GamifiedFullPage backPath="/therapist/gamified-activities" patientId="therapist-preview" />
+// The therapist's "Games" tab runs the same Pao game hub the patients use,
+// but the therapist first chooses who is playing (or practice mode). Progress
+// from every game goes to that chosen patient's Pao.
+// It's a full-screen overlay (fixed/inset:0) by design, so it isn't wrapped in
+// TherapistPageShell — the back button returns to the therapist's Stats tab.
+export default function TherapistActivityLibraryPage({ user }) {
+  const therapistEmail = user?.email || null
+  return (
+    <ActivitySessionProvider therapistEmail={therapistEmail}>
+      <GamifiedFullPage backPath="/therapist/gamified-activities" requirePlayer therapistEmail={therapistEmail} />
+    </ActivitySessionProvider>
+  )
 }

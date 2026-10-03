@@ -37,6 +37,12 @@ export async function reportGameCompletion({ patientEmail, gameName, score = nul
   }
 }
 
+export async function resolveGameIdByName(gameName) {
+  if (!gameName) return null
+  const map = await loadGameIdMap()
+  return map[gameName.trim().toLowerCase()] || null
+}
+
 export async function fetchUnlockState(patientEmail) {
   const empty = { unlockedItemCodes: [], earnedBadgeCodes: [] }
   if (!patientEmail) return empty

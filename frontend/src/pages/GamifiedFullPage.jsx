@@ -12,6 +12,9 @@ import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
+import { PaoProvider, usePao } from '../context/PaoContext'
+import { useActivitySession } from '../context/ActivitySessionContext'
+import WhoIsPlayingModal from '../components/WhoIsPlayingModal'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLanguage'
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
@@ -214,8 +217,12 @@ function PaoLanguageModal({ selected, onSelect }) {
 // ─── In-game profile view ──────────────────────────────────────────────────────
 // A playful, kid-facing profile just for this page — separate from the real
 // account settings page at /patient/profile.
-function GamifiedProfileView({ progress, onBack, onViewAllBadges }) {
-  const { patientName, level, xp, xpNeeded, characterStats, badges, streak, weekly } = progress
+function GamifiedProfileView({ progress, pao, onBack, onViewAllBadges }) {
+  const { patientName, characterStats, badges, streak, weekly } = progress
+  const level = pao?.level ?? 1
+  const xp = pao?.xp ?? 0
+  const xpNeeded = pao?.xpToNext ?? Math.max(1, xp)
+  const statValues = pao?.stats || characterStats || {}
 
   return (
     <div style={{ position:'fixed', inset:0, background:'linear-gradient(180deg,#87ceeb 0%,#b8e6f5 60%,#d4f1e8 100%)' }}>
@@ -274,7 +281,7 @@ function GamifiedProfileView({ progress, onBack, onViewAllBadges }) {
           <h3 style={{ margin:'0 0 14px', fontSize:16, fontWeight:800, color:'#3a2e6b' }}>Character Stats</h3>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             {STATS_META.map((meta) => {
-              const value = characterStats?.[meta.key] ?? 0
+              const value = statValues[meta.key] ?? 0
               return (
                 <div key={meta.key}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, fontWeight:700, color:'#3a2e6b', marginBottom:4 }}>
@@ -321,8 +328,28 @@ function GamifiedProfileView({ progress, onBack, onViewAllBadges }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null }) {
+// Whose Pao this is: a therapist's picked patient (via the activity session),
+// or the signed-in patient on their own device. Practice mode has no Pao.
+export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
+  const activity = useActivitySession()
+  let ident = null
+  if (requirePlayer) {
+    if (activity.isActive && !activity.isPractice) ident = { activitySessionId: activity.session.id }
+  } else if (rest.patientEmail) {
+    ident = { patientEmail: rest.patientEmail }
+  }
+  return (
+    <PaoProvider ident={ident}>
+      <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+    </PaoProvider>
+  )
+}
+
+function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null }) {
   const navigate = useNavigate()
+  const pao = usePao()
+  const activity = useActivitySession()
+  const [justStarted, setJustStarted] = useState(null)
 
   const [phase,        setPhase]        = useState('intro')
   const [introStage,   setIntroStage]   = useState(0)
@@ -343,10 +370,23 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   // prefilled with whatever was picked last time.
   const [lang,          setLang]          = useState(() => getPaoLanguage())
   const [showLangModal, setShowLangModal] = useState(true)
+  const sessionReady = !requirePlayer || !activity.loading
+  const showPicker = requirePlayer && !showLangModal && sessionReady
+    && (activity.pickerOpen || !activity.isActive || !!justStarted)
+  const gateOpen = !showLangModal && sessionReady && !showPicker
+  const introStartedRef = useRef(false)
 
   // Character level/XP/stats — live, driven by played sessions (ProgressContext).
   const { progress } = useSharedProgress()
-  const character = { level: progress.level, xp: progress.xp, xpNeeded: progress.xpNeeded }
+  // Real Pao progression from the server (see PaoContext), not local progress.
+  const character = {
+    level: pao.profile?.level ?? 1,
+    xp: pao.profile?.xp ?? 0,
+    xpNeeded: pao.profile?.xpToNext ?? Math.max(1, pao.profile?.xp ?? 1),
+  }
+  const headerName = requirePlayer
+    ? (activity.isPractice ? 'Practice mode' : (activity.patient?.displayName || ''))
+    : progress.patientName
 
   const advTimer = useRef(null)
   const stageRef = useRef(0)
@@ -421,10 +461,11 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
 
   // ── Intro enter — waits for a language to be chosen first ────────────────────
   useEffect(() => {
-    if (showLangModal) return
+    if (!gateOpen || introStartedRef.current) return
+    introStartedRef.current = true
     setShowUI(true)
     speakStage(0)
-  }, [showLangModal]) // eslint-disable-line
+  }, [gateOpen]) // eslint-disable-line
 
   // ── Pao click → gentle reaction + friendly line ──────────────────────────────
   const clickCountRef = useRef(0)
@@ -458,7 +499,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
   }
 
   if (phase === 'profile') {
-    return <GamifiedProfileView progress={progress} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
+    return <GamifiedProfileView progress={progress} pao={pao.profile} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
   }
 
   if (phase === 'badges') {
@@ -617,9 +658,16 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
             </div>
             <div style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}
-              <span style={{ fontSize:15, fontWeight:800, color:'#3a2e6b' }}>{progress.patientName}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                <span style={{ fontSize:15, fontWeight:800, color:'#3a2e6b' }}>{headerName}</span>
+                {requirePlayer && (activity.isPractice
+                  ? <span style={{ fontSize:12, fontWeight:800, color:'#065f46', background:'rgba(16,185,129,.14)', border:'1px solid rgba(16,185,129,.4)', borderRadius:20, padding:'3px 10px' }}>Practice mode</span>
+                  : <button onClick={() => activity.changePlayer()} style={{ fontSize:12, fontWeight:800, color:'#5b21b6', background:'rgba(139,92,246,.12)', border:'1.5px solid rgba(139,92,246,.4)', borderRadius:12, padding:'4px 12px', cursor:'pointer', minHeight:32 }}>Change player</button>
+                )}
+              </div>
 
-              {/* Level badge + stats toggle */}
+              {/* Level badge + stats toggle — practice mode saves nothing, so no Pao progress */}
+              {!(requirePlayer && activity.isPractice) && (
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,183,3,.14)', border:'1px solid rgba(255,183,3,.4)', borderRadius:20, padding:'4px 12px 4px 8px' }}>
                   <span style={{ fontSize:14 }}>⭐</span>
@@ -638,6 +686,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
                   📊
                 </button>
               </div>
+              )}
 
               {/* Speech bubble */}
               <div style={{ background:'rgba(255,255,255,.82)', border:'1.5px solid rgba(124,79,224,.18)', borderRadius:'4px 18px 18px 18px', padding:'10px 16px', minHeight:48, animation:'gfBubbleIn .5s ease' }}>
@@ -665,7 +714,7 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
                 {STATS_META.map(stat => {
-                  const value = progress.characterStats[stat.key]
+                  const value = (pao.profile?.stats || progress.characterStats || {})[stat.key] ?? 0
                   return (
                     <div key={stat.key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -797,6 +846,20 @@ export default function GamifiedFullPage({ backPath = '/dashboard', patientId = 
       )}
       {showCatModal && <CategoryModal onSelect={handleCatSelect} onClose={() => setShowCatModal(false)} lang={lang}/>}
       {showLangModal && <PaoLanguageModal selected={lang} onSelect={handleLanguageSelect}/>}
+      {showPicker && (
+        <WhoIsPlayingModal
+          therapistEmail={therapistEmail}
+          language={lang}
+          onChangeVoice={() => setShowLangModal(true)}
+          onClose={() => navigate(backPath)}
+          confirmed={justStarted}
+          onStart={async (opts) => {
+            const s = await activity.start(opts)
+            setJustStarted({ ...s, onChangePlayer: async () => { setJustStarted(null); await activity.changePlayer() } })
+          }}
+          onGoToGames={() => { setJustStarted(null); activity.closePicker() }}
+        />
+      )}
     </div>
   )
 }

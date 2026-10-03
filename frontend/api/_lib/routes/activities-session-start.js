@@ -83,6 +83,7 @@ export default async function handler(req, res) {
       session: {
         id: String(session._id),
         mode,
+        remember,
         language,
         patient: patient ? {
           id: String(patient._id),

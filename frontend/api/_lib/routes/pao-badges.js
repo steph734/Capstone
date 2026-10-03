@@ -6,7 +6,7 @@
 import { getMongo } from '../mongo.js'
 import { Badge } from '../models/badge.js'
 import { PatientBadge } from '../models/patientBadge.js'
-import { resolvePatientId } from '../resolvePatient.js'
+import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializeBadge } from '../serializeBadge.js'
 
 export default async function handler(req, res) {
@@ -16,11 +16,15 @@ export default async function handler(req, res) {
   }
 
   const patientEmail = String(req.query.patientEmail || '').trim()
-  if (!patientEmail) return res.status(400).json({ error: 'Missing patientEmail.' })
+
+  const activitySessionId = String(req.query.activitySessionId || '').trim() || null
+  if (!patientEmail && !activitySessionId) return res.status(400).json({ error: 'Missing patientEmail.' })
 
   try {
     await getMongo()
-    const patientId = await resolvePatientId(patientEmail)
+    const resolved = await resolveRequestPatient({ activitySessionId, patientEmail })
+    if (resolved.error) return res.status(resolved.error.status).json({ error: resolved.error.message })
+    const patientId = resolved.patientId
 
     const badges = await Badge.find({ is_active: true, status: 'active' }).sort({ sort_order: 1, name: 1 }).lean()
     const earned = patientId

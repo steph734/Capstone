@@ -11,7 +11,7 @@ function article(word) {
 
 export default function GameScreen({
   questions, categoryLabel, Mascot, readAloud = true, autoHintAfter = 2,
-  onBack, onFinish, logger,
+  onBack, onFinish, onWrongTry, logger,
 }) {
   const [current, setCurrent]     = useState(0)
   const [wrongSet, setWrongSet]   = useState(() => new Set())
@@ -79,6 +79,7 @@ export default function GameScreen({
       return
     }
 
+    onWrongTry?.()
     setWrongSet((prev) => new Set(prev).add(word))
     const nextTries = tries + 1
     setTries(nextTries)

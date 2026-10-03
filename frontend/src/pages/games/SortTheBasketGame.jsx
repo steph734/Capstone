@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { SORT_BASKET_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import { fetchGameBadge } from '../../utils/gameProgress'
+import { useGameSession } from '../../hooks/useGameSession'
 import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Item pool by category ─────────────────────────────────────────────────────
@@ -102,7 +103,7 @@ function BasketBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmail = null }) {
+function FinishScreen({ score, total, onReplay, onExit, lang = 'en', onRecord }) {
   const pct      = score / total
   const stars    = pct >= 0.85 ? 3 : pct >= 0.55 ? 2 : 1
   const scoreMsg = pickLine(
@@ -137,7 +138,7 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
               localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Basket Sorter']))
             }
           } catch {}
-          reportGameCompletion({ patientEmail, gameName: 'Sort the Basket', score, maxScore: total })
+          onRecord?.()
           fetchGameBadge('Sort the Basket').then(setRealBadge)
           setBadgeShown(true)
           speak(pickLine(SORT_BASKET_LINES.badgeScript, lang))
@@ -181,6 +182,12 @@ function FinishScreen({ score, total, onReplay, onExit, lang = 'en', patientEmai
 // ─── Main game ────────────────────────────────────────────────────────────────
 
 export default function SortTheBasketGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'sort-basket', domain = 'Cognitive', lang = 'en' }) {
+  const gameSession = useGameSession({ gameName: 'Sort the Basket' })
+  const wrongTotalRef = useRef(0)
+  const recordFinish = () => gameSession.finish({
+    correct: score, attempts: items.length + wrongTotalRef.current, hints_used: 0, stars: score,
+    detail: { wrongTries: wrongTotalRef.current },
+  })
   const [items]        = useState(buildSession)
   const [current,      setCurrent]      = useState(0)
   const [wrongCount,   setWrongCount]   = useState(0)
@@ -273,6 +280,7 @@ export default function SortTheBasketGame({ onExit, patientId = 'alvrin', patien
       setItemAnim('sbShake')
       speak(pickRandomLine(SORT_BASKET_LINES.wrongTry, lang))
       const nextWrong = wrongCount + 1
+      wrongTotalRef.current += 1
       timerRef.current = setTimeout(() => {
         setWrongCount(nextWrong)
         setResultBinId(null); setResultType(null); setItemAnim('sbBob')
@@ -305,7 +313,7 @@ export default function SortTheBasketGame({ onExit, patientId = 'alvrin', patien
     onExit()
   }
 
-  if (done) return <FinishScreen score={score} total={items.length} onReplay={handleReplay} onExit={handleExit} lang={lang} patientEmail={patientEmail}/>
+  if (done) return <FinishScreen score={score} total={items.length} onReplay={handleReplay} onExit={handleExit} lang={lang} onRecord={recordFinish}/>
   if (!item) return null
 
   return (

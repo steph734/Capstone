@@ -4,7 +4,8 @@ import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { RED_RIDING_HOOD_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
-import { reportGameCompletion, fetchGameBadge } from '../../utils/gameProgress'
+import { fetchGameBadge } from '../../utils/gameProgress'
+import { useGameSession } from '../../hooks/useGameSession'
 import BadgeMedal from '../../components/BadgeMedal'
 
 // ─── Little Red Riding Hood — an interactive branching story ─────────────────
@@ -64,7 +65,7 @@ function StoryBadge({ animate = false }) {
 
 // ─── Finish screen ────────────────────────────────────────────────────────────
 
-function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
+function FinishScreen({ onReplay, onExit, lang = 'en', onRecord }) {
   const [talking, setTalking]       = useState(false)
   const [mouthOpen, setMouthOpen]   = useState(false)
   const [badgeShown, setBadgeShown] = useState(false)
@@ -84,7 +85,7 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
         localStorage.setItem('pao_badges', JSON.stringify([...earned, 'Story Explorer']))
       }
     } catch {}
-    reportGameCompletion({ patientEmail, gameName: 'Story Builder', score: 1, maxScore: 1 })
+    onRecord?.()
     fetchGameBadge('Story Builder').then(setRealBadge)
     const t = setTimeout(() => {
       setBadgeShown(true)
@@ -124,6 +125,8 @@ function FinishScreen({ onReplay, onExit, lang = 'en', patientEmail = null }) {
 // ─── Main game ────────────────────────────────────────────────────────────────
 
 export default function LittleRedRidingHoodGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'story-red-riding-hood', domain = 'Cognitive', lang = 'en' }) {
+  const gameSession = useGameSession({ gameName: 'Story Builder' })
+  const recordFinish = () => gameSession.finish({ correct: 1, attempts: 1, hints_used: 0, stars: 1, detail: { story: 'red-riding-hood' } })
   // intro | basket | path | obstacle | safewalk | wolf | wolfFeedback
   const [scene, setScene]               = useState('intro')
   const [basketTray, setBasketTray]     = useState(() => shuffle(BASKET_ITEMS))

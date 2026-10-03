@@ -7,7 +7,7 @@ import { getMongo, getDb } from '../mongo.js'
 import { PaoProfile } from '../models/paoProfile.js'
 import { PatientUnlock } from '../models/patientUnlock.js'
 import { Badge } from '../models/badge.js'
-import { resolvePatientId } from '../resolvePatient.js'
+import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 import { serializePaoHair } from '../serializePaoHair.js'
 import { describeUnlock } from '../describeUnlock.js'
@@ -19,13 +19,16 @@ export default async function handler(req, res) {
   }
 
   const patientEmail = String(req.query.patientEmail || '').trim()
-  if (!patientEmail) return res.status(400).json({ error: 'Missing patientEmail.' })
+
+  const activitySessionId = String(req.query.activitySessionId || '').trim() || null
+  if (!patientEmail && !activitySessionId) return res.status(400).json({ error: 'Missing patientEmail.' })
 
   try {
     await getMongo()
     const db = await getDb()
-    const patientId = await resolvePatientId(patientEmail)
-    if (!patientId) return res.status(404).json({ error: 'No patient record is linked to this account yet.' })
+    const resolved = await resolveRequestPatient({ activitySessionId, patientEmail })
+    if (resolved.error) return res.status(resolved.error.status).json({ error: resolved.error.message })
+    const patientId = resolved.patientId
 
     let profile = await PaoProfile.findOne({ patient_id: patientId })
     if (!profile) profile = await PaoProfile.create({ patient_id: patientId })

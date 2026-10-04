@@ -221,7 +221,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   // catalog now that a real `games` collection exists.
   useEffect(() => {
     let cancelled = false
-    fetch('/api/games/list')
+    fetch('/api/games/list?scope=all')
       .then(async (r) => {
         const body = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
@@ -975,7 +975,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                         }))
                       }}
                     >
-                      {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      {games.map((g) => <option key={g.id} value={g.id}>{g.name}{g.status && g.status !== "published" ? ` (${g.status})` : ""}</option>)}
                     </select>
                   </label>
                 )}

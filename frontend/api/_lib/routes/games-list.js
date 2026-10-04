@@ -17,9 +17,11 @@ export default async function handler(req, res) {
   try {
     await getMongo()
     const db = await getDb()
+    // ?scope=all (admin pickers) includes drafts; the default is published only.
+    const allStatuses = String(req.query.scope || '') === 'all'
     const docs = await db.collection('games')
-      .find({ status: 'published' })
-      .project({ name: 1, therapy_type: 1, difficulty: 1, points_per_play: 1, unlocks_badge_id: 1, game_type: 1, unlock_level: 1 })
+      .find(allStatuses ? {} : { status: 'published' })
+      .project({ name: 1, status: 1, therapy_type: 1, difficulty: 1, points_per_play: 1, unlocks_badge_id: 1, game_type: 1, unlock_level: 1 })
       .sort({ name: 1 })
       .toArray()
 
@@ -39,6 +41,7 @@ export default async function handler(req, res) {
         return {
           id: String(d._id),
           name: d.name,
+          status: d.status || null,
           therapyType: d.therapy_type || null,
           difficulty: d.difficulty || null,
           pointsPerPlay: Number(d.points_per_play) || 100,

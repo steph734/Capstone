@@ -164,6 +164,7 @@ app.all('/api/pao-hair/:id', paoHairItem)
 app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
 app.all('/api/games/list', gamesList)
+app.all('/api/games/by-name', gamesByName) // must come before /api/games/:gameId, or "by-name" is read as an id
 app.all('/api/games', gamesAdminList)
 app.all('/api/games/:gameId', gamesAdminItem)
 app.all('/api/speech-recordings/create', speechRecordingsCreate)
@@ -201,7 +202,6 @@ app.all('/api/sessions/:id/abandon', gameSessionsAbandon)
 app.all('/api/sessions/:id/complete', gameSessionsComplete)
 
 // "Who is playing today?" activity sessions.
-app.all('/api/games/by-name', gamesByName)
 app.all('/api/activities/players', activitiesPlayers)
 app.all('/api/activities/session/current', activitiesSessionCurrent)
 app.all('/api/activities/session', activitiesSessionStart)

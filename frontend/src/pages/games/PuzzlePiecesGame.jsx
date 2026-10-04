@@ -510,7 +510,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
               Find this piece · {levelMeta.label.toUpperCase()} shapes
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.7, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-              {findPieceLine({ item: currentTarget, refItem: currentStepKey === 'top' ? null : round.board[currentStepKey === 'under' ? 'top' : 'under'], stepKey: currentStepKey, lang })}
+              {currentTarget && findPieceLine({ item: currentTarget, refItem: currentStepKey === 'top' ? null : round.board[currentStepKey === 'under' ? 'top' : 'under'], stepKey: currentStepKey, lang })}
             </div>
           </div>
 

@@ -94,6 +94,7 @@ import paoSeen from './_lib/routes/pao-seen.js'
 import gameSessionsStart from './_lib/routes/game-sessions-start.js'
 import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
 import gameSessionsComplete from './_lib/routes/game-sessions-complete.js'
+import gamesByName from './_lib/routes/games-by-name.js'
 import activitiesPlayers from './_lib/routes/activities-players.js'
 import activitiesSessionCurrent from './_lib/routes/activities-session-current.js'
 import activitiesSessionStart from './_lib/routes/activities-session-start.js'
@@ -196,6 +197,7 @@ app.all('/api/sessions/:id/abandon', gameSessionsAbandon)
 app.all('/api/sessions/:id/complete', gameSessionsComplete)
 
 // "Who is playing today?" activity sessions.
+app.all('/api/games/by-name', gamesByName)
 app.all('/api/activities/players', activitiesPlayers)
 app.all('/api/activities/session/current', activitiesSessionCurrent)
 app.all('/api/activities/session', activitiesSessionStart)

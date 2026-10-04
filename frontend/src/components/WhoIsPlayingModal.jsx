@@ -191,7 +191,7 @@ export default function WhoIsPlayingModal({
       <p className="mt-4 text-[13px] font-extrabold tracking-wide text-[#5A5670]">YOUR PATIENTS · {players.length}</p>
 
       {/* Scrollable list — about 3.5 rows visible */}
-      <div role="radiogroup" aria-label="Your patients" className="mt-2 max-h-[324px] space-y-2 overflow-y-auto pr-1">
+      <div role="radiogroup" aria-label="Your patients" className="mt-2 max-h-[min(324px,34vh)] min-h-[200px] space-y-2 overflow-y-auto pr-1">
         {loading && <p className="py-6 text-center text-[15px] text-[#5A5670]">Loading patients…</p>}
         {!loading && error && <p className="py-6 text-center text-[15px] text-[#5A5670]">{error}</p>}
         {!loading && !error && players.length === 0 && (
@@ -267,7 +267,7 @@ function Shell({ dialogRef, onClose, label, children }) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="w-full max-w-[520px] rounded-[36px] bg-[#FFFDF8] p-7 shadow-xl"
+        className="w-full max-w-[520px] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[36px] bg-[#FFFDF8] p-7 shadow-xl"
         style={BODY}
       >
         {children}

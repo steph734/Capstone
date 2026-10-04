@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { getPaoProfile, equipPao, equipPaoTheme, hasIdent } from '../utils/paoApi'
 import RewardSequence from '../components/RewardSequence'
+import AppErrorBoundary from '../components/AppErrorBoundary'
 
 // Pao's real profile (level, XP, stats, equipped outfit) from the server,
 // plus the reward sequence shown after a finished game. `ident` says whose
@@ -59,12 +60,14 @@ export function PaoProvider({ ident, children }) {
     <PaoContext.Provider value={value}>
       {children}
       {pendingReward && (
-        <RewardSequence
-          reward={pendingReward}
-          ident={ident}
-          onEquip={equip}
-          onDone={() => setPendingReward(null)}
-        />
+        <AppErrorBoundary label="reward sequence" onReset={() => setPendingReward(null)}>
+          <RewardSequence
+            reward={pendingReward}
+            ident={ident}
+            onEquip={equip}
+            onDone={() => setPendingReward(null)}
+          />
+        </AppErrorBoundary>
       )}
     </PaoContext.Provider>
   )

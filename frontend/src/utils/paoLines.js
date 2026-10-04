@@ -16,7 +16,8 @@ import { SHAPE_NAMES } from '../data/puzzlePals'
 
 export function pickLine(line, lang, ...args) {
   const resolved = typeof line === 'function' ? line(...args) : line
-  return resolved[lang] || resolved.en
+  if (!resolved) return ''
+  return resolved[lang] || resolved.en || ''
 }
 
 export function pickRandomLine(lines, lang, ...args) {

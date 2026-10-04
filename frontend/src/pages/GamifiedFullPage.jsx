@@ -10,11 +10,13 @@ import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
+import MoneyMatchPage from './games/MoneyMatchPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
 import { useActivitySession } from '../context/ActivitySessionContext'
 import WhoIsPlayingModal from '../components/WhoIsPlayingModal'
+import AppErrorBoundary from '../components/AppErrorBoundary'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLanguage'
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
@@ -56,6 +58,9 @@ const GAMES = [
   { id: 'alphabet',     title: 'Alphabet Blast',        emoji: '🚀', desc: 'Zoom through the alphabet!',        color: '#ef4444', requiredLevel: 12, category: 'speech',       difficulty: 'medium',
     instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100,
     benefits: 'Reinforces letter recognition and alphabet sequencing, builds processing speed, and strengthens an early-literacy foundation for reading and writing.' },
+  { id: 'money-match', title: 'Money Match', emoji: '💵', desc: 'Sort the money into the right place!', color: '#16a34a', requiredLevel: 1, category: 'cognitive', difficulty: 'easy',
+    instructions: 'Put the bills in the wallet first, then the coins in the coin purse.', badge: 'Money Match', badgeEmoji: '💵', xp: 100,
+    benefits: 'Teaches coins and bills and where each one goes, a first step toward paying at the sari-sari store.' },
   { id: 'sort-basket',  title: 'Sort the Basket',       emoji: '🧺', desc: 'Sort each item into the right basket!', color: '#f59e0b', requiredLevel: 1,  category: 'cognitive',    difficulty: 'easy',
     instructions: 'One item appears at a time. Tap or drag it into the basket it belongs in — Food, Clothes, or Toys!', badge: 'Basket Sorter', badgeEmoji: '🧺', xp: 100,
     benefits: 'Teaches categorisation — grouping things that belong together even when they look nothing alike — which underlies vocabulary growth, word retrieval, and everyday tasks like packing a bag. Uses errorless learning, so a wrong guess is never far off and confidence stays protected.' },
@@ -338,9 +343,12 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
   } else if (rest.patientEmail) {
     ident = { patientEmail: rest.patientEmail }
   }
+  const navigate = useNavigate()
   return (
     <PaoProvider ident={ident}>
-      <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+      <AppErrorBoundary label="games" onReset={() => navigate(rest.backPath || '/dashboard')}>
+        <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+      </AppErrorBoundary>
     </PaoProvider>
   )
 }
@@ -489,6 +497,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'picture-word') { stopPaoVoice(); setPhase('picture-word') }
     else if (game.id === 'puzzle-pieces') { stopPaoVoice(); setPuzzlePicker(true) }
     else if (game.id === 'sort-basket') { stopPaoVoice(); setPhase('sort-basket') }
+    else if (game.id === 'money-match') { stopPaoVoice(); setPhase('money-match') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else setShowCatModal(true)
   }
@@ -534,6 +543,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'puzzle-pieces') {
     return <PuzzlePiecesGame patientId={patientId} patientEmail={patientEmail} lang={lang} setId={puzzleConfig.setId} level={puzzleConfig.level} onExit={backToGames}/>
+  }
+
+  if (phase === 'money-match') {
+    return <MoneyMatchPage lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'sort-basket') {

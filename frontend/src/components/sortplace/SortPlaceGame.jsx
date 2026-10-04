@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import SunnyScenery from '../../pages/games/SunnyScenery'
+import PandaMascot from '../../pages/games/PandaMascot'
 import { resolveSequence, activeZoneKey, stepIndexOf, tapPiece, tapZone, isLevelComplete, withItemIds, isCoinItem, correctZoneFor } from './sortLogic'
 
 // A generic "sort into zones" game driven entirely by the game document:
@@ -9,6 +10,18 @@ const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" }
 const BODY = { fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }
 const SPEECH_LANG = { en: 'en-US', tl: 'fil-PH', ceb: 'fil-PH' }
 const ZONE_ICON = { wallet: '👛', purse: '🪙' }
+
+// Phones get smaller pieces so the tray and zones fit without sideways scrolling.
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
 
 function speakLine(text, lang, enabled) {
   if (!enabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return
@@ -156,7 +169,8 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
 
   const levelLabel = level ? `Level ${level.level_order} · ${level.level_name}` : ''
   const billsOrder = zones.map((z, i) => `${i + 1}. ${z.label}`).join('  ')
-  const pieceSize = (it) => (isCoinItem(it) ? 84 : 132)
+  const narrow = useIsNarrow()
+  const pieceSize = (it) => (isCoinItem(it) ? (narrow ? 60 : 84) : (narrow ? 104 : 124))
 
   if (finished) {
     const total = levels.reduce((n, l) => n + (l.items?.length || 0), 0)
@@ -215,7 +229,7 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
       </div>
 
       {/* Tray — all items of the level, mixed in their saved order */}
-      <div className="relative z-10 mx-4 flex flex-shrink-0 flex-wrap items-center justify-center gap-4 rounded-[32px] bg-white/85 px-5 py-4 shadow-lg" role="group" aria-label="Pieces to sort">
+      <div className="relative z-10 mx-4 flex flex-shrink-0 flex-wrap items-center justify-center gap-3 rounded-[32px] sm:gap-4 bg-white/85 px-5 py-4 shadow-lg" role="group" aria-label="Pieces to sort">
         {items.filter((it) => !placed.has(it.id)).map((it) => {
           const isSel = selectedId === it.id
           const dim = sequence === 'zone_by_zone' && activeKey && it.zone_key !== activeKey
@@ -235,7 +249,9 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
 
       {/* Pao + bubble */}
       <div className="relative z-10 mx-4 mt-3 flex flex-shrink-0 items-center gap-3">
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-white text-[34px] shadow-md" aria-hidden="true">🐼</div>
+        <div className="flex h-[76px] w-[76px] flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-md" aria-hidden="true">
+          <PandaMascot pxWidth={64} pandaState="happy" viewPad={{ top: 30, bottom: 0 }} />
+        </div>
         <p aria-live="polite" className={`min-h-[52px] flex-1 rounded-[6px_18px_18px_18px] border-2 px-4 py-2.5 text-[16px] font-bold leading-snug ${line.tone === 'success' ? 'border-[#A9D8B6] bg-[#E3F4E8] text-[#2F8A4C]' : line.tone === 'hint' ? 'border-[#F3D284] bg-[#FFF0CC] text-[#C97A00]' : 'border-[#E4DFCE] bg-white text-[#2B2A4C]'}`} style={BODY}>
           {line.text}
         </p>
@@ -269,7 +285,7 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
                 {sorted.length === zoneItems.length && zoneItems.length ? `Done ${sorted.length} / ${zoneItems.length}` : `${sorted.length} / ${zoneItems.length}`}
               </span>
               <span className="flex min-h-[48px] flex-wrap justify-center gap-1.5">
-                {sorted.map((it) => <Piece key={it.id} item={it} width={isCoinItem(it) ? 34 : 52} small />)}
+                {sorted.map((it) => <Piece key={it.id} item={it} width={isCoinItem(it) ? (narrow ? 26 : 34) : (narrow ? 42 : 52)} small />)}
               </span>
             </button>
           )
@@ -314,7 +330,7 @@ function Piece({ item, width, selected = false, dim = false, small = false, onTa
           ? <img src={item.image_url} alt={item.label} onError={() => setBroken(true)} className="h-full w-full object-contain" draggable={false} />
           : <span className="text-[28px]" aria-hidden="true">{coin ? '🪙' : '💵'}</span>}
       </span>
-      {!small && <span className="mt-1 text-[13px] font-bold text-[#2B2A4C]">{item.text || item.label}</span>}
+      {!small && <span className="mt-1 text-[15px] font-extrabold text-[#2B2A4C]" style={HEADING}>{item.text || item.label}</span>}
     </Tag>
   )
 }

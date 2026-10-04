@@ -17,7 +17,7 @@
 //   gamesInARow: number — pao_profiles.games_in_a_row
 //   allCategoriesComplete: boolean — every published therapy_type covered
 //   earnedBadgeCodes: Set<string> — badge codes already known to be earned
-export function evaluateCriteria({ type, gameId, value, badgeCode }, ctx) {
+export function evaluateCriteria({ type, gameId, value, badgeCode, taskKey }, ctx) {
   const gid = gameId ? String(gameId) : null
   const v = value == null ? 1 : value
   switch (type) {
@@ -26,6 +26,7 @@ export function evaluateCriteria({ type, gameId, value, badgeCode }, ctx) {
     case 'complete_any_game':
       return (ctx.gamesCompleted ?? ctx.completedGameIds.size) >= v
     case 'complete_specific_game':
+      if (gid && taskKey) return (ctx.taskCompletionCountByGame?.get(`${gid}|${taskKey}`) || 0) >= v
       return gid ? (ctx.completionCountByGame?.get(gid) || 0) >= v : false
     case 'perfect_score':
       return gid ? ctx.perfectGameIds.has(gid) : (ctx.perfectGames ?? (ctx.anyPerfect ? 1 : 0)) >= v

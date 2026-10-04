@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import SunnyScenery from '../../pages/games/SunnyScenery'
-import PandaMascot from '../../pages/games/PandaMascot'
+import PaoGuide from '../PaoGuide'
+import GameFinishScreen from '../GameFinishScreen'
 import { resolveSequence, activeZoneKey, stepIndexOf, tapPiece, tapZone, isLevelComplete, withItemIds, isCoinItem, correctZoneFor } from './sortLogic'
 
 // A generic "sort into zones" game driven entirely by the game document:
@@ -175,30 +176,21 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
   if (finished) {
     const total = levels.reduce((n, l) => n + (l.items?.length || 0), 0)
     const isLast = levelIdx >= levels.length - 1
+    const gains = Object.entries(game.statGains || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k[0].toUpperCase()}${k.slice(1)} +${v}`)
+    const restart = () => { finishedRef.current = false; totals.current = { placed: 0, wrong: 0, hints: 0 }; setFinished(false); setLevelIdx(0); nextLevel() }
+    const nextOne = () => { finishedRef.current = false; setFinished(false); nextLevel() }
     return (
-      <Shell>
-        <div className="flex w-full max-w-[520px] flex-col items-center gap-3 rounded-[32px] bg-[#FFF8EC] p-7 text-center shadow-xl" style={BODY} role="dialog" aria-modal="true" aria-label="All sorted">
-          <div className="text-[56px]" aria-hidden="true">🎉</div>
-          <h2 className="text-[30px] font-extrabold text-[#2B2366]" style={HEADING}>All sorted!</h2>
-          <p className="text-[16px] text-[#2B2A4C]">All {total} pieces are in the right places.</p>
-          <div className="flex flex-wrap justify-center gap-2 text-[14px] font-bold">
-            <span className="rounded-full bg-[#E3F4E8] px-3 py-1.5 text-[#2F8A4C]">+{game.pointsPerPlay} XP for Pao</span>
-            {game.statGains && Object.entries(game.statGains).filter(([, v]) => v > 0).map(([k, v]) => (
-              <span key={k} className="rounded-full bg-[#ede9fe] px-3 py-1.5 text-[#5b21b6]">{k[0].toUpperCase() + k.slice(1)} +{v}</span>
-            ))}
-            {game.badge && <span className="rounded-full bg-[#FFF0CC] px-3 py-1.5 text-[#C97A00]">Badge: {game.badge.name}</span>}
-          </div>
-          <div className="mt-2 flex w-full flex-col gap-2.5">
-            {!isLast && (
-              <button type="button" onClick={() => { finishedRef.current = false; setFinished(false); nextLevel() }} className="h-14 rounded-2xl bg-[#6D4AE0] text-[18px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">Next level</button>
-            )}
-            {isLast && (
-              <button type="button" onClick={() => { finishedRef.current = false; totals.current = { placed: 0, wrong: 0, hints: 0 }; setFinished(false); setLevelIdx(0); nextLevel() }} className="h-14 rounded-2xl bg-[#F59E0B] text-[18px] font-extrabold text-[#2B2366] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">Play again</button>
-            )}
-            <button type="button" onClick={onExit} className="h-12 rounded-2xl border-2 border-[#E4DFCE] bg-white text-[16px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">All games</button>
-          </div>
-        </div>
-      </Shell>
+      <GameFinishScreen
+        title={isLast ? 'All sorted!' : 'Level done!'}
+        subtitle={`All ${total} pieces are in the right places.`}
+        badge={game.badge ? { name: game.badge.name, shape: game.badge.shape, colour: game.badge.colour, symbol: game.badge.symbol } : null}
+        badgeFallback={{ emoji: '💵', name: game.badge?.name || 'Money Match' }}
+        xp={game.pointsPerPlay ?? 100}
+        chips={gains}
+        replayLabel={isLast ? 'Play again' : 'Next level'}
+        onReplay={isLast ? restart : nextOne}
+        onExit={onExit}
+      />
     )
   }
 
@@ -248,14 +240,9 @@ export default function SortPlaceGame({ game, lang = 'en', onExit, onFinish }) {
       </div>
 
       {/* Pao + bubble */}
-      <div className="relative z-10 mx-4 mt-3 flex flex-shrink-0 items-center gap-3">
-        <div className="flex h-[76px] w-[76px] flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-md" aria-hidden="true">
-          <PandaMascot pxWidth={64} pandaState="happy" viewPad={{ top: 30, bottom: 0 }} />
-        </div>
-        <p aria-live="polite" className={`min-h-[52px] flex-1 rounded-[6px_18px_18px_18px] border-2 px-4 py-2.5 text-[16px] font-bold leading-snug ${line.tone === 'success' ? 'border-[#A9D8B6] bg-[#E3F4E8] text-[#2F8A4C]' : line.tone === 'hint' ? 'border-[#F3D284] bg-[#FFF0CC] text-[#C97A00]' : 'border-[#E4DFCE] bg-white text-[#2B2A4C]'}`} style={BODY}>
-          {line.text}
-        </p>
-      </div>
+      <PaoGuide tone={line.tone} bubbleStyle={BODY}>
+        {line.text}
+      </PaoGuide>
 
       {levelDone && levelIdx < levels.length - 1 && (
         <div className="relative z-10 mx-4 mb-2 flex justify-center">

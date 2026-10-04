@@ -11,6 +11,7 @@ import PandaMascot from './games/PandaMascot'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
+import DailyRoutinesPage from './games/DailyRoutinesPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -58,6 +59,9 @@ const GAMES = [
   { id: 'alphabet',     title: 'Alphabet Blast',        emoji: '🚀', desc: 'Zoom through the alphabet!',        color: '#ef4444', requiredLevel: 12, category: 'speech',       difficulty: 'medium',
     instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100,
     benefits: 'Reinforces letter recognition and alphabet sequencing, builds processing speed, and strengthens an early-literacy foundation for reading and writing.' },
+  { id: 'daily-routines', title: 'Daily Routines', emoji: '🌅', desc: 'Put everyday routines in the right order!', color: '#F59E0B', requiredLevel: 1, category: 'cognitive', difficulty: 'easy',
+    instructions: 'Pick a routine, then put its pictures in order from first to last.', badge: 'Daily Routines', badgeEmoji: '🌅', xp: 100,
+    benefits: 'Builds the order of everyday routines, one step at a time, so getting ready feels easier.' },
   { id: 'money-match', title: 'Money Match', emoji: '💵', desc: 'Sort the money into the right place!', color: '#16a34a', requiredLevel: 1, category: 'cognitive', difficulty: 'easy',
     instructions: 'Put the bills in the wallet first, then the coins in the coin purse.', badge: 'Money Match', badgeEmoji: '💵', xp: 100,
     benefits: 'Teaches coins and bills and where each one goes, a first step toward paying at the sari-sari store.' },
@@ -132,7 +136,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 // Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'picture-word', 'puzzle-pieces', 'echo'])
+const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'picture-word', 'puzzle-pieces', 'echo'])
 
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -501,6 +505,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'puzzle-pieces') { stopPaoVoice(); setPuzzlePicker(true) }
     else if (game.id === 'sort-basket') { stopPaoVoice(); setPhase('sort-basket') }
     else if (game.id === 'money-match') { stopPaoVoice(); setPhase('money-match') }
+    else if (game.id === 'daily-routines') { stopPaoVoice(); setPhase('daily-routines') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else setShowCatModal(true)
   }
@@ -550,6 +555,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'money-match') {
     return <MoneyMatchPage lang={lang} onExit={backToGames}/>
+  }
+
+  if (phase === 'daily-routines') {
+    return <DailyRoutinesPage lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'sort-basket') {

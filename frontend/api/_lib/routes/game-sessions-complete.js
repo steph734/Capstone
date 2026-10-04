@@ -184,7 +184,7 @@ export default async function handler(req, res) {
         const newlyEarnedBadges = []
         for (const b of activeBadges) {
           if (alreadyEarned.has(b.code)) continue
-          const met = evaluateCriteria({ type: b.criteria?.type, gameId: b.criteria?.game_id, value: b.criteria?.value }, ctx)
+          const met = evaluateCriteria({ type: b.criteria?.type, gameId: b.criteria?.game_id, value: b.criteria?.value, taskKey: b.criteria?.task_key }, ctx)
           if (met) {
             newlyEarnedBadges.push(b)
             ctx.earnedBadgeCodes.add(b.code)

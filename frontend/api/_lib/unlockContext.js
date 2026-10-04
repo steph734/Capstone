@@ -28,6 +28,18 @@ export async function buildUnlockContext(patientId, mongoSession = null) {
   const completionCountByGame = new Map()
   for (const c of completions) completionCountByGame.set(String(c.game_id), c.times_completed || 0)
 
+  // Finished sessions per (game, task): step_by_step games like Daily Routines
+  // store result.detail.task_key so a badge can be earned per task.
+  const sessionRows = await db.collection(game_sessions).find(
+    { patient_id: patientId, status: completed, result.detail.task_key: { $exists: true } },
+    { ...opt, projection: { game_id: 1, result.detail.task_key: 1 } }
+  ).toArray()
+  const taskCompletionCountByGame = new Map()
+  for (const r of sessionRows) {
+    const k = `${String(r.game_id)}|${r.result.detail.task_key}`
+    taskCompletionCountByGame.set(k, (taskCompletionCountByGame.get(k) || 0) + 1)
+  }
+
   const allTherapyTypes = new Set(publishedGames.map((g) => g.therapy_type).filter(Boolean))
   const categoriesCompleted = new Set(profile?.categories_completed || [])
   const allCategoriesComplete = allTherapyTypes.size > 0 && [...allTherapyTypes].every((t) => categoriesCompleted.has(t))
@@ -37,6 +49,7 @@ export async function buildUnlockContext(patientId, mongoSession = null) {
     perfectGameIds: new Set(completions.filter((c) => c.perfect_score_achieved).map((c) => String(c.game_id))),
     anyPerfect: completions.some((c) => c.perfect_score_achieved),
     completionCountByGame,
+    taskCompletionCountByGame,
     gamesCompleted: profile?.games_completed || 0,
     perfectGames: profile?.perfect_games || 0,
     level: profile?.level || 1,

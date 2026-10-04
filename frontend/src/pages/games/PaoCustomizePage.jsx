@@ -4,7 +4,6 @@ import { OutfitThumbnail } from './PaoOutfits'
 import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
-import { fetchUnlockState, loadBadges } from '../../utils/gameProgress'
 import { usePao } from '../../context/PaoContext'
 import { getWardrobe } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
@@ -99,18 +98,29 @@ export function BadgeCasePage({ patientEmail, onBack }) {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
 
+  // Reads the durable patient_badges record (same source as the Pao profile),
+  // so a badge earned at the end of a game shows here straight away.
+  const pao = usePao()
+  const ident = pao?.ident || {}
+  const identQuery = ident.activitySessionId
+    ? `activitySessionId=${encodeURIComponent(ident.activitySessionId)}`
+    : `patientEmail=${encodeURIComponent(patientEmail || ident.patientEmail || '')}`
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([loadBadges(), fetchUnlockState(patientEmail)])
-      .then(([realBadges, unlockState]) => {
+    fetch(`/api/pao/badges?${identQuery}`)
+      .then((r) => r.json())
+      .then((body) => {
         if (cancelled) return
-        setBadges(realBadges)
-        setEarnedCodes(new Set(unlockState.earnedBadgeCodes))
+        const list = (body.badges || []).filter((b) => b.isActive)
+        setBadges(list)
+        setEarnedCodes(new Set(list.filter((b) => b.earned).map((b) => b.code)))
       })
+      .catch(() => { if (!cancelled) setBadges([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [patientEmail])
+  }, [identQuery])
 
   const pageCount = Math.max(1, Math.ceil(badges.length / BADGE_PAGE_SIZE))
   const pageBadges = badges.slice(page * BADGE_PAGE_SIZE, page * BADGE_PAGE_SIZE + BADGE_PAGE_SIZE)

@@ -33,7 +33,7 @@
 .sb-root h1, .sb-root h2, .sb-root p, .sb-root li { color: var(--sb-ink); text-shadow: none; }
 .sb-root .sb-btn, .sb-root .sb-btn--green, .sb-root .sb-btn--ghost { text-shadow: none; }
 .sb-root .sb-btn--ghost, .sb-root .sb-modal-close { color: var(--sb-ink); }
-.sb-root .sb-btn { color: #fff; }
+.sb-root .sb-btn:not(.sb-btn--ghost) { color: #fff; }
 .sb-modal .sb-modal-close { color: var(--sb-ink); background: #fff; }
 
 .sb-btn {
@@ -147,7 +147,11 @@
   .sb-step-dot { width: 30px; height: 30px; font-size: 14px; border-width: 2px; }
   .sb-step--current .sb-step-dot { box-shadow: 0 0 0 3px #DDD6FE; }
 
-  .sb-body { grid-template-columns: 1fr; gap: 10px; padding: 6px 10px; }
+  /* Let the step screen scroll as a page so Pao's bar is never squeezed out */
+  .sb-root { overflow-y: auto; }
+  .sb-screen { height: auto; min-height: 100%; }
+  .sb-body { grid-template-columns: 1fr; gap: 10px; padding: 6px 10px; flex: none; overflow: visible; }
+  .sb-pao { position: sticky; bottom: 0; z-index: 2; margin-top: auto; background: linear-gradient(180deg, rgba(125,208,245,0), #7dd0f5 40%); }
   .sb-scene-card { padding: 10px; gap: 8px; border-radius: 18px; }
   .sb-scene { max-height: 24vh; border-radius: 12px; }
   .sb-story-line { font-size: 16px; line-height: 1.3; }

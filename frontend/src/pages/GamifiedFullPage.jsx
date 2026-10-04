@@ -620,9 +620,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           .gf-stats-panel { margin:8px 12px 0 !important; padding:10px 12px !important; }
           .gf-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
           .gf-games-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-          .gf-chips { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
-          .gf-chips::-webkit-scrollbar { display:none; }
-          .gf-chips > button { flex-shrink:0; padding:6px 12px !important; font-size:12.5px !important; }
+          .gf-chips { flex-wrap:wrap; gap:6px; }
+          .gf-chips > button { padding:6px 10px !important; font-size:12px !important; white-space:nowrap; }
           .gf-back { top:10px !important; left:10px !important; padding:6px 12px !important; font-size:12px !important; }
           .gf-profile { top:10px !important; right:10px !important; padding:6px 10px !important; font-size:12px !important; }
           .gf-card { padding:10px !important; min-height:0 !important; border-radius:14px !important; gap:6px !important; }

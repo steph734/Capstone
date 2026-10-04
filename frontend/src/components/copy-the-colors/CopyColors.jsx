@@ -43,6 +43,8 @@ export default function CopyColors({ game, onExit, onComplete }) {
   const level = cfg.levels[levelIdx];
   const padCount = cfg.pads.length;
   const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // Web layout (md and up) opens the How-to card and uses bigger shapes; phones collapse the card.
+  const [isDesktop] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(min-width: 768px)").matches);
   const hint = hintPad(s, level);
   const timing = SPEEDS[speed];
 
@@ -160,108 +162,117 @@ export default function CopyColors({ game, onExit, onComplete }) {
   const copiedCount = s.phase === "input" ? s.pos : 0;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-y-auto" style={BODY}>
+    <div className="cc-screen fixed inset-0 z-[9999] overflow-y-auto" style={BODY}>
+      <style>{`
+        .cc-pao { transform-origin: top center; }
+        @media (max-width: 767px) { .cc-pao { zoom: .72; } }
+      `}</style>
       <SkyBackground />
-      {/* Top bar */}
-      <div className="relative z-10 flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <button type="button" onClick={leave} className="flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-extrabold text-[#2B2366] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]" style={HEADING}>← Games</button>
-        <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 shadow-md" style={HEADING}>
-          <span className="text-[16px] font-extrabold text-[#2B2366]">Copy the Colors</span>
-          <span className="rounded-full bg-[#ede9fe] px-2.5 py-0.5 text-[13px] font-bold text-[#5b21b6]">Pattern of {s.seq.length} · goal {level.goal}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={speed === "normal"}
-            onClick={() => setSpeed((v) => (v === "slow" ? "normal" : "slow"))}
-            className="h-12 rounded-full bg-white px-4 text-[14px] font-extrabold text-[#2B2366] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
-            style={HEADING}
-          >
-            Speed: {speed === "slow" ? "slow" : "normal"}
-          </button>
-          <div className="flex h-12 items-center rounded-full bg-white px-4 text-[17px] font-extrabold text-[#C97A00] shadow-md" style={HEADING} aria-label={`${s.stars} stars`}>⭐ {s.stars}</div>
-        </div>
-      </div>
 
-      <div className="relative z-10 mx-4 flex flex-1 flex-col gap-4 pb-4 md:flex-row">
-        {/* Left: banner, Pao, how to play */}
-        <div className="flex flex-col items-center gap-3 md:w-[40%]">
-          <div className="flex items-center gap-2 rounded-full px-4 py-1.5 text-[16px] font-extrabold text-white shadow-md" style={{ ...HEADING, background: bannerLook.color }}>
-            <span aria-hidden="true">{bannerLook.icon}</span>{bannerLook.text}
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-[1100px] flex-col gap-3 px-3 pb-6 pt-3 md:px-6">
+        {/* Top bar: one row on web; on phones the title drops to its own row */}
+        <header className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={leave} className="flex h-11 items-center rounded-full bg-white px-4 text-[15px] font-extrabold text-[#2B2366] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]" style={HEADING}>← Games</button>
+          <h1 className="order-last flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-[16px] font-extrabold text-[#2B2366] shadow-md md:order-none md:w-auto md:justify-start" style={HEADING}>
+            Copy the Colors
+            <span className="rounded-full bg-[#ede9fe] px-2.5 py-0.5 text-[13px] font-bold text-[#5b21b6]">Pattern of {s.seq.length} · goal {level.goal}</span>
+          </h1>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={speed === "normal"}
+              onClick={() => setSpeed((v) => (v === "slow" ? "normal" : "slow"))}
+              className="h-11 rounded-full bg-white px-4 text-[14px] font-extrabold text-[#2B2366] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
+              style={HEADING}
+            >
+              Speed: {speed}
+            </button>
+            <div className="flex h-11 items-center rounded-full bg-white px-4 text-[17px] font-extrabold text-[#C97A00] shadow-md" style={HEADING} aria-label={`${s.stars} stars`}>⭐ {s.stars}</div>
           </div>
-          <div aria-live="polite" className={`max-w-[360px] rounded-[18px] border-2 px-4 py-2.5 text-center text-[17px] font-bold ${tone === "try" ? "border-[#F59E0B] bg-[#FFF4D6] text-[#92400E]" : "border-[#E4DFCE] bg-white text-[#2B2A4C]"}`} style={BODY}>{bubble}</div>
-          <PandaMascot entered pandaState={s.phase === "input" ? "happy" : "normal"} pxWidth={160} />
+        </header>
 
-          <div className="w-full max-w-[360px] rounded-[20px] bg-white p-4 shadow-md">
-            <p className="text-[15px] font-extrabold text-[#2B2366]" style={HEADING}>How to play</p>
-            <ol className="mt-1 list-decimal pl-5 text-[14px] text-[#2B2A4C]">
-              <li>Watch the shapes light up.</li>
-              <li>Say each one: “red circle, blue square”.</li>
-              <li>Tap the same shapes in the same order.</li>
-            </ol>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {cfg.pads.map((p) => (
-                <span key={p.key} className="flex items-center gap-1 rounded-full border-2 px-2.5 py-1 text-[12px] font-extrabold text-[#2B2A4C]" style={{ borderColor: p.color, ...HEADING }}>
-                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: p.color }} aria-hidden="true" />{fullName(p)}
-                </span>
-              ))}
+        <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-start">
+          {/* Left: banner, bubble, Pao, how to play */}
+          <aside className="flex w-full flex-col items-center gap-2 md:w-[340px] md:flex-shrink-0 md:gap-3">
+            <div className="flex items-center gap-2 rounded-full px-4 py-1.5 text-[15px] font-extrabold text-white shadow-md" style={{ ...HEADING, background: bannerLook.color }}>
+              <span aria-hidden="true">{bannerLook.icon}</span>{bannerLook.text}
             </div>
-            {s.phase === "input" && (
-              <button type="button" onClick={showAgain} className="mt-3 h-12 w-full rounded-2xl border-2 border-[#E4DFCE] bg-white px-4 text-[15px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">🔊 Show me again</button>
-            )}
-          </div>
-        </div>
+            <div aria-live="polite" className={`w-full max-w-[360px] rounded-[18px] border-2 px-4 py-2 text-center text-[16px] font-bold ${tone === "try" ? "border-[#F59E0B] bg-[#FFF4D6] text-[#92400E]" : "border-[#E4DFCE] bg-white text-[#2B2A4C]"}`} style={BODY}>{bubble}</div>
+            <div className="cc-pao">
+              <PandaMascot entered pandaState={s.phase === "input" ? "happy" : "normal"} pxWidth={150} />
+            </div>
 
-        {/* Right: pattern track + pads */}
-        <div className="flex flex-1 flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-[28px] bg-white p-5 shadow-lg">
-            <p className="text-[16px] font-extrabold text-[#2B2366]" style={HEADING}>Pattern</p>
-            <div className="flex flex-wrap gap-2" aria-label="Pattern">
-              {s.seq.map((p, i) => {
-                const filled = i < copiedCount;
-                const next = s.phase === "input" && i === s.pos;
-                return (
-                  <span
-                    key={i}
-                    className={`flex h-12 w-12 items-center justify-center rounded-full ${filled ? "" : "border-[3px] border-dashed border-[#B9B3CF]"} ${next ? "ring-4 ring-[#7C3AED]" : ""}`}
-                    style={filled ? { background: cfg.pads[p].color } : undefined}
-                    aria-hidden="true"
-                  >
-                    {filled && <ShapeIcon shape={cfg.pads[p].shape} size={26} />}
+            <details open={isDesktop} className="w-full max-w-[360px] rounded-[20px] bg-white p-4 shadow-md">
+              <summary className="cursor-pointer text-[15px] font-extrabold text-[#2B2366]" style={HEADING}>How to play</summary>
+              <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-[14px] text-[#2B2A4C]">
+                <li>Watch the shapes light up.</li>
+                <li>Say each one: “red circle, blue square”.</li>
+                <li>Tap the same shapes in the same order.</li>
+              </ol>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {cfg.pads.map((p) => (
+                  <span key={p.key} className="flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-[12px] font-extrabold text-[#2B2A4C]" style={{ borderColor: p.color, ...HEADING }}>
+                    <span className="inline-block h-3 w-3 rounded-full" style={{ background: p.color }} aria-hidden="true" />{fullName(p)}
                   </span>
+                ))}
+              </div>
+            </details>
+            {s.phase === "input" && (
+              <button type="button" onClick={showAgain} className="h-12 w-full max-w-[360px] rounded-2xl border-2 border-[#E4DFCE] bg-white px-4 text-[15px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">🔊 Show me again</button>
+            )}
+          </aside>
+
+          {/* Right: pattern track + pads */}
+          <main className="flex w-full min-w-0 flex-1 flex-col gap-3">
+            <section className="flex flex-col gap-2 rounded-[22px] bg-white p-4 shadow-lg">
+              <p className="text-[15px] font-extrabold text-[#2B2366]" style={HEADING}>Pattern</p>
+              <div className="flex min-h-[44px] flex-wrap gap-2" aria-label="Pattern">
+                {s.seq.map((p, i) => {
+                  const filled = i < copiedCount;
+                  const next = s.phase === "input" && i === s.pos;
+                  return (
+                    <span
+                      key={i}
+                      className={`flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12 ${filled ? "" : "border-[3px] border-dashed border-[#B9B3CF]"} ${next ? "ring-4 ring-[#7C3AED]" : ""}`}
+                      style={filled ? { background: cfg.pads[p].color } : undefined}
+                      aria-hidden="true"
+                    >
+                      {filled && <ShapeIcon shape={cfg.pads[p].shape} size={24} />}
+                    </span>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="grid w-full grid-cols-2 gap-3 md:gap-4">
+              {cfg.pads.map((p, i) => {
+                const isLit = lit === i || flash === i;
+                const isHint = hint === i;
+                const disabled = s.phase !== "input";
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    aria-label={fullName(p)}
+                    disabled={disabled}
+                    onClick={() => tap(i)}
+                    className={`relative flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-[28px] p-3 text-white transition-transform focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] disabled:cursor-default md:min-h-[170px] md:rounded-[32px] ${isLit && !reduced ? "scale-[1.04]" : ""}`}
+                    style={{
+                      background: isLit ? p.lit : p.color,
+                      border: `4px solid ${isLit ? "#fff" : p.ring}`,
+                      boxShadow: isLit ? `0 0 22px ${p.lit}` : `0 7px 0 ${p.ring}`,
+                      opacity: disabled && !isLit ? 0.85 : 1,
+                    }}
+                  >
+                    {isHint && <span className="absolute -top-3 rounded-full bg-[#F59E0B] px-2 py-0.5 text-[12px] font-extrabold text-white">Next one</span>}
+                    <ShapeIcon shape={p.shape} size={isDesktop ? 56 : 42} />
+                    <span className="text-[17px] font-extrabold md:text-[20px]" style={HEADING}>{p.label}</span>
+                    <span className="text-[13px] font-bold opacity-90 md:text-[15px]">{p.shape}</span>
+                  </button>
                 );
               })}
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {cfg.pads.map((p, i) => {
-              const isLit = lit === i || flash === i;
-              const isHint = hint === i;
-              const disabled = s.phase !== "input";
-              return (
-                <button
-                  key={p.key}
-                  type="button"
-                  aria-label={fullName(p)}
-                  disabled={disabled}
-                  onClick={() => tap(i)}
-                  className={`relative flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-[40px] p-3 text-white transition-transform focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] disabled:cursor-default sm:min-h-[186px] ${isLit && !reduced ? "scale-[1.06]" : ""}`}
-                  style={{
-                    background: isLit ? p.lit : p.color,
-                    border: `6px solid ${isLit ? "#fff" : p.ring}`,
-                    boxShadow: isLit ? `0 0 24px ${p.lit}` : `0 10px 0 ${p.ring}`,
-                    opacity: disabled && !isLit ? 0.85 : 1,
-                  }}
-                >
-                  {isHint && <span className="absolute -top-3 rounded-full bg-[#F59E0B] px-2 py-0.5 text-[12px] font-extrabold text-white">Next one</span>}
-                  <ShapeIcon shape={p.shape} size={60} />
-                  <span className="text-[18px] font-extrabold" style={HEADING}>{p.label}</span>
-                  <span className="text-[14px] font-bold opacity-90">{p.shape}</span>
-                </button>
-              );
-            })}
-          </div>
+          </main>
         </div>
       </div>
 

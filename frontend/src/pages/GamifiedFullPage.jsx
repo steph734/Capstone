@@ -12,6 +12,7 @@ import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
 import DailyRoutinesPage from './games/DailyRoutinesPage'
 import FeedPaoPage from './games/FeedPaoPage'
+import CopyColorsPage from './games/CopyColorsPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -53,6 +54,9 @@ const GAMES = [
   { id: 'rhyme',        title: 'Rhyme Time',            emoji: '🎵', desc: 'Find words that rhyme!',            color: '#ec4899', requiredLevel: 7,  category: 'speech',       difficulty: 'easy',
     instructions: 'Listen to the word, then pick the picture whose name rhymes with it!', badge: 'Rhyme Master',  badgeEmoji: '🎵', xp: 100,
     benefits: 'Builds phonological awareness through rhyme detection, strengthens auditory memory and pattern recognition, and supports pre-reading skills.' },
+  { id: 'copy-colors',  title: 'Copy the Colors',       emoji: '🎨', desc: 'Watch Pao, then copy the pattern!',   color: '#2F6FD6', requiredLevel: 1,  category: 'cognitive',    difficulty: 'medium',
+    instructions: 'Watch the shapes light up, then tap them in the same order. The pattern gets one shape longer each time.', badge: 'Memory Master', badgeEmoji: '🧠', xp: 100,
+    benefits: 'Builds visual working memory and attention, and practises holding a sequence in mind.' },
   { id: 'story',        title: 'Story Builder',         emoji: '📖', desc: 'Create your own short story!',      color: '#8b5cf6', requiredLevel: 1,  category: 'cognitive',    difficulty: 'hard',
     instructions: 'Pick a story, then choose what happens next at each step to tell your own version!', badge: 'Story Builder', badgeEmoji: '📖', xp: 100,
     benefits: 'Builds narrative sequencing and comprehension, encourages decision-making and cause-and-effect reasoning, and supports social-emotional learning through story choices.' },
@@ -139,7 +143,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 // Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo'])
+const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors'])
 
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -511,6 +515,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'daily-routines') { stopPaoVoice(); setPhase('daily-routines') }
     else if (game.id === 'feed-pao') { stopPaoVoice(); setPhase('feed-pao') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
+    else if (game.id === 'copy-colors') { stopPaoVoice(); setPhase('copy-colors') }
     else setShowCatModal(true)
   }
 
@@ -573,6 +578,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     return <SortTheBasketGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
 
+  if (phase === 'copy-colors') {
+    return <CopyColorsPage onExit={backToGames}/>
+  }
+
   if (phase === 'story-select') {
     return <StoryBuilder onExit={backToGames}/>
   }
@@ -622,6 +631,16 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           .gf-card-desc { display:none; }
           .gf-card-tags span { font-size:10px !important; padding:2px 6px !important; }
           .gf-card-status { font-size:10px !important; }
+        }
+        /* Phones: one game per row so the therapy type and difficulty tags fit and stay visible */
+        @media (max-width: 480px) {
+          .gf-games-grid { grid-template-columns:minmax(0,1fr) !important; gap:10px; }
+          .gf-card { flex-direction:row !important; align-items:center !important; gap:12px !important; }
+          .gf-card > div { flex:1; min-width:0; }
+          .gf-card-desc { display:block !important; }
+          .gf-card-tags { flex-wrap:wrap; }
+          .gf-card-tags span { white-space:nowrap; }
+          .gf-card-status { white-space:nowrap; }
         }
       `}</style>
 

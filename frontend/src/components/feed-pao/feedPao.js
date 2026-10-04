@@ -11,14 +11,17 @@ export function buildRounds(game) {
           .filter((c) => c.is_correct)
           .sort((a, b) => (a.step ?? 1) - (b.step ?? 1))
           .map((c) => c.key);
+        const healthy = item.mode === "healthy";
         return {
+          mode: healthy ? "healthy" : "follow",
+          need: healthy ? item.pick_count || 1 : wanted.length,
           levelName: level.level_name,
           levelOrder: level.level_order,
           promptLevel: level.prompt_level || "partial",
           direction: item.question || item.text,
           audioUrl: item.audio_url || null,
           options,
-          wanted, // keys in the order Pao wants them
+          wanted, // follow mode: keys in the order Pao wants them; healthy mode: any healthy key
         };
       })
     );
@@ -27,7 +30,7 @@ export function buildRounds(game) {
 const GLOW_AFTER = { full_model: 1, partial: 2, none: 3 };
 
 export function initRound() {
-  return { given: [], wrongKeys: [], tries: 0, glowKey: null, mood: "hungry", message: null, roundDone: false, attempts: 0, hints: 0 };
+  return { given: [], wrongKeys: [], refused: [], tries: 0, glowKey: null, mood: "hungry", message: null, roundDone: false, attempts: 0, hints: 0 };
 }
 
 const nameOf = (round, key) => round.options.find((o) => o.key === key)?.label ?? key;
@@ -38,6 +41,7 @@ const nameOf = (round, key) => round.options.find((o) => o.key === key)?.label ?
  */
 export function pick(state, round, key) {
   if (state.roundDone || state.given.includes(key)) return state;
+  if (round.mode === "healthy") return pickHealthy(state, round, key);
   const need = round.wanted[state.given.length];
   const attempts = state.attempts + 1;
 
@@ -75,6 +79,47 @@ export function pick(state, round, key) {
         ? `Good one, but first the ${nameOf(round, need)}!`
         : `Hmm, Pao wants the ${nameOf(round, need)}. Listen again!`,
       tone: "try",
+    },
+  };
+}
+
+/**
+ * Healthy choices: Pao takes any healthy food (is_correct), and politely refuses
+ * "sometimes foods" (is_sometimes_food) with the choice's feedback. Refusing is not a
+ * mistake: no stars lost, the food just moves to the Sometimes box.
+ */
+function pickHealthy(state, round, key) {
+  if (state.refused.includes(key)) return state;
+  const choice = round.options.find((o) => o.key === key);
+  const attempts = state.attempts + 1;
+
+  if (choice.is_sometimes_food || !choice.is_correct) {
+    return {
+      ...state,
+      attempts,
+      refused: choice.is_sometimes_food ? [...state.refused, key] : state.refused,
+      wrongKeys: choice.is_sometimes_food ? state.wrongKeys : [...state.wrongKeys, key],
+      mood: "no",
+      message: {
+        text: choice.feedback || `No thank you! The ${choice.label} is a sometimes food.`,
+        tone: "try",
+      },
+    };
+  }
+
+  const given = [...state.given, key];
+  const roundDone = given.length >= round.need;
+  return {
+    ...state,
+    given,
+    attempts,
+    mood: "eating",
+    roundDone,
+    message: {
+      text: roundDone
+        ? `Yum! The ${choice.label} is healthy. It helps me grow strong!`
+        : `Yum, the ${choice.label}! That is healthy. One more, please!`,
+      tone: "good",
     },
   };
 }

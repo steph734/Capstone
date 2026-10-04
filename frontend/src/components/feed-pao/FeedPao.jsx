@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import SunnyScenery from "../../pages/games/SunnyScenery";
-import PandaMascot from "../../pages/games/PandaMascot";
+import GameFinishScreen from "../GameFinishScreen";
 import { buildRounds, initRound, pick } from "./feedPao";
 
 // Feed Pao: listen to a direction, then give Pao the right food, in order.
 // Rules and wording live in feedPao.js; this file only draws and speaks.
 const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const BODY = { fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" };
-const FOOD_EMOJI = { banana: "🍌", milk: "🥛", carrot: "🥕", bread: "🍞", water: "💧", apple: "🍎", "red apple": "🍎", "green apple": "🍏" };
-const MOOD_PANDA = { hungry: "sad", eating: "excited", happy: "happy" };
+const FOOD_EMOJI = {
+  banana: "🍌", milk: "🥛", carrot: "🥕", bread: "🍞", water: "💧", cookie: "🍪",
+  apple: "🍎", apple_red: "🍎", apple_green: "🍏", "red apple": "🍎", "green apple": "🍏",
+  candy: "🍬", chips: "🥔", soda: "🥤", fries: "🍟",
+};
+// Pao's four faces from public/games/feed-pao/pao/ (see the mood set in feedPao.js).
+const PAO_FACE = {
+  hungry: "/games/feed-pao/pao/pao-hungry.svg",
+  eating: "/games/feed-pao/pao/pao-eating.svg",
+  happy: "/games/feed-pao/pao/pao-happy.svg",
+  no: "/games/feed-pao/pao/pao-no-thanks.svg",
+};
+const NO_THANKS_MS = 1600;
 const SPEECH_RATE = 0.8;
 const SPEECH_PITCH = 1.15;
 
@@ -51,6 +62,13 @@ export default function FeedPao({ game, onExit, onComplete }) {
 
   useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
 
+  // After a polite "no thank you", Pao goes back to hungry. Not a mistake, so no stars change.
+  useEffect(() => {
+    if (state.mood !== "no") return undefined;
+    const t = setTimeout(() => setState((s) => (s.mood === "no" ? { ...s, mood: "hungry" } : s)), NO_THANKS_MS);
+    return () => clearTimeout(t);
+  }, [state.mood, state.attempts]);
+
   const choose = (key) => {
     if (!round || state.roundDone) return;
     const next = pick(state, round, key);
@@ -89,30 +107,24 @@ export default function FeedPao({ game, onExit, onComplete }) {
   const hearAgain = () => speak(round?.direction, readAloud);
 
   if (done) {
+    const gains = Object.entries(game.statGains || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k[0].toUpperCase()}${k.slice(1)} +${v}`);
     return (
-      <Shell>
-        <div className="flex w-full max-w-[520px] flex-col items-center gap-3 rounded-[32px] bg-[#FFF8EC] p-7 text-center shadow-xl" style={BODY} role="dialog" aria-modal="true" aria-label="Pao is full">
-          <PandaMascot entered pandaState="happy" pxWidth={150} />
-          <h2 className="text-[30px] font-extrabold text-[#2B2366]" style={HEADING}>Pao is full!</h2>
-          <div className="flex flex-wrap justify-center gap-2 text-[14px] font-bold">
-            <span className="rounded-full bg-[#E3F4E8] px-3 py-1.5 text-[#2F8A4C]">+{game.pointsPerPlay ?? 100} XP for Pao</span>
-            {Object.entries(game.statGains || {}).filter(([, v]) => v > 0).map(([k, v]) => (
-              <span key={k} className="rounded-full bg-[#ede9fe] px-3 py-1.5 text-[#5b21b6]">{k[0].toUpperCase() + k.slice(1)} +{v}</span>
-            ))}
-          </div>
-          <div className="mt-2 flex w-full flex-col gap-2.5">
-            <button type="button" onClick={() => { reportedRef.current = false; totals.current = { attempts: 0, hints: 0 }; setDone(false); setRoundIdx(0); setState(initRound()); setStars(0) }} className="h-14 rounded-2xl bg-[#6D4AE0] text-[18px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">Play again</button>
-            <button type="button" onClick={onExit} className="h-12 rounded-2xl border-2 border-[#E4DFCE] bg-white text-[16px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">All games</button>
-          </div>
-        </div>
-      </Shell>
+      <GameFinishScreen
+        title="Pao is full!"
+        subtitle={`You fed Pao ${rounds.length} times. Thank you!`}
+        badgeFallback={{ emoji: "👂", name: "Good Listener" }}
+        xp={game.pointsPerPlay ?? 100}
+        chips={gains}
+        replayLabel="Play again"
+        onReplay={() => { reportedRef.current = false; totals.current = { attempts: 0, hints: 0 }; setDone(false); setRoundIdx(0); setState(initRound()); setStars(0) }}
+        onExit={onExit}
+      />
     );
   }
 
   if (!round) return null;
 
   const tall = round.options.length <= 4;
-  const plateLabels = round.wanted.map((k) => round.options.find((o) => o.key === k)?.label || k);
   const givenLabel = (k) => round.options.find((o) => o.key === k)?.label || k;
   const bubble = state.message?.text || (showWords ? round.direction : "Listen to Pao…");
   const bubbleTone = state.message?.tone === "try" ? "border-[#F59E0B] bg-[#FFF4D6] text-[#92400E]" : "border-[#E4DFCE] bg-white text-[#2B2A4C]";
@@ -143,16 +155,33 @@ export default function FeedPao({ game, onExit, onComplete }) {
         {/* Left: Pao, bubble, plate */}
         <div className="flex flex-col items-center gap-3 md:w-[40%]">
           <div aria-live="polite" className={`max-w-[360px] rounded-[18px] border-2 px-4 py-2.5 text-center text-[17px] font-bold ${bubbleTone}`} style={BODY}>{bubble}</div>
-          <PandaMascot entered pandaState={MOOD_PANDA[state.mood] || "happy"} pxWidth={180} />
+          <img src={PAO_FACE[state.mood] || PAO_FACE.hungry} alt="" className="h-[180px] w-[180px] object-contain" />
           <div className="flex min-h-[64px] min-w-[220px] flex-wrap items-center justify-center gap-2 rounded-[50%] border-[3px] border-dashed border-[#8A5A3B] bg-white/80 px-6 py-3">
             {state.given.length === 0
               ? <span className="text-[14px] font-bold text-[#5A5670]" style={BODY}>Pao’s plate</span>
-              : state.given.map((k) => (
-                <span key={k} className="flex items-center gap-1 text-[15px] font-extrabold text-[#2B2A4C]" style={HEADING}>
-                  <span aria-hidden="true">{FOOD_EMOJI[k] || "🍽️"}</span>{givenLabel(k)}
-                </span>
-              ))}
+              : state.given.map((k) => {
+                const opt = round.options.find((o) => o.key === k);
+                return opt?.image_url
+                  ? <img key={k} src={opt.image_url} alt={givenLabel(k)} className="h-[64px] w-[64px] object-contain" />
+                  : (
+                    <span key={k} className="flex items-center gap-1 text-[15px] font-extrabold text-[#2B2A4C]" style={HEADING}>
+                      <span aria-hidden="true">{FOOD_EMOJI[k] || "🍽️"}</span>{givenLabel(k)}
+                    </span>
+                  );
+              })}
           </div>
+
+          {state.refused.length > 0 && (
+            <div className="flex min-h-[64px] flex-wrap items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-[#D97706] bg-[#FFF7E6] px-4 py-2" aria-label="Sometimes foods">
+              <span className="w-full text-center text-[13px] font-extrabold text-[#92400E]" style={HEADING}>Sometimes foods</span>
+              {state.refused.map((k) => {
+                const opt = round.options.find((o) => o.key === k);
+                return opt?.image_url
+                  ? <img key={k} src={opt.image_url} alt={givenLabel(k)} className="h-[48px] w-[48px] object-contain" />
+                  : <span key={k} aria-hidden="true" className="text-[28px]">{FOOD_EMOJI[k] || "🍽️"}</span>;
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right: direction + food */}
@@ -162,7 +191,19 @@ export default function FeedPao({ game, onExit, onComplete }) {
               <p className="text-[20px] font-extrabold text-[#2B2366]" style={HEADING}>{showWords ? round.direction : "Listen to Pao…"}</p>
               <button type="button" onClick={hearAgain} className="h-12 rounded-2xl border-2 border-[#E4DFCE] bg-white px-4 text-[15px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">🔊 Hear again</button>
             </div>
-            {round.wanted.length > 1 && (
+            {round.mode === "healthy" && (
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: round.need }, (_, i) => {
+                  const filled = Boolean(state.given[i]);
+                  return (
+                    <span key={i} className={`rounded-full px-3 py-1 text-[13px] font-extrabold ${filled ? "bg-[#2F8A4C] text-white" : "bg-[#EDE9FE] text-[#5b21b6]"}`} style={HEADING}>
+                      Healthy food{filled ? ` · ${FOOD_EMOJI[state.given[i]] || ""} ${givenLabel(state.given[i])}` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {round.mode !== "healthy" && round.wanted.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {round.wanted.map((k, i) => {
                   const filled = state.given.includes(k);
@@ -178,7 +219,8 @@ export default function FeedPao({ game, onExit, onComplete }) {
 
           <div className={`grid gap-3 ${tall ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
             {round.options.map((opt) => {
-              const gone = state.wrongKeys.includes(opt.key) || state.given.includes(opt.key);
+              const refused = state.refused.includes(opt.key);
+              const gone = state.wrongKeys.includes(opt.key) || state.given.includes(opt.key) || refused;
               const glow = state.glowKey === opt.key;
               return (
                 <button
@@ -191,6 +233,7 @@ export default function FeedPao({ game, onExit, onComplete }) {
                   style={{ minHeight: tall ? 230 : 170 }}
                 >
                   {glow && <span className="absolute -top-3 rounded-full bg-[#F59E0B] px-2 py-0.5 text-[12px] font-extrabold text-white">This one</span>}
+                  {refused && <span className="absolute -top-3 rounded-full bg-[#D97706] px-2 py-0.5 text-[12px] font-extrabold text-white">Sometimes food</span>}
                   {opt.image_url
                     ? <img src={opt.image_url} alt="" className="h-[110px] w-full object-contain" onError={(e) => { e.currentTarget.style.display = "none" }} />
                     : <span className="text-[72px]" aria-hidden="true">{FOOD_EMOJI[opt.key] || "🍽️"}</span>}

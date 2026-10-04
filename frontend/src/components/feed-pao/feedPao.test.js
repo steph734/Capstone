@@ -28,25 +28,6 @@ describe("buildRounds", () => {
     expect(rounds.map((r) => r.levelName)).toEqual(["One step", "Two steps"]);
     expect(rounds[1].wanted).toEqual(["banana", "milk"]);
   });
-
-  it("keeps a three-step direction in step order", () => {
-    const three = buildRounds({
-      levels: [{ level_order: 1, level_name: "Three steps", prompt_level: "partial", items: [{
-        question: "Give Pao the bread, then the banana, then the water.",
-        choices: [
-          { label: "water", choice_key: "water", is_correct: true, step: 3 },
-          { label: "bread", choice_key: "bread", is_correct: true, step: 1 },
-          { label: "banana", choice_key: "banana", is_correct: true, step: 2 },
-          { label: "milk", choice_key: "milk", is_correct: false },
-        ],
-      }] }],
-    });
-    expect(three[0].wanted).toEqual(["bread", "banana", "water"]);
-    let s = initRound();
-    for (const key of three[0].wanted) s = pick(s, three[0], key);
-    expect(s.roundDone).toBe(true);
-    expect(s.given).toEqual(["bread", "banana", "water"]);
-  });
 });
 
 describe("pick", () => {
@@ -82,5 +63,60 @@ describe("pick", () => {
     expect(s.glowKey).toBe(null);
     s = pick(s, rounds[1], "bread");
     expect(s.glowKey).toBe("banana");
+  });
+
+  it("three steps in order, with a wrong food in the middle", () => {
+    const threeStep = buildRounds({ levels: [{ level_order: 3, level_name: "Three steps", prompt_level: "partial", items: [{
+      question: "Give Pao the bread, the water, then the banana.",
+      choices: [
+        { label: "banana", choice_key: "banana", is_correct: true, step: 3 },
+        { label: "bread", choice_key: "bread", is_correct: true, step: 1 },
+        { label: "water", choice_key: "water", is_correct: true, step: 2 },
+        { label: "candy", choice_key: "candy", is_correct: false },
+      ],
+    }] }] });
+    const [round] = threeStep;
+    expect(round.wanted).toEqual(["bread", "water", "banana"]);
+
+    let s = pick(initRound(), round, "water");
+    expect(s.roundDone).toBe(false);
+    expect(s.wrongKeys).toEqual([]);
+    expect(s.message.text).toBe("Good one, but first the bread!");
+
+    s = pick(s, round, "bread");
+    s = pick(s, round, "candy");
+    expect(s.wrongKeys).toEqual(["candy"]);
+    s = pick(s, round, "water");
+    expect(s.given).toEqual(["bread", "water"]);
+    s = pick(s, round, "banana");
+    expect(s.roundDone).toBe(true);
+    expect(s.given).toEqual(["bread", "water", "banana"]);
+  });
+});
+
+describe("healthy choices", () => {
+  const healthyGame = { levels: [{ level_order: 4, level_name: "Healthy choices", prompt_level: "partial", items: [{
+    question: "Give me two healthy foods.", mode: "healthy", pick_count: 2,
+    choices: [
+      { label: "candy", choice_key: "candy", is_correct: false, is_sometimes_food: true, feedback: "No thank you! Candy is a sometimes treat." },
+      { label: "red apple", choice_key: "apple_red", is_correct: true },
+      { label: "carrot", choice_key: "carrot", is_correct: true },
+    ],
+  }] }] };
+  const [round] = buildRounds(healthyGame);
+
+  it("refuses a sometimes food without marking it wrong", () => {
+    const s = pick(initRound(), round, "candy");
+    expect(s.mood).toBe("no");
+    expect(s.refused).toEqual(["candy"]);
+    expect(s.wrongKeys).toEqual([]);
+    expect(s.message.text).toBe("No thank you! Candy is a sometimes treat.");
+  });
+
+  it("takes healthy foods in any order until pick_count", () => {
+    let s = pick(initRound(), round, "carrot");
+    expect(s.roundDone).toBe(false);
+    s = pick(s, round, "apple_red");
+    expect(s.roundDone).toBe(true);
   });
 });

@@ -126,6 +126,8 @@ const SEED_APPOINTMENTS = [
   { seed_key: 'seed-appt-10', patient: 'seed-patient-sophia-lim', employeeEmail: 'rica.domingo@therapypro.app', dayOffset: 2, slot: '2-3', sessionType: 'Behavioral', status: 'Pending', paymentMethod: 'Cash' },
   { seed_key: 'seed-appt-11', patient: 'seed-patient-ella-marasigan', employeeEmail: 'jade.santos@therapypro.app', dayOffset: 4, slot: '10-11', sessionType: 'Cognitive', status: 'Confirmed', paymentMethod: 'GCash QR', onlineMethod: 'GCash' },
   { seed_key: 'seed-appt-12', patient: 'seed-patient-nathan-garcia', employeeEmail: 'miguel.reyes@therapypro.app', dayOffset: 6, slot: '1-2', sessionType: 'Physical', status: 'Pending', paymentMethod: null },
+  // Today's session for Edward Briones (employee T-756630).
+  { seed_key: 'seed-appt-today-edward', patient: 'seed-patient-ella-marasigan', employeeEmail: 'stephentatel21@gmail.com', dayOffset: 0, slot: '10-11', sessionType: 'Occupational', status: 'Confirmed', paymentMethod: 'Cash' },
 ]
 
 // Maps the booking form's payment label onto the `payments` collection's

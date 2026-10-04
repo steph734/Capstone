@@ -11,6 +11,7 @@ import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
 import DailyRoutinesPage from './games/DailyRoutinesPage'
+import FeedPaoPage from './games/FeedPaoPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -58,6 +59,9 @@ const GAMES = [
   { id: 'alphabet',     title: 'Alphabet Blast',        emoji: '🚀', desc: 'Zoom through the alphabet!',        color: '#ef4444', requiredLevel: 12, category: 'speech',       difficulty: 'medium',
     instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100,
     benefits: 'Reinforces letter recognition and alphabet sequencing, builds processing speed, and strengthens an early-literacy foundation for reading and writing.' },
+  { id: 'feed-pao', title: 'Feed Pao', emoji: '🍌', desc: 'Give Pao the right food, in the right order!', color: '#84CC16', requiredLevel: 1, category: 'speech', difficulty: 'easy',
+    instructions: 'Listen to Pao, then give him the food he asks for.', badge: 'Good Listener', badgeEmoji: '👂', xp: 100,
+    benefits: 'Builds listening and following one-step and two-step directions, and remembering the order.' },
   { id: 'daily-routines', title: 'Daily Routines', emoji: '🌅', desc: 'Put everyday routines in the right order!', color: '#F59E0B', requiredLevel: 1, category: 'cognitive', difficulty: 'easy',
     instructions: 'Pick a routine, then put its pictures in order from first to last.', badge: 'Daily Routines', badgeEmoji: '🌅', xp: 100,
     benefits: 'Builds the order of everyday routines, one step at a time, so getting ready feels easier.' },
@@ -135,7 +139,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 // Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'picture-word', 'puzzle-pieces', 'echo'])
+const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo'])
 
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -505,6 +509,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'sort-basket') { stopPaoVoice(); setPhase('sort-basket') }
     else if (game.id === 'money-match') { stopPaoVoice(); setPhase('money-match') }
     else if (game.id === 'daily-routines') { stopPaoVoice(); setPhase('daily-routines') }
+    else if (game.id === 'feed-pao') { stopPaoVoice(); setPhase('feed-pao') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else setShowCatModal(true)
   }
@@ -560,6 +565,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     return <DailyRoutinesPage lang={lang} onExit={backToGames}/>
   }
 
+  if (phase === 'feed-pao') {
+    return <FeedPaoPage onExit={backToGames}/>
+  }
+
   if (phase === 'sort-basket') {
     return <SortTheBasketGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
   }
@@ -586,6 +595,34 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
         @media (max-width: 480px) {
           .pao-mascot-intro svg { width: 190px !important; }
         }
+
+        /* Games screen: desktop keeps its layout; tablet and phone shrink it */
+        .gf-games-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; flex:1; align-content:start; }
+        .gf-stats-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+        .gf-chips { display:flex; flex-wrap:wrap; gap:8px; }
+        @media (max-width: 900px) {
+          .gf-games-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width: 640px) {
+          .gf-main { padding:10px 12px 14px !important; }
+          .gf-hero { padding:56px 12px 0 !important; gap:10px !important; }
+          .gf-hero > .gf-mascot { zoom:.62; flex-shrink:0; }
+          .gf-hero-text { min-width:0; }
+          .gf-stats-panel { margin:8px 12px 0 !important; padding:10px 12px !important; }
+          .gf-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+          .gf-games-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+          .gf-chips { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
+          .gf-chips::-webkit-scrollbar { display:none; }
+          .gf-chips > button { flex-shrink:0; padding:6px 12px !important; font-size:12.5px !important; }
+          .gf-back { top:10px !important; left:10px !important; padding:6px 12px !important; font-size:12px !important; }
+          .gf-profile { top:10px !important; right:10px !important; padding:6px 10px !important; font-size:12px !important; }
+          .gf-card { padding:10px !important; min-height:0 !important; border-radius:14px !important; gap:6px !important; }
+          .gf-card-emoji { font-size:24px !important; }
+          .gf-card-title { font-size:13px !important; line-height:1.2; }
+          .gf-card-desc { display:none; }
+          .gf-card-tags span { font-size:10px !important; padding:2px 6px !important; }
+          .gf-card-status { font-size:10px !important; }
+        }
       `}</style>
 
       <Sun/>
@@ -595,7 +632,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       <Cloud x="88%" y="22%" size={80}  delay={0.3} dur={7.5}/>
       <HillsScenery/>
 
-      <button onClick={() => { stopPaoVoice(); navigate(backPath) }} style={{ position:'absolute', top:18, left:20, zIndex:10, background:'rgba(255,255,255,.8)', border:'1.5px solid rgba(124,79,224,.25)', color:'#4b3f7a', borderRadius:10, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 10px rgba(80,60,20,.1)' }}>
+      <button className="gf-back" onClick={() => { stopPaoVoice(); navigate(backPath) }} style={{ position:'absolute', top:18, left:20, zIndex:10, background:'rgba(255,255,255,.8)', border:'1.5px solid rgba(124,79,224,.25)', color:'#4b3f7a', borderRadius:10, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 10px rgba(80,60,20,.1)' }}>
         ← Back
       </button>
 
@@ -663,18 +700,18 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
         <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
           {/* Profile button — top right */}
-          <button onClick={() => { stopPaoVoice(); setPhase('profile') }} style={{ position:'absolute', top:18, right:20, zIndex:10, display:'flex', alignItems:'center', gap:7, background:'rgba(139,92,246,.14)', border:'1.5px solid rgba(139,92,246,.4)', color:'#5b21b6', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s' }}
+          <button className="gf-profile" onClick={() => { stopPaoVoice(); setPhase('profile') }} style={{ position:'absolute', top:18, right:20, zIndex:10, display:'flex', alignItems:'center', gap:7, background:'rgba(139,92,246,.14)', border:'1.5px solid rgba(139,92,246,.4)', color:'#5b21b6', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s' }}
             onMouseEnter={e => { e.currentTarget.style.background='rgba(139,92,246,.26)'; e.currentTarget.style.borderColor='rgba(139,92,246,.6)' }}
             onMouseLeave={e => { e.currentTarget.style.background='rgba(139,92,246,.14)'; e.currentTarget.style.borderColor='rgba(139,92,246,.4)' }}>
             👤 Profile
           </button>
 
           {/* Pao + speech bubble row */}
-          <div style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
-            <div style={{ flexShrink:0 }}>
+          <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
+            <div className="gf-mascot" style={{ flexShrink:0 }}>
               <PandaMascot pxWidth={150} mouthOpen={talking} onClick={handlePandaClick}/>
             </div>
-            <div style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
+            <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}
               <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                 <span style={{ fontSize:15, fontWeight:800, color:'#3a2e6b' }}>{headerName}</span>
@@ -725,12 +762,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
           {/* ── Stats dropdown panel ── */}
           {showStats && (
-            <div style={{ margin:'8px 24px 0', background:'rgba(255,255,255,.88)', border:'1.5px solid rgba(139,92,246,.25)', borderRadius:16, padding:'14px 18px', animation:'gfFadeIn .25s ease', backdropFilter:'blur(12px)', flexShrink:0 }}>
+            <div className="gf-stats-panel" style={{ margin:'8px 24px 0', background:'rgba(255,255,255,.88)', border:'1.5px solid rgba(139,92,246,.25)', borderRadius:16, padding:'14px 18px', animation:'gfFadeIn .25s ease', backdropFilter:'blur(12px)', flexShrink:0 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <span style={{ fontSize:12, fontWeight:700, color:'rgba(58,46,107,.65)', letterSpacing:.5 }}>CHARACTER STATS</span>
                 <button onClick={() => setShowStats(false)} style={{ background:'none', border:'none', color:'rgba(58,46,107,.4)', cursor:'pointer', fontSize:16, lineHeight:1 }}>✕</button>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+              <div className="gf-stats-grid">
                 {STATS_META.map(stat => {
                   const value = (pao.profile?.stats || progress.characterStats || {})[stat.key] ?? 0
                   return (
@@ -750,13 +787,13 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           )}
 
           {/* ── Games grid ── */}
-          <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'10px 24px 16px', gap:10, overflowY:'auto' }}>
+          <div className="gf-main" style={{ flex:1, display:'flex', flexDirection:'column', padding:'10px 24px 16px', gap:10, overflowY:'auto' }}>
             <h1 style={{ color:'#3a2e6b', fontSize:18, fontWeight:800, margin:0, opacity: gamesIn ? 1 : 0, transform: gamesIn ? 'none' : 'translateY(-10px)', transition:'all .5s ease' }}>
               Choose a Game!
             </h1>
 
             {/* Category filter chips */}
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+            <div className="gf-chips">
               {GAME_CATEGORIES.map(cat => {
                 const active = gameCatFilter === cat.id
                 return (
@@ -775,7 +812,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
             </div>
 
             {/* Difficulty filter chips */}
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:4 }}>
+            <div className="gf-chips" style={{ marginBottom:4 }}>
               {GAME_DIFFICULTIES.map(diff => {
                 const active = gameDiffFilter === diff.id
                 return (
@@ -793,7 +830,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
               })}
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, flex:1 }}>
+            <div className="gf-games-grid">
               {GAMES.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&
                 (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter)
@@ -802,7 +839,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 const catMeta = GAME_CATEGORIES.find(c => c.id === game.category)
                 const diffMeta = GAME_DIFFICULTIES.find(d => d.id === game.difficulty)
                 return (
-                  <button key={game.id} onClick={() => {
+                  <button key={game.id} className="gf-card" onClick={() => {
                     if (!unlocked) return
                     // These games show their own start screen, so skip the generic preview (one modal only)
                     if (SELF_START_GAMES.has(game.id)) { startGame(game); return }
@@ -825,11 +862,11 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                   }}
                     onMouseEnter={e => unlocked && (e.currentTarget.style.transform='scale(1.04)')}
                     onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}>
-                    <span style={{ fontSize:30, filter: unlocked ? 'none' : 'grayscale(.6)' }}>{game.emoji}</span>
+                    <span className="gf-card-emoji" style={{ fontSize:30, filter: unlocked ? 'none' : 'grayscale(.6)' }}>{game.emoji}</span>
                     <div>
-                      <div style={{ color: unlocked ? '#2d2a4a' : 'rgba(45,42,74,.35)', fontWeight:800, fontSize:14 }}>{game.title}</div>
-                      <div style={{ color:'rgba(45,42,74,.5)', fontSize:11, marginTop:2 }}>{game.desc}</div>
-                      <div style={{ display:'flex', gap:6, marginTop:7, flexWrap:'wrap' }}>
+                      <div className="gf-card-title" style={{ color: unlocked ? '#2d2a4a' : 'rgba(45,42,74,.35)', fontWeight:800, fontSize:14 }}>{game.title}</div>
+                      <div className="gf-card-desc" style={{ color:'rgba(45,42,74,.5)', fontSize:11, marginTop:2 }}>{game.desc}</div>
+                      <div className="gf-card-tags" style={{ display:'flex', gap:6, marginTop:7, flexWrap:'wrap' }}>
                         {catMeta && (
                           <span style={{ background:catMeta.color, color:'#fff', borderRadius:8, padding:'3px 9px', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:4, boxShadow:`0 1px 4px ${catMeta.color}70` }}>
                             {catMeta.icon} {catMeta.label}

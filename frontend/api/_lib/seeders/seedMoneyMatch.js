@@ -12,13 +12,13 @@ const statGains = (partial) => Object.fromEntries(STAT_KEYS.map((k) => [k, new I
 const bill = (value, zone_key = 'wallet') => ({
   label: `${value} peso bill`,
   text: `${value} pesos`,
-  image_url: `/games/money-match/bill-${value}.webp`,
+  image_url: `/games/money-match/bill-${value}.png`,
   zone_key,
 })
 const coin = (value, zone_key = 'purse') => ({
   label: `${value} peso coin`,
   text: `${value} pesos`,
-  image_url: `/games/money-match/coin-${value}.webp`,
+  image_url: `/games/money-match/coin-${value}.png`,
   zone_key,
 })
 

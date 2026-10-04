@@ -40,8 +40,8 @@ export default function SortPlaceStartModal({ game, onStart, onCancel }) {
       >
         <div className="flex flex-col items-center text-center">
           <div className="relative mb-3 h-[92px] w-[130px]" aria-hidden="true">
-            <img src="/games/money-match/bill-100.webp" alt="" className="absolute left-0 top-2 h-[78px] w-[130px] -rotate-8 rounded-lg object-cover shadow-md" style={{ transform: 'rotate(-8deg)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-            <img src="/games/money-match/coin-20.webp" alt="" className="absolute bottom-0 right-0 h-[56px] w-[56px] rounded-full object-cover shadow-md" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+            <img src="/games/money-match/bill-100.png" alt="" className="absolute left-0 top-2 h-[78px] w-[130px] -rotate-8 rounded-lg object-cover shadow-md" style={{ transform: 'rotate(-8deg)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+            <img src="/games/money-match/coin-20.png" alt="" className="absolute bottom-0 right-0 h-[56px] w-[56px] rounded-full object-cover shadow-md" onError={(e) => { e.currentTarget.style.display = 'none' }} />
           </div>
           <h2 id="mm-title" className="text-[32px] font-extrabold leading-tight text-[#2B2366]" style={HEADING}>{game.name}</h2>
           <p className="mt-2 max-w-[480px] text-[16px] leading-relaxed text-[#2B2A4C]">{game.description}</p>

@@ -799,6 +799,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 return (
                   <button key={game.id} onClick={() => {
                     if (!unlocked) return
+                    // Money Match shows its own start screen, so skip the generic preview
+                    if (game.id === 'money-match') { startGame(game); return }
                     setPreviewGame(game)
                   }} style={{
                     background: unlocked ? `${game.color}1f` : 'rgba(0,0,0,.03)',

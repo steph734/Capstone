@@ -7,9 +7,9 @@ import {
 
 const zones = [{ zone_key: 'wallet' }, { zone_key: 'purse' }]
 const items = withItemIds([
-  { label: '20 bill', zone_key: 'wallet', image_url: '/bill-20.webp' },
-  { label: '5 coin', zone_key: 'purse', image_url: '/coin-5.webp' },
-  { label: '50 bill', zone_key: 'wallet', image_url: '/bill-50.webp' },
+  { label: '20 bill', zone_key: 'wallet', image_url: '/bill-20.png' },
+  { label: '5 coin', zone_key: 'purse', image_url: '/coin-5.png' },
+  { label: '50 bill', zone_key: 'wallet', image_url: '/bill-50.png' },
 ], 1)
 const bill20 = items[0].id
 const coin5 = items[1].id

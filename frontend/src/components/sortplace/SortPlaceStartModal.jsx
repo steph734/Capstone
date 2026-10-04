@@ -1,14 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-// Start screen for a sort_place game: what it is, what you earn, why it helps.
-const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" }
-const BODY = { fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }
-const STAT_LABEL = {
-  intelligence: 'Intelligence', focus: 'Focus', resistance: 'Resistance',
-  creativity: 'Creativity', speed: 'Speed', memory: 'Memory',
-}
-
-export default function SortPlaceStartModal({ game, onStart, onCancel }) {
+// Start screen for a sort_place game. Same layout as the other game start
+// screens: two stat cards, a "why this helps" box, then Start and Cancel.
+export default function SortPlaceStartModal({ game, ready = true, onStart, onCancel }) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -26,44 +20,43 @@ export default function SortPlaceStartModal({ game, onStart, onCancel }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onCancel])
 
-  const gains = Object.entries(game.statGains || {}).filter(([, v]) => v > 0)
+  const color = game.color || '#16a34a'
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[rgba(30,60,100,0.45)] p-4 backdrop-blur-sm" style={BODY}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', background: 'rgba(60,50,90,0.45)', fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="mm-title"
-        className="max-h-[95vh] w-full max-w-[600px] overflow-y-auto rounded-[36px] p-7 shadow-2xl"
-        style={{ background: 'linear-gradient(180deg,#FFFFFF,#FFF8EC)' }}
+        style={{ background: 'linear-gradient(145deg,#ffffff,#fdf3e3)', border: `1.5px solid ${color}40`, borderRadius: 28, padding: '28px 28px', width: 400, maxWidth: '92vw', boxShadow: '0 24px 64px rgba(80,60,20,.25)' }}
       >
-        <div className="flex flex-col items-center text-center">
-          <div className="relative mb-3 h-[92px] w-[130px]" aria-hidden="true">
-            <img src="/games/money-match/bill-100.png" alt="" className="absolute left-0 top-2 h-[78px] w-[130px] -rotate-8 rounded-lg object-cover shadow-md" style={{ transform: 'rotate(-8deg)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-            <img src="/games/money-match/coin-20.png" alt="" className="absolute bottom-0 right-0 h-[56px] w-[56px] rounded-full object-cover shadow-md" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
+          <img src="/games/money-match/bill-100.png" alt="" style={{ height: 70, width: 'auto', transform: 'rotate(-8deg)', borderRadius: 8, boxShadow: '0 4px 10px rgba(0,0,0,.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          <img src="/games/money-match/coin-20.png" alt="" style={{ height: 52, width: 52, marginLeft: -14, marginTop: 22, borderRadius: '50%', boxShadow: '0 4px 10px rgba(0,0,0,.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        </div>
+        <h2 id="mm-title" style={{ color: '#3a2e6b', fontSize: 22, fontWeight: 800, margin: '0 0 10px', textAlign: 'center' }}>{game.name || game.title}</h2>
+        <p style={{ color: 'rgba(58,46,107,.75)', fontSize: 14, lineHeight: 1.5, margin: '0 0 20px', textAlign: 'center' }}>{game.description || game.desc}</p>
+
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <Card label="Badge" value={game.badge?.name || 'Money Match'} color={color} emoji="💵" />
+          <Card label="Points" value={`+${game.pointsPerPlay ?? game.xp ?? 100} XP`} color={color} emoji="⭐" />
+        </div>
+
+        <div style={{ background: 'rgba(16,185,129,.08)', border: '1.5px solid rgba(16,185,129,.3)', borderRadius: 16, padding: '14px 16px', marginBottom: 22, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>🌱</span>
+          <div>
+            <div style={{ fontSize: 11, color: '#0d9488', fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 4 }}>Why this helps</div>
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(58,46,107,.85)' }}>
+              Teaches the difference between coins and bills and how to keep money in the right place, a first step toward paying at the sari-sari store. Real peso photos help the skill carry over to real money.
+            </p>
           </div>
-          <h2 id="mm-title" className="text-[32px] font-extrabold leading-tight text-[#2B2366]" style={HEADING}>{game.name}</h2>
-          <p className="mt-2 max-w-[480px] text-[16px] leading-relaxed text-[#2B2A4C]">{game.description}</p>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2.5">
-          <Card label="Badge" value={game.badge?.name || 'None yet'} tint="#FFF0CC" />
-          <Card label="Points" value={`+${game.pointsPerPlay} XP`} tint="#E3F4E8" />
-          <Card label="Pao stats" value={gains.length ? gains.map(([k, v]) => `${STAT_LABEL[k] || k} +${v}`).join(' · ') : 'Stronger Pao'} tint="#ede9fe" />
-        </div>
-
-        <div className="mt-5 rounded-2xl border-2 border-[#A9D8B6] bg-[#E3F4E8] p-4">
-          <p className="text-[12px] font-extrabold tracking-wider text-[#2F8A4C]">WHY THIS HELPS</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-[#2B2A4C]">
-            Teaches the difference between coins and bills and how to keep money in the right place, a first step toward paying at the sari-sari store. Real peso photos help the skill carry over to real money.
-          </p>
-        </div>
-
-        <button type="button" onClick={onStart} className="mt-6 h-14 w-full rounded-2xl bg-[#F59E0B] text-[20px] font-extrabold text-[#2B2A4C] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]" style={{ ...HEADING, boxShadow: '0 5px 0 #C97A00' }}>
-          Start Game
+        <button type="button" onClick={onStart} disabled={!ready} style={{ width: '100%', background: color, border: 'none', color: '#fff', borderRadius: 14, padding: '13px', cursor: ready ? 'pointer' : 'wait', opacity: ready ? 1 : 0.6, fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 15, fontWeight: 800, boxShadow: `0 6px 16px ${color}55`, marginBottom: 10 }}>
+          Start Game 🎮
         </button>
-        <button type="button" onClick={onCancel} className="mt-2.5 h-12 w-full rounded-2xl border-2 border-[#E4DFCE] bg-white text-[16px] font-bold text-[#5A5670] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]">
+        <button type="button" onClick={onCancel} style={{ width: '100%', background: 'rgba(124,79,224,.06)', border: '1px solid rgba(124,79,224,.15)', color: 'rgba(58,46,107,.6)', borderRadius: 12, padding: '10px', cursor: 'pointer', fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13, fontWeight: 600 }}>
           Cancel
         </button>
       </div>
@@ -71,11 +64,12 @@ export default function SortPlaceStartModal({ game, onStart, onCancel }) {
   )
 }
 
-function Card({ label, value, tint }) {
+function Card({ label, value, color, emoji }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl p-3 text-center" style={{ background: tint }}>
-      <span className="text-[11px] font-bold uppercase tracking-wide text-[#5A5670]">{label}</span>
-      <span className="text-[14px] font-extrabold text-[#2B2A4C]" style={HEADING}>{value}</span>
+    <div style={{ flex: 1, background: `${color}1a`, border: `1.5px solid ${color}55`, borderRadius: 16, padding: '12px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <span style={{ fontSize: 26 }}>{emoji}</span>
+      <span style={{ fontSize: 11, color: 'rgba(58,46,107,.55)', fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: '#3a2e6b', fontWeight: 800, textAlign: 'center' }}>{value}</span>
     </div>
   )
 }

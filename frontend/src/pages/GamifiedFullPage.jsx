@@ -131,6 +131,9 @@ function CategoryModal({ onSelect, onClose, lang }) {
 
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
+// Games that open their own start screen (or picker) after the card is tapped.
+const SELF_START_GAMES = new Set(['money-match', 'picture-word', 'puzzle-pieces', 'echo'])
+
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
 
@@ -799,8 +802,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 return (
                   <button key={game.id} onClick={() => {
                     if (!unlocked) return
-                    // Money Match shows its own start screen, so skip the generic preview
-                    if (game.id === 'money-match') { startGame(game); return }
+                    // These games show their own start screen, so skip the generic preview (one modal only)
+                    if (SELF_START_GAMES.has(game.id)) { startGame(game); return }
                     setPreviewGame(game)
                   }} style={{
                     background: unlocked ? `${game.color}1f` : 'rgba(0,0,0,.03)',

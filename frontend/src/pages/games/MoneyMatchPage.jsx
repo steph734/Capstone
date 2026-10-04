@@ -3,6 +3,15 @@ import SortPlaceStartModal from '../../components/sortplace/SortPlaceStartModal'
 import SortPlaceGame from '../../components/sortplace/SortPlaceGame'
 import { useGameSession } from '../../hooks/useGameSession'
 
+// Shown straight away while the database record loads, so there is no blank wait.
+const PREVIEW = {
+  name: 'Money Match',
+  description: 'Sort the money! Put the bills in the wallet, then the coins in the coin purse.',
+  pointsPerPlay: 100,
+  badge: { name: 'Money Match' },
+  color: '#16a34a',
+}
+
 // Money Match: loads the game from the database, shows its start screen, plays
 // it with the generic sort_place screen, and reports the finished game to Pao.
 export default function MoneyMatchPage({ lang = 'en', onExit }) {
@@ -29,13 +38,18 @@ export default function MoneyMatchPage({ lang = 'en', onExit }) {
     )
   }
 
-  if (!game) {
-    return <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#87ceeb] text-[18px] font-bold text-[#2B2A4C]">Loading Money Match…</div>
+  if (!started) {
+    return (
+      <SortPlaceStartModal
+        game={game || PREVIEW}
+        ready={!!game}
+        onStart={() => setStarted(true)}
+        onCancel={onExit}
+      />
+    )
   }
 
-  if (!started) {
-    return <SortPlaceStartModal game={game} onStart={() => setStarted(true)} onCancel={onExit} />
-  }
+  if (!game) return null
 
   return (
     <SortPlaceGame

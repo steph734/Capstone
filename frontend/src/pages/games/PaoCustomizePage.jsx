@@ -456,7 +456,11 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-bubble { width:100%; background:#f8fafc; border:2px solid #cbd5e1; border-radius:14px; padding:8px 10px; font-size:12.5px; font-weight:700; color:#1e293b; min-height:40px; }
         .pc-play { width:100%; margin-top:auto; border:none; border-radius:14px; padding:13px; background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 5px 0 #0f7a3a; }
         @media (max-width: 900px) {
-          .pc-body { grid-template-columns:1fr; grid-template-rows:auto auto 1fr; }
+          .pc-root { overflow-y:auto; align-items:flex-start; }
+          .pc-panel { height:auto; min-height:100%; overflow:visible; }
+          .pc-body { grid-template-columns:1fr; grid-template-rows:none; flex:none; }
+          .pc-grid-wrap { min-height:340px; }
+          .pc-grid { overflow:visible; }
           .pc-preview { order:-1; flex-direction:row; flex-wrap:wrap; justify-content:center; border-left:none; border-bottom:2px solid #93c5fd; padding:10px; }
           .pc-cats { flex-direction:row; overflow-x:auto; overflow-y:hidden; border-right:none; border-bottom:2px solid #93c5fd; padding:8px; }
           .pc-cat { flex-shrink:0; padding:8px 12px; }
@@ -465,7 +469,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         }
         @media (max-width: 560px) {
           .pc-root { padding:0; }
-          .pc-panel { height:100%; border-radius:0; border:none; }
+          .pc-panel { border-radius:0; border:none; }
           .pc-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; }
           .pc-tile { min-height:118px; }
           .pc-title h1 { font-size:17px; }

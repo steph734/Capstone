@@ -67,6 +67,7 @@ import paoThemesList from './_lib/routes/pao-themes-list.js'
 import paoThemesItem from './_lib/routes/pao-themes-item.js'
 import gamesList from './_lib/routes/games-list.js'
 import gamesAdminList from './_lib/routes/games-admin-list.js'
+import gamesAdminItem from './_lib/routes/games-admin-item.js'
 import speechRecordingsCreate from './_lib/routes/speech-recordings-create.js'
 import speechRecordingsList from './_lib/routes/speech-recordings-list.js'
 import speechRecordingsItem from './_lib/routes/speech-recordings-item.js'
@@ -164,6 +165,7 @@ app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
 app.all('/api/games/list', gamesList)
 app.all('/api/games', gamesAdminList)
+app.all('/api/games/:gameId', gamesAdminItem)
 app.all('/api/speech-recordings/create', speechRecordingsCreate)
 app.all('/api/speech-recordings/list', speechRecordingsList)
 app.all('/api/speech-recordings/:id/summarize', speechRecordingsSummarize)

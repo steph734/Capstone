@@ -29,6 +29,12 @@
 .sb-screen { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
 
 .sb-title { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; line-height: 1.1; margin: 0; }
+/* Global heading and button styles in the app can set white text; keep it dark on the white cards */
+.sb-root h1, .sb-root h2, .sb-root p, .sb-root li { color: var(--sb-ink); text-shadow: none; }
+.sb-root .sb-btn, .sb-root .sb-btn--green, .sb-root .sb-btn--ghost { text-shadow: none; }
+.sb-root .sb-btn--ghost, .sb-root .sb-modal-close { color: var(--sb-ink); }
+.sb-root .sb-btn { color: #fff; }
+.sb-modal .sb-modal-close { color: var(--sb-ink); background: #fff; }
 
 .sb-btn {
   border: none; border-radius: 18px; padding: 14px 26px; min-height: 64px;
@@ -130,14 +136,54 @@
 .sb-panel-num { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; color: var(--sb-purple-dark); }
 .sb-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
-/* Phones: stack the step screen and keep a 16px gutter */
+/* Phones: compact sizes so the whole step fits, with a tracker that scrolls sideways */
 @media (max-width: 720px) {
-  .sb-body { grid-template-columns: 1fr; overflow: auto; }
-  .sb-question { font-size: 28px; }
-  .sb-tiles { grid-template-columns: 1fr; }
-  .sb-choices--three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sb-topbar { padding: 12px 16px; }
-  .sb-modal { padding: 20px; }
+  .sb-topbar { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
+  .sb-topbar > .sb-btn--ghost { min-height: 44px; font-size: 15px; padding: 8px 14px; box-shadow: 0 4px 0 #cbd5e1; }
+  .sb-topbar > .sb-pill { font-size: 13px; padding: 4px 10px 4px 4px; margin-left: auto; }
+  .sb-topbar > .sb-pill img { width: 30px !important; height: 30px !important; }
+  .sb-tracker { order: 3; flex: 0 0 100%; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; padding: 6px 10px; gap: 4px; border-radius: 16px; }
+  .sb-step { min-width: 52px; font-size: 11px; }
+  .sb-step-dot { width: 30px; height: 30px; font-size: 14px; border-width: 2px; }
+  .sb-step--current .sb-step-dot { box-shadow: 0 0 0 3px #DDD6FE; }
+
+  .sb-body { grid-template-columns: 1fr; gap: 10px; padding: 6px 10px; }
+  .sb-scene-card { padding: 10px; gap: 8px; border-radius: 18px; }
+  .sb-scene { max-height: 24vh; border-radius: 12px; }
+  .sb-story-line { font-size: 16px; line-height: 1.3; }
+  .sb-basket img { width: 48px; height: 48px; }
+  .sb-slot { min-width: 64px; min-height: 40px; font-size: 13px; padding: 4px 6px; }
+  .sb-scene-card .sb-btn { min-height: 44px; font-size: 16px; padding: 8px 14px; }
+
+  .sb-question { font-size: 22px; }
+  .sb-question-col { gap: 8px; }
+  .sb-choices, .sb-choices--three { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sb-tile-choice { min-height: 104px; border-width: 3px; border-radius: 16px; padding: 6px; box-shadow: 0 4px 0 #cbd5e1; }
+  .sb-tile-choice img { width: 52px; height: 52px; }
+  .sb-tile-label { font-size: 16px; }
+  .sb-tile-sub { font-size: 12px; }
+  .sb-check { width: 26px; height: 26px; font-size: 14px; top: 6px; right: 6px; }
+
+  .sb-pao { padding: 4px 10px 8px; gap: 8px; align-items: center; }
+  .sb-pao > div:first-child { zoom: .55; flex-shrink: 0; }
+  .sb-bubble { font-size: 15px; padding: 8px 12px; min-height: 0; border-radius: 16px; }
+
+  .sb-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 14px 0; }
+  .sb-tile { font-size: 14px; padding: 10px 4px; border-radius: 14px; }
+  .sb-tile-icon { font-size: 26px; }
+  .sb-title { font-size: 28px !important; }
+  .sb-modal { padding: 16px; border-radius: 22px; }
+  .sb-modal p { font-size: 15px !important; }
+  .sb-modal-close { width: 40px; height: 40px; font-size: 18px; top: 8px; right: 8px; }
+  .sb-story-grid { gap: 8px; margin: 12px 0; }
+  .sb-story-card { padding: 8px; border-radius: 16px; gap: 4px; }
+  .sb-story-card img { max-width: none; aspect-ratio: 16 / 10; }
+  .sb-story-card-title { font-size: 14px; }
+  .sb-story-card span:last-child { font-size: 12px; }
+  .sb-btn { min-height: 52px; font-size: 17px; padding: 10px 18px; border-radius: 16px; }
+  .sb-recap-grid { gap: 8px; margin: 12px 0; }
+  .sb-panel { font-size: 13px; padding: 6px; gap: 4px; border-radius: 14px; }
+  .sb-panel img { border-radius: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

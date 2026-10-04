@@ -30,9 +30,9 @@ export async function buildUnlockContext(patientId, mongoSession = null) {
 
   // Finished sessions per (game, task): step_by_step games like Daily Routines
   // store result.detail.task_key so a badge can be earned per task.
-  const sessionRows = await db.collection(game_sessions).find(
-    { patient_id: patientId, status: completed, result.detail.task_key: { $exists: true } },
-    { ...opt, projection: { game_id: 1, result.detail.task_key: 1 } }
+  const sessionRows = await db.collection('game_sessions').find(
+    { patient_id: patientId, status: 'completed', 'result.detail.task_key': { $exists: true } },
+    { ...opt, projection: { game_id: 1, 'result.detail.task_key': 1 } }
   ).toArray()
   const taskCompletionCountByGame = new Map()
   for (const r of sessionRows) {

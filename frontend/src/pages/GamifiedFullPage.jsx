@@ -4,8 +4,7 @@ import PictureWordGame from '../components/picture-word-game/PictureWordGame'
 import SlowMotionEchoGame from './games/SlowMotionEchoGame'
 import PuzzlePiecesGame from './games/PuzzlePiecesGame'
 import SortTheBasketGame from './games/SortTheBasketGame'
-import StoryBuilderGame from './games/StoryBuilderGame'
-import LittleRedRidingHoodGame from './games/LittleRedRidingHoodGame'
+import StoryBuilder from '../components/story-builder/StoryBuilder'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
@@ -566,13 +565,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'story-select') {
-    return <StoryBuilderGame onSelect={(storyId) => {
-      if (storyId === 'red-riding-hood') setPhase('story-red-riding-hood')
-    }} onExit={backToGames}/>
-  }
-
-  if (phase === 'story-red-riding-hood') {
-    return <LittleRedRidingHoodGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
+    return <StoryBuilder onExit={backToGames}/>
   }
 
   return (

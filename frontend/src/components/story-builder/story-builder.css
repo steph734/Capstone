@@ -1,0 +1,145 @@
+/* Story Builder. Class names are prefixed sb- so they can't leak into other games. */
+
+.sb-root {
+  --sb-purple: #6D4AE0;
+  --sb-purple-dark: #4B2FB0;
+  --sb-green: #16A34A;
+  --sb-amber: #F59E0B;
+  --sb-ink: #2B2A4C;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  color: var(--sb-ink);
+  background: linear-gradient(180deg, #56b8ee 0%, #7dd0f5 55%, #bdeafd 100%);
+}
+
+.sb-root button { font: inherit; cursor: pointer; }
+.sb-root button:focus-visible { outline: 4px solid #1D4ED8; outline-offset: 3px; }
+.sb-root button:disabled { cursor: default; }
+
+/* Scenery: hills and clouds, drawn in CSS so no extra image is needed */
+.sb-hill { position: absolute; bottom: -120px; border-radius: 50%; pointer-events: none; }
+.sb-hill--a { left: -10%; width: 70%; height: 260px; background: #7fd16b; }
+.sb-hill--b { right: -15%; width: 80%; height: 300px; background: #5fbf55; }
+.sb-cloud { position: absolute; width: 130px; height: 40px; border-radius: 40px; background: rgba(255,255,255,.85); pointer-events: none; }
+.sb-cloud::before { content: ''; position: absolute; width: 60px; height: 60px; border-radius: 50%; background: inherit; left: 22px; top: -28px; }
+
+.sb-screen { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+
+.sb-title { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; line-height: 1.1; margin: 0; }
+
+.sb-btn {
+  border: none; border-radius: 18px; padding: 14px 26px; min-height: 64px;
+  font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; font-size: 20px;
+  background: var(--sb-purple); color: #fff; box-shadow: 0 8px 0 var(--sb-purple-dark);
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+.sb-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 4px 0 var(--sb-purple-dark); }
+.sb-btn--ghost { background: #fff; color: var(--sb-ink); box-shadow: 0 8px 0 #cbd5e1; }
+.sb-btn--ghost:active:not(:disabled) { box-shadow: 0 4px 0 #cbd5e1; }
+.sb-btn--green { background: var(--sb-green); box-shadow: 0 8px 0 #15803D; }
+.sb-btn--green:active:not(:disabled) { box-shadow: 0 4px 0 #15803D; }
+
+.sb-pill {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+  padding: 6px 14px; font-weight: 700; font-size: 15px; background: #fff; color: var(--sb-ink);
+}
+
+/* Modals */
+.sb-overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(30, 27, 75, .45); }
+.sb-modal {
+  position: relative; width: min(760px, 100%); max-height: 100%; overflow: auto;
+  background: #fff; border-radius: 28px; padding: 28px; text-align: center;
+  box-shadow: 0 14px 0 rgba(43, 42, 76, .18);
+}
+.sb-modal-close {
+  position: absolute; top: 12px; right: 12px; width: 52px; height: 52px; border-radius: 50%;
+  border: 2px solid #e2e8f0; background: #fff; font-size: 22px; font-weight: 800;
+}
+
+/* Start modal */
+.sb-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 22px 0; }
+.sb-tile { border-radius: 20px; padding: 16px 8px; color: var(--sb-ink); font-weight: 800; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 18px; }
+.sb-tile-icon { display: block; font-size: 40px; line-height: 1.1; }
+
+/* Picker */
+.sb-story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.sb-story-card {
+  border: 3px solid transparent; border-radius: 22px; padding: 12px; color: var(--sb-ink);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 64px;
+}
+.sb-story-card img { width: 100%; max-width: 200px; aspect-ratio: 4 / 3; object-fit: contain; background: #fff; border-radius: 16px; }
+.sb-story-card-title { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; font-size: 20px; line-height: 1.15; }
+
+/* Step screen */
+.sb-topbar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; flex-wrap: wrap; }
+.sb-tracker { flex: 1; display: flex; align-items: flex-start; justify-content: center; gap: 10px; flex-wrap: wrap; background: #fff; border-radius: 999px; padding: 8px 18px; }
+.sb-step { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; font-size: 13px; font-weight: 700; }
+.sb-step-dot {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; background: #e2e8f0; color: #475569; border: 3px solid transparent;
+}
+.sb-step--current .sb-step-dot { border-color: var(--sb-purple); background: #EDE9FE; color: var(--sb-purple-dark); box-shadow: 0 0 0 4px #DDD6FE; }
+.sb-step--done .sb-step-dot { background: var(--sb-green); color: #fff; }
+
+.sb-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; padding: 8px 18px; overflow: auto; }
+.sb-scene-card { background: #fff; border-radius: 26px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.sb-scene { width: 100%; max-height: 46vh; object-fit: contain; border-radius: 18px; background: #F0FDF4; }
+.sb-story-line { font-size: 22px; font-weight: 700; line-height: 1.35; margin: 0; }
+.sb-basket { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.sb-basket img { width: 88px; height: 88px; object-fit: contain; }
+.sb-slot {
+  min-width: 96px; min-height: 64px; border: 3px dashed #94a3b8; border-radius: 14px; padding: 6px 10px;
+  display: grid; place-items: center; font-weight: 700; color: #64748b; background: #f8fafc;
+}
+.sb-slot--filled { border-style: solid; border-color: var(--sb-green); background: #DCFCE7; color: #14532D; }
+
+.sb-question-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sb-question { font-family: 'Baloo 2', system-ui, sans-serif; font-size: 34px; font-weight: 800; line-height: 1.12; margin: 0; }
+.sb-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.sb-choices--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sb-tile-choice {
+  min-height: 150px; border: 4px solid #fff; border-radius: 22px; background: #fff; color: var(--sb-ink);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px;
+  box-shadow: 0 6px 0 #cbd5e1; transition: transform .1s ease, opacity .4s ease, background-color .3s ease;
+}
+.sb-tile-choice:not(:disabled):active { transform: translateY(4px); box-shadow: 0 2px 0 #cbd5e1; }
+.sb-tile-choice img { width: 92px; height: 92px; object-fit: contain; }
+.sb-tile-label { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; font-size: 22px; line-height: 1.1; text-align: center; }
+.sb-tile-sub { font-size: 15px; opacity: .75; text-align: center; }
+.sb-tile-choice[aria-pressed="true"] { background: #DCFCE7; border-color: var(--sb-green); box-shadow: 0 6px 0 #15803D; }
+.sb-check { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; background: var(--sb-green); color: #fff; display: grid; place-items: center; font-weight: 900; }
+.sb-tile-choice { position: relative; }
+.sb-tile-choice--wrong { opacity: .35; }
+
+/* Pao bubble */
+.sb-pao { display: flex; align-items: flex-end; gap: 12px; padding: 8px 18px 14px; }
+.sb-bubble {
+  position: relative; flex: 1; border-radius: 22px; padding: 14px 20px; font-size: 20px; font-weight: 700; line-height: 1.3;
+  background: #fff; box-shadow: 0 6px 0 rgba(43, 42, 76, .15); min-height: 56px;
+}
+.sb-bubble--good { background: #DCFCE7; color: #14532D; }
+.sb-bubble--gentle { background: #FEF3C7; color: #78350F; }
+
+/* Recap */
+.sb-recap-grid { display: grid; gap: 12px; margin: 18px 0; }
+.sb-panel { background: #F8FAFC; border-radius: 18px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 16px; }
+.sb-panel img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 12px; background: #fff; }
+.sb-panel-num { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; color: var(--sb-purple-dark); }
+.sb-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* Phones: stack the step screen and keep a 16px gutter */
+@media (max-width: 720px) {
+  .sb-body { grid-template-columns: 1fr; overflow: auto; }
+  .sb-question { font-size: 28px; }
+  .sb-tiles { grid-template-columns: 1fr; }
+  .sb-choices--three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sb-topbar { padding: 12px 16px; }
+  .sb-modal { padding: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-root *, .sb-root *::before, .sb-root *::after { animation: none !important; transition: none !important; }
+}

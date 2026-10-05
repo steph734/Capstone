@@ -23,6 +23,11 @@ describe("buildConfig", () => {
     expect(cfg.levels[0]).toMatchObject({ start: 2, goal: 4, promptLevel: "full_model" });
   });
 
+  it("caps pattern lengths at 5 even if the database asks for more", () => {
+    const cfg = buildConfig({ levels: [{ level_order: 1, level_name: "Long", start_length: 4, goal_length: 9, items: [] }] });
+    expect(cfg.levels[0]).toMatchObject({ start: 4, goal: 5 });
+  });
+
   it("falls back to the 4 default pads", () => {
     expect(buildConfig({}).pads).toHaveLength(4);
     expect(fullName(DEFAULT_PADS[3])).toBe("Yellow star");

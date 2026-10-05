@@ -7,6 +7,9 @@ export const DEFAULT_PADS = [
   { key: "yellow", label: "Yellow", shape: "star", color: "#E6A700", lit: "#FFC933", ring: "#B07F00" },
 ];
 
+// The longest pattern a patient copies. Levels in the database can't go above this.
+export const MAX_PATTERN = 5;
+
 export const SPEEDS = {
   slow: { on: 1000, off: 400 },
   normal: { on: 650, off: 250 },
@@ -36,8 +39,8 @@ export function buildConfig(game) {
       ? levels.map((l) => ({
           order: l.level_order,
           name: l.level_name,
-          start: l.start_length ?? 2,
-          goal: l.goal_length ?? 5,
+          start: Math.min(l.start_length ?? 2, MAX_PATTERN),
+          goal: Math.min(l.goal_length ?? 5, MAX_PATTERN),
           promptLevel: l.prompt_level || "partial",
         }))
       : [{ order: 1, name: "Warm-up", start: 2, goal: 5, promptLevel: "partial" }],

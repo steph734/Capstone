@@ -13,6 +13,7 @@ import MoneyMatchPage from './games/MoneyMatchPage'
 import DailyRoutinesPage from './games/DailyRoutinesPage'
 import FeedPaoPage from './games/FeedPaoPage'
 import CopyColorsPage from './games/CopyColorsPage'
+import SpotDifferencePage from './games/SpotDifferencePage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -54,6 +55,9 @@ const GAMES = [
   { id: 'rhyme',        title: 'Rhyme Time',            emoji: '🎵', desc: 'Find words that rhyme!',            color: '#ec4899', requiredLevel: 7,  category: 'speech',       difficulty: 'easy',
     instructions: 'Listen to the word, then pick the picture whose name rhymes with it!', badge: 'Rhyme Master',  badgeEmoji: '🎵', xp: 100,
     benefits: 'Builds phonological awareness through rhyme detection, strengthens auditory memory and pattern recognition, and supports pre-reading skills.' },
+  { id: 'spot-difference', title: 'Spot the Difference', emoji: '🔍', desc: 'Compare two pictures and find what is different!', color: '#DC2626', requiredLevel: 3, category: 'cognitive', difficulty: 'hard',
+    instructions: 'Compare the two pictures and tap each difference. Use Help me if you get stuck.', badge: 'Eagle Eyes', badgeEmoji: '🦅', xp: 150,
+    benefits: 'Builds visual attention and noticing details, and grows vocabulary as Pao names each difference.' },
   { id: 'copy-colors',  title: 'Copy the Colors',       emoji: '🎨', desc: 'Watch Pao, then copy the pattern!',   color: '#2F6FD6', requiredLevel: 1,  category: 'cognitive',    difficulty: 'medium',
     instructions: 'Watch the shapes light up, then tap them in the same order. The pattern gets one shape longer each time.', badge: 'Memory Master', badgeEmoji: '🧠', xp: 100,
     benefits: 'Builds visual working memory and attention, and practises holding a sequence in mind.' },
@@ -143,7 +147,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 // Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors'])
+const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors', 'spot-difference'])
 
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -516,6 +520,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'feed-pao') { stopPaoVoice(); setPhase('feed-pao') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else if (game.id === 'copy-colors') { stopPaoVoice(); setPhase('copy-colors') }
+    else if (game.id === 'spot-difference') { stopPaoVoice(); setPhase('spot-difference') }
     else setShowCatModal(true)
   }
 
@@ -580,6 +585,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'copy-colors') {
     return <CopyColorsPage onExit={backToGames}/>
+  }
+
+  if (phase === 'spot-difference') {
+    return <SpotDifferencePage onExit={backToGames}/>
   }
 
   if (phase === 'story-select') {

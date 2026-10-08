@@ -14,6 +14,7 @@ import DailyRoutinesPage from './games/DailyRoutinesPage'
 import FeedPaoPage from './games/FeedPaoPage'
 import CopyColorsPage from './games/CopyColorsPage'
 import SpotDifferencePage from './games/SpotDifferencePage'
+import EmergencyReadyPage from './games/EmergencyReadyPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -67,6 +68,9 @@ const GAMES = [
   { id: 'alphabet',     title: 'Alphabet Blast',        emoji: '🚀', desc: 'Zoom through the alphabet!',        color: '#ef4444', requiredLevel: 12, category: 'speech',       difficulty: 'medium',
     instructions: 'Blast off through the alphabet by tapping each letter in order, as fast as you can!', badge: 'Alphabet Blast', badgeEmoji: '🚀', xp: 100,
     benefits: 'Reinforces letter recognition and alphabet sequencing, builds processing speed, and strengthens an early-literacy foundation for reading and writing.' },
+  { id: 'emergency-ready', title: 'Emergency Ready', emoji: '🚨', desc: 'Learn what to do for six emergencies!', color: '#EF4444', requiredLevel: 3, category: 'cognitive', difficulty: 'hard',
+    instructions: 'Pick an emergency, learn what to do, then practice the steps.', badge: 'Safety Star', badgeEmoji: '🌟', xp: 150,
+    benefits: 'Calm, no-pressure practice for real emergencies: earthquake, fire, typhoon, flood, tsunami and volcano.' },
   { id: 'feed-pao', title: 'Feed Pao', emoji: '🍌', desc: 'Give Pao the right food, in the right order!', color: '#84CC16', requiredLevel: 1, category: 'speech', difficulty: 'easy',
     instructions: 'Listen to Pao, then give him the food he asks for.', badge: 'Good Listener', badgeEmoji: '👂', xp: 100,
     benefits: 'Builds listening and following one-step and two-step directions, and remembering the order.' },
@@ -147,7 +151,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
 // Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors', 'spot-difference'])
+const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors', 'spot-difference', 'emergency-ready'])
 
 function GameInstructionsModal({ game, onStart, onClose }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -540,6 +544,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'money-match') { stopPaoVoice(); setPhase('money-match') }
     else if (game.id === 'daily-routines') { stopPaoVoice(); setPhase('daily-routines') }
     else if (game.id === 'feed-pao') { stopPaoVoice(); setPhase('feed-pao') }
+    else if (game.id === 'emergency-ready') { stopPaoVoice(); setPhase('emergency-ready') }
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else if (game.id === 'copy-colors') { stopPaoVoice(); setPhase('copy-colors') }
     else if (game.id === 'spot-difference') { stopPaoVoice(); setPhase('spot-difference') }
@@ -599,6 +604,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'feed-pao') {
     return <FeedPaoPage onExit={backToGames}/>
+  }
+
+  if (phase === 'emergency-ready') {
+    return <EmergencyReadyPage lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'sort-basket') {

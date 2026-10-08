@@ -65,6 +65,7 @@ export default function PuzzlePickerModal({ lang = 'en', onStart, onBack }) {
           {PUZZLE_SETS.map((set) => {
             const selected = set.id === setId
             const miniShapes = LEVELS[0].shapes
+            const miniSize = typeof window !== 'undefined' && window.innerWidth < 640 ? 34 : 50
             return (
               <button
                 key={set.id}
@@ -72,7 +73,7 @@ export default function PuzzlePickerModal({ lang = 'en', onStart, onBack }) {
                 onClick={() => setSetId(set.id)}
                 style={{
                   position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px 8px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
+                  padding: '10px 4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
                   background: selected ? '#e6fbf2' : '#f2fbf7',
                   border: `2px solid ${selected ? '#34d399' : '#d9efe6'}`,
                   boxShadow: selected ? '0 0 0 4px rgba(52,211,153,.2)' : 'none',
@@ -89,9 +90,9 @@ export default function PuzzlePickerModal({ lang = 'en', onStart, onBack }) {
                     <CheckIcon size={14}/>
                   </span>
                 )}
-                <div style={{ display: 'flex', gap: 2 }}>
+                <div style={{ display: 'flex', gap: 2, maxWidth: '100%', justifyContent: 'center' }}>
                   {set.items.slice(0, 3).map((item, i) => (
-                    <PuzzlePiece key={item.id} item={{ ...item, shape: miniShapes[i % miniShapes.length] }} size={50}/>
+                    <PuzzlePiece key={item.id} item={{ ...item, shape: miniShapes[i % miniShapes.length] }} size={miniSize}/>
                   ))}
                 </div>
                 <span style={{ fontSize: 20 }}>{set.icon}</span>

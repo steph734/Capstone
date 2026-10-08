@@ -391,6 +391,28 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   const [showStats,    setShowStats]    = useState(false)
   const [gameCatFilter,  setGameCatFilter]  = useState('all')
   const [gameDiffFilter, setGameDiffFilter] = useState('all')
+  // Name -> status for every game in the database, so a card for a game an
+  // admin unpublished (or hasn't published yet) is hidden here even though
+  // GAMES itself is a static local list. A name with no DB row at all is
+  // left alone (shown), so games not yet migrated to the database still work.
+  const [dbGameStatus, setDbGameStatus] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/games')
+      .then((r) => r.json())
+      .then((body) => {
+        if (cancelled) return
+        const map = new Map((body.games || []).map((g) => [String(g.name || '').trim().toLowerCase(), g.status]))
+        setDbGameStatus(map)
+      })
+      .catch(() => { if (!cancelled) setDbGameStatus(new Map()) })
+    return () => { cancelled = true }
+  }, [])
+  const isGamePublished = (title) => {
+    if (!dbGameStatus) return true // still loading: don't hide anything yet
+    const status = dbGameStatus.get(String(title).trim().toLowerCase())
+    return status === undefined || status === 'published'
+  }
 
   // Pao's spoken language — chosen fresh each visit via the modal below,
   // prefilled with whatever was picked last time.
@@ -860,7 +882,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
             <div className="gf-games-grid">
               {GAMES.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&
-                (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter)
+                (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter) &&
+                isGamePublished(g.title)
               ).map((game, i) => {
                 const unlocked = character.level >= game.requiredLevel
                 const catMeta = GAME_CATEGORIES.find(c => c.id === game.category)

@@ -460,6 +460,19 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
         @keyframes pzSoundWave { 0%,100%{transform:scaleY(.35)} 50%{transform:scaleY(1)} }
         @keyframes pzCursor    { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes pzFadeIn    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .pz-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 22px; flex-shrink: 0; }
+        .pz-main { position: relative; z-index: 2; flex: 1; min-height: 0; overflow-y: auto; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 56px; padding: 8px 24px 12px; }
+        .pz-board { padding: 26px; border-radius: 30px; background: repeating-linear-gradient(95deg,rgba(120,70,30,.08) 0 3px,transparent 3px 22px), linear-gradient(160deg,#e9b877,#d49a57 60%,#c28545); box-shadow: inset 0 3px 0 rgba(255,255,255,.45), inset 0 -6px 0 rgba(120,70,30,.35), 0 12px 0 #9a6431, 0 30px 40px rgba(60,40,10,.28); }
+        .pz-grid { display: grid; grid-template-columns: repeat(2, clamp(104px, 30vw, 170px)); grid-template-rows: repeat(2, clamp(104px, 30vw, 170px)); gap: clamp(12px, 3vw, 30px); }
+        .pz-side { width: 560px; max-width: 100%; display: flex; flex-direction: column; gap: 18px; }
+        .pz-tray { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+        @media (max-width: 760px) {
+          .pz-main { flex-direction: column; flex-wrap: nowrap; gap: 14px; padding: 8px 12px; justify-content: flex-start; }
+          .pz-board { padding: 14px; border-radius: 22px; }
+          .pz-side { width: 100%; gap: 12px; }
+          .pz-tray { gap: 12px; padding: 14px 10px !important; }
+          .pz-top { padding: 10px 12px; }
+        }
         .pz-bob { animation: pzPieceBob 2.6s ease-in-out infinite; }
         .pz-shake { animation: pzShake .45s ease; }
         @media (prefers-reduced-motion: reduce) {
@@ -468,7 +481,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
       `}</style>
 
       {/* Top bar */}
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 22px', flexShrink: 0 }}>
+      <div className="pz-top" style={{ position: 'relative', zIndex: 2 }}>
         <button onClick={handleExit} style={{ background: 'rgba(255,255,255,.85)', border: '1.5px solid rgba(124,79,224,.25)', color: '#5b21b6', borderRadius: 12, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           ← All Games
         </button>
@@ -485,15 +498,11 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
       </div>
 
       {/* Main content */}
-      <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 90, padding: '0 24px 8px', flexWrap: 'wrap' }}>
+      <div className="pz-main">
 
         {/* Board */}
-        <div style={{
-          background: 'repeating-linear-gradient(95deg,rgba(120,70,30,.08) 0 3px,transparent 3px 22px), linear-gradient(160deg,#e9b877,#d49a57 60%,#c28545)',
-          padding: 26, borderRadius: 30,
-          boxShadow: 'inset 0 3px 0 rgba(255,255,255,.45), inset 0 -6px 0 rgba(120,70,30,.35), 0 12px 0 #9a6431, 0 30px 40px rgba(60,40,10,.28)',
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 170px)', gridTemplateRows: 'repeat(2, 170px)', gap: 30 }}>
+        <div className="pz-board">
+          <div className="pz-grid">
             <div/>
             <BoardCell cellRef={topRef} stepKey="top" item={round.board.top} filled={placed.includes('top')} justFilled={justFilled === 'top'} isCurrent={currentStepKey === 'top'} hintOn={hint}/>
             <BoardCell cellRef={nextToRef} stepKey="nextTo" item={round.board.nextTo} filled={placed.includes('nextTo')} justFilled={justFilled === 'nextTo'} isCurrent={currentStepKey === 'nextTo'} hintOn={hint}/>
@@ -502,7 +511,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
         </div>
 
         {/* Side column */}
-        <div style={{ width: 560, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="pz-side">
 
           {/* Find this piece */}
           <div style={{ background: 'rgba(255,255,255,.9)', border: '1.5px solid rgba(124,79,224,.18)', borderRadius: 20, padding: '18px 22px' }}>
@@ -515,7 +524,7 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
           </div>
 
           {/* Tray */}
-          <div style={{ background: 'rgba(255,255,255,.7)', border: '2px dashed rgba(124,79,224,.25)', borderRadius: 24, padding: '22px 18px', display: 'flex', gap: 26, flexWrap: 'wrap', justifyContent: 'center', minHeight: 150 }}>
+          <div className="pz-tray" style={{ background: 'rgba(255,255,255,.7)', border: '2px dashed rgba(124,79,224,.25)', borderRadius: 24, padding: '22px 18px', minHeight: 150 }}>
             {tray.map((item) => {
               const isGlowing = hint && item.id === currentTarget.id
               const isShaking = shakeId === item.id

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PandaMascot from "../../pages/games/PandaMascot";
+import GameFinishScreen from "../GameFinishScreen";
 import { SkyBackground, PressableButton, GhostButton, ModalShell, CloseButton, useSpeech } from "../picture-word-game/ui";
 import { buildConfig, fullName, startGame, showFinished, replay, tapPad, hintPad, initGame, SPEEDS } from "./copyColors";
 
@@ -277,13 +278,15 @@ export default function CopyColors({ game, onExit, onComplete }) {
       </div>
 
       {finished && (
-        <SuperMemoryModal
-          count={s.seq.length}
+        <GameFinishScreen
+          title="Super memory!"
+          subtitle={`You copied a pattern of ${s.seq.length} shapes.`}
+          badgeFallback={{ emoji: "🧠", name: "Memory Master" }}
           xp={game?.points_per_play ?? 100}
-          stats={game?.stat_gains || {}}
-          hasNext={levelIdx < cfg.levels.length - 1}
-          onNext={() => { setFinished(false); beginLevel(levelIdx + 1) }}
-          onReplay={() => { setFinished(false); beginLevel(levelIdx) }}
+          chips={Object.entries(game?.stat_gains || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k[0].toUpperCase()}${k.slice(1)} +${v}`)}
+          stars={s.stars}
+          replayLabel={levelIdx < cfg.levels.length - 1 ? "Next level" : "Play again"}
+          onReplay={() => { setFinished(false); levelIdx < cfg.levels.length - 1 ? beginLevel(levelIdx + 1) : beginLevel(levelIdx) }}
           onExit={leave}
         />
       )}
@@ -325,31 +328,6 @@ function StartModal({ game, cfg, onStart, onCancel }) {
         <div className="flex w-full flex-col gap-2 sm:flex-row">
           <PressableButton color="#F59E0B" shadow="#C97A00" className="h-14 flex-1 text-[18px]" onClick={onStart}>Start Game</PressableButton>
           <GhostButton className="h-14 flex-1 text-[16px]" onClick={onCancel}>Cancel</GhostButton>
-        </div>
-      </div>
-    </ModalShell>
-  );
-}
-
-function SuperMemoryModal({ count, xp, stats, hasNext, onNext, onReplay, onExit }) {
-  const gains = Object.entries(stats).filter(([, v]) => v > 0);
-  return (
-    <ModalShell onClose={onExit} label="Super memory">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <PandaMascot entered pandaState="happy" pxWidth={150} />
-        <h2 className="text-[32px] font-extrabold text-[#2B2366]" style={HEADING}>Super memory!</h2>
-        <p className="text-[16px] text-[#2B2A4C]">You copied a pattern of {count} shapes.</p>
-        <div className="flex flex-wrap justify-center gap-2 text-[14px] font-bold text-[#2B2A4C]">
-          <span className="rounded-full bg-white px-3 py-1 shadow">⭐ +{xp} XP</span>
-          {gains.map(([k, v]) => (
-            <span key={k} className="rounded-full bg-white px-3 py-1 shadow">{k[0].toUpperCase()}{k.slice(1)} +{v}</span>
-          ))}
-        </div>
-        <div className="flex w-full flex-col gap-2">
-          {hasNext
-            ? <PressableButton color="#16A34A" shadow="#15803D" className="h-14 text-[18px]" onClick={onNext}>Next level</PressableButton>
-            : <PressableButton color="#16A34A" shadow="#15803D" className="h-14 text-[18px]" onClick={onReplay}>Play again</PressableButton>}
-          <GhostButton className="h-12 text-[16px]" onClick={onExit}>All games</GhostButton>
         </div>
       </div>
     </ModalShell>

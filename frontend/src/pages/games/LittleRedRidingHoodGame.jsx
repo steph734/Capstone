@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import PandaMascot from './PandaMascot'
+import GameFinishScreen from '../../components/GameFinishScreen'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger, getPointerPressure } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
@@ -95,30 +96,14 @@ function FinishScreen({ onReplay, onExit, lang = 'en', onRecord }) {
   }, []) // eslint-disable-line
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'radial-gradient(ellipse at 50% 35%,#1a1430 0%,#0a0a0f 100%)', color: '#fff', fontFamily: "'Segoe UI',system-ui,sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, overflow: 'hidden' }}>
-      <style>{`
-        @keyframes lrFloat    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-        @keyframes lrBadgePop { 0%{transform:scale(0) rotate(-15deg)} 65%{transform:scale(1.18) rotate(4deg)} 100%{transform:scale(1) rotate(0)} }
-        @keyframes lrFadeUp   { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-      `}</style>
-      <div style={{ animation: 'lrFloat 2.5s ease-in-out infinite' }}>
-        <PandaMascot entered={true} mouthOpen={mouthOpen} pandaState="excited" pxWidth={150}/>
-      </div>
-      <div style={{ display: 'flex', gap: 6, fontSize: 34 }}><span>⭐</span><span>⭐</span><span>⭐</span></div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, textAlign: 'center' }}>Story complete!</h1>
-      {badgeShown && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, animation: 'lrFadeUp .5s both', background: 'rgba(167,139,250,.08)', border: '2px solid rgba(167,139,250,.3)', borderRadius: 24, padding: '16px 32px' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(196,181,253,.8)', letterSpacing: 1.5, textTransform: 'uppercase' }}>🎉 Badge Earned!</div>
-          {realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={90} /> : <StoryBadge animate={true}/>}
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#c4b5fd' }}>{realBadge ? realBadge.name : 'Story Explorer'}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>Unlocks new Customize items for Pao!</div>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-        <button onClick={onReplay} style={{ background: '#a78bfa', border: 'none', color: '#2e1065', borderRadius: 14, padding: '13px 28px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Play Again 📖</button>
-        <button onClick={onExit} style={{ background: '#374151', border: 'none', color: '#fff', borderRadius: 14, padding: '13px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>← All Games</button>
-      </div>
-    </div>
+    <GameFinishScreen
+      title="Story complete!"
+      badge={badgeShown ? realBadge : null}
+      badgeFallback={badgeShown ? { emoji: "📖", name: "Story Explorer" } : null}
+      replayLabel="Play again"
+      onReplay={onReplay}
+      onExit={onExit}
+    />
   )
 }
 

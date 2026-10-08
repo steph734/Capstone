@@ -12,6 +12,7 @@ export default function GameFinishScreen({
   xp = 100,
   chips = [],              // small pills under the card, e.g. stat gains
   visual = null,           // optional picture shown above Pao, e.g. the finished board
+  stars = 3,               // how many of the 3 stars are lit
   replayLabel = 'Play Again',
   onReplay,
   onExit,
@@ -28,7 +29,11 @@ export default function GameFinishScreen({
         </div>
 
         <div className="flex w-full max-w-[380px] flex-col items-center gap-2.5 rounded-[32px] bg-white p-7 text-center shadow-2xl">
-          <div className="flex gap-1.5 text-[34px]" aria-hidden="true"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+          <div className="flex gap-1.5 text-[34px]" aria-label={`${Math.min(3, stars)} of 3 stars`}>
+            {[0, 1, 2].map((i) => (
+              <span key={i} aria-hidden="true" style={{ opacity: i < stars ? 1 : 0.2, filter: i < stars ? 'none' : 'grayscale(1)' }}>⭐</span>
+            ))}
+          </div>
           <h1 className="mt-1 text-[36px] font-black leading-tight text-[#1e1b4b]">{title}</h1>
           {subtitle && <p className="text-[14px] font-semibold text-[#3a2e6b]/70">{subtitle}</p>}
 

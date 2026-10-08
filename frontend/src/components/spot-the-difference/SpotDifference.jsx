@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import PandaMascot from "../../pages/games/PandaMascot";
+import GameFinishScreen from "../GameFinishScreen";
 import { SkyBackground, PressableButton, GhostButton, ModalShell, CloseButton } from "../picture-word-game/ui";
 import { speakPao, stopPaoVoice } from "../../utils/paoVoice";
 import { buildLevels, initLevel, tapPicture, helpPress, nextUnfound } from "./spotDifference";
@@ -210,15 +211,18 @@ export default function SpotDifference({ game, onExit, onComplete }) {
       </div>
 
       {levelDone && (
-        <DoneModal
-          isLast={isLast}
-          sceneName={level.label}
-          total={total}
+        <GameFinishScreen
+          title={isLast ? "Eagle eyes!" : "Great looking!"}
+          subtitle={`You found all ${total} differences in ${level.label}.`}
+          badgeFallback={isLast ? { emoji: "🦅", name: game?.badge?.name || "Eagle Eyes" } : null}
           xp={game?.points_per_play ?? 150}
-          stats={game?.stat_gains || {}}
-          badgeName={game?.badge?.name || "Eagle Eyes"}
-          onNext={() => { setLevelDone(false); beginLevel(levelIdx + 1) }}
-          onReplay={() => { results.current = []; reportedRef.current = false; setAllDone(false); beginLevel(0) }}
+          chips={isLast ? Object.entries(game?.stat_gains || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k[0].toUpperCase()}${k.slice(1)} +${v}`) : []}
+          stars={s.stars}
+          replayLabel={isLast ? "Play again" : "Next level"}
+          onReplay={() => {
+            if (isLast) { results.current = []; reportedRef.current = false; setAllDone(false); beginLevel(0) }
+            else { setLevelDone(false); beginLevel(levelIdx + 1) }
+          }}
           onExit={leave}
         />
       )}
@@ -259,34 +263,6 @@ function StartModal({ game, levels, onStart, onCancel }) {
         <div className="flex w-full flex-col gap-2 sm:flex-row">
           <PressableButton color="#F59E0B" shadow="#C97A00" className="h-14 flex-1 text-[18px]" onClick={onStart}>Start Game</PressableButton>
           <GhostButton className="h-14 flex-1 text-[16px]" onClick={onCancel}>Cancel</GhostButton>
-        </div>
-      </div>
-    </ModalShell>
-  );
-}
-
-function DoneModal({ isLast, sceneName, total, xp, stats, badgeName, onNext, onReplay, onExit }) {
-  const gains = Object.entries(stats).filter(([, v]) => v > 0);
-  return (
-    <ModalShell onClose={onExit} label={isLast ? "Eagle eyes" : "Great looking"}>
-      <div className="flex flex-col items-center gap-4 text-center">
-        <PandaMascot entered pandaState="happy" pxWidth={130} />
-        <h2 className="text-[30px] font-extrabold text-[#2B2366]" style={HEADING}>{isLast ? "Eagle eyes!" : "Great looking!"}</h2>
-        <p className="text-[16px] text-[#2B2A4C]">You found all {total} differences in {sceneName}.</p>
-        {isLast && (
-          <div className="flex flex-wrap justify-center gap-2 text-[14px] font-bold text-[#2B2A4C]">
-            <span className="rounded-full bg-white px-3 py-1 shadow">⭐ +{xp} XP</span>
-            <span className="rounded-full bg-white px-3 py-1 shadow">🦅 Badge: {badgeName}</span>
-            {gains.map(([k, v]) => (
-              <span key={k} className="rounded-full bg-white px-3 py-1 shadow">{k[0].toUpperCase()}{k.slice(1)} +{v}</span>
-            ))}
-          </div>
-        )}
-        <div className="flex w-full flex-col gap-2">
-          {isLast
-            ? <PressableButton color="#16A34A" shadow="#15803D" className="h-14 text-[18px]" onClick={onReplay}>Play again</PressableButton>
-            : <PressableButton color="#16A34A" shadow="#15803D" className="h-14 text-[18px]" onClick={onNext}>Next level</PressableButton>}
-          <GhostButton className="h-12 text-[16px]" onClick={onExit}>All games</GhostButton>
         </div>
       </div>
     </ModalShell>

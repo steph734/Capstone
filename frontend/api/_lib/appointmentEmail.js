@@ -156,3 +156,65 @@ export async function sendAppointmentConfirmationEmail(payload = {}) {
 
   return { sent: true, referenceId }
 }
+
+// Emails the patient's registered address once a therapist accepts or
+// declines their appointment request (see appointments-respond.js).
+export async function sendAppointmentStatusEmail({ email, guardianName, patient, therapist, therapistRole, dateStr, timeStr, accepted }) {
+  const to = String(email || '').trim()
+  if (!to) throw new Error('Missing email')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error('Invalid email')
+
+  const greeting = guardianName ? `Hi ${esc(guardianName)},` : 'Hi,'
+  const heading = accepted ? 'Appointment accepted' : 'Appointment declined'
+  const lead = accepted
+    ? `Good news! ${therapist ? esc(therapist) : 'Your therapist'} has accepted the appointment request for ${esc(patient || 'your patient')}.`
+    : `${therapist ? esc(therapist) : 'Your therapist'} is unable to take the appointment request for ${esc(patient || 'your patient')}.`
+  const footer = accepted
+    ? "We'll send a reminder before the session. You can reschedule or cancel up to 24 hours before the appointment."
+    : 'Please book a new appointment at a different time, or with another therapist, from your dashboard.'
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
+        <h1 style="margin:0 0 4px;font-size:20px;">${heading}</h1>
+        <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">${greeting}</p>
+        <p style="margin:0 0 20px;font-size:14px;color:#2c4a3e;">${lead}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          ${rows([
+            ['Patient', patient],
+            ['Therapist', therapistRole ? `${therapist} (${therapistRole})` : therapist],
+            ['Date', dateStr],
+            ['Time', timeStr],
+          ])}
+        </table>
+        <p style="margin:20px 0 0;font-size:13px;color:#6b7c75;">${footer}</p>
+      </div>
+      <p style="text-align:center;color:#9fb0a9;font-size:11px;margin-top:16px;">${BRAND}</p>
+    </div>
+  </body>
+</html>`
+
+  const plain = [
+    greeting.replace(/&#39;/g, "'"),
+    '',
+    lead.replace(/&#39;/g, "'"),
+    '',
+    patient && `Patient: ${patient}`,
+    therapist && `Therapist: ${therapistRole ? `${therapist} (${therapistRole})` : therapist}`,
+    dateStr && `Date: ${dateStr}`,
+    timeStr && `Time: ${timeStr}`,
+    '',
+    footer,
+  ].filter(Boolean).join('\n')
+
+  const { referenceId } = await sendEmail({
+    to,
+    toName: guardianName || undefined,
+    subject: `${BRAND}: ${heading}${dateStr ? ` — ${dateStr}` : ''}`,
+    html,
+    plain,
+  })
+  return { sent: true, referenceId }
+}

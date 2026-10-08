@@ -327,6 +327,36 @@ function RestoreConfirmModal({ appt, patient, appointments, onConfirm, onRebook,
   )
 }
 
+/* ── Accept/Decline Confirm Modal ──────────────────────────── */
+function RespondConfirmModal({ req, action, busy, onConfirm, onClose }) {
+  const accept = action === 'accept'
+  return (
+    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && !busy && onClose()}>
+      <div className="tapp-confirm-modal">
+        <div className="tapp-confirm-icon">{accept ? '✅' : '🚫'}</div>
+        <h3 className="tapp-confirm-title">{accept ? 'Accept this request?' : 'Decline this request?'}</h3>
+        <p className="tapp-confirm-msg">
+          {accept ? (
+            <>This will confirm <strong>{req.name}</strong>'s appointment on{' '}
+              <strong>{fmtDate(req.date)}</strong> at <strong>{fmt12(req.start)}</strong>, and
+              email the guardian that it was accepted.</>
+          ) : (
+            <>This will decline <strong>{req.name}</strong>'s appointment on{' '}
+              <strong>{fmtDate(req.date)}</strong> at <strong>{fmt12(req.start)}</strong>, free the
+              time slot, and email the guardian that it was declined.</>
+          )}
+        </p>
+        <div className="tapp-confirm-actions">
+          <button className="tapp-confirm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="tapp-confirm-ok" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Please wait…' : accept ? 'Yes, Accept' : 'Yes, Decline'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Time slot options (8 AM – 5 PM, every 1h 30min) ──────── */
 const TIME_SLOTS = (() => {
   const slots = []
@@ -553,6 +583,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
   const [toast,        setToast]        = useState('')
+  const [respondTarget, setRespondTarget] = useState(null) // { req, action: 'accept' | 'decline' }
+  const [respondBusy,   setRespondBusy]   = useState(false)
 
   // Every appointment patients have actually booked with this therapist,
   // straight from the `appointments` collection (see
@@ -662,11 +694,39 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
   }
 
-  // Accept/Decline give feedback only for now — they don't yet write the
-  // status change back to MongoDB, so a reload still shows the request as
-  // Pending until that's wired up.
-  const handleAcceptRequest = (req) => showToast(`Accepted ${req.name}'s request`)
-  const handleDeclineRequest = (req) => showToast(`Declined ${req.name}'s request`)
+  // Accept/Decline open a confirmation modal first; the actual PATCH only
+  // fires once the therapist confirms there (see confirmRespond below).
+  const handleAcceptRequest = (req) => setRespondTarget({ req, action: 'accept' })
+  const handleDeclineRequest = (req) => setRespondTarget({ req, action: 'decline' })
+
+  const confirmRespond = async () => {
+    if (!respondTarget) return
+    const { req, action } = respondTarget
+    setRespondBusy(true)
+    try {
+      const res = await fetch(`/api/appointments/${req.id}/respond`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Could not update the appointment.')
+
+      const nextStatus = action === 'accept' ? 'Confirmed' : 'Cancelled'
+      setAppointments(p => p.map(a => (a.id === req.id ? { ...a, status: nextStatus, cancelledReason: action === 'decline' ? 'Declined by therapist' : a.cancelledReason } : a)))
+      showToast(
+        action === 'accept'
+          ? `Accepted ${req.name}'s request${body.emailSent ? ' — guardian notified by email.' : '.'}`
+          : `Declined ${req.name}'s request${body.emailSent ? ' — guardian notified by email.' : '.'}`
+      )
+      logAppt(action === 'accept' ? '✅' : '🚫', `${action === 'accept' ? 'Accepted' : 'Declined'} appointment request for ${req.name}`, { id: req.id })
+      setRespondTarget(null)
+    } catch (err) {
+      showToast(err.message || 'Something went wrong.')
+    } finally {
+      setRespondBusy(false)
+    }
+  }
   const handleStartSession = (name) => showToast(`Starting session with ${name}…`)
 
   return (
@@ -860,6 +920,15 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onConfirm={id => { handleUnarchive(id); setConfirmRestoreAppt(null) }}
           onRebook={a => { setEditAppt(a); setConfirmRestoreAppt(null) }}
           onClose={() => setConfirmRestoreAppt(null)}
+        />
+      )}
+      {respondTarget && (
+        <RespondConfirmModal
+          req={respondTarget.req}
+          action={respondTarget.action}
+          busy={respondBusy}
+          onConfirm={confirmRespond}
+          onClose={() => !respondBusy && setRespondTarget(null)}
         />
       )}
       {toast    && <div className="tapp-toast">{toast}</div>}

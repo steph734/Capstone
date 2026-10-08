@@ -9,7 +9,7 @@ import { getWardrobe } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 import PaoLayered from '../../components/pao/PaoLayered'
-import { loadLayerManifest, layerUrl, slugifyItemName, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
+import { loadLayerManifest, layerUrl, resolveItemKey, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
 
 const EQUIP_LINES = ["Ooh, I love it!", "So stylish!", "Looking good!", "Yay, perfect!", "This is my favorite!"]
 function useReducedMotionCM() {
@@ -43,22 +43,38 @@ function softPop() {
 // layer art (there's no full-body render set yet), cropped to the relevant
 // body part. Locked items stay in full colour at reduced opacity with a
 // lock chip, rather than a grey silhouette.
-const CROP_POSITION = { hats: '50% 8%', clothes: '50% 55%', pants: '50% 82%', shoes: '50% 96%' }
+//
+// Every layer shares one 300x380 canvas (viewBox "0 -40 300 380"). Rather
+// than fight object-fit/object-position math, each category's crop is a
+// measured center point (as a fraction of that canvas) plus a zoom, used to
+// pan+scale a full-size <img>. Centers were read off the actual SVGs:
+// hats sit around y=20%-30% of the canvas, clothes bodies around y=75%-85%,
+// pants around y=85%-95%, shoes (a left+right pair) around y=90%-95% and
+// need a wider zoom to keep both shoes in frame.
 const LAYER_PICK = { hats: 'hat', clothes: 'body', pants: 'body', shoes: 'fore' }
+const CROP_CENTER = { hats: { x: 0.5, y: 0.28 }, clothes: { x: 0.5, y: 0.79 }, pants: { x: 0.5, y: 0.895 }, shoes: { x: 0.5, y: 0.92 } }
+const CROP_ZOOM = { hats: 2.4, clothes: 2.1, pants: 2.6, shoes: 1.6 }
+const CANVAS_ASPECT = 380 / 300
+
 function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64 }) {
   const layer = manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey && l.layer === (LAYER_PICK[category] || l.layer))
     || manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey)
   if (!layer) return null
+
+  const zoom = CROP_ZOOM[category] || 2.2
+  const center = CROP_CENTER[category] || { x: 0.5, y: 0.5 }
+  const imgW = width * zoom
+  const imgH = imgW * CANVAS_ASPECT
+  const left = -(center.x * imgW - width / 2)
+  const top = -(center.y * imgH - width / 2)
+
   return (
     <div style={{ width, height: width, borderRadius: 10, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
       <img
         src={layerUrl(layer.file)}
         alt=""
         draggable={false}
-        style={{
-          width: '100%', height: '100%', objectFit: 'cover', objectPosition: CROP_POSITION[category] || '50% 50%',
-          transform: 'scale(2.2)', opacity: unlocked ? 1 : 0.55,
-        }}
+        style={{ position: 'absolute', width: imgW, height: imgH, left, top, opacity: unlocked ? 1 : 0.55 }}
         onError={(e) => { e.currentTarget.parentElement.style.display = 'none' }}
       />
       {!unlocked && (
@@ -463,6 +479,17 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const getEquippedName = (catId) =>
     categories.find(c => c.id === catId)?.items.find(i => i.id === equipped[catId])?.name ?? 'None'
 
+  const isNatural = (catId) => !equipped[catId] || equipped[catId] === 'none'
+
+  const unequip = (catId) => {
+    const noneItem = categories.find(c => c.id === catId)?.items.find(i => i.id === 'none')
+    if (noneItem) equip(catId, noneItem)
+  }
+
+  const unequipAll = () => {
+    categories.forEach((cat) => { if (!isNatural(cat.id)) unequip(cat.id) })
+  }
+
   const equip = (catId, item) => {
     if (!isUnlocked(item)) return
     setEquipped(e => ({ ...e, [catId]: item.id }))
@@ -487,7 +514,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     const out = {}
     for (const catId of LAYER_CATEGORIES) {
       const item = categories.find((c) => c.id === catId)?.items.find((i) => i.id === equipped[catId])
-      if (item && item.id !== 'none') out[catId] = slugifyItemName(item.name)
+      if (item && item.id !== 'none') out[catId] = resolveItemKey(item.name)
     }
     return out
   }, [equipped, categories])
@@ -539,6 +566,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-equipped { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; }
         .pc-eq { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:6px 8px; font-size:11px; }
         .pc-eq b { display:block; color:#1e40af; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+        .pc-unequip { flex-shrink:0; width:18px; height:18px; border-radius:999px; border:none; background:#fee2e2; color:#b91c1c; font-size:11px; font-weight:900; cursor:pointer; line-height:1; }
+        .pc-unequip-all { width:100%; border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:10px; padding:8px; font-size:12.5px; font-weight:800; cursor:pointer; }
         .pc-bubble { width:100%; background:#f8fafc; border:2px solid #cbd5e1; border-radius:14px; padding:8px 10px; font-size:12.5px; font-weight:700; color:#1e293b; min-height:40px; }
         .pc-play { width:100%; margin-top:auto; border:none; border-radius:14px; padding:13px; background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 5px 0 #0f7a3a; }
         @media (max-width: 900px) {
@@ -601,8 +630,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 const tag = isEquipped ? '✓ Equipped'
                   : !unlocked ? (badge ? `🔒 ${item.badge}` : unlockLabel ? `🔒 ${unlockLabel}` : '🔒 Locked')
                   : 'Tap to wear'
-                const itemKey = item.id !== 'none' ? slugifyItemName(item.name) : null
-                const isLayerCategory = LAYER_CATEGORIES.includes(activeTab)
+                const itemKey = item.id !== 'none' ? resolveItemKey(item.name) : null
+                const hasLayerArt = itemKey && layerManifest?.layers?.some((l) => l.category === activeTab && l.item_key === itemKey)
                 return (
                   <button key={item.id} type="button"
                     className={`pc-tile ${isEquipped ? 'on' : ''} ${!unlocked ? 'lock' : ''}`}
@@ -610,7 +639,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                     aria-pressed={isEquipped}
                     aria-label={`${item.name}${unlocked ? '' : ', locked'}`}>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:56 }}>
-                      {isLayerCategory && itemKey && layerManifest
+                      {hasLayerArt
                         ? <LayerCardIcon manifest={layerManifest} category={activeTab} itemKey={itemKey} unlocked={unlocked} width={64} />
                         : <div style={{ opacity: unlocked ? 1 : 0.55 }}><WardrobeThumb item={item} categoryId={activeTab} width={64}/></div>}
                     </div>
@@ -630,9 +659,20 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
             </div>
             <div className="pc-equipped">
               {categories.map(cat => (
-                <div key={cat.id} className="pc-eq"><b>{cat.label}</b>{getEquippedName(cat.id)}</div>
+                <div key={cat.id} className="pc-eq">
+                  <b>{cat.label}</b>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
+                    <span style={{ overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{getEquippedName(cat.id)}</span>
+                    {!isNatural(cat.id) && (
+                      <button type="button" className="pc-unequip" onClick={() => unequip(cat.id)} aria-label={`Take off ${cat.label}`} title="Take off">✕</button>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
+            {categories.some(c => !isNatural(c.id)) && (
+              <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take everything off</button>
+            )}
             <div className="pc-bubble" aria-live="polite">
               {talking && <span style={{ color:'#7c3aed', marginRight:6 }}>🎵</span>}
               {displayText || 'Pao is excited!'}

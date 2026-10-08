@@ -15,6 +15,17 @@ export function slugifyItemName(name) {
   return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+// The one name that doesn't slugify to its manifest item_key as-is.
+const ITEM_KEY_OVERRIDES = { 'patchwork-puzzle-vest': 'patchwork-vest' }
+
+// Same as slugifyItemName, but corrected for names that don't match their
+// manifest item_key 1:1 — use this (not slugifyItemName directly) to look
+// up layer art.
+export function resolveItemKey(name) {
+  const slug = slugifyItemName(name)
+  return ITEM_KEY_OVERRIDES[slug] || slug
+}
+
 let manifestPromise = null
 export function loadLayerManifest() {
   if (!manifestPromise) {

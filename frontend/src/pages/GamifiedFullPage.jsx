@@ -9,7 +9,7 @@ import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import PaoBuddy from '../components/pao/PaoBuddy'
 import { getWardrobe } from '../utils/paoApi'
-import { slugifyItemName } from '../components/pao/paoLayers'
+import { resolveItemKey } from '../components/pao/paoLayers'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
@@ -411,7 +411,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       if (cancelled) return
       const map = new Map()
       Object.values(body.items || {}).flat().forEach((item) => {
-        if (item?.code && item?.name) map.set(item.code, slugifyItemName(item.name))
+        if (item?.code && item?.name) map.set(item.code, resolveItemKey(item.name))
       })
       setCodeToLayerKey(map)
     }).catch(() => { /* header falls back to the plain pose art */ })

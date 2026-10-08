@@ -7,6 +7,7 @@ import SortTheBasketGame from './games/SortTheBasketGame'
 import StoryBuilder from '../components/story-builder/StoryBuilder'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
+import PaoBuddy from '../components/pao/PaoBuddy'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
@@ -767,7 +768,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PandaMascot pxWidth={150} mouthOpen={talking} onClick={handlePandaClick}/>
+              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

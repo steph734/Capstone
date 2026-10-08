@@ -1,6 +1,10 @@
 import { useMemo, useState, useEffect } from 'react'
 import { markPaoSeen } from '../utils/paoApi'
 import BadgeMedal from './BadgeMedal'
+import PaoBuddy from './pao/PaoBuddy'
+
+// Which pose Pao strikes for each reward screen (see the Pao poses prompt).
+const POSE_FOR_SCREEN = { xp: 'clap', level: 'dance', stats: 'great', badge: 'wow', item: 'clap' }
 
 // One screen at a time after a finished game: XP, then level up, stats,
 // each new badge, and each new item. Read aloud at a calm pace; nothing times
@@ -77,6 +81,9 @@ export default function RewardSequence({ reward, ident, onEquip, onDone }) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Pao's rewards" className="fixed inset-0 z-[10010] flex items-center justify-center bg-[rgba(30,60,100,0.45)] p-4">
       <div className="w-full max-w-[460px] rounded-[28px] bg-[#FFFDF8] p-7 text-center shadow-xl" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif", color: '#2B2A4C' }}>
+        <div className="mx-auto mb-1 flex justify-center">
+          <PaoBuddy mood={POSE_FOR_SCREEN[screen.kind] || 'hooray'} size={110} interactive={false} readAloud={false} />
+        </div>
         <p className="text-[13px] font-bold tracking-wide text-[#5A5670]">{index + 1} of {screens.length}</p>
 
         {screen.kind === 'xp' && (

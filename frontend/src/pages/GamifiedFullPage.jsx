@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import PictureWordGame from '../components/picture-word-game/PictureWordGame'
 import SlowMotionEchoGame from './games/SlowMotionEchoGame'
 import PuzzlePiecesGame from './games/PuzzlePiecesGame'
@@ -8,6 +8,8 @@ import StoryBuilder from '../components/story-builder/StoryBuilder'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import PaoBuddy from '../components/pao/PaoBuddy'
+import { getWardrobe } from '../utils/paoApi'
+import { slugifyItemName } from '../components/pao/paoLayers'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
@@ -397,6 +399,34 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
 function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null }) {
   const navigate = useNavigate()
   const pao = usePao()
+
+  // Maps each equipped item's code (from pao.profile.equipped) to the
+  // layer-art item_key (slugified from its name), so the header Pao can
+  // wear the same outfit as the Customize Pao modal via <PaoLayered/>.
+  const [codeToLayerKey, setCodeToLayerKey] = useState(() => new Map())
+  useEffect(() => {
+    if (!pao.ident?.activitySessionId && !pao.ident?.patientEmail) return
+    let cancelled = false
+    getWardrobe(pao.ident).then((body) => {
+      if (cancelled) return
+      const map = new Map()
+      Object.values(body.items || {}).flat().forEach((item) => {
+        if (item?.code && item?.name) map.set(item.code, slugifyItemName(item.name))
+      })
+      setCodeToLayerKey(map)
+    }).catch(() => { /* header falls back to the plain pose art */ })
+    return () => { cancelled = true }
+  }, [pao.ident?.activitySessionId, pao.ident?.patientEmail])
+
+  const headerOutfit = useMemo(() => {
+    const equipped = pao.profile?.equipped || {}
+    const out = {}
+    for (const cat of ['hats', 'clothes', 'pants', 'shoes']) {
+      const code = equipped[cat]
+      if (code && codeToLayerKey.has(code)) out[cat] = codeToLayerKey.get(code)
+    }
+    return out
+  }, [pao.profile?.equipped, codeToLayerKey])
   const activity = useActivitySession()
   const [justStarted, setJustStarted] = useState(null)
 
@@ -808,7 +838,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} onTap={handlePandaClick}/>
+              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} outfit={headerOutfit} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

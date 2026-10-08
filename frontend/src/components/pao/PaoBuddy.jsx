@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import PandaMascot from '../../pages/games/PandaMascot'
+import PaoLayered from './PaoLayered'
 import {
   POSE_DESCRIPTION, REACTION_CYCLE, REACTION_CYCLE_CALM, CALM_SAFE_POSES,
   FALLBACK_PANDA_STATE, FALLBACK_TALKING_POSES, poseImagePaths, hasPoseArt,
@@ -155,6 +156,12 @@ export default function PaoBuddy({
   const paths = useMemo(() => poseImagePaths(safePose), [safePose])
   const description = POSE_DESCRIPTION[safePose] || safePose
 
+  // The layered wardrobe (hat/clothes/pants/shoes) only exists drawn for the
+  // standing idle pose, so it only replaces the pose art there — any other
+  // mood (hooray, dance, ...) still shows that pose's own single-image art.
+  const OUTFIT_SAFE_POSES = useMemo(() => new Set(['idle', 'blink', 'hello', 'talk', 'listen', 'point']), [])
+  const showOutfitLayers = !!outfit && Object.values(outfit).some(Boolean) && OUTFIT_SAFE_POSES.has(safePose)
+
   const minTarget = Math.max(size, 96)
   const transform = [
     !calm && reaction ? 'translateY(-12px)' : '',
@@ -192,7 +199,9 @@ export default function PaoBuddy({
         }}
       >
         <style>{`@keyframes paoBreathe{0%,100%{scale:1}50%{scale:1.03}} .pao-pose-img{transition:opacity .2s ease}`}</style>
-        {art ? (
+        {showOutfitLayers ? (
+          <PaoLayered equipped={outfit} size={size} />
+        ) : art ? (
           <img
             src={paths.svg}
             onError={(e) => { if (e.currentTarget.src !== paths.png) e.currentTarget.src = paths.png }}

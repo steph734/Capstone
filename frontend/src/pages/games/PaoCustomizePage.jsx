@@ -8,6 +8,65 @@ import { usePao } from '../../context/PaoContext'
 import { getWardrobe } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
+import PaoLayered from '../../components/pao/PaoLayered'
+import { loadLayerManifest, layerUrl, slugifyItemName, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
+
+const EQUIP_LINES = ["Ooh, I love it!", "So stylish!", "Looking good!", "Yay, perfect!", "This is my favorite!"]
+function useReducedMotionCM() {
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduced
+}
+function softPop() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    const ctx = new Ctx()
+    const osc = ctx.createOscillator(); const gain = ctx.createGain()
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(560, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(820, ctx.currentTime + 0.08)
+    gain.gain.setValueAtTime(0.05, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15)
+    osc.start(); osc.stop(ctx.currentTime + 0.16)
+    osc.onended = () => ctx.close()
+  } catch { /* sound is a nice-to-have */ }
+}
+
+// Card icon for a single hat/clothes/pants/shoes item: the item's own
+// layer art (there's no full-body render set yet), cropped to the relevant
+// body part. Locked items stay in full colour at reduced opacity with a
+// lock chip, rather than a grey silhouette.
+const CROP_POSITION = { hats: '50% 8%', clothes: '50% 55%', pants: '50% 82%', shoes: '50% 96%' }
+const LAYER_PICK = { hats: 'hat', clothes: 'body', pants: 'body', shoes: 'fore' }
+function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64 }) {
+  const layer = manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey && l.layer === (LAYER_PICK[category] || l.layer))
+    || manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey)
+  if (!layer) return null
+  return (
+    <div style={{ width, height: width, borderRadius: 10, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
+      <img
+        src={layerUrl(layer.file)}
+        alt=""
+        draggable={false}
+        style={{
+          width: '100%', height: '100%', objectFit: 'cover', objectPosition: CROP_POSITION[category] || '50% 50%',
+          transform: 'scale(2.2)', opacity: unlocked ? 1 : 0.55,
+        }}
+        onError={(e) => { e.currentTarget.parentElement.style.display = 'none' }}
+      />
+      {!unlocked && (
+        <span style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: '#1e293b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }} aria-hidden="true">🔒</span>
+      )}
+    </div>
+  )
+}
 
 // ─── Badge definitions ────────────────────────────────────────────────────────
 
@@ -297,6 +356,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   })
   const [wardrobeItems, setWardrobeItems] = useState([])
   const [wardrobeLoading, setWardrobeLoading] = useState(true)
+  const [hop, setHop] = useState(false)
+  const [layerManifest, setLayerManifest] = useState(null)
+  const reducedMotion = useReducedMotionCM()
+  useEffect(() => { loadLayerManifest().then(setLayerManifest) }, [])
   const [games, setGames] = useState([])
   const [unlockedItemCodes, setUnlockedItemCodes] = useState(() => new Set())
   const mouthRef = useRef(null)
@@ -404,10 +467,30 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     if (!isUnlocked(item)) return
     setEquipped(e => ({ ...e, [catId]: item.id }))
     pao.equip(catId, item.id === 'none' ? null : item.code).catch(() => { /* server keeps the last good outfit */ })
-    tts(item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : pickLine(CUSTOMIZE_LINES.loveTheItem, lang, item.name), {})
+    const line = item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : EQUIP_LINES[Math.floor(Math.random() * EQUIP_LINES.length)]
+    tts(line, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) })
+    if (!reducedMotion) { setHop(true); setTimeout(() => setHop(false), 220) }
+    softPop()
+  }
+
+  const tapLocked = (item) => {
+    const line = item.badge ? `Win ${item.badge} to get this!` : 'Keep playing to unlock this one!'
+    tts(line, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) })
   }
 
   const activeCategory = categories.find(c => c.id === activeTab)
+
+  // Which layer-art item_key is equipped in each of the four layered
+  // categories, for <PaoLayered/>. Hair has no overlay art yet (see
+  // paoLayers.js), so it isn't part of this and still shows as text only.
+  const equippedLayerKeys = useMemo(() => {
+    const out = {}
+    for (const catId of LAYER_CATEGORIES) {
+      const item = categories.find((c) => c.id === catId)?.items.find((i) => i.id === equipped[catId])
+      if (item && item.id !== 'none') out[catId] = slugifyItemName(item.name)
+    }
+    return out
+  }, [equipped, categories])
 
   // PandaMascot's `accessories` prop wants a built-in code string (for
   // OUTFIT_MAP lookups) or { design } for admin-designed pieces — `equipped`
@@ -431,7 +514,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     <div className="pc-root">
       <style>{`
         .pc-root { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:18px; background:radial-gradient(circle,rgba(255,255,255,.06) 1.5px,transparent 2px) 0 0/26px 26px,linear-gradient(180deg,#1b2b5c,#14204a); font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; overflow:hidden; }
-        .pc-panel { width:min(1100px,100%); height:min(640px,100%); display:flex; flex-direction:column; background:#f4f8ff; border-radius:22px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.45); border:3px solid #7fb6ff; }
+        .pc-panel { width:min(1100px,100%); height:min(640px, calc(100vh - 160px)); display:flex; flex-direction:column; background:#f4f8ff; border-radius:22px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.45); border:3px solid #7fb6ff; }
+        .pc-skel { height:132px; border-radius:14px; background:linear-gradient(90deg,#e2e8f0 25%,#eef2f7 37%,#e2e8f0 63%); background-size:400% 100%; animation:pcSkel 1.4s ease infinite; }
+        @keyframes pcSkel { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+        @media (prefers-reduced-motion: reduce) { .pc-skel { animation:none; } }
         .pc-title { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:linear-gradient(180deg,#5eaeff,#2f7fe8); color:#fff; flex-shrink:0; }
         .pc-title h1 { margin:0; font-size:20px; font-weight:900; letter-spacing:.3px; text-shadow:0 2px 0 rgba(0,0,0,.2); }
         .pc-close { width:36px; height:36px; border-radius:10px; border:2px solid #fff; background:#ef4444; color:#fff; font-size:18px; font-weight:900; cursor:pointer; flex-shrink:0; }
@@ -499,7 +585,11 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
 
           <div className="pc-grid-wrap">
             <div className="pc-note">Each item shows the badge needed to unlock it</div>
-            {wardrobeLoading && <div style={{ padding:'14px 12px', fontSize:12, color:'#475569', fontWeight:700 }}>Loading Pao's wardrobe…</div>}
+            {wardrobeLoading ? (
+              <div className="pc-grid">
+                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="pc-skel" />)}
+              </div>
+            ) : (
             <div className="pc-grid">
               {activeCategory?.items.map((item) => {
                 const unlocked = isUnlocked(item)
@@ -511,14 +601,18 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 const tag = isEquipped ? '✓ Equipped'
                   : !unlocked ? (badge ? `🔒 ${item.badge}` : unlockLabel ? `🔒 ${unlockLabel}` : '🔒 Locked')
                   : 'Tap to wear'
+                const itemKey = item.id !== 'none' ? slugifyItemName(item.name) : null
+                const isLayerCategory = LAYER_CATEGORIES.includes(activeTab)
                 return (
                   <button key={item.id} type="button"
                     className={`pc-tile ${isEquipped ? 'on' : ''} ${!unlocked ? 'lock' : ''}`}
-                    onClick={() => { if (unlocked) equip(activeTab, item) }}
+                    onClick={() => (unlocked ? equip(activeTab, item) : tapLocked(item))}
                     aria-pressed={isEquipped}
                     aria-label={`${item.name}${unlocked ? '' : ', locked'}`}>
-                    <div style={{ filter: unlocked ? 'none' : 'grayscale(1) opacity(.6)', display:'flex', alignItems:'center', justifyContent:'center', minHeight:56 }}>
-                      <WardrobeThumb item={item} categoryId={activeTab} width={64}/>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:56 }}>
+                      {isLayerCategory && itemKey && layerManifest
+                        ? <LayerCardIcon manifest={layerManifest} category={activeTab} itemKey={itemKey} unlocked={unlocked} width={64} />
+                        : <div style={{ opacity: unlocked ? 1 : 0.55 }}><WardrobeThumb item={item} categoryId={activeTab} width={64}/></div>}
                     </div>
                     <div className="pc-tile-name">{item.name}</div>
                     <div className="pc-tile-sub">{item.desc}</div>
@@ -527,11 +621,12 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 )
               })}
             </div>
+            )}
           </div>
 
           <div className="pc-preview">
-            <div style={{ animation:'cpFloat 3s ease-in-out infinite' }}>
-              <PandaMascot entered={true} mouthOpen={mouthOpen} pxWidth={180} accessories={previewAccessories} viewPad={{ top:60, bottom:6 }}/>
+            <div style={{ animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
+              <PaoLayered equipped={equippedLayerKeys} size={180} />
             </div>
             <div className="pc-equipped">
               {categories.map(cat => (

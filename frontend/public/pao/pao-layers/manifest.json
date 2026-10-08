@@ -1,0 +1,210 @@
+{
+ "viewBox": "0 -40 300 380",
+ "stack": [
+  "0 back",
+  "1 base-bottom",
+  "2 pants",
+  "3 clothes body",
+  "4 base-top",
+  "5 clothes fore + shoes",
+  "6 hat"
+ ],
+ "layers": [
+  {
+   "category": "clothes",
+   "item_key": "rainbow-tee",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-rainbow-tee-body.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "rainbow-tee",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/clothes-rainbow-tee-fore.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "astronaut-suit",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-astronaut-suit-body.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "astronaut-suit",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/clothes-astronaut-suit-fore.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "superhero-cape",
+   "layer": "back",
+   "z": 0,
+   "file": "items/clothes-superhero-cape-back.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "superhero-cape",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-superhero-cape-body.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "superhero-cape",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/clothes-superhero-cape-fore.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "cozy-hoodie",
+   "layer": "back",
+   "z": 0,
+   "file": "items/clothes-cozy-hoodie-back.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "cozy-hoodie",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-cozy-hoodie-body.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "cozy-hoodie",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/clothes-cozy-hoodie-fore.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "star-overalls",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-star-overalls-body.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "echo-scarf",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/clothes-echo-scarf-fore.svg"
+  },
+  {
+   "category": "clothes",
+   "item_key": "patchwork-vest",
+   "layer": "body",
+   "z": 3,
+   "file": "items/clothes-patchwork-vest-body.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "orange-bowtie",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-orange-bowtie-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "party-hat",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-party-hat-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "flower-crown",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-flower-crown-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "wizard-hat",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-wizard-hat-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "backwards-cap",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-backwards-cap-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "bunny-ears",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-bunny-ears-hat.svg"
+  },
+  {
+   "category": "hats",
+   "item_key": "thinking-cap",
+   "layer": "hat",
+   "z": 6,
+   "file": "items/hats-thinking-cap-hat.svg"
+  },
+  {
+   "category": "pants",
+   "item_key": "polka-dot-leggings",
+   "layer": "body",
+   "z": 2,
+   "file": "items/pants-polka-dot-leggings-body.svg"
+  },
+  {
+   "category": "pants",
+   "item_key": "cargo-shorts",
+   "layer": "body",
+   "z": 2,
+   "file": "items/pants-cargo-shorts-body.svg"
+  },
+  {
+   "category": "pants",
+   "item_key": "pajama-pants",
+   "layer": "body",
+   "z": 2,
+   "file": "items/pants-pajama-pants-body.svg"
+  },
+  {
+   "category": "pants",
+   "item_key": "denim-overalls",
+   "layer": "body",
+   "z": 2,
+   "file": "items/pants-denim-overalls-body.svg"
+  },
+  {
+   "category": "shoes",
+   "item_key": "rocket-sneakers",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/shoes-rocket-sneakers-fore.svg"
+  },
+  {
+   "category": "shoes",
+   "item_key": "rain-boots",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/shoes-rain-boots-fore.svg"
+  },
+  {
+   "category": "shoes",
+   "item_key": "ballet-flats",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/shoes-ballet-flats-fore.svg"
+  },
+  {
+   "category": "shoes",
+   "item_key": "high-top-stars",
+   "layer": "fore",
+   "z": 5,
+   "file": "items/shoes-high-top-stars-fore.svg"
+  }
+ ]
+}

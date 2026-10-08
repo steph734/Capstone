@@ -48,7 +48,7 @@ function useReducedMotion() {
 // <PandaMascot/> for any pose that has no pao-<pose>.svg/png yet, so this
 // works today and upgrades automatically once real pose art is added.
 export default function PaoBuddy({
-  mood = 'idle', size = 220, say = '', interactive = true, outfit = null,
+  mood = 'idle', size = 220, say = '', interactive = true, outfit = null, layeredPose = 'idle',
   calmVisuals = false, lang = 'en', readAloud = true, onTap, className = '',
 }) {
   const reducedMotion = useReducedMotion()
@@ -200,7 +200,7 @@ export default function PaoBuddy({
       >
         <style>{`@keyframes paoBreathe{0%,100%{scale:1}50%{scale:1.03}} .pao-pose-img{transition:opacity .2s ease}`}</style>
         {showOutfitLayers ? (
-          <PaoLayered equipped={outfit} size={size} />
+          <PaoLayered equipped={outfit} size={size} pose={layeredPose} showFx={!calm} />
         ) : art ? (
           <img
             src={paths.svg}

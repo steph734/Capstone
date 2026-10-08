@@ -10,6 +10,7 @@ import PandaMascot from './games/PandaMascot'
 import PaoBuddy from '../components/pao/PaoBuddy'
 import { getWardrobe } from '../utils/paoApi'
 import { resolveItemKey } from '../components/pao/paoLayers'
+import { takeHandoffPose } from '../components/pao/usePaoReaction'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
@@ -427,10 +428,22 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     }
     return out
   }, [pao.profile?.equipped, codeToLayerKey])
+
   const activity = useActivitySession()
   const [justStarted, setJustStarted] = useState(null)
 
   const [phase,        setPhase]        = useState('intro')
+  // After closing Customize Pao, the header shows Pao's last reaction pose
+  // for a moment (see usePaoReaction's handoff), then settles back to idle.
+  const [headerPose,   setHeaderPose]   = useState('idle')
+  useEffect(() => {
+    if (phase !== 'games') return
+    const handoff = takeHandoffPose()
+    if (!handoff) return
+    setHeaderPose(handoff)
+    const t = setTimeout(() => setHeaderPose('idle'), 1500)
+    return () => clearTimeout(t)
+  }, [phase])
   const [introStage,   setIntroStage]   = useState(0)
   const [showUI,       setShowUI]       = useState(false)
   const [talking,      setTalking]      = useState(false)
@@ -838,7 +851,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} outfit={headerOutfit} onTap={handlePandaClick}/>
+              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} outfit={headerOutfit} layeredPose={headerPose} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

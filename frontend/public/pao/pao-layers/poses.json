@@ -1,0 +1,79 @@
+{
+ "note": "pose-<name>.svg REPLACES base-top.svg at z=4; fx-<name>.svg (if exists) goes on top at z=7. Head and body never move, so every outfit layer stays aligned.",
+ "poses": [
+  "idle",
+  "happy",
+  "wow",
+  "wave",
+  "hips",
+  "flex",
+  "love",
+  "wink",
+  "giggle",
+  "shy",
+  "proud",
+  "cheer",
+  "dance",
+  "sleepy"
+ ],
+ "fx": [
+  "happy",
+  "wow",
+  "wave",
+  "hips",
+  "flex",
+  "love",
+  "wink",
+  "giggle",
+  "shy",
+  "proud",
+  "cheer",
+  "dance",
+  "sleepy"
+ ],
+ "item_reaction": {
+  "hats": {
+   "orange-bowtie": "wink",
+   "party-hat": "cheer",
+   "flower-crown": "love",
+   "wizard-hat": "wow",
+   "backwards-cap": "hips",
+   "bunny-ears": "giggle",
+   "thinking-cap": "proud"
+  },
+  "clothes": {
+   "rainbow-tee": "wave",
+   "astronaut-suit": "wow",
+   "superhero-cape": "flex",
+   "cozy-hoodie": "shy",
+   "star-overalls": "hips",
+   "echo-scarf": "happy",
+   "patchwork-vest": "proud"
+  },
+  "pants": {
+   "polka-dot-leggings": "dance",
+   "cargo-shorts": "hips",
+   "pajama-pants": "sleepy",
+   "denim-overalls": "flex"
+  },
+  "shoes": {
+   "rocket-sneakers": "cheer",
+   "rain-boots": "giggle",
+   "ballet-flats": "dance",
+   "high-top-stars": "wink"
+  }
+ },
+ "random_pool_for_any_equip": [
+  "happy",
+  "wow",
+  "wave",
+  "hips",
+  "flex",
+  "love",
+  "wink",
+  "giggle",
+  "shy",
+  "proud",
+  "cheer"
+ ]
+}

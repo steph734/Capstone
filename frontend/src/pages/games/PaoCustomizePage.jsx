@@ -10,6 +10,7 @@ import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 import PaoLayered from '../../components/pao/PaoLayered'
 import { loadLayerManifest, layerUrl, resolveItemKey, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
+import { usePaoReaction } from '../../components/pao/usePaoReaction'
 
 const EQUIP_LINES = ["Ooh, I love it!", "So stylish!", "Looking good!", "Yay, perfect!", "This is my favorite!"]
 function useReducedMotionCM() {
@@ -376,6 +377,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const [layerManifest, setLayerManifest] = useState(null)
   const reducedMotion = useReducedMotionCM()
   useEffect(() => { loadLayerManifest().then(setLayerManifest) }, [])
+  const reaction = usePaoReaction({
+    calm: reducedMotion,
+    onSpeak: (text) => { if (text) tts(text, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) }) },
+  })
   const [games, setGames] = useState([])
   const [unlockedItemCodes, setUnlockedItemCodes] = useState(() => new Set())
   const mouthRef = useRef(null)
@@ -494,15 +499,20 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     if (!isUnlocked(item)) return
     setEquipped(e => ({ ...e, [catId]: item.id }))
     pao.equip(catId, item.id === 'none' ? null : item.code).catch(() => { /* server keeps the last good outfit */ })
-    const line = item.id === 'none' ? pickLine(CUSTOMIZE_LINES.backToNatural, lang) : EQUIP_LINES[Math.floor(Math.random() * EQUIP_LINES.length)]
-    tts(line, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) })
     if (!reducedMotion) { setHop(true); setTimeout(() => setHop(false), 220) }
     softPop()
+    if (item.id === 'none') {
+      reaction.reactToUnequip()
+    } else if (LAYER_CATEGORIES.includes(catId)) {
+      reaction.reactToEquip(catId, resolveItemKey(item.name))
+    } else {
+      // Hair has no reaction mapping yet — same random-pool behaviour.
+      reaction.reactToEquip('hair', resolveItemKey(item.name))
+    }
   }
 
   const tapLocked = (item) => {
-    const line = item.badge ? `Win ${item.badge} to get this!` : 'Keep playing to unlock this one!'
-    tts(line, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) })
+    reaction.reactToLocked(item.badge)
   }
 
   const activeCategory = categories.find(c => c.id === activeTab)
@@ -597,7 +607,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           <h1>✨ Customize Pao</h1>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <button className="pc-badges" onClick={() => setShowBadgeCase(true)}>🏆 Badge Case{earnedBadges.size > 0 ? ` (${earnedBadges.size})` : ''}</button>
-            <button className="pc-close" aria-label="Close" onClick={() => { stopPaoVoice(); onDone() }}>✕</button>
+            <button className="pc-close" aria-label="Close" onClick={() => { reaction.handoffNow(); stopPaoVoice(); onDone() }}>✕</button>
           </div>
         </div>
 
@@ -655,7 +665,14 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
 
           <div className="pc-preview">
             <div style={{ animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
-              <PaoLayered equipped={equippedLayerKeys} size={180} />
+              <PaoLayered
+                equipped={equippedLayerKeys}
+                pose={reaction.pose}
+                showFx={reaction.fx}
+                size={180}
+                interactive
+                onClick={reaction.tapCycle}
+              />
             </div>
             <div className="pc-equipped">
               {categories.map(cat => (
@@ -675,9 +692,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
             )}
             <div className="pc-bubble" aria-live="polite">
               {talking && <span style={{ color:'#7c3aed', marginRight:6 }}>🎵</span>}
-              {displayText || 'Pao is excited!'}
+              {displayText || reaction.bubble || 'Pao is excited!'}
             </div>
-            <button className="pc-play" onClick={() => { stopPaoVoice(); onDone() }}>Let's Play! 🎮</button>
+            <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); onDone() }}>Let's Play! 🎮</button>
           </div>
         </div>
       </div>

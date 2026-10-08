@@ -718,7 +718,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
           {/* Pao mascot */}
           <div className="pao-mascot-intro" style={{ flexShrink:0 }}>
-            <PandaMascot pxWidth={250} mouthOpen={talking} onClick={handlePandaClick}/>
+            <PaoBuddy
+              mood={talking ? 'talk' : (introStage === INTRO_STAGES.length - 1 ? 'hooray' : 'hello')}
+              size={250}
+              lang={lang}
+              onTap={handlePandaClick}
+            />
           </div>
 
           {/* Speech bubble */}

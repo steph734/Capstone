@@ -3,8 +3,10 @@ import PandaMascot from '../../pages/games/PandaMascot'
 import {
   POSE_DESCRIPTION, REACTION_CYCLE, REACTION_CYCLE_CALM, CALM_SAFE_POSES,
   FALLBACK_PANDA_STATE, FALLBACK_TALKING_POSES, poseImagePaths, hasPoseArt,
-  preloadPaoPoses, PRELOAD_FIRST, POSES,
+  preloadPaoPoses, PRELOAD_FIRST, POSES, EXPLAIN_POSES, EXPLAIN_ART_POSES,
 } from './paoPoses'
+
+const EXPLAIN_SET = new Set(EXPLAIN_POSES)
 
 const SPEECH_LANG = { en: 'en-US', tl: 'fil-PH', ceb: 'fil-PH' }
 
@@ -63,7 +65,7 @@ export default function PaoBuddy({
   // Preload: the first-paint set right away, the rest after first paint.
   useEffect(() => {
     preloadPaoPoses(PRELOAD_FIRST)
-    const t = setTimeout(() => preloadPaoPoses(POSES), 800)
+    const t = setTimeout(() => preloadPaoPoses([...POSES, ...EXPLAIN_ART_POSES]), 800)
     return () => clearTimeout(t)
   }, [])
 
@@ -129,8 +131,26 @@ export default function PaoBuddy({
     setTimeout(() => { setReaction(null); reactingRef.current = false }, 1400)
   }
 
-  const displayPose = speaking ? 'talk' : reaction || (blinking ? 'blink' : mood)
-  const safePose = calm && !CALM_SAFE_POSES.has(displayPose) ? (CALM_SAFE_POSES.has(mood) ? mood : 'idle') : displayPose
+  // "Explaining" poses (the Meet Pao intro) have an open-mouth and a -b
+  // closed-mouth frame; alternate every ~220ms while that bare pose is the
+  // active mood, so Pao looks like he's talking. Calm visuals / reduced
+  // motion skip the flicker and just show the smiling -b frame.
+  const explainBase = reaction || (speaking ? '' : mood)
+  const [explainOpen, setExplainOpen] = useState(true)
+  useEffect(() => {
+    if (!EXPLAIN_SET.has(explainBase)) return
+    if (calm) { setExplainOpen(false); return }
+    setExplainOpen(true)
+    const id = setInterval(() => setExplainOpen((v) => !v), 220)
+    return () => clearInterval(id)
+  }, [explainBase, calm])
+
+  const basePose = speaking ? 'talk' : reaction || (blinking ? 'blink' : mood)
+  const displayPose = EXPLAIN_SET.has(basePose) ? (explainOpen ? basePose : `${basePose}-b`) : basePose
+  const isExplainArt = (p) => EXPLAIN_SET.has(p) || EXPLAIN_SET.has(p?.replace(/-b$/, ''))
+  const safePose = calm && !CALM_SAFE_POSES.has(displayPose) && !isExplainArt(displayPose)
+    ? (CALM_SAFE_POSES.has(mood) ? mood : 'idle')
+    : displayPose
   const art = hasPoseArt(safePose)
   const paths = useMemo(() => poseImagePaths(safePose), [safePose])
   const description = POSE_DESCRIPTION[safePose] || safePose

@@ -63,6 +63,20 @@ export const FALLBACK_PANDA_STATE = {
 }
 export const FALLBACK_TALKING_POSES = new Set(['talk', 'eat', 'hello', 'hooray'])
 
+// The 8 "explaining" poses used by the Meet Pao intro only. Each has two
+// frames: the bare name is mouth-open (talking), `<name>-b` is mouth-closed
+// (smiling) — PaoBuddy alternates between them while that pose is active and
+// settles on the `-b` frame once speech ends or under calm visuals.
+export const EXPLAIN_POSES = [
+  'explain-open', 'explain-controller', 'explain-six', 'explain-levelup',
+  'explain-stats', 'explain-badge', 'explain-outfit', 'explain-letsgo',
+]
+export const EXPLAIN_ART_POSES = EXPLAIN_POSES.flatMap((p) => [p, `${p}-b`])
+EXPLAIN_POSES.forEach((p) => {
+  POSE_DESCRIPTION[p] = `explaining, ${p.replace('explain-', '')}`
+  POSE_DESCRIPTION[`${p}-b`] = `smiling, ${p.replace('explain-', '')}`
+})
+
 const svgPath = (pose) => `/pao/svg/pao-${pose}.svg`
 const pngPath = (pose) => `/pao/png/pao-${pose}.png`
 export function poseImagePaths(pose) {
@@ -70,7 +84,8 @@ export function poseImagePaths(pose) {
 }
 
 // Poses worth blocking on before first paint; the rest load lazily.
-export const PRELOAD_FIRST = ['idle', 'blink', 'hello', 'hooray', 'talk']
+// explain-open/-b are first too, since they're the very first thing Meet Pao shows.
+export const PRELOAD_FIRST = ['idle', 'blink', 'hello', 'hooray', 'talk', 'explain-open', 'explain-open-b']
 
 const checked = new Map() // pose -> true (has art) | false (confirmed missing)
 

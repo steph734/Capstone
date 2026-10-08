@@ -36,6 +36,24 @@ const INTRO_STAGES = [
   { key: 'badges',    icon: '🏆', label: 'Badges & Customize',  lineKey: 'introBadges' },
 ]
 
+// Which "explaining" pose each intro stage opens on, which it switches to
+// partway through (switchAt = how far into the line, 0-1), and what it
+// settles on once that stage's line finishes speaking.
+const INTRO_POSE_PLAN = [
+  { first: 'explain-open',       second: 'hello',           secondIsExplain: false, switchAt: 0.3  },
+  { first: 'explain-controller', second: 'explain-six',     secondIsExplain: true,  switchAt: 0.12 },
+  { first: 'explain-levelup',    second: 'explain-stats',   secondIsExplain: true,  switchAt: 0.30 },
+  { first: 'explain-badge',      second: 'explain-outfit',  secondIsExplain: true,  switchAt: 0.45 },
+]
+
+function introMoodFor(stageIdx, talking, explainPhase) {
+  const plan = INTRO_POSE_PLAN[stageIdx] || INTRO_POSE_PLAN[0]
+  if (talking) return explainPhase === 0 ? plan.first : plan.second
+  const isLast = stageIdx === INTRO_STAGES.length - 1
+  if (isLast) return 'explain-letsgo-b'
+  return plan.secondIsExplain ? `${plan.second}-b` : plan.second
+}
+
 // ─── Game list ────────────────────────────────────────────────────────────────
 
 const GAMES = [
@@ -387,6 +405,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   const [showUI,       setShowUI]       = useState(false)
   const [talking,      setTalking]      = useState(false)
   const [displayText,  setDisplayText]  = useState('')
+  const [explainPhase, setExplainPhase] = useState(0) // 0 = first explaining pose, 1 = second
   const [gamesIn,      setGamesIn]      = useState(false)
   const [showCatModal, setShowCatModal] = useState(false)
   const [selCategory,  setSelCategory]  = useState('fruits')
@@ -462,9 +481,25 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   // ── Intro stage speech — plays speech only, does NOT auto-advance ────────────
+  // Also drives which "explaining" pose shows: starts on INTRO_POSE_PLAN[idx]
+  // .first, switches to .second once that fraction of the line has been
+  // spoken (word-boundary driven, language-agnostic).
   const speakStage = (idx) => {
     setDisplayText('')
-    speakScript(pickLine(FULL_PAGE_LINES[INTRO_STAGES[idx].lineKey], lang), 1.62)
+    setExplainPhase(0)
+    const script = pickLine(FULL_PAGE_LINES[INTRO_STAGES[idx].lineKey], lang)
+    const switchAt = (INTRO_POSE_PLAN[idx] || INTRO_POSE_PLAN[0]).switchAt
+    setDisplayText('')
+    speakPao(script, {
+      pitch: 1.62,
+      rate: 1.12,
+      onStart: () => setTalking(true),
+      onEnd: () => { setTalking(false) },
+      onWord: (partial) => {
+        setDisplayText(partial)
+        if (script.length && partial.length / script.length >= switchAt) setExplainPhase(1)
+      },
+    })
   }
 
   // ── Language picker → persist choice, then start the intro ───────────────────
@@ -719,7 +754,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao mascot */}
           <div className="pao-mascot-intro" style={{ flexShrink:0 }}>
             <PaoBuddy
-              mood={talking ? 'talk' : (introStage === INTRO_STAGES.length - 1 ? 'hooray' : 'hello')}
+              mood={introMoodFor(introStage, talking, explainPhase)}
               size={250}
               lang={lang}
               onTap={handlePandaClick}

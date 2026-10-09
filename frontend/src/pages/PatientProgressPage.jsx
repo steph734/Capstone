@@ -27,6 +27,11 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [range, setRange] = useState('week')
   const [data, setData] = useState(null)
+  // The sidebar shows the logged-in account's own name (user.name). The
+  // title must match it, rather than trusting the backend's resolved
+  // `patients` record in isolation — the two can disagree if that email is
+  // linked to more than one patient document.
+  const displayName = user?.name || data?.name || 'Your'
   const [error, setError] = useState('')
   const readAloud = user?.read_aloud !== false
 
@@ -53,13 +58,18 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
     <div className="page-with-sidebar" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif", background: '#FFF8EC' }}>
       <PatientSidebar user={user} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} profilePath="/patient/profile" />
 
-      <main className="page-content" style={{ padding: '24px 28px 60px', maxWidth: 1160, margin: '0 auto' }}>
+      {/* .page-content carries the fixed sidebar's offset (margin-left) —
+          centering must happen on an inner wrapper, never on this element
+          itself, or an inline/competing margin silently cancels the offset
+          and the content slides back under the sidebar. */}
+      <main className="page-content" style={{ padding: '24px 28px 60px' }}>
         <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
 
+        <div className="mx-auto w-full max-w-[1160px] min-w-0">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-[30px] font-extrabold text-[#2B2366]">
-              {data ? `${data.name}'s Progress Journey` : "Progress Journey"} <span aria-hidden="true">☀️</span>
+              {displayName}'s Progress Journey <span aria-hidden="true">☀️</span>
             </h1>
             <p className="mt-1 text-[15px] text-[#5A5670]">A warm look at how things are going — celebrate every step together!</p>
           </div>
@@ -231,6 +241,7 @@ export default function PatientProgressPage({ user, onLogout, betaTier }) {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   )

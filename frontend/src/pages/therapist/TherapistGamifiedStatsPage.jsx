@@ -326,8 +326,9 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
                           <td className="py-3 text-[13.5px] font-bold" style={{ color: GREEN_900 }}>🏆 {p.badges}</td>
                           <td className="py-3 text-[13px]" style={{ color: '#5D7770' }}>{fmtDate(p.lastPlayedAt)}</td>
                           <td className="py-3 text-right">
-                            <button type="button" onClick={() => navigate(`/therapist/gamified-activities/patients/${p.id}`)}
-                              className="whitespace-nowrap rounded-xl px-4 py-2.5 text-[12.5px] font-extrabold text-white" style={{ background: GREEN_700 }}>
+                            <button type="button" onClick={() => navigate(`/therapist/gamified-activities/patients/${p.id}?${params.toString()}`)}
+                              aria-label={`View stats for ${p.name}`}
+                              className="whitespace-nowrap rounded-xl px-4 py-2.5 text-[12.5px] font-extrabold text-white" style={{ background: GREEN_700, minHeight: 44 }}>
                               View Stats →
                             </button>
                           </td>

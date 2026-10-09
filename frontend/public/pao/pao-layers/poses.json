@@ -14,22 +14,64 @@
   "proud",
   "cheer",
   "dance",
-  "sleepy"
+  "sleepy",
+  "look-left",
+  "look-right",
+  "look-up",
+  "look-down",
+  "point-up",
+  "point-down",
+  "point-side",
+  "spot",
+  "cup-ear",
+  "say-ah",
+  "say-ee",
+  "say-oo",
+  "say-mm",
+  "slow",
+  "rhyme",
+  "build",
+  "paint",
+  "read",
+  "idea",
+  "thumbsup",
+  "encourage",
+  "star-eyes",
+  "heart-eyes"
  ],
  "fx": [
-  "happy",
-  "wow",
-  "wave",
-  "hips",
-  "flex",
-  "love",
-  "wink",
-  "giggle",
-  "shy",
-  "proud",
+  "build",
   "cheer",
+  "cup-ear",
   "dance",
-  "sleepy"
+  "encourage",
+  "flex",
+  "giggle",
+  "happy",
+  "heart-eyes",
+  "hips",
+  "idea",
+  "love",
+  "paint",
+  "point-down",
+  "point-side",
+  "point-up",
+  "proud",
+  "read",
+  "rhyme",
+  "say-ah",
+  "say-ee",
+  "say-mm",
+  "say-oo",
+  "shy",
+  "sleepy",
+  "slow",
+  "spot",
+  "star-eyes",
+  "thumbsup",
+  "wave",
+  "wink",
+  "wow"
  ],
  "item_reaction": {
   "hats": {
@@ -75,5 +117,79 @@
   "shy",
   "proud",
   "cheer"
- ]
+ ],
+ "game_reactions": {
+  "puzzle-pals": {
+   "instruction_on_top": "point-up",
+   "instruction_under": "point-down",
+   "instruction_next_to": "point-side",
+   "waiting": "look-down",
+   "piece_picked": "build",
+   "correct": "cheer",
+   "correct_streak": "star-eyes",
+   "wrong": "encourage",
+   "finished": "heart-eyes"
+  },
+  "picture-word-matching": {
+   "question": "look-left",
+   "choices": "look-right",
+   "hear_it": "say-ah",
+   "correct": "thumbsup",
+   "wrong": "encourage",
+   "finished": "star-eyes"
+  },
+  "slow-motion-echo": {
+   "model_slowly": "slow",
+   "vowel_ah": "say-ah",
+   "vowel_ee": "say-ee",
+   "vowel_oo": "say-oo",
+   "lips_mm": "say-mm",
+   "patient_speaking": "cup-ear",
+   "attempt": "thumbsup",
+   "finished": "heart-eyes"
+  },
+  "sound-hunt": {
+   "listen_to_sound": "cup-ear",
+   "searching": "spot",
+   "found": "cheer",
+   "finished": "star-eyes"
+  },
+  "rhyme-time": {
+   "say_rhyme": "rhyme",
+   "mouth_shape_ee": "say-ee",
+   "correct": "cheer",
+   "finished": "heart-eyes"
+  },
+  "sentence-builder": {
+   "reading": "read",
+   "placing_word": "build",
+   "idea_hint": "idea",
+   "correct": "thumbsup",
+   "finished": "star-eyes"
+  },
+  "story-builder": {
+   "reading_story": "read",
+   "choosing": "idea",
+   "finished": "heart-eyes"
+  },
+  "copy-the-colors": {
+   "watch_pattern": "look-up",
+   "copying": "paint",
+   "correct": "star-eyes",
+   "wrong": "encourage",
+   "finished": "heart-eyes"
+  },
+  "spot-the-difference": {
+   "left_picture": "look-left",
+   "right_picture": "look-right",
+   "searching": "spot",
+   "found": "cheer",
+   "finished": "star-eyes"
+  },
+  "emergency-ready": {
+   "calm_steps": "calm (existing)",
+   "brave_done": "proud (existing)",
+   "finished": "thumbsup"
+  }
+ }
 }

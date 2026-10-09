@@ -8,6 +8,7 @@ import {
 } from './emergencyReady'
 import { EmergencyStartModal, EmergencyPicker, EmergencyPickerFooter, EmergencyIntro, EmergencyEndModal } from './EmergencyReadyModals'
 import { OrderPart, SafeOrNotPart, ChoosePart, SortPart, EMERGENCY_BODY } from './EmergencyReadyParts'
+import { usePaoGameReactions } from '../pao/usePaoGameReactions'
 
 const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" }
 const SPEECH_LANG = { en: 'en-US', tl: 'fil-PH', ceb: 'fil-PH' }
@@ -48,6 +49,10 @@ export default function EmergencyReady({ game, lang = 'en', onExit, onComplete }
   const [partState, setPartState] = useState(null)
   const totals = useRef({ stars: 0, attempts: 0, hints: 0, safeMistakes: 0 })
   const reportedRef = useRef(false)
+  // Emergency Ready only ever uses the calm pose set (idle, calm, proud,
+  // thumbsup) — see poses.json's game_reactions.emergency-ready, which maps
+  // only to those, never cheer/star-eyes/rhyme/anything fast-moving.
+  const paoGame = usePaoGameReactions('emergency-ready', { calm: true, readAloud: false })
 
   const emergency = emergencies.find((e) => e.key === activeKey) || null
   const level = emergency?.levels[partIdx] || null
@@ -62,6 +67,7 @@ export default function EmergencyReady({ game, lang = 'en', onExit, onComplete }
     setPartIdx(0)
     setPartState(init[e.levels[0].mode](e.levels[0]))
     setPhase('intro')
+    paoGame.react('calm_steps', { hold: 0 })
     speak(`${e.name}. ${e.rule}.`, lang, readAloud)
   }
 
@@ -92,9 +98,11 @@ export default function EmergencyReady({ game, lang = 'en', onExit, onComplete }
           detail: { emergency_key: emergency.key, parts_completed: 4, safe_or_not_mistakes: t.safeMistakes },
         })
       }
+      paoGame.react('finished', { hold: 0 })
       setPhase('end')
       speak(`You're ${emergency.name} Ready!`, lang, readAloud)
     } else {
+      paoGame.react('brave_done')
       openPart(nextIdx)
     }
   }
@@ -171,7 +179,7 @@ export default function EmergencyReady({ game, lang = 'en', onExit, onComplete }
         {level.mode === 'choose' && <ChoosePart level={level} state={partState} dispatch={dispatch} isLast={isLastChoice} onNext={() => { const n = chooseReducer(partState, { type: 'next' }, level); setPartState(n); if (n.done) advance() }} />}
         {level.mode === 'sort' && <SortPart level={level} zones={zones} state={partState} dispatch={dispatch} />}
       </div>
-      <PaoGuide tone={tone} bubbleStyle={EMERGENCY_BODY}>{line || 'Take your time.'}</PaoGuide>
+      <PaoGuide tone={tone} bubbleStyle={EMERGENCY_BODY} pose={paoGame.pose !== 'idle' ? paoGame.pose : null} showFx={paoGame.showFx}>{line || 'Take your time.'}</PaoGuide>
     </Shell>
   )
 }

@@ -57,6 +57,7 @@ import TherapistSpeechToTextPage from './pages/therapist/TherapistSpeechToTextPa
 import TherapistTextToSpeechPage from './pages/therapist/TherapistTextToSpeechPage'
 import TherapistSpeechFeaturesPage from './pages/therapist/TherapistSpeechFeaturesPage'
 import TherapistGamifiedActivitiesPage from './pages/therapist/TherapistGamifiedActivitiesPage'
+import TherapistPatientStatsPage from './pages/therapist/TherapistPatientStatsPage'
 import TherapistActivityLibraryPage from './pages/therapist/TherapistActivityLibraryPage'
 import PatientSpeechToTextPage from './pages/PatientSpeechToTextPage'
 import PatientTextToSpeechPage from './pages/PatientTextToSpeechPage'
@@ -844,6 +845,21 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
                 <TherapistGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/gamified-activities/patients/:patientId"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistPatientStatsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

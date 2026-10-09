@@ -1,369 +1,237 @@
-import { useState, useEffect } from 'react'
-import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
-import { Pie } from 'react-chartjs-2'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
-import { useSharedProgress } from '../context/ProgressContext'
-import './PatientProgressPage.css'
+import './PageWithSidebar.css'
+import BadgeMedal from '../components/BadgeMedal'
+import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 
-ChartJS.register(ArcElement, Tooltip)
+// Patient-facing "My Progress" page. Real data only (GET /api/patient/progress
+// — see api/_lib/routes/patient-progress.js), never the browser. Keeps to
+// the patient-facing rules throughout: no accuracy percentages, no response
+// times, no hints chart, no red, no timers, no negative comparisons.
+const TYPE_COLOR = { Cognitive: '#6366f1', Speech: '#ec4899', Occupational: '#f59e0b', Physical: '#10b981' }
+const DAYS_SUN_FIRST = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-/* ── Line icons (replace decorative emoji) ── */
-const svgBase = {
-  viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-  strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
-}
-const IconBrain = (p) => (
-  <svg {...svgBase} {...p}><path d="M12 5a3 3 0 1 0-5.997.142 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.142 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>
-)
-const IconActivity = (p) => (
-  <svg {...svgBase} {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-)
-const IconHand = (p) => (
-  <svg {...svgBase} {...p}><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
-)
-const IconSpeech = (p) => (
-  <svg {...svgBase} {...p}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-)
-const IconSun = (p) => (
-  <svg {...svgBase} {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-)
-const IconStar = (p) => (
-  <svg {...svgBase} {...p} fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"/></svg>
-)
-const IconTrophy = (p) => (
-  <svg {...svgBase} {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-)
-const IconFlame = (p) => (
-  <svg {...svgBase} {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5Z"/></svg>
-)
-const IconTrendUp = (p) => (
-  <svg {...svgBase} {...p}><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
-)
-const IconSparkles = (p) => (
-  <svg {...svgBase} {...p}><path d="M9.94 14.06 8 20l-1.94-5.94L1 12l5.06-2.06L8 4l1.94 5.94L15 12Z"/><path d="M18 5v4M20 7h-4"/></svg>
-)
-
-const DOMAIN_META = {
-  Cognitive:     { color: '#6366f1', icon: <IconBrain width={13} height={13} />,    friendly: 'focus and thinking games' },
-  Physical:      { color: '#10b981', icon: <IconActivity width={13} height={13} />, friendly: 'balance and movement games' },
-  Occupational:  { color: '#f59e0b', icon: <IconHand width={13} height={13} />,     friendly: 'everyday skills practice' },
-  Speech:        { color: '#ec4899', icon: <IconSpeech width={13} height={13} />,   friendly: 'talking and word games' },
+function Skeleton({ className = '' }) {
+  return <div className={`animate-pulse rounded-2xl bg-[#EDE9E0] ${className}`} />
 }
 
-function Confetti() {
-  const pieces = Array.from({ length: 36 }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    delay: Math.random() * 0.6,
-    dur: 2.2 + Math.random() * 1.4,
-    color: ['#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#a29bfe', '#ff9ff3'][i % 6],
-    rotate: Math.random() * 360,
-  }))
-  return (
-    <div className="pp-confetti-layer" aria-hidden="true">
-      {pieces.map((p) => (
-        <span
-          key={p.id}
-          className="pp-confetti-piece"
-          style={{
-            left: `${p.left}%`,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.dur}s`,
-            background: p.color,
-            transform: `rotate(${p.rotate}deg)`,
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
-function MilestoneModal({ badge, onClose }) {
-  return (
-    <div className="pp-modal-backdrop" onClick={onClose}>
-      <Confetti />
-      <div className="pp-milestone-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="pp-milestone-icon">{badge.icon}</div>
-        <p className="pp-milestone-eyebrow">New Badge Unlocked!</p>
-        <h2 className="pp-milestone-name">{badge.label}</h2>
-        <p className="pp-milestone-sub">Way to go! Celebrate this win together.</p>
-        <button className="pp-milestone-btn" onClick={onClose}>Yay!</button>
-      </div>
-    </div>
-  )
-}
-
-function DomainEngagementPie({ domainEngagement }) {
-  const entries = Object.entries(domainEngagement).map(([key, value]) => {
-    const label = key.charAt(0).toUpperCase() + key.slice(1)
-    return { label, value, meta: DOMAIN_META[label] }
-  })
-  const total = entries.reduce((sum, e) => sum + e.value, 0)
-
-  const data = {
-    labels: entries.map((e) => e.label),
-    datasets: [{
-      data: entries.map((e) => e.value),
-      backgroundColor: entries.map((e) => e.meta.color),
-      borderColor: '#fff',
-      borderWidth: 2,
-    }],
-  }
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (ctx) => {
-            const pct = total ? Math.round((ctx.parsed / total) * 100) : 0
-            return ` ${ctx.label}: ${pct}%`
-          },
-        },
-      },
-    },
-  }
-
-  return (
-    <div className="pp-pie-wrap">
-      <div className="pp-pie-chart">
-        <Pie data={data} options={options} />
-      </div>
-      <ul className="pp-pie-legend">
-        {entries.map((e) => (
-          <li key={e.label} className="pp-pie-legend-item">
-            <span className="pp-pie-legend-dot" style={{ background: e.meta.color }} />
-            <span className="pp-pie-legend-label">{e.meta.icon} {e.label}</span>
-            <span className="pp-pie-legend-pct">{total ? Math.round((e.value / total) * 100) : 0}%</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function StreakTracker({ streak }) {
-  return (
-    <div className="pp-card pp-streak-card">
-      <div className="pp-streak-flame"><IconFlame width={26} height={26} /></div>
-      <div>
-        <div className="pp-streak-num">{streak.current}-day play streak!</div>
-        <div className="pp-streak-days">
-          {streak.last7Days.map((played, i) => (
-            <span key={i} className={`pp-streak-dot ${played ? 'pp-streak-dot-on' : ''}`} />
-          ))}
-        </div>
-        <p className="pp-streak-sub">
-          Best ever: {streak.longest} days in a row <IconTrophy width={13} height={13} />
-        </p>
-      </div>
-    </div>
-  )
+function PaoFace({ size = 56 }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) return <span style={{ fontSize: size * 0.7 }} aria-hidden="true">🐼</span>
+  return <img src="/pao/svg/pao-great.svg" alt="" draggable={false} style={{ width: size, height: size, objectFit: 'contain' }} onError={() => setBroken(true)} />
 }
 
 export default function PatientProgressPage({ user, onLogout, betaTier }) {
+  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [period, setPeriod] = useState('weekly')
-  const { progress, dismissNewBadge, markExerciseDone } = useSharedProgress()
-  const currentUser = user || { name: progress.patientName, role: 'Patient', avatar: '/therapy-pro-logo.png' }
-
-  const newBadge = progress.badges.find((b) => b.isNew)
-  const [showMilestone, setShowMilestone] = useState(false)
+  const [range, setRange] = useState('week')
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  const readAloud = user?.read_aloud !== false
 
   useEffect(() => {
-    if (newBadge) {
-      const t = setTimeout(() => setShowMilestone(true), 500)
-      return () => clearTimeout(t)
-    }
-  }, [newBadge?.id]) // eslint-disable-line
+    let cancelled = false
+    setData(null)
+    setError('')
+    const params = new URLSearchParams({ range })
+    if (user?.email) params.set('patientEmail', user.email)
+    fetch(`/api/patient/progress?${params}`)
+      .then((r) => r.json().then((b) => ({ ok: r.ok, b })))
+      .then(({ ok, b }) => { if (!cancelled) (ok ? setData(b) : setError(b.error || 'Could not load progress.')) })
+      .catch(() => { if (!cancelled) setError('Could not load progress.') })
+    return () => { cancelled = true }
+  }, [range, user?.email])
 
-  const closeMilestone = () => {
-    setShowMilestone(false)
-    if (newBadge) dismissNewBadge(newBadge.id)
+  const speakPaoMessage = () => {
+    if (!data?.paoMessage) return
+    speakPao(data.paoMessage, { rate: 0.9 })
   }
-
-  const topDomain = Object.entries(progress.domainEngagement).sort((a, b) => b[1] - a[1])[0][0]
-  const topDomainLabel = topDomain.charAt(0).toUpperCase() + topDomain.slice(1)
-  const friendlySummary = `Getting better at ${DOMAIN_META[topDomainLabel]?.friendly || 'their exercises'}!`
-
-  const stats = period === 'weekly' ? progress.weekly : progress.monthly
-  const prevGames = period === 'weekly' ? progress.weekly.gamesCompletedPrev : progress.monthly.gamesCompletedPrev
-  const gamesDelta = stats.gamesCompleted - prevGames
-  const trendUp = gamesDelta > 0
-  const trendNote = gamesDelta === 0
-    ? `Same number of games as last ${period === 'weekly' ? 'week' : 'month'}.`
-    : gamesDelta > 0
-      ? `${gamesDelta} more game${gamesDelta === 1 ? '' : 's'} completed than last ${period === 'weekly' ? 'week' : 'month'}!`
-      : `${Math.abs(gamesDelta)} fewer games than last ${period === 'weekly' ? 'week' : 'month'} — that's okay, every day is different!`
-
-  const bestDelta = progress.personalBest.current - progress.personalBest.best
-  const personalBestNote = bestDelta > 0
-    ? `Best week yet! ${progress.personalBest.current} (previous best: ${progress.personalBest.best})`
-    : `Working toward their best: ${progress.personalBest.current} of ${progress.personalBest.best}`
+  useEffect(() => () => stopPaoVoice(), [])
 
   return (
-    <div className="page-with-sidebar pp-layout">
-      <PatientSidebar
-        user={currentUser}
-        onLogout={onLogout}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        betaTier={betaTier}
-        profilePath="/patient/profile"
-      />
+    <div className="page-with-sidebar" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif", background: '#FFF8EC' }}>
+      <PatientSidebar user={user} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} betaTier={betaTier} profilePath="/patient/profile" />
 
-      <main className="page-content pp-content">
+      <main className="page-content" style={{ padding: '24px 28px 60px', maxWidth: 1160, margin: '0 auto' }}>
         <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
 
-        <div className="pp-header">
-          <h1 className="pp-title">
-            {progress.patientName}'s Progress Journey
-            <IconSun width={22} height={22} className="pp-title-icon" />
-          </h1>
-          <p className="pp-subtitle">A warm look at how things are going — celebrate every step together!</p>
-        </div>
-
-        {/* ── Snapshot ── */}
-        <div className="pp-card pp-snapshot-card">
-          <div className="pp-snapshot-top">
-            <div className="pp-level-badge"><IconStar width={13} height={13} /> Level {progress.level}</div>
-            <div className="pp-xp-wrap">
-              <span className="pp-xp-label">XP {progress.xp} / {progress.xpNeeded}</span>
-              <div className="pp-xp-bar"><div className="pp-xp-fill" style={{ width: `${(progress.xp / progress.xpNeeded) * 100}%` }} /></div>
-            </div>
-            <div className="pp-badges-count"><IconTrophy width={16} height={16} /> {progress.badges.length} Badges</div>
-          </div>
-          <p className="pp-snapshot-summary">{friendlySummary}</p>
-        </div>
-
-        {/* ── Weekly / Monthly summary ── */}
-        <div className="pp-card">
-          <div className="pp-section-header">
-            <h2 className="pp-section-title">Progress Recap</h2>
-            <div className="pp-period-toggle">
-              <button className={period === 'weekly' ? 'pp-period-btn active' : 'pp-period-btn'} onClick={() => setPeriod('weekly')}>This Week</button>
-              <button className={period === 'monthly' ? 'pp-period-btn active' : 'pp-period-btn'} onClick={() => setPeriod('monthly')}>This Month</button>
-            </div>
-          </div>
-          <div className="pp-recap-grid">
-            <div className="pp-recap-item">
-              <span className="pp-recap-num">{stats.sessionsCompleted}</span>
-              <span className="pp-recap-lbl">Sessions Completed</span>
-            </div>
-            <div className="pp-recap-item">
-              <span className="pp-recap-num">{stats.minutesPlayed}</span>
-              <span className="pp-recap-lbl">Minutes Played</span>
-            </div>
-            <div className="pp-recap-item">
-              <span className="pp-recap-num">{stats.gamesCompleted}</span>
-              <span className="pp-recap-lbl">Games Completed</span>
-            </div>
-          </div>
-          <div className="pp-domain-chips">
-            {stats.domainsPracticed.map((d) => (
-              <span key={d} className="pp-domain-chip" style={{ background: `${DOMAIN_META[d]?.color}18`, color: DOMAIN_META[d]?.color }}>
-                {DOMAIN_META[d]?.icon} {d}
-              </span>
-            ))}
-          </div>
-          <p className="pp-trend-note">
-            {trendUp && <IconSparkles width={15} height={15} />}
-            {trendNote}
-          </p>
-        </div>
-
-        {/* ── Streak ── */}
-        <StreakTracker streak={progress.streak} />
-
-        {/* ── Domain engagement pie ── */}
-        <div className="pp-card">
-          <h2 className="pp-section-title">How They're Engaging</h2>
-          <DomainEngagementPie domainEngagement={progress.domainEngagement} />
-          <p className="pp-domain-note">This chart shows {progress.patientName}'s share of engagement across each area — not a clinical score.</p>
-        </div>
-
-        {/* ── Personal best ── */}
-        <div className="pp-card pp-personal-best-card">
-          <div className="pp-personal-best-icon"><IconTrendUp width={26} height={26} /></div>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="pp-personal-best-title">Comparing to {progress.patientName}'s Own Best</h3>
-            <p className="pp-personal-best-note">{personalBestNote}</p>
-            <p className="pp-personal-best-hint">We only ever compare {progress.patientName} to their own progress — never to other children.</p>
+            <h1 className="flex items-center gap-2 text-[30px] font-extrabold text-[#2B2366]">
+              {data ? `${data.name}'s Progress Journey` : "Progress Journey"} <span aria-hidden="true">☀️</span>
+            </h1>
+            <p className="mt-1 text-[15px] text-[#5A5670]">A warm look at how things are going — celebrate every step together!</p>
+          </div>
+          <div className="flex gap-2 rounded-full bg-white p-1 shadow-sm">
+            <button type="button" onClick={() => setRange('week')} className={`h-11 rounded-full px-5 text-[14px] font-extrabold ${range === 'week' ? 'bg-[#234C40] text-white' : 'text-[#5A5670]'}`}>This Week</button>
+            <button type="button" onClick={() => setRange('month')} className={`h-11 rounded-full px-5 text-[14px] font-extrabold ${range === 'month' ? 'bg-[#234C40] text-white' : 'text-[#5A5670]'}`}>This Month</button>
           </div>
         </div>
 
-        {/* ── Upcoming goals ── */}
-        <div className="pp-card">
-          <h2 className="pp-section-title">Upcoming Goals</h2>
-          <ul className="pp-goals-list">
-            {progress.goals.map((g) => (
-              <li key={g.id} className="pp-goal-item">
-                <span className="pp-domain-chip" style={{ background: `${DOMAIN_META[g.domain]?.color}18`, color: DOMAIN_META[g.domain]?.color }}>
-                  {DOMAIN_META[g.domain]?.icon} {g.domain}
-                </span>
-                <span className="pp-goal-text">{g.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {error && <div className="mb-5 rounded-2xl border-2 border-[#F3D284] bg-[#FFF0CC] p-4 text-[15px] font-bold text-[#92400E]">{error}</div>}
 
-        {/* ── Therapist notes (curated) ── */}
-        <div className="pp-card">
-          <h2 className="pp-section-title">Notes From the Therapist</h2>
-          {progress.sharedNotes.length === 0 ? (
-            <p className="pp-empty-note">No shared updates yet — check back soon!</p>
-          ) : (
-            <div className="pp-notes-list">
-              {progress.sharedNotes.map((n) => (
-                <div key={n.id} className="pp-note-card">
-                  <div className="pp-note-top">
-                    <span className="pp-domain-chip" style={{ background: `${DOMAIN_META[n.domain]?.color}18`, color: DOMAIN_META[n.domain]?.color }}>
-                      {DOMAIN_META[n.domain]?.icon} {n.domain}
-                    </span>
-                    <span className="pp-note-date">{n.date}</span>
+        {!data && !error && (
+          <div className="grid gap-5">
+            <Skeleton className="h-[140px]" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><Skeleton className="h-[110px]" /><Skeleton className="h-[110px]" /><Skeleton className="h-[110px]" /></div>
+            <Skeleton className="h-[220px]" />
+          </div>
+        )}
+
+        {data && (
+          <div className="grid gap-5">
+            {/* Level + streak */}
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-[1.6fr_1fr]">
+              <div className="flex items-center gap-4 rounded-[28px] p-5" style={{ background: 'linear-gradient(135deg,#FDE3E8,#FFF1D6)' }}>
+                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-md"><PaoFace size={64} /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-[#FFC933] px-3 py-1 text-[13px] font-extrabold text-[#5A3E00]">⭐ Level {data.level}</span>
+                    <span className="text-[13px] font-bold text-[#5A5670]">XP {data.xp} / {data.xpMax}</span>
+                    <span className="ml-auto text-[13px] font-extrabold text-[#C97A00]">🏆 {data.badgeCount} Badges</span>
                   </div>
-                  <p className="pp-note-summary">{n.summary}</p>
+                  <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/70">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FFC933]" style={{ width: `${Math.min(100, (data.xp / data.xpMax) * 100)}%` }} />
+                  </div>
+                  <p className="mt-2 text-[15px] font-bold text-[#2B2366]">{data.headline}</p>
+                  <p className="text-[13px] text-[#5A5670]">Only {Math.max(0, data.xpMax - data.xp)} XP to reach Level {data.level + 1} — you can do it!</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
 
-        {/* ── Suggested home activities ── */}
-        <div className="pp-card">
-          <h2 className="pp-section-title">Suggested Home Activities</h2>
-          {progress.exercises.length === 0 ? (
-            <p className="pp-empty-note">No home activities assigned right now.</p>
-          ) : (
-            <div className="pp-activities-list">
-              {progress.exercises.map((ex) => (
-                <label key={ex.id} className={`pp-activity-item ${ex.status === 'Done' ? 'pp-activity-done' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={ex.status === 'Done'}
-                    onChange={() => ex.status !== 'Done' && markExerciseDone(ex.id)}
-                    disabled={ex.status === 'Done'}
-                  />
-                  <div className="pp-activity-body">
-                    <div className="pp-activity-top">
-                      <span className="pp-activity-title">{ex.title}</span>
-                      <span className="pp-domain-chip" style={{ background: `${DOMAIN_META[ex.domain]?.color}18`, color: DOMAIN_META[ex.domain]?.color }}>
-                        {DOMAIN_META[ex.domain]?.icon} {ex.domain}
-                      </span>
-                    </div>
-                    <p className="pp-activity-instructions">{ex.instructions}</p>
-                    <span className="pp-activity-due">Due {ex.due}</span>
+              <div className="flex items-center gap-3 rounded-[28px] p-5" style={{ background: 'linear-gradient(135deg,#FFEAD2,#FFE0CC)' }}>
+                <span className="text-[28px]" aria-hidden="true">🔥</span>
+                <div>
+                  <p className="text-[16px] font-extrabold text-[#2B2366]">{data.streak.current}-day play streak!</p>
+                  <div className="mt-1.5 flex gap-1.5">
+                    {data.streak.days.map((on, i) => (
+                      <span key={i} className={`h-6 w-6 rounded-full text-center text-[11px] font-extrabold leading-6 ${on ? 'bg-[#F59E0B] text-white' : 'bg-white/70 text-[#C9A063]'}`}>{DAYS_SUN_FIRST[i]}</span>
+                    ))}
                   </div>
-                </label>
-              ))}
+                  <p className="mt-1.5 text-[12.5px] font-bold text-[#92400E]">Best ever: {data.streak.best} days in a row 🏆</p>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      </main>
 
-      {showMilestone && newBadge && <MilestoneModal badge={newBadge} onClose={closeMilestone} />}
+            {/* KPIs */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-[22px] p-5" style={{ background: '#E3F0FD' }}>
+                <p className="text-[32px] font-extrabold text-[#1D4ED8]">{data.kpis.sessions}</p>
+                <p className="text-[13px] font-bold text-[#334155]">Sessions completed</p>
+              </div>
+              <div className="rounded-[22px] p-5" style={{ background: '#FFF1D6' }}>
+                <p className="text-[32px] font-extrabold text-[#C97A00]">{data.kpis.minutes}</p>
+                <p className="text-[13px] font-bold text-[#334155]">Minutes played</p>
+              </div>
+              <div className="rounded-[22px] p-5" style={{ background: '#E3F6EA' }}>
+                <p className="text-[32px] font-extrabold text-[#166534]">{data.kpis.games}</p>
+                <p className="text-[13px] font-bold text-[#334155]">Games completed</p>
+              </div>
+            </div>
+
+            {/* Types + comparison (never negative) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {data.types.map((t) => (
+                <span key={t} className="rounded-full px-3 py-1.5 text-[13px] font-extrabold" style={{ background: `${TYPE_COLOR[t] || '#64748B'}18`, color: TYPE_COLOR[t] || '#64748B' }}>{t}</span>
+              ))}
+              <span className="rounded-2xl bg-[#E3F6EA] px-4 py-2.5 text-[14px] font-extrabold text-[#166534]">
+                {data.moreThanBefore > 0 ? `✨ ${data.moreThanBefore} more game${data.moreThanBefore === 1 ? '' : 's'} than last ${range === 'week' ? 'week' : 'month'}!` : 'Every game counts!'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Skills */}
+              <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                <h2 className="text-[18px] font-extrabold text-[#2B2366]">My skills are growing 🌱</h2>
+                <p className="text-[13px] text-[#5A5670]">Every game helps a different skill grow</p>
+                <div className="mt-3 flex flex-col gap-3">
+                  {data.skills.map((s) => (
+                    <div key={s.key}>
+                      <div className="flex items-center justify-between text-[13.5px] font-bold text-[#2B2366]">
+                        <span>{s.label}</span>
+                        {s.deltaMonth > 0 && <span className="text-[#16a34a]">↑ +{s.deltaMonth} this month</span>}
+                      </div>
+                      <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-[#F1EFE6]">
+                        <div className="h-full rounded-full bg-gradient-to-r from-[#6D4AE0] to-[#9B7BF0]" style={{ width: `${Math.min(100, s.value)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Badges */}
+              <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[18px] font-extrabold text-[#2B2366]">My badges 🏆</h2>
+                  <span className="text-[13px] font-bold text-[#5A5670]">{data.badgeCount} of {data.badges.length}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-4 gap-3">
+                  {data.badges.slice(0, 8).map((b) => (
+                    <div key={b.code} className="flex flex-col items-center gap-1">
+                      <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={56} muted={!b.earned} />
+                      <span className="text-center text-[10.5px] font-bold text-[#5A5670]">{b.name}</span>
+                    </div>
+                  ))}
+                </div>
+                {data.nextBadge && <p className="mt-3 rounded-xl bg-[#FFF0CC] px-3 py-2 text-[13px] font-bold text-[#92400E]">Next badge: {data.nextBadge.name} — keep playing!</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Recent games */}
+              <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                <h2 className="text-[18px] font-extrabold text-[#2B2366]">Games I played 🎮</h2>
+                {data.recent.length === 0 ? (
+                  <p className="mt-2 text-[14px] text-[#5A5670]">No games played yet — let's start one!</p>
+                ) : (
+                  <div className="mt-3 flex flex-col divide-y divide-[#F1EFE6]">
+                    {data.recent.map((g, i) => (
+                      <div key={i} className="flex items-center justify-between py-3">
+                        <div>
+                          <p className="text-[14.5px] font-extrabold text-[#2B2366]">{g.name}</p>
+                          <p className="text-[12px] text-[#5A5670]">{new Date(g.playedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                        </div>
+                        <span aria-label={`${g.stars} of 3 stars`}>{'⭐'.repeat(g.stars)}{'☆'.repeat(3 - g.stars)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* My week */}
+              <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                <h2 className="text-[18px] font-extrabold text-[#2B2366]">My week 📅</h2>
+                <p className="text-[13px] text-[#5A5670]">Games I finished each day</p>
+                <div className="mt-4 flex h-[140px] items-end justify-between gap-2">
+                  {data.week.map((d, i) => {
+                    const max = Math.max(1, ...data.week.map((w) => w.games))
+                    return (
+                      <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                        <span className="text-[12px] font-extrabold text-[#2B2366]">{d.games || ''}</span>
+                        <div className="w-full rounded-t-lg bg-gradient-to-t from-[#16a34a] to-[#34d399]" style={{ height: `${Math.max(4, (d.games / max) * 100)}px` }} />
+                        <span className="text-[11px] font-bold text-[#5A5670]">{d.day}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Pao strip */}
+            <div className="flex flex-wrap items-center gap-4 rounded-[26px] bg-[#E3F0FD] p-5">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white shadow"><PaoFace size={44} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#1D4ED8]">Pao says</p>
+                <p className="text-[15px] font-bold text-[#2B2366]">{data.paoMessage}</p>
+              </div>
+              {readAloud && (
+                <button type="button" onClick={speakPaoMessage} aria-label="Read Pao's message aloud" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-[18px] shadow">🔊</button>
+              )}
+              <button type="button" onClick={() => navigate('/patient/gamified-activities')} className="h-11 flex-shrink-0 rounded-full bg-[#234C40] px-5 text-[14px] font-extrabold text-white">Play now 🎮</button>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   )
 }

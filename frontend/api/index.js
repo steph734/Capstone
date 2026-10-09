@@ -68,6 +68,8 @@ import paoThemesList from './_lib/routes/pao-themes-list.js'
 import paoThemesItem from './_lib/routes/pao-themes-item.js'
 import gamesList from './_lib/routes/games-list.js'
 import gamesAdminList from './_lib/routes/games-admin-list.js'
+import patientProgress from './_lib/routes/patient-progress.js'
+import therapistGamifiedOverview from './_lib/routes/therapist-gamified-overview.js'
 import gamesAdminItem from './_lib/routes/games-admin-item.js'
 import speechRecordingsCreate from './_lib/routes/speech-recordings-create.js'
 import speechRecordingsList from './_lib/routes/speech-recordings-list.js'
@@ -157,6 +159,8 @@ app.all('/api/exercises/:id', exercisesDelete)
 app.all('/api/badges/list', badgesList)
 app.all('/api/badges/create', badgesCreate)
 app.all('/api/badges/:id', badgesItem)
+app.all('/api/patient/progress', patientProgress)
+app.all('/api/therapist/gamified/overview', therapistGamifiedOverview)
 app.all('/api/pao-items/list', paoItemsList)
 app.all('/api/pao-items/create', paoItemsCreate)
 app.all('/api/pao-items/:id', paoItemsItem)

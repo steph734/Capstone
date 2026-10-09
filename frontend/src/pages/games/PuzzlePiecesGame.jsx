@@ -11,6 +11,20 @@ import { buildPuzzleRound, SHAPE_NAMES, SHAPE_FACTS, LEVELS } from '../../data/p
 import { PuzzlePiece, PuzzleHole } from './PuzzleShapes'
 import { HandIcon, ArrowUpIcon, ArrowDownIcon, ArrowRightIcon } from '../../components/icons/SpeechIcons'
 import BadgeMedal from '../../components/BadgeMedal'
+import PaoLayered from '../../components/pao/PaoLayered'
+import { usePaoGameReactions } from '../../components/pao/usePaoGameReactions'
+
+const INSTRUCTION_EVENT = { top: 'instruction_on_top', under: 'instruction_under', nextTo: 'instruction_next_to' }
+function useReducedMotionPz() {
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduced
+}
 
 // ─── Puzzle Pals ───────────────────────────────────────────────────────────────
 //
@@ -228,6 +242,9 @@ function BoardCell({ cellRef, stepKey, item, filled, justFilled, isCurrent, hint
 
 export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patientEmail = null, exerciseId = 'puzzle-pieces', domain = 'Cognitive', lang = 'en', setId = 'animals', level = 'easy' }) {
   const gameSession = useGameSession({ gameName: 'Puzzle Pals' })
+  const reducedMotion = useReducedMotionPz()
+  const paoGame = usePaoGameReactions('puzzle-pals', { calm: reducedMotion, readAloud: false })
+  const streakRef = useRef(0)
   const tallyRef = useRef({ wrong: 0, hints: 0 })
   const recordFinish = () => gameSession.finish({
     correct: STEP_ORDER.length,
@@ -315,6 +332,8 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
     const item = round.board[stepKey]
     promptShownAtRef.current = Date.now()
     loggerRef.current.log('prompt_shown', {})
+    streakRef.current = 0
+    paoGame.react(INSTRUCTION_EVENT[stepKey])
     const t = setTimeout(() => {
       speakPrompt(pickLine(PUZZLE_LINES.promptFor, lang, stepKey, item), findPieceLine({ item, refItem: null, stepKey, lang }))
     }, 500)
@@ -344,6 +363,8 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
       setShakeId(item.id)
       clearTimeout(shakeTimerRef.current)
       shakeTimerRef.current = setTimeout(() => setShakeId(null), 450)
+      streakRef.current = 0
+      paoGame.react('wrong')
       const nextMiss = missCount + 1
       tallyRef.current.wrong += 1
       if (nextMiss === 2) tallyRef.current.hints += 1
@@ -359,6 +380,8 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
     }
 
     // Fill the slot immediately — only the next prompt's narration waits.
+    streakRef.current += 1
+    paoGame.react(streakRef.current > 0 && streakRef.current % 3 === 0 ? 'correct_streak' : 'correct')
     setMissCount(0); setHint(false)
     setTray(prev => prev.filter(a => a.id !== item.id))
     setPlaced(prev => [...prev, currentStepKey])
@@ -374,11 +397,13 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
     setTimeout(() => {
       if (nextIndex >= STEP_ORDER.length) {
         logExitOnce()
+        paoGame.react('finished', { hold: 0 })
         setTimeout(() => setDone(true), 1400)
         return
       }
       setLocked(false)
       const nextKey = STEP_ORDER[nextIndex]
+      paoGame.react(INSTRUCTION_EVENT[nextKey])
       const refKey  = nextKey === 'under' ? 'top' : 'under'
       const nextItem = round.board[nextKey]
       const refItem = round.board[refKey]
@@ -570,8 +595,8 @@ export default function PuzzlePiecesGame({ onExit, patientId = 'alvrin', patient
 
       {/* Pao speech bar */}
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 14, padding: '10px 18px 14px', flexShrink: 0, background: 'rgba(255,255,255,.35)', borderTop: '1px solid rgba(255,255,255,.7)', backdropFilter: 'blur(6px)', animation: 'pzFadeIn .5s ease' }}>
-        <div style={{ animation: 'pzFloat 3s ease-in-out infinite', flexShrink: 0 }}>
-          <PandaMascot entered={true} mouthOpen={mouthOpen} pxWidth={110} pandaState="happy"/>
+        <div style={{ animation: 'pzFloat 3s ease-in-out infinite', flexShrink: 0, overflow: 'visible' }}>
+          <PaoLayered pose={paoGame.pose} showFx={paoGame.showFx} size={110} />
         </div>
         <div style={{ flex: 1, background: 'rgba(255,255,255,.92)', border: '1px solid rgba(124,79,224,.18)', borderRadius: '4px 18px 18px 18px', padding: '12px 16px', minHeight: 64, maxHeight: 90, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
           {talking && (

@@ -5,7 +5,7 @@ import BetaTag from '../../components/BetaTag'
 import '../PageWithSidebar.css'
 import '../admin/AdminPages.css'
 
-export default function TherapistPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, beta }) {
+export default function TherapistPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, beta, bare }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -41,7 +41,7 @@ export default function TherapistPageShell({ user, onLogout, title, subtitle, ic
           </div>
         </div>
 
-        <div className="content-container admin-content-container">
+        <div className={bare ? 'admin-content-container' : 'content-container admin-content-container'} style={bare ? { maxWidth: 1280, margin: '0 auto' } : undefined}>
           {children}
         </div>
       </main>

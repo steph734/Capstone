@@ -162,20 +162,31 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                 {/* KPI tiles */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                   <div className="rounded-[22px] p-4" style={{ background: '#E3F0FD' }}>
-                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Games played</p>
-                    <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>{data.kpis.games.value}{changeText(data.kpis.games.change)}</p>
+                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Games completed</p>
+                    <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>
+                      {data.kpis.games.value}{data.kpis.games.assigned ? <span className="text-[16px] font-bold" style={{ color: '#5D7770' }}> / {data.kpis.games.assigned} assigned</span> : null}
+                    </p>
+                    {data.kpis.games.completionRate !== null && <p className="text-[11.5px] font-bold" style={{ color: '#5D7770' }}>{data.kpis.games.completionRate}% completion rate</p>}
                   </div>
                   <div className="rounded-[22px] p-4" style={{ background: '#E3F6EA' }}>
-                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Accuracy</p>
+                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Average accuracy</p>
                     <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>{data.kpis.accuracy.value !== null ? `${Math.round(data.kpis.accuracy.value)}%` : '—'}{changeText(data.kpis.accuracy.change, ' pts')}</p>
+                  </div>
+                  <div className="rounded-[22px] p-4" style={{ background: '#FFF1D6' }}>
+                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Badges earned</p>
+                    <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>{data.kpis.badges.value} <span className="text-[14px] font-bold" style={{ color: '#5D7770' }}>/ {data.kpis.badges.total}</span></p>
+                    {data.kpis.badges.newThisRange > 0 && <p className="text-[11.5px] font-bold" style={{ color: '#5D7770' }}>{data.kpis.badges.newThisRange} new this period</p>}
                   </div>
                   <div className="rounded-[22px] p-4" style={{ background: '#FDE3E8' }}>
                     <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Active days</p>
                     <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>{data.kpis.activeDays.value}<span className="text-[14px] font-bold" style={{ color: '#5D7770' }}> / {data.kpis.activeDays.daysInRange} days</span></p>
-                  </div>
-                  <div className="rounded-[22px] p-4" style={{ background: '#FFF1D6' }}>
-                    <p className="text-[13px] font-bold" style={{ color: '#3a4a45' }}>Current streak</p>
-                    <p className="text-[28px] font-extrabold" style={{ color: GREEN_900 }}>{data.kpis.currentStreak.value} <span className="text-[14px] font-bold" style={{ color: '#5D7770' }}>days</span></p>
+                    {data.kpis.activeDays.dayFlags && (
+                      <div className="mt-1.5 flex flex-wrap gap-[3px]" role="img" aria-label={`${data.kpis.activeDays.value} active days out of ${data.kpis.activeDays.daysInRange}`}>
+                        {data.kpis.activeDays.dayFlags.map((played, i) => (
+                          <span key={i} className="h-[6px] w-[6px] rounded-full" style={{ background: played ? '#DB2777' : '#F6D5E0' }} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -190,26 +201,44 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                   <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
-                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Games per week</h2>
-                    <div className="flex h-[90px] items-end justify-between gap-1">
+                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Weekly completion</h2>
+                    <div className="flex h-[90px] items-end justify-between gap-2">
                       {data.weekly.slice(-8).map((w) => {
-                        const max = Math.max(1, ...data.weekly.map((x) => x.completed))
-                        return <div key={w.weekStart} className="flex-1 rounded-t" style={{ height: `${Math.max(3, (w.completed / max) * 90)}px`, background: '#1FA58A' }} title={`${w.label}: ${w.completed}`} />
+                        const max = Math.max(1, ...data.weekly.map((x) => x.assigned || x.completed))
+                        return (
+                          <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1">
+                            <span className="text-[10.5px] font-extrabold" style={{ color: GREEN_900 }}>{w.completed}</span>
+                            <div className="relative w-full overflow-hidden rounded-t" style={{ height: 70, background: '#F1F5F3' }} title={`${w.label}: ${w.completed} of ${w.assigned}`}>
+                              <div className="absolute bottom-0 w-full rounded-t" style={{ height: `${Math.max(3, (w.completed / max) * 70)}px`, background: '#1FA58A' }} />
+                            </div>
+                          </div>
+                        )
                       })}
                     </div>
-                  </div>
-                  <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
-                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Top games</h2>
-                    <div className="flex flex-col gap-1.5">
-                      {data.topGames.map((g) => (
-                        <div key={g.gameId} className="flex justify-between text-[13px] font-bold" style={{ color: GREEN_900 }}><span className="truncate">{g.name}</span><span>{g.count}</span></div>
-                      ))}
-                      {data.topGames.length === 0 && <p className="text-[12.5px]" style={{ color: '#5D7770' }}>No games yet.</p>}
+                    <div className="mt-2 flex justify-between text-[10.5px] font-bold" style={{ color: '#5D7770' }}>
+                      {data.weekly.slice(-8).map((w) => <span key={w.weekStart}>{w.label}</span>)}
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: '#5D7770' }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#1FA58A' }} /> Completed
                     </div>
                   </div>
                   <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
-                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Share by therapy type</h2>
+                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Recent games</h2>
+                    <div className="flex flex-col gap-2">
+                      {data.recentGames.map((g, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2 text-[12.5px]" style={{ color: GREEN_900 }}>
+                          <span className="min-w-0 flex-1 truncate font-bold">{g.name}</span>
+                          <span style={{ color: '#F59E0B' }}>{'★'.repeat(g.stars)}{'☆'.repeat(5 - g.stars)}</span>
+                          <span style={{ color: '#5D7770' }}>{g.accuracy !== null ? `${g.accuracy}%` : '—'}</span>
+                        </div>
+                      ))}
+                      {data.recentGames.length === 0 && <p className="text-[12.5px]" style={{ color: '#5D7770' }}>No games yet.</p>}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
+                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Time by therapy type</h2>
                     <Donut segments={data.shareByType} total={data.totalMinutes} unit="minutes" />
+                    {data.typeNote && <p className="mt-3 text-[11.5px] font-bold" style={{ color: '#5D7770' }}>💡 {data.typeNote}</p>}
                   </div>
                 </div>
 
@@ -280,6 +309,30 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                       ))}
                     </div>
                     {data.nextBadge && <p className="mt-3 rounded-xl px-3 py-2 text-[12.5px] font-bold" style={{ background: '#FFF1D6', color: '#92400E' }}>Next: {data.nextBadge.name}</p>}
+                  </div>
+                </div>
+
+                {/* Independence + Pao's summary */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
+                    <h2 className="text-[16px] font-extrabold" style={{ color: GREEN_900 }}>Independence</h2>
+                    <p className="mb-2 text-[12px] font-bold" style={{ color: '#5D7770' }}>Hints used per game — fewer means {data.profile.name.split(' ')[0]} needs less help</p>
+                    <SmallLine points={data.hintsWeekly} color="#EC4899" valueKey="value" />
+                  </div>
+                  <div className="flex flex-col justify-between rounded-[22px] p-5" style={{ background: 'linear-gradient(135deg,#E3F0FD,#E3F6EA)' }}>
+                    <div className="flex items-start gap-3">
+                      <img src="/pao/png/pao-hooray.png" alt="" className="h-16 w-16 flex-shrink-0 object-contain" />
+                      <div>
+                        <p className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: '#5D7770' }}>Pao's summary</p>
+                        <p className="mt-1 text-[14px] font-bold leading-snug" style={{ color: GREEN_900 }}>{data.paoSummary}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => navigate(`/therapist/assign-exercises?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}
+                        className="rounded-full px-4 py-2.5 text-[12.5px] font-extrabold text-white" style={{ background: GREEN_700 }}>Assign exercises</button>
+                      <button type="button" onClick={() => navigate(`/therapist/notes-progress?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}
+                        className="rounded-full px-4 py-2.5 text-[12.5px] font-extrabold" style={{ border: `1px solid ${BORDER}`, color: GREEN_900, background: '#fff' }}>Add a note</button>
+                    </div>
                   </div>
                 </div>
 

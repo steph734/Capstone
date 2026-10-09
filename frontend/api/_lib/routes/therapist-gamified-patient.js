@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const prevFrom = manilaMidnightUtc(days * 2 - 1)
     const prevTo = from
 
-    const [patient, profile, allBadges, earnedBadges, games, curSessions, prevSessions, recentLookback] = await Promise.all([
+    const [patient, profile, allBadges, earnedBadges, games, curSessions, prevSessions, recentLookback, assignments] = await Promise.all([
       db.collection('patients').findOne({ _id: pid }, { projection: { first_name: 1, last_name: 1, birthdate: 1 } }),
       db.collection('pao_profiles').findOne({ patient_id: pid }),
       db.collection('badges').find({ is_active: true, status: 'active' }).sort({ sort_order: 1, name: 1 }).toArray(),
@@ -105,6 +105,7 @@ export default async function handler(req, res) {
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed', completed_at: { $gte: from, $lt: toExclusive } }).sort({ completed_at: 1 }).toArray(),
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed', completed_at: { $gte: prevFrom, $lt: prevTo } }).toArray(),
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed' }).sort({ completed_at: -1 }).limit(200).toArray(),
+      db.collection('exercise_assignments').find({ patient_id: pid, is_archived: { $ne: true } }, { projection: { due_date: 1, status: 1 } }).toArray(),
     ])
     if (!patient) return res.status(404).json({ error: 'Patient not found.' })
 
@@ -136,11 +137,27 @@ export default async function handler(req, res) {
       else break
     }
 
+    // ── Assigned exercises in range (for "games completed / assigned") ───
+    const fromKey = manilaDayKey(from)
+    const toKeyInclusive = manilaDayKey(new Date(toExclusive.getTime() - 1))
+    const assignedInRange = assignments.filter((a) => a.due_date >= fromKey && a.due_date <= toKeyInclusive)
+    const assignedCount = assignedInRange.length
+    const completionRate = assignedCount > 0 ? Math.round((curSessions.length / assignedCount) * 100) : null
+
+    // ── Day-by-day flags in range, for the "active days" dot row ─────────
+    const activeDayKeySet = new Set(curSessions.map((s) => manilaDayKey(s.completed_at)))
+    const dayFlags = []
+    for (let d = new Date(from); d < toExclusive; d = new Date(d.getTime() + 86400000)) dayFlags.push(activeDayKeySet.has(manilaDayKey(d)))
+
+    const earnedCount = earnedBadges.length
+    const newThisRange = earnedBadges.filter((b) => b.earned_at >= from && b.earned_at < toExclusive).length
+
     const kpis = {
-      games: { value: curSessions.length, previous: prevSessions.length, change: delta(curSessions.length, prevSessions.length, true) },
+      games: { value: curSessions.length, previous: prevSessions.length, change: delta(curSessions.length, prevSessions.length, true), assigned: assignedCount, completionRate },
       accuracy: { value: curAccuracy, previous: prevAccuracy, change: delta(curAccuracy, prevAccuracy, curAccuracy !== null && prevAccuracy !== null) },
-      activeDays: { value: curActive, daysInRange: days, previous: prevActive, change: delta(curActive, prevActive, true) },
+      activeDays: { value: curActive, daysInRange: days, previous: prevActive, change: delta(curActive, prevActive, true), dayFlags },
       currentStreak: { value: currentStreak },
+      badges: { value: earnedCount, total: allBadges.length, newThisRange },
     }
 
     // ── Accuracy over time (per-session points, newest-last) ────────────
@@ -168,7 +185,23 @@ export default async function handler(req, res) {
     }
     const weekCounts = new Map(weekKeys.map((k) => [k, 0]))
     for (const s of curSessions) { const wk = mondayWeekKey(s.completed_at); if (weekCounts.has(wk)) weekCounts.set(wk, weekCounts.get(wk) + 1) }
-    const weekly = weekKeys.map((k, i) => ({ weekStart: k, label: `Wk ${i + 1}`, completed: weekCounts.get(k) }))
+    const weekAssignedCounts = new Map(weekKeys.map((k) => [k, 0]))
+    for (const a of assignedInRange) { const wk = mondayWeekKey(a.due_date); if (weekAssignedCounts.has(wk)) weekAssignedCounts.set(wk, weekAssignedCounts.get(wk) + 1) }
+    const weekly = weekKeys.map((k, i) => ({ weekStart: k, label: `Wk ${i + 1}`, completed: weekCounts.get(k), assigned: Math.max(weekCounts.get(k), weekAssignedCounts.get(k)) }))
+
+    // ── Independence: hints used per game, averaged per week (fewer = less help needed) ──
+    const weekHintSum = new Map(weekKeys.map((k) => [k, 0]))
+    const weekHintCount = new Map(weekKeys.map((k) => [k, 0]))
+    for (const s of curSessions) {
+      const wk = mondayWeekKey(s.completed_at)
+      if (!weekHintSum.has(wk)) continue
+      weekHintSum.set(wk, weekHintSum.get(wk) + (s.result?.hints_used || 0))
+      weekHintCount.set(wk, weekHintCount.get(wk) + 1)
+    }
+    const hintsWeekly = weekKeys.map((k, i) => ({
+      weekStart: k, label: `Wk ${i + 1}`,
+      value: weekHintCount.get(k) > 0 ? Math.round((weekHintSum.get(k) / weekHintCount.get(k)) * 10) / 10 : 0,
+    }))
 
     const gameCounts = new Map()
     for (const s of curSessions) gameCounts.set(String(s.game_id), (gameCounts.get(String(s.game_id)) || 0) + 1)
@@ -188,6 +221,17 @@ export default async function handler(req, res) {
     const typeShares = largestRemainderPercent(typeEntries.map(([, c]) => c))
     const shareByType = typeEntries.map(([type, count], i) => ({ type, games: count, minutes: Math.round(typeMinutes.get(type) || 0), share: typeShares[i] }))
     const totalMinutes = Math.round([...typeMinutes.values()].reduce((a, b) => a + b, 0))
+
+    // Plain-language note under the donut: which type gets the most/least time.
+    const typeNote = (() => {
+      if (shareByType.length < 2) return null
+      const sorted = [...shareByType].sort((a, b) => b.share - a.share)
+      const most = sorted[0], least = sorted[sorted.length - 1]
+      if (most.share >= 35 && least.share <= 15) {
+        return `${name.split(' ')[0]} spends most of their time on ${most.type} games. ${least.type} activities are only ${least.share}% — consider assigning more.`
+      }
+      return `${name.split(' ')[0]}'s time is fairly balanced across therapy types this period.`
+    })()
 
     // ── Session analytics per therapy type (accuracy series + last 3) ────
     const analytics = {}
@@ -217,7 +261,6 @@ export default async function handler(req, res) {
     // ── Badges ────────────────────────────────────────────────────────────
     const earnedCodes = new Set(earnedBadges.map((b) => b.badge_code))
     const badgesOut = allBadges.map((b) => ({ code: b.code, name: b.name, shape: b.art?.shape || 'circle', colour: b.art?.color || 'gold', symbol: b.art?.symbol || 'star', earned: earnedCodes.has(b.code) }))
-    const newThisRange = earnedBadges.filter((b) => b.earned_at >= from && b.earned_at < toExclusive).length
     const nextBadge = badgesOut.find((b) => !b.earned) || null
 
     // ── Recent sessions (paginate client-side; cap 100) ───────────────────
@@ -229,15 +272,48 @@ export default async function handler(req, res) {
       minutes: Math.round((s.result?.duration_seconds || 0) / 60),
     }))
 
+    // ── Recent games (5 most recent, with a star rating derived from accuracy) ──
+    const recentGames = recentLookback.slice(0, 5).map((s) => {
+      const acc = sessionAccuracy(s)
+      const t = gameById.get(String(s.game_id))?.therapy_type || ''
+      return {
+        date: manilaDayKey(s.completed_at),
+        name: gameById.get(String(s.game_id))?.name || 'Game',
+        therapyType: t ? t.charAt(0).toUpperCase() + t.slice(1) : '—',
+        accuracy: acc !== null ? Math.round(acc) : null,
+        stars: acc !== null ? Math.max(1, Math.min(5, Math.round(acc / 20))) : 0,
+      }
+    })
+
+    // ── Pao's summary: a template-generated note from the numbers only ───
+    const firstName = name.split(' ')[0]
+    const paoSummary = (() => {
+      if (curSessions.length === 0) return `${firstName} hasn't played yet. Assign a game to get started.`
+      const parts = [`${firstName} played ${curSessions.length} game${curSessions.length === 1 ? '' : 's'} this period${curAccuracy !== null ? ` at ${Math.round(curAccuracy)}% accuracy` : ''}.`]
+      const hintsCur = curSessions.length ? curSessions.reduce((s, x) => s + (x.result?.hints_used || 0), 0) / curSessions.length : null
+      const hintsPrev = prevSessions.length ? prevSessions.reduce((s, x) => s + (x.result?.hints_used || 0), 0) / prevSessions.length : null
+      if (hintsCur !== null && hintsPrev !== null) {
+        const dir = hintsCur < hintsPrev ? 'down' : hintsCur > hintsPrev ? 'up' : 'steady'
+        parts.push(dir === 'steady'
+          ? `Hints used per game are steady at ${hintsCur.toFixed(1)}.`
+          : `Hints are ${dir} from ${hintsPrev.toFixed(1)} to ${hintsCur.toFixed(1)} per game.`)
+      }
+      const lowestStat = [...characterStats].sort((a, b) => a.value - b.value)[0]
+      if (lowestStat) parts.push(`Their lowest stat is ${lowestStat.label} (${lowestStat.value}).`)
+      return parts.join(' ')
+    })()
+
     return res.status(200).json({
       profile: { id: patientId, name, age, level, xp, xpMax, lastPlayedAt, favoriteGame },
       kpis,
       series, trend,
-      weekly, topGames, shareByType, totalMinutes,
+      weekly, topGames, shareByType, totalMinutes, typeNote,
+      hintsWeekly,
       analytics,
       characterStats,
       badges: badgesOut, nextBadge, newThisRange,
-      recentSessions,
+      recentSessions, recentGames,
+      paoSummary,
       meta: {
         range: { days, from: from.toISOString(), to: toExclusive.toISOString(), tz: 'Asia/Manila' },
         definitions: {

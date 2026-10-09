@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -93,6 +94,7 @@ function fromApiAssignment(a) {
 }
 
 export default function TherapistAssignExercisesPage({ user, onLogout, betaTier }) {
+  const [searchParams] = useSearchParams()
   const [appointments, setAppointments] = useState([])
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -164,14 +166,19 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointments, todayKey])
 
-  // Default to whichever session is happening (or about to happen) right now.
+  // Default to whichever session is happening (or about to happen) right
+  // now — unless a patient was handed to us (e.g. from the Gamified Stats
+  // dashboard's "Assign exercises" button) and has a session today, in
+  // which case that one wins.
   useEffect(() => {
     if (selectedSessionId != null || todaysSessions.length === 0) return
-    const preferred = todaysSessions.find((s) => s.computedStatus === 'In session')
+    const preselectPatientId = searchParams.get('patientId')
+    const preferred = (preselectPatientId && todaysSessions.find((s) => s.patientId === preselectPatientId))
+      || todaysSessions.find((s) => s.computedStatus === 'In session')
       || todaysSessions.find((s) => s.computedStatus === 'Up next')
       || todaysSessions[0]
     setSelectedSessionId(preferred.id)
-  }, [todaysSessions, selectedSessionId])
+  }, [todaysSessions, selectedSessionId, searchParams])
 
   // A game plan is specific to one session — starting fresh when the
   // therapist switches patients avoids carrying over a plan that doesn't

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -595,6 +596,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TherapistNotesProgressPage({ user, onLogout, betaTier }) {
+  const [searchParams] = useSearchParams()
   const [patients,    setPatients]    = useState([])
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
@@ -657,9 +659,10 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   // an empty "select a patient" state.
   useEffect(() => {
     if (!loading && selectedId === null && patients.length > 0) {
-      setSelectedId(patients[0].id)
+      const preselect = searchParams.get('patientId')
+      setSelectedId(patients.some((p) => p.id === preselect) ? preselect : patients[0].id)
     }
-  }, [loading, patients, selectedId])
+  }, [loading, patients, selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // On phones the notebook (new/viewer) renders below the patient list, so
   // opening it would otherwise look like nothing happened — bring it into

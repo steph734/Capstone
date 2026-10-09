@@ -13,13 +13,21 @@ const GREEN_900 = '#1F3D36'
 const GREEN_700 = '#234C40'
 const BORDER = '#E4EBE8'
 const TYPE_COLOR = { Cognitive: '#7C5CE0', Speech: '#1FA58A', Occupational: '#F59E0B', Physical: '#4A90D9' }
-const RANGE_OPTIONS = [{ id: '7', label: '7 days' }, { id: '30', label: '30 days' }, { id: '90', label: '3 months' }]
+const RANGE_OPTIONS = [{ id: '7', label: 'Last 7 days', days: 7 }, { id: '30', label: 'Last 30 days', days: 30 }, { id: '90', label: 'Last 3 months', days: 90 }]
 const TABS = ['Cognitive', 'Occupational', 'Physical', 'Speech']
 const PAGE_SIZE = 10
 const TREND_LABEL = { improving: 'Improving', steady: 'Steady', 'needs more practice': 'Needs more practice', not_enough_data: 'Not enough data yet' }
+const STAT_ICON = { intelligence: '🧠', focus: '🎯', resistance: '🛡️', creativity: '🎨', speed: '⚡', memory: '💭' }
+const GAME_ICON = { Cognitive: '🧩', Speech: '🗣️', Occupational: '🧶', Physical: '🏃' }
 
 function initials(name) { return (name || '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?' }
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—' }
+function fmtRangeLabel(days) {
+  const to = new Date(); to.setHours(0, 0, 0, 0)
+  const from = new Date(to); from.setDate(from.getDate() - (days - 1))
+  const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${fmt(from)} – ${fmt(to)}, ${to.getFullYear()}`
+}
 function changeText(change, unit = '') {
   if (change === null || change === undefined) return <span style={{ color: '#5D7770' }}> · no previous data</span>
   if (change === 0) return <span style={{ color: '#5D7770' }}> · no change</span>
@@ -84,6 +92,9 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [showAllBadges, setShowAllBadges] = useState(false)
+  const [showAllGames, setShowAllGames] = useState(false)
 
   // The table forwards its sort/range/q into this page's URL when it
   // navigates here; passing the same params straight back restores them.
@@ -144,10 +155,21 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                   </div>
                 </div>
               </div>
-              <div className="flex gap-1 rounded-full bg-[#F8FAF9] p-1" role="group" aria-label="Date range">
-                {RANGE_OPTIONS.map((r) => (
-                  <button key={r.id} type="button" aria-pressed={rangeId === r.id} onClick={() => setRange(r.id)} className="h-9 rounded-full px-3.5 text-[12.5px] font-extrabold" style={{ background: rangeId === r.id ? GREEN_700 : 'transparent', color: rangeId === r.id ? '#fff' : '#3a4a45' }}>{r.label}</button>
-                ))}
+              <div className="relative">
+                <button type="button" onClick={() => setRangeOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={rangeOpen}
+                  className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-extrabold" style={{ border: `1px solid ${BORDER}`, color: GREEN_900 }}>
+                  🗓️ {fmtRangeLabel(RANGE_OPTIONS.find((r) => r.id === rangeId)?.days)} <span style={{ color: '#5D7770' }}>▾</span>
+                </button>
+                {rangeOpen && (
+                  <ul role="listbox" className="absolute right-0 top-[calc(100%+6px)] z-10 w-40 overflow-hidden rounded-xl bg-white py-1 shadow-lg" style={{ border: `1px solid ${BORDER}` }}>
+                    {RANGE_OPTIONS.map((r) => (
+                      <li key={r.id}>
+                        <button type="button" role="option" aria-selected={rangeId === r.id} onClick={() => { setRange(r.id); setRangeOpen(false) }}
+                          className="block w-full px-3.5 py-2 text-left text-[12.5px] font-bold" style={{ background: rangeId === r.id ? '#F1F5F3' : 'transparent', color: GREEN_900 }}>{r.label}</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -218,17 +240,24 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                     <div className="mt-2 flex justify-between text-[10.5px] font-bold" style={{ color: '#5D7770' }}>
                       {data.weekly.slice(-8).map((w) => <span key={w.weekStart}>{w.label}</span>)}
                     </div>
-                    <div className="mt-2 flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: '#5D7770' }}>
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#1FA58A' }} /> Completed
+                    <div className="mt-2 flex items-center gap-3 text-[11.5px] font-bold" style={{ color: '#5D7770' }}>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#1FA58A' }} /> Completed</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#F1F5F3' }} /> Assigned</span>
                     </div>
                   </div>
                   <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
-                    <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Recent games</h2>
-                    <div className="flex flex-col gap-2">
-                      {data.recentGames.map((g, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2 text-[12.5px]" style={{ color: GREEN_900 }}>
-                          <span className="min-w-0 flex-1 truncate font-bold">{g.name}</span>
-                          <span style={{ color: '#F59E0B' }}>{'★'.repeat(g.stars)}{'☆'.repeat(5 - g.stars)}</span>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h2 className="text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Recent games</h2>
+                      {data.recentGames.length > 0 && (
+                        <button type="button" onClick={() => setShowAllGames((v) => !v)} className="text-[11.5px] font-extrabold" style={{ color: GREEN_700 }}>{showAllGames ? 'Show less' : 'View all →'}</button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                      {(showAllGames ? data.recentSessions : data.recentGames).slice(0, showAllGames ? 100 : 5).map((g, i) => (
+                        <div key={i} className="flex items-center gap-2.5 text-[12.5px]" style={{ color: GREEN_900 }}>
+                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[14px]" style={{ background: '#F1F5F3' }}>{GAME_ICON[g.therapyType] || '🎮'}</span>
+                          <span className="min-w-0 flex-1 truncate font-bold">{g.name || g.game}</span>
+                          {'stars' in g && <span style={{ color: '#F59E0B' }}>{'★'.repeat(g.stars)}{'☆'.repeat(5 - g.stars)}</span>}
                           <span style={{ color: '#5D7770' }}>{g.accuracy !== null ? `${g.accuracy}%` : '—'}</span>
                         </div>
                       ))}
@@ -279,15 +308,18 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                       <h2 className="text-[16px] font-extrabold" style={{ color: GREEN_900 }}>Character stats</h2>
                       <span className="text-[11.5px] font-bold" style={{ color: '#5D7770' }}>vs. last month</span>
                     </div>
-                    <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-3">
                       {data.characterStats.map((s) => (
-                        <div key={s.key}>
-                          <div className="flex items-center justify-between text-[13px] font-bold" style={{ color: GREEN_900 }}>
-                            <span>{s.label}</span>
-                            <span>{s.value} {s.change ? <span style={{ color: '#16a34a' }}>↑ +{s.change}</span> : null}</span>
-                          </div>
-                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full" style={{ background: '#F1F5F3' }}>
-                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, s.value)}%`, background: 'linear-gradient(90deg,#7C5CE0,#4A90D9)' }} />
+                        <div key={s.key} className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[16px]" style={{ background: '#F1F5F3' }}>{STAT_ICON[s.key] || '⭐'}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between text-[13px] font-bold" style={{ color: GREEN_900 }}>
+                              <span>{s.label}</span>
+                              <span>{s.value} {s.change ? <span style={{ color: '#16a34a' }}>↑ +{s.change}</span> : null}</span>
+                            </div>
+                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full" style={{ background: '#F1F5F3' }}>
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, s.value)}%`, background: 'linear-gradient(90deg,#7C5CE0,#4A90D9)' }} />
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -298,10 +330,15 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                   <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
                     <div className="mb-2 flex items-center justify-between">
                       <h2 className="text-[16px] font-extrabold" style={{ color: GREEN_900 }}>Badges earned</h2>
-                      <span className="text-[13px] font-bold" style={{ color: '#5D7770' }}>{data.badges.filter((b) => b.earned).length} of {data.badges.length}{data.newThisRange ? ` · ${data.newThisRange} new` : ''}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[13px] font-bold" style={{ color: '#5D7770' }}>{data.badges.filter((b) => b.earned).length} of {data.badges.length}{data.newThisRange ? ` · ${data.newThisRange} new` : ''}</span>
+                        {data.badges.length > 6 && (
+                          <button type="button" onClick={() => setShowAllBadges((v) => !v)} className="text-[11.5px] font-extrabold" style={{ color: GREEN_700 }}>{showAllBadges ? 'Show less' : 'View all →'}</button>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
-                      {data.badges.slice(0, 12).map((b) => (
+                      {data.badges.slice(0, showAllBadges ? data.badges.length : 6).map((b) => (
                         <div key={b.code} className="flex flex-col items-center gap-1">
                           <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={48} muted={!b.earned} />
                           <span className="text-center text-[9.5px] font-bold" style={{ color: '#5D7770' }}>{b.name}</span>

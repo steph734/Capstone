@@ -1,6 +1,7 @@
 import { getStripeClient } from './stripeClient.js'
 import { sendEmail } from './brevo.js'
 import { getDb } from './mongo.js'
+import { insertPaymentWithRef } from './paymentRef.js'
 
 const BRAND = 'TherapyPro'
 
@@ -13,7 +14,7 @@ function formatMoney(amountMinor, currency) {
   return cur === 'PHP' ? `₱${value}` : `${value} ${cur}`
 }
 
-function buildReceiptHtml({ brand, amount, dateStr, description, cardLine, receiptUrl, referenceNo }) {
+function buildReceiptHtml({ brand, amount, dateStr, description, cardLine, receiptUrl, referenceNo, paymentRef }) {
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
@@ -36,6 +37,7 @@ function buildReceiptHtml({ brand, amount, dateStr, description, cardLine, recei
             <td style="padding:8px 0;color:#6b7c75;">Reference</td>
             <td style="padding:8px 0;text-align:right;font-family:monospace;font-size:12px;">${referenceNo}</td>
           </tr>
+          ${paymentRef ? `<tr><td style="padding:8px 0;color:#6b7c75;">Reference No.</td><td style="padding:8px 0;text-align:right;font-family:monospace;font-size:14px;letter-spacing:1px;">${paymentRef}</td></tr>` : ''}
           <tr>
             <td style="padding:14px 0 0;border-top:2px solid #e8f5f0;font-weight:700;font-size:16px;">Amount paid</td>
             <td style="padding:14px 0 0;border-top:2px solid #e8f5f0;text-align:right;font-weight:700;font-size:16px;">${amount}</td>
@@ -55,7 +57,7 @@ function buildReceiptHtml({ brand, amount, dateStr, description, cardLine, recei
 </html>`
 }
 
-function buildReceiptText({ brand, amount, dateStr, description, cardLine, receiptUrl, referenceNo }) {
+function buildReceiptText({ brand, amount, dateStr, description, cardLine, receiptUrl, referenceNo, paymentRef }) {
   return [
     `${brand} — Payment receipt`,
     '',
@@ -63,6 +65,7 @@ function buildReceiptText({ brand, amount, dateStr, description, cardLine, recei
     `Date: ${dateStr}`,
     cardLine ? `Payment method: ${cardLine}` : null,
     `Reference: ${referenceNo}`,
+    paymentRef ? `Reference No.: ${paymentRef}` : null,
     `Amount paid: ${amount}`,
     receiptUrl ? `\nStripe receipt: ${receiptUrl}` : null,
     '',
@@ -85,7 +88,7 @@ async function recordSubscriptionPayment({ pi, tierId }) {
       subscriptionId = tier?._id || null
     }
     const now = new Date()
-    await db.collection('payments').insertOne({
+    const payDoc = await insertPaymentWithRef(db.collection('payments'), {
       payment_for: 'subscription',
       ...(subscriptionId ? { subscription_id: subscriptionId } : {}),
       amount: Math.round(pi.amount_received || pi.amount) / 100,
@@ -93,10 +96,9 @@ async function recordSubscriptionPayment({ pi, tierId }) {
       method: 'card', // subscriptions only take CardElement today (StripeSubscribeForm.jsx)
       payment_date: now,
       status: 'completed',
-      reference_number: pi.id,
-      created_at: now,
-      updated_at: now,
+      reference_number: pi.id, // the Stripe transaction id — kept separate from payment_ref
     })
+    return payDoc.payment_ref
   } catch (err) {
     console.error('sendSubscriptionReceipt: failed to record payment:', err)
   }
@@ -118,7 +120,7 @@ export async function sendSubscriptionReceipt({ email, name, paymentIntentId, ti
     throw new Error(`PaymentIntent is not succeeded (status: ${pi.status})`)
   }
 
-  await recordSubscriptionPayment({ pi, tierId })
+  const paymentRef = await recordSubscriptionPayment({ pi, tierId })
 
   const charge = pi.latest_charge && typeof pi.latest_charge === 'object' ? pi.latest_charge : null
   const card = charge?.payment_method_details?.card
@@ -138,12 +140,13 @@ export async function sendSubscriptionReceipt({ email, name, paymentIntentId, ti
     cardLine: card ? `${card.brand} ···· ${card.last4}` : null,
     receiptUrl: charge?.receipt_url || null,
     referenceNo: pi.id,
+    paymentRef,
   }
 
   const { referenceId } = await sendEmail({
     to: email,
     toName: name,
-    subject: `Your ${BRAND} payment receipt — ${view.amount}`,
+    subject: `Your ${BRAND} payment receipt — ${view.amount}${paymentRef ? ` (Ref ${paymentRef})` : ''}`,
     html: buildReceiptHtml(view),
     plain: buildReceiptText(view),
   })

@@ -89,6 +89,7 @@ export default function PaymentHistoryModal({ email, onClose }) {
                   <span className="payment-row-sub">
                     {formatDate(p.created)}
                     {p.cardBrand && p.cardLast4 ? ` · ${p.cardBrand} ···· ${p.cardLast4}` : ''}
+                    {p.paymentRef ? <> · Ref. no. <span style={{ fontFamily: 'monospace', letterSpacing: '0.5px' }}>{p.paymentRef}</span></> : ''}
                   </span>
                   <span className="payment-row-meta">
                     <span className={`payment-status ${p.status}`}>{p.status}</span>

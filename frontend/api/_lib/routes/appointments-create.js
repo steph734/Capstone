@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import crypto from 'crypto'
 import { getDb } from '../mongo.js'
+import { insertPaymentWithRef } from '../paymentRef.js'
 
 const { ObjectId } = mongoose.Types
 
@@ -263,9 +264,10 @@ export default async function handler(req, res) {
     const paymentMethod = resolvePaymentMethod(payment)
     let paymentRecorded = false
     let paymentError = null
+    let paymentRef = null
     if (paymentMethod && total != null) {
       try {
-        const payRes = await db.collection('payments').insertOne({
+        const payDoc = await insertPaymentWithRef(db.collection('payments'), {
           // The collection has a unique index on PaymentID (a legacy key the
           // app never reads) — without a value here every insert after the
           // first collides on null and silently fails, which is exactly why
@@ -279,14 +281,13 @@ export default async function handler(req, res) {
           method: paymentMethod,
           payment_date: now,
           status: paymentMethod === 'cash' ? 'pending' : 'completed',
-          created_at: now,
-          updated_at: now,
         })
         await db.collection('appointments').updateOne(
           { _id: appointmentId },
-          { $set: { payment_id: payRes.insertedId, updated_at: new Date() } }
+          { $set: { payment_id: payDoc._id, updated_at: new Date() } }
         )
         paymentRecorded = true
+        paymentRef = payDoc.payment_ref
       } catch (err) {
         // Not fatal to the booking, but must not vanish silently — this is
         // exactly the kind of failure (e.g. schema/index violations) that
@@ -296,7 +297,13 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(201).json({ success: true, appointmentId, patientId, paymentRecorded, paymentError })
+    // amount/method echoed back so the confirmation screen and email use
+    // exactly what was persisted, instead of recomputing it client-side and
+    // risking the two drifting apart.
+    return res.status(201).json({
+      success: true, appointmentId, patientId, paymentRecorded, paymentError,
+      paymentRef, amount: total, method: paymentMethod,
+    })
   } catch (err) {
     console.error('appointments/create error:', err)
     return res.status(500).json({ error: err.message || 'Could not save the appointment.' })

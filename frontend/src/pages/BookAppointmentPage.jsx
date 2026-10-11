@@ -42,6 +42,12 @@ const PAYMENT_METHODS = [
   { id: 'stripe', label: 'Pay Online (Stripe)', desc: 'Card / online banking via Stripe' },
 ]
 
+// Display label for the method actually saved in the payments collection
+// (the server's canonical enum: cash/card/gcash/paymaya) — used for the
+// email and receipt instead of the top-level "Pay Online (Stripe)" choice,
+// which doesn't say whether the payer used a card or GCash.
+const METHOD_LABEL = { cash: 'Cash', card: 'Card', gcash: 'GCash QR', paymaya: 'Maya' }
+
 const SESSION_FEE = 300
 const SERVICE_CHARGE = 50
 const TOTAL_DUE = SESSION_FEE + SERVICE_CHARGE
@@ -253,6 +259,10 @@ export default function BookAppointmentPage({ user }) {
      null | 'recorded' | 'error' */
   const [paymentRecordStatus, setPaymentRecordStatus] = useState(null)
   const [paymentRecordError, setPaymentRecordError]   = useState('')
+  // TherapyPro's own 8-digit reference, returned by /api/appointments/create
+  // once the payment is actually recorded — see api/_lib/paymentRef.js.
+  const [paymentRef, setPaymentRef] = useState(null)
+  const [refCopied, setRefCopied] = useState(false)
 
   /* Record the booking in the audit log + email a confirmation once the
      confirmation step is reached. Runs exactly once. */
@@ -318,14 +328,66 @@ export default function BookAppointmentPage({ user }) {
           setSaveError(msg)
           setPaymentRecordStatus('error')
           setPaymentRecordError('The appointment itself was not saved.')
+          return
+        }
+        setSaveStatus('saved')
+        if (body.paymentRecorded) {
+          setPaymentRecordStatus('recorded')
+          setPaymentRef(body.paymentRef || null)
         } else {
-          setSaveStatus('saved')
-          if (body.paymentRecorded) {
-            setPaymentRecordStatus('recorded')
-          } else {
-            setPaymentRecordStatus('error')
-            setPaymentRecordError(body.paymentError || 'Could not record the payment.')
-          }
+          setPaymentRecordStatus('error')
+          setPaymentRecordError(body.paymentError || 'Could not record the payment.')
+        }
+
+        // Email the confirmation using exactly what the server just
+        // persisted (amount, method, reference) — never a value recomputed
+        // client-side, which is how the receipt and the email used to be
+        // able to disagree with each other.
+        const to = form1.email.trim()
+        if (to) {
+          setEmailStatus('sending')
+          fetch('/api/send-appointment-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: to,
+              accountName: user?.name || '',
+              guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
+              patient: fullName,
+              condition: form1.condition,
+              therapist: therapistObj?.name || '',
+              therapistRole: therapistObj?.role || '',
+              sessionMode: sessionModeObj?.label || '',
+              date: bookingDateLabel,
+              time: pickedTime || '',
+              payment: METHOD_LABEL[body.method] || PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
+              paymentRef: body.paymentRef || '',
+              total: body.amount ?? TOTAL_DUE,
+              ...(payMethod === 'cash' && cashReceived > 0
+                ? { amountReceived: cashReceived, amountChange: cashChange }
+                : {}),
+            }),
+          })
+            .then(async (er) => {
+              const ebody = await er.json().catch(() => ({}))
+              if (!er.ok) {
+                const msg =
+                  ebody.error ||
+                  (er.status === 404
+                    ? 'Email service not reachable — run the app with `vercel dev`.'
+                    : `HTTP ${er.status}`)
+                console.warn('Appointment confirmation email was not sent:', msg)
+                setEmailStatus('error')
+                setEmailError(msg)
+              } else {
+                setEmailStatus('sent')
+              }
+            })
+            .catch((e) => {
+              console.warn('Appointment confirmation email request failed:', e)
+              setEmailStatus('error')
+              setEmailError(e.message || 'Request failed')
+            })
         }
       })
       .catch((e) => {
@@ -346,55 +408,6 @@ export default function BookAppointmentPage({ user }) {
       entity: `Appointment · ${bookingDateLabel}`,
       status: 'Success',
     })
-
-    // Email the confirmation to the address entered on the form, and text it
-    // to the guardian's contact number. The booking is already done, so a
-    // delivery hiccup on either channel must not block the success screen —
-    // each is independent and its outcome is surfaced on the confirmation card.
-    const to = form1.email.trim()
-    if (to) {
-      setEmailStatus('sending')
-      fetch('/api/send-appointment-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: to,
-          guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
-          patient: fullName,
-          condition: form1.condition,
-          therapist: therapistObj?.name || '',
-          therapistRole: therapistObj?.role || '',
-          sessionMode: sessionModeObj?.label || '',
-          date: bookingDateLabel,
-          time: pickedTime || '',
-          payment: PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
-          total: TOTAL_DUE,
-          ...(payMethod === 'cash' && cashReceived > 0
-            ? { amountReceived: cashReceived, amountChange: cashChange }
-            : {}),
-        }),
-      })
-        .then(async (r) => {
-          const body = await r.json().catch(() => ({}))
-          if (!r.ok) {
-            const msg =
-              body.error ||
-              (r.status === 404
-                ? 'Email service not reachable — run the app with `vercel dev`.'
-                : `HTTP ${r.status}`)
-            console.warn('Appointment confirmation email was not sent:', msg)
-            setEmailStatus('error')
-            setEmailError(msg)
-          } else {
-            setEmailStatus('sent')
-          }
-        })
-        .catch((e) => {
-          console.warn('Appointment confirmation email request failed:', e)
-          setEmailStatus('error')
-          setEmailError(e.message || 'Request failed')
-        })
-    }
 
     const phone = form1.contactNumber.trim()
     if (phone) {
@@ -843,7 +856,27 @@ export default function BookAppointmentPage({ user }) {
               )}
 
               {paymentRecordStatus === 'recorded' && (
-                <p className="confirm-email-note ok">✓ Payment successfully recorded</p>
+                <>
+                  <p className="confirm-email-note ok">✓ Payment successfully recorded</p>
+                  {paymentRef && (
+                    <p className="confirm-email-note" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      Reference no.{' '}
+                      <span style={{ fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 700 }}>{paymentRef}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(paymentRef).then(() => {
+                            setRefCopied(true)
+                            setTimeout(() => setRefCopied(false), 1500)
+                          })
+                        }}
+                        style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '2px 8px', fontSize: 12, background: '#fff', cursor: 'pointer' }}
+                      >
+                        {refCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </p>
+                  )}
+                </>
               )}
               {paymentRecordStatus === 'error' && (
                 <p className="confirm-email-note err">

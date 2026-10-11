@@ -36,7 +36,7 @@ function rows(items) {
 function buildHtml(view) {
   const {
     brand, greetingName, patient, condition, therapist, therapistRole,
-    sessionMode, dateStr, timeStr, paymentLabel, total, amountReceived, amountChange,
+    sessionMode, dateStr, timeStr, paymentLabel, total, amountReceived, amountChange, paymentRef,
   } = view
   const greeting = greetingName ? `Hi ${esc(greetingName)},` : 'Hi,'
   return `<!doctype html>
@@ -60,6 +60,7 @@ function buildHtml(view) {
             ['Date', dateStr],
             ['Time', timeStr],
             ['Payment', paymentLabel],
+            ['Reference No.', paymentRef, { strong: false }],
           ])}
           ${
             total
@@ -94,7 +95,7 @@ function buildHtml(view) {
 function buildText(view) {
   const {
     brand, greetingName, patient, condition, therapist, therapistRole,
-    sessionMode, dateStr, timeStr, paymentLabel, total, amountReceived, amountChange,
+    sessionMode, dateStr, timeStr, paymentLabel, total, amountReceived, amountChange, paymentRef,
   } = view
   return [
     greetingName ? `Hi ${greetingName},` : 'Hi,',
@@ -108,6 +109,7 @@ function buildText(view) {
     dateStr && `Date: ${dateStr}`,
     timeStr && `Time: ${timeStr}`,
     paymentLabel && `Payment: ${paymentLabel}`,
+    paymentRef && `Reference No.: ${paymentRef}`,
     total && `Total: ${total}`,
     amountReceived && `Amount Received: ${amountReceived}`,
     amountChange && `Amount Change: ${amountChange}`,
@@ -131,7 +133,9 @@ export async function sendAppointmentConfirmationEmail(payload = {}) {
 
   const view = {
     brand: BRAND,
-    greetingName: payload.guardianName ? String(payload.guardianName).trim() : '',
+    // The logged-in patient's own account name — not the guardian fields
+    // typed into the booking form, which can be left as placeholder text.
+    greetingName: payload.accountName ? String(payload.accountName).trim() : (payload.guardianName ? String(payload.guardianName).trim() : ''),
     patient: payload.patient ? String(payload.patient).trim() : '',
     condition: payload.condition ? String(payload.condition).trim() : '',
     therapist: payload.therapist ? String(payload.therapist).trim() : '',
@@ -140,16 +144,18 @@ export async function sendAppointmentConfirmationEmail(payload = {}) {
     dateStr: payload.date ? String(payload.date).trim() : '',
     timeStr: payload.time ? String(payload.time).trim() : '',
     paymentLabel: payload.payment ? String(payload.payment).trim() : '',
+    paymentRef: payload.paymentRef ? String(payload.paymentRef).trim() : '',
     total: formatPeso(payload.total),
     amountReceived: formatPeso(payload.amountReceived),
     amountChange: formatPeso(payload.amountChange),
   }
 
   const subjectDate = view.dateStr ? ` — ${view.dateStr}` : ''
+  const subjectRef = view.paymentRef ? ` (Ref ${view.paymentRef})` : ''
   const { referenceId } = await sendEmail({
     to: email,
     toName: view.greetingName || undefined,
-    subject: `Your ${BRAND} appointment is confirmed${subjectDate}`,
+    subject: `Your ${BRAND} appointment is confirmed${subjectDate}${subjectRef}`,
     html: buildHtml(view),
     plain: buildText(view),
   })

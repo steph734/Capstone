@@ -45,8 +45,8 @@ function ChatHeader({ onCall }) {
         <span className="msg-chat-header-status">{online ? 'Online' : 'Offline'}</span>
       </div>
       <div className="msg-chat-header-actions">
-        <button className="msg-icon-btn" onClick={() => onCall(other, true)} aria-label="Video call"><VideoIcon /></button>
-        <button className="msg-icon-btn" onClick={() => onCall(other, false)} aria-label="Voice call"><PhoneIcon /></button>
+        <button className="msg-icon-btn" onClick={() => onCall(other, true, channel.id)} aria-label="Video call"><VideoIcon /></button>
+        <button className="msg-icon-btn" onClick={() => onCall(other, false, channel.id)} aria-label="Voice call"><PhoneIcon /></button>
       </div>
     </div>
   )
@@ -109,9 +109,9 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
     }
   }
 
-  const handleCall = (otherUser, video) => {
+  const handleCall = (otherUser, video, channelId) => {
     if (!otherUser?.id) return
-    contact.callOtherUser(otherUser.id, { video }).catch((err) => alert(err.message))
+    contact.callOtherUser(otherUser.id, { video, channelId }).catch((err) => alert(err.message))
   }
 
   return (

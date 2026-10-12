@@ -33,9 +33,9 @@ export default function useContact(email) {
     return { channel, otherUser }
   }
 
-  async function callOtherUser(otherUserId, { video = true } = {}) {
+  async function callOtherUser(otherUserId, { video = true, channelId } = {}) {
     if (!videoClient || !session) throw new Error('Calling isn’t ready yet.')
-    return startCall(videoClient, { members: [session.userId, otherUserId], video, audioOnly: !video })
+    return startCall(videoClient, { members: [session.userId, otherUserId], video, audioOnly: !video, meta: { channelId, email } })
   }
 
   return { contact, listContacts, openChannel, callOtherUser }

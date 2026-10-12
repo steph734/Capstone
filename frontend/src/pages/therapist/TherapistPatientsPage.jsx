@@ -199,7 +199,7 @@ function MessageModal({ patient, therapistEmail, onClose }) {
   const handleCall = (video) => {
     const other = channel && Object.values(channel.state.members || {}).find((m) => m.user?.id !== chatClient.userID)?.user
     if (!other?.id) return
-    contact.callOtherUser(other.id, { video }).catch((err) => alert(err.message))
+    contact.callOtherUser(other.id, { video, channelId: channel.id }).catch((err) => alert(err.message))
   }
 
   return (

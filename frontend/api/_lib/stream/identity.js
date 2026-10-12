@@ -4,17 +4,26 @@
 // (e.g. patients-therapist-list.js trusts a bare ?email= query param) — not
 // a hardened auth check, just enough to keep strangers off each other's
 // threads. If this app ever adds real sessions, swap this for verifying one.
+import { ObjectId } from 'mongodb'
 import { getDb } from '../mongo.js'
 import { Employee } from '../models/employee.js'
+import { User } from '../models/user.js'
 import { patientStreamId, therapistStreamId } from './serverClient.js'
 
 // Returns one of:
-//   { kind: 'therapist', employee, streamId, name }
-//   { kind: 'patient', patient, streamId, name }
+//   { kind: 'therapist', employee, streamId, userId, name }
+//   { kind: 'patient', patient, streamId, userId, name }
 //   null  (email not recognized as either)
+// `userId` is the Mongo `users._id` behind this login — the FK the
+// `conversations`/`call_logs` collections actually reference (they model
+// therapist/guardian as Users, not as `employees`/`patients` rows).
 export async function resolveCallerIdentity(email) {
   const lower = String(email || '').trim().toLowerCase()
   if (!lower) return null
+
+  // `email` is always the login address (what resolveCallerIdentity is
+  // called with), which is exactly `users.email` regardless of role.
+  const user = await User.findOne({ email: lower }).lean()
 
   const employee = await Employee.findOne({ email: lower }).lean()
   if (employee) {
@@ -23,6 +32,7 @@ export async function resolveCallerIdentity(email) {
       kind: 'therapist',
       employee,
       streamId: therapistStreamId(employee._id),
+      userId: user?._id || employee.user_id || null,
       name,
       image: employee.profile_picture?.url || null,
     }
@@ -37,11 +47,40 @@ export async function resolveCallerIdentity(email) {
       kind: 'patient',
       patient,
       streamId: patientStreamId(patient._id),
+      userId: user?._id || null,
       name: guardianName || patientName || 'Guardian',
     }
   }
 
   return null
+}
+
+function parseStreamId(streamId) {
+  if (streamId?.startsWith('patient-')) return { kind: 'patient', id: streamId.slice('patient-'.length) }
+  if (streamId?.startsWith('therapist-')) return { kind: 'therapist', id: streamId.slice('therapist-'.length) }
+  return null
+}
+
+// The Mongo `users._id` behind a Stream user id — used when we only know
+// "the other side of this channel/call" as a Stream id (e.g. from a
+// message.new event) and need the FK for conversations/call_logs.
+export async function userIdForStreamId(streamId) {
+  const parsed = parseStreamId(streamId)
+  if (!parsed) return null
+
+  if (parsed.kind === 'therapist') {
+    const employee = await Employee.findById(parsed.id).lean()
+    if (!employee) return null
+    if (employee.user_id) return employee.user_id
+    const user = await User.findOne({ email: employee.email }).lean()
+    return user?._id || null
+  }
+
+  const db = await getDb()
+  const patient = await db.collection('patients').findOne({ _id: new ObjectId(parsed.id) })
+  if (!patient?.email) return null
+  const user = await User.findOne({ email: patient.email }).lean()
+  return user?._id || null
 }
 
 // Every therapist this patient has ever booked with, newest first.

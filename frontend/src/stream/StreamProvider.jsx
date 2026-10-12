@@ -88,6 +88,27 @@ export default function StreamProvider({ user, children }) {
     clientsRef.current.video?.disconnectUser().catch(() => {})
   }, [])
 
+  // Mirror every new message into `conversations` (last_message_preview/by/at)
+  // — best-effort, fire-and-forget, never blocks the chat UI.
+  useEffect(() => {
+    if (!chatClient) return undefined
+    const handler = (event) => {
+      const channelId = event.channel_id || event.channel?.id || event.cid?.split(':')[1]
+      if (!channelId || !event.message) return
+      fetch('/api/stream/message-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId, text: event.message.text, senderStreamId: event.message.user?.id }),
+      }).catch(() => {})
+    }
+    chatClient.on('message.new', handler)
+    chatClient.on('notification.message_new', handler)
+    return () => {
+      chatClient.off('message.new', handler)
+      chatClient.off('notification.message_new', handler)
+    }
+  }, [chatClient])
+
   const ctxValue = useMemo(() => ({
     chatClient, videoClient, session, error, ready: Boolean(chatClient && videoClient),
   }), [chatClient, videoClient, session, error])

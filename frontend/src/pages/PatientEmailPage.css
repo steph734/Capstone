@@ -320,6 +320,62 @@
 .pe-detail-body { font-size: 14px; line-height: 1.8; color: #202124; }
 .pe-detail-body p { margin: 0 0 2px; }
 
+.pe-thread-message {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #eef3f1;
+}
+.pe-thread-message:last-of-type { border-bottom: none; }
+
+.pe-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pe-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f3;
+  border: 1px solid #e1e9e5;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: #2c4a3e;
+  cursor: pointer;
+}
+.pe-attachment-chip:hover { background: #e6efe9; }
+
+.pe-reply-btn {
+  margin-top: 8px;
+  background: #1FA58A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.pe-row-restore {
+  background: #eef3f1;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #234C40;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.pe-error {
+  margin: 8px 16px;
+  color: #9a3b3b;
+  font-size: 13px;
+}
+
 /* ══════════════════════════════════════════
    ICON BUTTONS
 ══════════════════════════════════════════ */

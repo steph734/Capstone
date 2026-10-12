@@ -8,6 +8,7 @@ import {
   MessageComposer,
   Thread,
   useChannelStateContext,
+  useChatContext,
 } from 'stream-chat-react'
 import PatientSidebar from '../components/PatientSidebar'
 import { useStreamCtx } from '../stream/StreamProvider'
@@ -52,6 +53,40 @@ function ChatHeader({ onCall }) {
   )
 }
 
+// ChannelList has no `onSelect` prop in this version — the active channel
+// lives in Stream's own ChatContext, set by whatever calls `setActiveChannel`
+// (normally the default Preview). We render our own Preview row instead, both
+// to match the app's styling and so we can flip `onPick` for mobile view.
+function ConvPreview({ channel, setActiveChannel, activeChannel, onPick }) {
+  const other = Object.values(channel.state.members || {}).find((m) => m.user?.id !== channel.getClient().userID)?.user
+  const lastMessage = [...channel.state.messages].pop()
+  const unread = channel.countUnread()
+  const isActive = activeChannel?.id === channel.id
+
+  return (
+    <button
+      className={`msg-conv-item${isActive ? ' msg-conv-active' : ''}`}
+      onClick={() => { setActiveChannel(channel); onPick() }}
+    >
+      <div className="msg-conv-avatar-wrap">
+        {other?.image
+          ? <img src={other.image} alt="" className="msg-avatar" style={{ width: 46, height: 46 }} />
+          : <div className="msg-avatar" style={{ width: 46, height: 46, background: '#234C40' }}>{(other?.name || '?')[0]}</div>}
+      </div>
+      <div className="msg-conv-body">
+        <div className="msg-conv-top">
+          <span className="msg-conv-name">{other?.name || 'Conversation'}</span>
+          <span className="msg-conv-time">{lastMessage ? new Date(lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+        </div>
+        <div className="msg-conv-bottom">
+          <span className="msg-conv-preview">{lastMessage?.text || 'No messages yet'}</span>
+          {unread > 0 && <span className="msg-unread-badge">{unread}</span>}
+        </div>
+      </div>
+    </button>
+  )
+}
+
 function EmptyChat() {
   return (
     <div className="msg-empty">
@@ -62,16 +97,17 @@ function EmptyChat() {
   )
 }
 
-export default function MessagesPage({ user, onLogout, betaTier }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [mobileView, setMobileView] = useState('list')
-  const [activeChannel, setActiveChannel] = useState(null)
+// Rendered only once `chatClient` exists, i.e. only once StreamProvider has
+// actually mounted its <Chat client={chatClient}> wrapper — useChatContext()
+// would otherwise read from no provider at all and crash.
+function MessagesInner({ user, mobileView, setMobileView }) {
   const [search, setSearch] = useState('')
   const [composeOpen, setComposeOpen] = useState(false)
   const [contacts, setContacts] = useState([])
   const [searchParams] = useSearchParams()
 
-  const { chatClient, error: streamError } = useStreamCtx() || {}
+  const { chatClient } = useStreamCtx() || {}
+  const { channel: activeChannel, setActiveChannel } = useChatContext()
   const contact = useContact(user?.email)
 
   const filters = chatClient ? { type: 'messaging', members: { $in: [chatClient.userID] } } : null
@@ -115,6 +151,63 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
   }
 
   return (
+    <div className="msg-shell">
+      <aside className={`msg-left${mobileView === 'chat' ? ' msg-left-hidden' : ''}`}>
+        <div className="msg-left-header">
+          <h2 className="msg-left-title">Messages</h2>
+          <button className="msg-icon-btn" onClick={openCompose} aria-label="New conversation">+</button>
+        </div>
+
+        <div className="msg-search-wrap">
+          <span className="msg-search-icon"><SearchIcon /></span>
+          <input className="msg-search-input" placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+
+        {composeOpen && (
+          <div className="msg-compose-list">
+            {contacts.length === 0 && <p className="msg-no-results">No contacts yet.</p>}
+            {contacts.map((c) => (
+              <button key={c.targetPatientId || c.targetEmployeeId} className="msg-conv-item" onClick={() => startWith(c)}>
+                <div className="msg-conv-body"><span className="msg-conv-name">{c.name}</span></div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="msg-list">
+          <ChannelList
+            filters={filters}
+            sort={sort}
+            options={{ state: true, watch: true, presence: true }}
+            Preview={(props) => (
+              <ConvPreview {...props} onPick={() => setMobileView('chat')} />
+            )}
+          />
+        </div>
+      </aside>
+
+      <section className={`msg-center${mobileView === 'list' ? ' msg-center-hidden' : ''}`}>
+        {!activeChannel ? <EmptyChat /> : (
+          <Channel channel={activeChannel}>
+            <Window>
+              <ChatHeader onCall={handleCall} />
+              <MessageList />
+              <MessageComposer />
+            </Window>
+            <Thread />
+          </Channel>
+        )}
+      </section>
+    </div>
+  )
+}
+
+export default function MessagesPage({ user, onLogout, betaTier }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileView, setMobileView] = useState('list')
+  const { chatClient, error: streamError } = useStreamCtx() || {}
+
+  return (
     <div className="page-with-sidebar">
       <PatientSidebar
         user={user}
@@ -133,52 +226,7 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
         {!chatClient ? (
           <div className="msg-empty"><p>Connecting to messaging…</p></div>
         ) : (
-          <div className="msg-shell">
-            <aside className={`msg-left${mobileView === 'chat' ? ' msg-left-hidden' : ''}`}>
-              <div className="msg-left-header">
-                <h2 className="msg-left-title">Messages</h2>
-                <button className="msg-icon-btn" onClick={openCompose} aria-label="New conversation">+</button>
-              </div>
-
-              <div className="msg-search-wrap">
-                <span className="msg-search-icon"><SearchIcon /></span>
-                <input className="msg-search-input" placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
-              </div>
-
-              {composeOpen && (
-                <div className="msg-compose-list">
-                  {contacts.length === 0 && <p className="msg-no-results">No contacts yet.</p>}
-                  {contacts.map((c) => (
-                    <button key={c.targetPatientId || c.targetEmployeeId} className="msg-conv-item" onClick={() => startWith(c)}>
-                      <div className="msg-conv-body"><span className="msg-conv-name">{c.name}</span></div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="msg-list">
-                <ChannelList
-                  filters={filters}
-                  sort={sort}
-                  options={{ state: true, watch: true, presence: true }}
-                  onSelect={(ch) => { setActiveChannel(ch); setMobileView('chat') }}
-                />
-              </div>
-            </aside>
-
-            <section className={`msg-center${mobileView === 'list' ? ' msg-center-hidden' : ''}`}>
-              {!activeChannel ? <EmptyChat /> : (
-                <Channel channel={activeChannel}>
-                  <Window>
-                    <ChatHeader onCall={handleCall} />
-                    <MessageList />
-                    <MessageComposer />
-                  </Window>
-                  <Thread />
-                </Channel>
-              )}
-            </section>
-          </div>
+          <MessagesInner user={user} mobileView={mobileView} setMobileView={setMobileView} />
         )}
       </main>
     </div>

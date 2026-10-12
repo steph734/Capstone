@@ -6,6 +6,7 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useStreamCtx } from '../../stream/StreamProvider'
 import useContact from '../../stream/useContact'
+import EmailGuardianModal from '../../components/EmailGuardianModal'
 import { generateUniqueId } from '../../utils/idGenerator'
 
 function fmtDate(iso) {
@@ -93,7 +94,7 @@ function initialsFor(name) {
 }
 
 /* ── Profile Modal ──────────────────────────────────────── */
-function ProfileModal({ patient, onClose, onMessage }) {
+function ProfileModal({ patient, onClose, onMessage, onEmail }) {
   const sc = STATUS_CONFIG[patient.status] || STATUS_CONFIG['Active']
 
   return (
@@ -153,15 +154,14 @@ function ProfileModal({ patient, onClose, onMessage }) {
         {/* Footer */}
         <div className="tp-modal-footer">
           <button className="tp-btn-cancel" onClick={onClose}>Close</button>
-          <a
+          <button
+            type="button"
             className="tp-btn-cancel tp-btn-email"
-            href={patient.email ? `mailto:${patient.email}` : undefined}
-            aria-disabled={!patient.email}
-            onClick={(e) => { if (!patient.email) e.preventDefault() }}
+            onClick={() => { onClose(); onEmail(patient) }}
           >
             <EmailIcon />
             Email Guardian
-          </a>
+          </button>
           <button className="tp-btn-add" onClick={() => { onClose(); onMessage(patient) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -332,6 +332,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [showAdd, setShowAdd]     = useState(false)
   const [profilePt, setProfilePt] = useState(null)
   const [messagePt, setMessagePt] = useState(null)
+  const [emailingPt, setEmailingPt] = useState(null)
   // { type: 'archive' | 'delete', patient } while a confirm modal is open.
   const [confirmModal, setConfirmModal] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -640,14 +641,10 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
               Send message
             </button>
-            <a
-              href={p.email ? `mailto:${p.email}` : undefined}
-              aria-disabled={!p.email}
-              onClick={(e) => { if (!p.email) e.preventDefault(); setOpenMenuId(null); setMenuPos(null) }}
-            >
+            <button onClick={() => { setEmailingPt(p); setOpenMenuId(null); setMenuPos(null) }}>
               <EmailIcon />
               Send email
-            </a>
+            </button>
             <button onClick={() => { setProfilePt(p); setOpenMenuId(null); setMenuPos(null) }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
               View notes
@@ -665,6 +662,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           patient={profilePt}
           onClose={() => setProfilePt(null)}
           onMessage={(p) => { setProfilePt(null); setMessagePt(p) }}
+          onEmail={(p) => { setProfilePt(null); setEmailingPt(p) }}
         />
       )}
       {messagePt && (
@@ -672,6 +670,15 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           patient={messagePt}
           therapistEmail={user?.email}
           onClose={() => setMessagePt(null)}
+        />
+      )}
+      {emailingPt && (
+        <EmailGuardianModal
+          currentUserEmail={user?.email}
+          mode="compose"
+          patient={{ id: emailingPt.id, name: emailingPt.name }}
+          guardianName={emailingPt.guardian}
+          onClose={() => setEmailingPt(null)}
         />
       )}
       {confirmModal && (

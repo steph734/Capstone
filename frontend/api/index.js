@@ -37,6 +37,10 @@ import streamContact from './_lib/routes/stream-contact.js'
 import streamContacts from './_lib/routes/stream-contacts.js'
 import streamMessageLog from './_lib/routes/stream-message-log.js'
 import streamCallLog from './_lib/routes/stream-call-log.js'
+import emailsCollection from './_lib/routes/emails-collection.js'
+import emailsUnreadCount from './_lib/routes/emails-unread-count.js'
+import emailsItem from './_lib/routes/emails-item.js'
+import emailsAttachment from './_lib/routes/emails-attachment.js'
 import patientPhotosItem from './_lib/routes/patient-photos-item.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
@@ -144,6 +148,12 @@ app.all('/api/stream/contact', streamContact)
 app.all('/api/stream/contacts', streamContacts)
 app.all('/api/stream/message-log', streamMessageLog)
 app.all('/api/stream/call-log', streamCallLog)
+// Static-segment routes before their sibling :id route, or "unread-count"
+// gets read as an email id (same ordering gotcha as elsewhere in this file).
+app.all('/api/emails/unread-count', emailsUnreadCount)
+app.all('/api/emails/:id/attachments/:index', emailsAttachment)
+app.all('/api/emails/:id', emailsItem)
+app.all('/api/emails', emailsCollection)
 app.all('/api/patient-photos/:publicId', patientPhotosItem)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)

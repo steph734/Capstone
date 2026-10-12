@@ -91,6 +91,7 @@ const BASE_THERAPIST_MENU_ITEMS = [
   { id: 'attendance', label: 'Attendance', icon: <AttendanceIcon />, path: '/therapist/attendance' },
   { id: 'subscription', label: 'Subscription', icon: <SubscriptionIcon />, path: '/therapist/subscription' },
   { id: 'notes-progress', label: 'Notes & Progress', icon: <NotesIcon />, path: '/therapist/notes-progress' },
+  { id: 'email', label: 'Email', icon: <NotesIcon />, path: '/therapist/email' },
   { id: 'assign-exercises', label: 'Assign Exercises', icon: <ExercisesIcon />, path: '/therapist/assign-exercises' },
   { id: 'reports', label: 'Reports', icon: <ReportIcon />, path: '/therapist/reports' },
 ]

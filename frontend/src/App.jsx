@@ -68,6 +68,7 @@ import PatientProgressPage from './pages/PatientProgressPage'
 import PatientEmailPage from './pages/PatientEmailPage'
 import TherapistDashboard from './pages/therapist/TherapistDashboard'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
+import TherapistEmailPage from './pages/therapist/TherapistEmailPage'
 import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPage'
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage'
 import TherapistNotesProgressPage from './pages/therapist/TherapistNotesProgressPage'
@@ -615,6 +616,21 @@ function App() {
           }
         />
 
+
+        <Route
+          path="/therapist/email"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistEmailPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
         <Route
           path="/therapist/appointments"

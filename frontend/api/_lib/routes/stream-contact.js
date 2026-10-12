@@ -57,6 +57,7 @@ export default async function handler(req, res) {
 
     const channel = client.channel('messaging', {
       members: [caller.streamId, otherStreamId].sort(),
+      created_by_id: caller.streamId,
     })
     await channel.create()
 

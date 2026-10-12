@@ -32,6 +32,9 @@ import appointmentsTherapists from './_lib/routes/appointments-therapists.js'
 import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slots.js'
 import appointmentsTherapistList from './_lib/routes/appointments-therapist-list.js'
 import patientsTherapistList from './_lib/routes/patients-therapist-list.js'
+import streamToken from './_lib/routes/stream-token.js'
+import streamContact from './_lib/routes/stream-contact.js'
+import streamContacts from './_lib/routes/stream-contacts.js'
 import patientPhotosItem from './_lib/routes/patient-photos-item.js'
 import authSignup from './_lib/routes/auth-signup.js'
 import authVerifyOtp from './_lib/routes/auth-verify-otp.js'
@@ -134,6 +137,9 @@ app.all('/api/appointments/therapists', appointmentsTherapists)
 app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)
 app.all('/api/appointments/therapist-list', appointmentsTherapistList)
 app.all('/api/patients/therapist-list', patientsTherapistList)
+app.all('/api/stream/token', streamToken)
+app.all('/api/stream/contact', streamContact)
+app.all('/api/stream/contacts', streamContacts)
 app.all('/api/patient-photos/:publicId', patientPhotosItem)
 app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)

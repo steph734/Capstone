@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@cloudinary/react": "^1.14.4",
     "@cloudinary/url-gen": "^1.22.0",
+    "@stream-io/node-sdk": "^0.8.12",
     "@stream-io/video-react-sdk": "^1.39.1",
     "@stripe/react-stripe-js": "^6.8.2",
     "@stripe/stripe-js": "^9.14.0",
@@ -37,6 +38,8 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
+    "stream-chat": "^9.54.0",
+    "stream-chat-react": "^14.13.0",
     "stripe": "^22.5.0",
     "xlsx": "^0.18.5"
   },

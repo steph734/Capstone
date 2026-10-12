@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import useUnreadCount from '../stream/useUnreadCount'
 import './PatientSidebar.css'
 
 // SVG Icons
@@ -154,6 +155,7 @@ export default function PatientSidebar({
   profilePath,
 }) {
   const resolvedMenuItems = menuItems ?? getPatientMenuItems(betaTier)
+  const unreadCount = useUnreadCount()
   const navigate = useNavigate()
   const location = useLocation()
   const sidebarRef = useRef(null)
@@ -239,6 +241,9 @@ export default function PatientSidebar({
                 >
                   <span className="nav-icon">{item.icon}</span>
                   <span className="nav-label">{item.label}</span>
+                  {item.id === 'messages' && unreadCount > 0 && (
+                    <span className="nav-unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                  )}
                   {item.trial && <span className="nav-trial-tag">Trial</span>}
                   {hasChildren && (
                     <span className={`nav-chevron ${isExpanded ? 'open' : ''}`}>

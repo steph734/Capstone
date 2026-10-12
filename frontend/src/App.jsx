@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
+import StreamProvider from './stream/StreamProvider'
 import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
@@ -286,6 +287,7 @@ function App() {
   }
 
   return (
+    <StreamProvider user={currentUser}>
     <MessagesProvider>
     <ProgressProvider>
     <AnalyticsProvider>
@@ -1261,6 +1263,7 @@ function App() {
     </AnalyticsProvider>
     </ProgressProvider>
     </MessagesProvider>
+    </StreamProvider>
   )
 }
 

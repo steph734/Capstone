@@ -609,6 +609,18 @@
   transform: translateY(-1px);
 }
 
+.tp-msg-stream-body {
+  flex: 1;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tp-msg-stream-body .str-chat {
+  height: 100%;
+}
+
 .tp-msg-body {
   flex: 1;
   overflow-y: auto;

@@ -1,0 +1,105 @@
+.tp-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 30, 24, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.tp-call-ringing-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 28px;
+  width: min(320px, 90vw);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.tp-call-avatar {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 14px;
+}
+
+.tp-call-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #234C40;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.tp-call-ringing-card h3 {
+  margin: 0 0 4px;
+  color: #1F3D36;
+  font-size: 18px;
+}
+
+.tp-call-ringing-card p {
+  margin: 0 0 20px;
+  color: #6b7c75;
+  font-size: 13px;
+}
+
+.tp-call-ringing-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.tp-call-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tp-call-accept {
+  background: #1FA58A;
+  color: #fff;
+}
+
+.tp-call-decline {
+  background: #e24c4c;
+  color: #fff;
+}
+
+.tp-call-active {
+  background: rgba(10, 20, 16, 0.92);
+}
+
+.tp-call-active-body {
+  width: min(960px, 94vw);
+  height: min(640px, 86vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #11201a;
+}
+
+.tp-call-audio-note {
+  text-align: center;
+  color: #cfe7df;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.tp-messages-error {
+  margin: 12px 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff3f3;
+  border: 1px solid #f3c6c6;
+  color: #9a3b3b;
+  font-size: 13px;
+}

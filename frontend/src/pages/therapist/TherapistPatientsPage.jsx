@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
+import { Channel, Window, MessageList, MessageComposerUI } from 'stream-chat-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
-import { useSharedMessages } from '../../context/MessagesContext'
-import CallOverlay from '../../components/CallOverlay'
-import { STREAM_THERAPIST_USER } from '../../utils/streamConfig'
+import { useStreamCtx } from '../../stream/StreamProvider'
+import useContact from '../../stream/useContact'
 import { generateUniqueId } from '../../utils/idGenerator'
 
 function fmtDate(iso) {
@@ -21,9 +22,6 @@ function avatarFor(id) {
   return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
 }
 
-// Lazy-loaded: the GetStream Video SDK is large and only needed once someone
-// actually opens a real video/voice call.
-const StreamCallOverlay = lazy(() => import('../../components/StreamCallOverlay'))
 import './TherapistPatientsPage.css'
 
 function VideoIcon() {
@@ -177,27 +175,31 @@ function ProfileModal({ patient, onClose, onMessage }) {
 }
 
 /* ── Message Modal ──────────────────────────────────────── */
-function MessageModal({ patient, messages, onSend, onClose }) {
-  const [text, setText] = useState('')
-  const [activeCall, setActiveCall] = useState(null) // null | 'video' | 'voice'
-  const bottomRef = useRef(null)
+// Wired to the real 1-on-1 Stream channel between this therapist and the
+// patient's guardian (created on open via /api/stream/contact if it doesn't
+// exist yet). Video/voice buttons start real Stream calls.
+function MessageModal({ patient, therapistEmail, onClose }) {
+  const [channel, setChannel] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const navigate = useNavigate()
+  const { chatClient } = useStreamCtx() || {}
+  const contact = useContact(therapistEmail)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    let cancelled = false
+    setChannel(null)
+    setLoadError('')
+    if (!chatClient || !patient?.id) return undefined
+    contact.openChannel({ targetPatientId: patient.id })
+      .then(({ channel: ch }) => { if (!cancelled) setChannel(ch) })
+      .catch((err) => { if (!cancelled) setLoadError(err.message) })
+    return () => { cancelled = true }
+  }, [chatClient, patient?.id])
 
-  const handleSend = () => {
-    const trimmed = text.trim()
-    if (!trimmed) return
-    onSend(patient.id, trimmed)
-    setText('')
-  }
-
-  const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
+  const handleCall = (video) => {
+    const other = channel && Object.values(channel.state.members || {}).find((m) => m.user?.id !== chatClient.userID)?.user
+    if (!other?.id) return
+    contact.callOtherUser(other.id, { video }).catch((err) => alert(err.message))
   }
 
   return (
@@ -211,66 +213,37 @@ function MessageModal({ patient, messages, onSend, onClose }) {
             <span className="tp-msg-header-sub">Messaging · {patient.guardian} (Guardian)</span>
           </div>
           <div className="tp-msg-header-actions">
-            <button className="tp-icon-btn" onClick={() => setActiveCall('video')} aria-label="Video call"><VideoIcon /></button>
-            <button className="tp-icon-btn" onClick={() => setActiveCall('voice')} aria-label="Voice call"><PhoneIcon /></button>
+            <button className="tp-icon-btn" onClick={() => handleCall(true)} aria-label="Video call" disabled={!channel}><VideoIcon /></button>
+            <button className="tp-icon-btn" onClick={() => handleCall(false)} aria-label="Voice call" disabled={!channel}><PhoneIcon /></button>
+            {channel && (
+              <button
+                className="tp-icon-btn"
+                onClick={() => navigate(`/messages?cid=${channel.type}:${channel.id}`)}
+                aria-label="Open in Messages"
+                title="Open in Messages"
+              >
+                ↗
+              </button>
+            )}
             <button className="tp-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
         </div>
 
-        {/* Messages */}
-        <div className="tp-msg-body">
-          {messages.map((m, i) => (
-            <div key={i} className={`tp-bubble-wrap ${m.from === 'me' ? 'tp-wrap-me' : 'tp-wrap-them'}`}>
-              {m.from === 'them' && (
-                <img src={patient.avatar} alt="" className="tp-bubble-avatar" />
-              )}
-              <div className={`tp-bubble ${m.from === 'me' ? 'tp-bubble-me' : 'tp-bubble-them'}`}>
-                <p className="tp-bubble-text">{m.text}</p>
-                <span className="tp-bubble-time">{m.time}</span>
-              </div>
-            </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
+        {loadError && <div className="tp-msg-body"><p style={{ color: '#9a3b3b' }}>{loadError}</p></div>}
 
-        {/* Input */}
-        <div className="tp-msg-input-row">
-          <textarea
-            className="tp-msg-input"
-            placeholder="Type a message…"
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={handleKey}
-            rows={1}
-          />
-          <button className="tp-msg-send" onClick={handleSend} aria-label="Send">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
-        </div>
+        {channel && (
+          <div className="tp-msg-stream-body">
+            <Channel channel={channel}>
+              <Window>
+                <MessageList />
+                <MessageComposerUI />
+              </Window>
+            </Channel>
+          </div>
+        )}
+
+        {!channel && !loadError && <div className="tp-msg-body"><p>Connecting…</p></div>}
       </div>
-
-      {patient.id === 0 ? (
-        activeCall && (
-          <Suspense fallback={null}>
-            <StreamCallOverlay
-              open={!!activeCall}
-              localUser={STREAM_THERAPIST_USER}
-              onClose={() => setActiveCall(null)}
-            />
-          </Suspense>
-        )
-      ) : (
-        <CallOverlay
-          open={!!activeCall}
-          type={activeCall || 'voice'}
-          contactName={patient.name}
-          avatarUrl={patient.avatar}
-          onClose={() => setActiveCall(null)}
-        />
-      )}
     </div>
   )
 }
@@ -361,7 +334,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [messagePt, setMessagePt] = useState(null)
   // { type: 'archive' | 'delete', patient } while a confirm modal is open.
   const [confirmModal, setConfirmModal] = useState(null)
-  const [threads, setThreads]     = useState({})
   const [openMenuId, setOpenMenuId] = useState(null)
   // Fixed-position coordinates for the open row menu, computed from the
   // kebab button that opened it. The menu is portaled to <body> (see
@@ -370,8 +342,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   // that container's overflow-x: auto (which — per the CSS overflow spec —
   // forces overflow-y to auto too whenever only one axis is set).
   const [menuPos, setMenuPos] = useState(null)
-
-  const { thread, sendAsTherapist } = useSharedMessages()
 
   // Every patient who has actually booked with this therapist, derived from
   // the `appointments` collection (see api/_lib/routes/patients-therapist-list.js)
@@ -425,19 +395,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       window.removeEventListener('resize', close)
     }
   }, [openMenuId])
-
-  // Build the message list for a given patient.
-  // Patient id=0 (Alvrin) is the demo patient — use the shared context thread.
-  const getMessages = (patientId) => {
-    if (patientId === 0) {
-      return thread.map(m => ({
-        from: m.from === 'therapist' ? 'me' : 'them',
-        text: m.text,
-        time: m.time,
-      }))
-    }
-    return threads[patientId] || []
-  }
 
   // These just apply the change — the confirm/unarchive decision lives in
   // the button handlers below (via `confirmModal`), so callers here are
@@ -504,22 +461,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       notes:       'No clinical notes yet.',
     }
     setPatients(prev => [newPt, ...prev])
-    setThreads(prev => ({ ...prev, [newPt.id]: [] }))
-  }
-
-  const handleSend = (patientId, text) => {
-    if (patientId === 0) {
-      // Route through shared context so Alvrin sees it in their Messages page
-      sendAsTherapist(text)
-      return
-    }
-    const now = new Date()
-    const time = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-      ', ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    setThreads(prev => ({
-      ...prev,
-      [patientId]: [...(prev[patientId] || []), { from: 'me', text, time }],
-    }))
   }
 
   return (
@@ -729,8 +670,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       {messagePt && (
         <MessageModal
           patient={messagePt}
-          messages={getMessages(messagePt.id)}
-          onSend={handleSend}
+          therapistEmail={user?.email}
           onClose={() => setMessagePt(null)}
         />
       )}

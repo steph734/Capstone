@@ -51,6 +51,8 @@ import OwnerSpeechToTextPage from './pages/owner/OwnerSpeechToTextPage'
 import OwnerTextToSpeechPage from './pages/owner/OwnerTextToSpeechPage'
 import OwnerSpeechFeaturesPage from './pages/owner/OwnerSpeechFeaturesPage'
 import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPage'
+import OwnerGamifiedPatientStatsPage from './pages/owner/OwnerGamifiedPatientStatsPage'
+import OwnerGamePreviewPage from './pages/owner/OwnerGamePreviewPage'
 import OwnerActivityLibraryPage from './pages/owner/OwnerActivityLibraryPage'
 import OwnerRequestGamePage from './pages/owner/OwnerRequestGamePage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
@@ -667,7 +669,7 @@ function App() {
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
-                <TherapistSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+                <TherapistSubscriptionPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} activePlan={ownerActivePlan} planTrialEnds={ownerPlanTrialEnds} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -818,6 +820,36 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
                 <OwnerGamifiedActivitiesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/gamified-activities/patients/:patientId"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerGamifiedPatientStatsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/owner/gamified-activities/preview/:gameKey"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Owner' ? (
+                <OwnerGamePreviewPage />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

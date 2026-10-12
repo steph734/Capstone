@@ -247,6 +247,26 @@
 
 .msg-back-btn { display: none; }
 
+/* Stream's own ChannelList renders a default "Chats" header above the list
+   — redundant with our own .msg-left-header title + compose button above. */
+.msg-list .str-chat__channel-list__header { display: none; }
+
+/* Let Stream's own Window/MessageList/MessageComposer fill the remaining
+   height of .msg-center at any width, instead of each keeping its own
+   intrinsic/min size (which is what caused empty space and overflow). */
+.msg-center .str-chat {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+}
+.msg-center .str-chat__container,
+.msg-center .str-chat__main-panel {
+  min-height: 0;
+  height: 100%;
+}
+.msg-center .str-chat__list { min-height: 0; }
+
 .msg-chat-header-avatar { flex-shrink: 0; }
 
 .msg-chat-header-info {

@@ -59,7 +59,7 @@ function introMoodFor(stageIdx, talking, explainPhase) {
 
 // ─── Game list ────────────────────────────────────────────────────────────────
 
-const GAMES = [
+export const GAMES = [
   { id: 'puzzle-pieces', title: 'Puzzle Pals',        emoji: '🐾', desc: 'Place each piece where it belongs!', color: '#34d399', requiredLevel: 1,  category: 'cognitive',    difficulty: 'easy',
     instructions: 'Drag each piece into the hole with the same shape. Learn on top, under and next to, with animals, fruits, vehicles and more!', badge: 'Puzzle Pro',    badgeEmoji: '🧩', xp: 100,
     benefits: 'Builds spatial awareness and positional vocabulary (on top, under, next to), strengthens visual matching and problem-solving, and supports fine motor coordination through drag-and-place actions.' },
@@ -397,7 +397,7 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
   )
 }
 
-function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null }) {
+function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null }) {
   const navigate = useNavigate()
   const pao = usePao()
 
@@ -484,12 +484,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   // Pao's spoken language — chosen fresh each visit via the modal below,
   // prefilled with whatever was picked last time.
   const [lang,          setLang]          = useState(() => getPaoLanguage())
-  const [showLangModal, setShowLangModal] = useState(true)
+  const [showLangModal, setShowLangModal] = useState(!previewGameId)
   const sessionReady = !requirePlayer || !activity.loading
   const showPicker = requirePlayer && !showLangModal && sessionReady
     && (activity.pickerOpen || !activity.isActive || !!justStarted)
   const gateOpen = !showLangModal && sessionReady && !showPicker
-  const introStartedRef = useRef(false)
+  const introStartedRef = useRef(!!previewGameId)
 
   // Character level/XP/stats — live, driven by played sessions (ProgressContext).
   const { progress } = useSharedProgress()
@@ -630,7 +630,19 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else setShowCatModal(true)
   }
 
+  // Owner "Preview" (see OwnerGamePreviewPage): launch one game straight
+  // away. There's no player / activity session here, so the PaoProvider has no
+  // identity and nothing is saved to the server.
+  useEffect(() => {
+    if (!previewGameId) return
+    const game = GAMES.find((g) => g.id === previewGameId)
+    if (game) startGame(game)
+    else navigate(backPath)
+  }, [previewGameId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const backToGames = () => {
+    // Owner preview: leaving a game goes straight back to the library.
+    if (previewGameId) { stopPaoVoice(); navigate(backPath); return }
     setPhase('games'); setGamesIn(true); setDisplayText('')
     setTimeout(() => speakScript(pickLine(FULL_PAGE_LINES.gamesScript, lang)), 400)
   }
@@ -703,6 +715,21 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'story-select') {
     return <StoryBuilder onExit={backToGames}/>
+  }
+
+  if (previewGameId) {
+    return (
+      <div style={{ position:'fixed', inset:0, zIndex:9999, background:'linear-gradient(180deg,#56b8ee 0%,#7dd0f5 55%,#bdeafd 100%)' }}>
+        {puzzlePicker && (
+          <PuzzlePickerModal
+            lang={lang}
+            onBack={() => navigate(backPath)}
+            onStart={(cfg) => { setPuzzlePicker(false); setPuzzleConfig(cfg); stopPaoVoice(); setPhase('puzzle-pieces') }}
+          />
+        )}
+        {showCatModal && <CategoryModal onSelect={handleCatSelect} onClose={() => navigate(backPath)} lang={lang}/>}
+      </div>
+    )
   }
 
   return (

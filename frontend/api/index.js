@@ -80,6 +80,10 @@ import gamesAdminList from './_lib/routes/games-admin-list.js'
 import patientProgress from './_lib/routes/patient-progress.js'
 import therapistGamifiedOverview from './_lib/routes/therapist-gamified-overview.js'
 import therapistGamifiedPatient from './_lib/routes/therapist-gamified-patient.js'
+import ownerGamifiedOverview from './_lib/routes/owner-gamified-overview.js'
+import ownerGamifiedPatient from './_lib/routes/owner-gamified-patient.js'
+import ownerGamifiedNotify from './_lib/routes/owner-gamified-notify.js'
+import ownerGamifiedLibrary from './_lib/routes/owner-gamified-library.js'
 import gamesAdminItem from './_lib/routes/games-admin-item.js'
 import speechRecordingsCreate from './_lib/routes/speech-recordings-create.js'
 import speechRecordingsList from './_lib/routes/speech-recordings-list.js'
@@ -183,6 +187,10 @@ app.all('/api/badges/:id', badgesItem)
 app.all('/api/patient/progress', patientProgress)
 app.all('/api/therapist/gamified/overview', therapistGamifiedOverview)
 app.all('/api/therapist/gamified/patients/:patientId', therapistGamifiedPatient)
+app.all('/api/owner/gamified/overview', ownerGamifiedOverview)
+app.all('/api/owner/gamified/patients/:patientId', ownerGamifiedPatient)
+app.all('/api/owner/gamified/notify', ownerGamifiedNotify)
+app.all('/api/owner/gamified/library', ownerGamifiedLibrary)
 app.all('/api/pao-items/list', paoItemsList)
 app.all('/api/pao-items/create', paoItemsCreate)
 app.all('/api/pao-items/:id', paoItemsItem)

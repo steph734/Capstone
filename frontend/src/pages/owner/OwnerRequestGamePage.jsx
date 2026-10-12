@@ -22,7 +22,7 @@ const STATUS_META = {
   declined: { label: 'Declined', pill: 'ogs-s-declined', dot: 'ogs-dot-declined' },
 }
 
-const INITIAL_REQUESTS = [
+export const INITIAL_REQUESTS = [
   { id: 1, name: 'Underwater Word Hunt', focus: 'Speech & language', ageFrom: 8, ageTo: 11, submitted: 'Jul 1, 2026', status: 'pending' },
   { id: 2, name: 'Shape Sorter Sprint', focus: 'Cognitive', ageFrom: 5, ageTo: 8, submitted: 'Jun 20, 2026', status: 'approved' },
   { id: 3, name: 'Balance Bridge Builder', focus: 'Gross motor', ageFrom: 9, ageTo: 13, submitted: 'Jun 10, 2026', status: 'dev' },

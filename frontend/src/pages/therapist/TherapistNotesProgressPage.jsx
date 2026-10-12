@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -410,9 +410,81 @@ function statusPillClass(status) {
 
 const PATIENT_FILTERS = ['All', 'Needs signing', 'Signed', 'No notes']
 
-function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNote, onToggleShare }) {
+const PAGE_SIZE = 5
+const MOBILE_QUERY = '(max-width: 767px)'
+
+function useIsMobile() {
+  const get = () => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
+  const [mobile, setMobile] = useState(get)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const onChange = () => setMobile(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return mobile
+}
+
+// Nearest ancestor that actually scrolls (the page shell scrolls its own
+// content area), falling back to the window.
+function getScroller(el) {
+  let node = el?.parentElement
+  while (node && node !== document.body) {
+    const oy = getComputedStyle(node).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node
+    node = node.parentElement
+  }
+  return window
+}
+const scrollTopOf = (s) => (s === window ? window.scrollY : s.scrollTop)
+const scrollToY = (s, y) => (s === window ? window.scrollTo(0, y) : (s.scrollTop = y))
+
+function ChevronRightIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 6 15 12 9 18" /></svg>
+}
+function ChevronLeftIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 6 9 12 15 18" /></svg>
+}
+function CheckIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="5 12 10 17 19 7" /></svg>
+}
+
+function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, onViewNote, onToggleShare, isMobile }) {
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [visible, setVisible] = useState(PAGE_SIZE)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetSearch, setSheetSearch] = useState('')
+  const rootRef = useRef(null)
+  const listRef = useRef(null)
+  const savedScroll = useRef(null)
+
+  const changeFilter = (f) => { setFilter(f); setVisible(PAGE_SIZE) }
+  const changeSearch = (v) => { setSearch(v); setVisible(PAGE_SIZE) }
+
+  const mobileDetail = isMobile && selectedId != null
+  const showList = !mobileDetail
+
+  // Remember the list scroll position when a patient opens (mobile) and put
+  // it back when returning; open the notes screen at the top.
+  const openPatient = (id) => {
+    if (isMobile) savedScroll.current = scrollTopOf(getScroller(rootRef.current))
+    onSelect(id)
+  }
+  useLayoutEffect(() => {
+    if (!isMobile) return
+    const s = getScroller(rootRef.current)
+    if (mobileDetail) scrollToY(s, 0)
+    else if (savedScroll.current != null) { scrollToY(s, savedScroll.current); savedScroll.current = null }
+  }, [mobileDetail, isMobile])
+
+  useEffect(() => {
+    if (!sheetOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setSheetOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheetOpen])
 
   const statusFor = (p) => {
     const pNotes = notes[p.id] || []
@@ -450,8 +522,55 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
   const selectedPatient = patients.find(p => p.id === selectedId)
   const patientNotes = selectedId != null ? (notes[selectedId] || []) : []
 
+  // Show-more paging: the selected patient is always kept inside the visible slice.
+  const selIdx = filteredPatients.findIndex(p => p.id === selectedId)
+  const shown = Math.min(filteredPatients.length, Math.max(visible, selIdx + 1))
+  const allShown = shown >= filteredPatients.length
+  const pagedPatients = filteredPatients.slice(0, shown)
+  const togglePaging = () => {
+    if (!allShown) { setVisible(shown + PAGE_SIZE); return }
+    setVisible(PAGE_SIZE)
+    listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const sheetQ = sheetSearch.trim().toLowerCase()
+  const sheetPatients = patients.filter(p => !sheetQ || p.name.toLowerCase().includes(sheetQ) || p.diagnosis.toLowerCase().includes(sheetQ))
+  const closeSheet = () => { setSheetOpen(false); setSheetSearch('') }
+
+  const notesBlock = patientNotes.length === 0 ? (
+    <div className="tnp2-empty-notes">
+      <ClipboardListIcon />
+      <span>No session notes yet for this patient.</span>
+    </div>
+  ) : (
+    <div className="tnp2-note-list">
+      {patientNotes.map(n => (
+        <div key={n.id} className="tnp2-note-card">
+          <div className="tnp2-note-card-top">
+            <span className="tnp2-note-date">{n.date}</span>
+            <span className={n.signed ? 'tnp-signed-pill' : 'tnp-pending-pill'}>
+              {n.signed && <CheckCircleIcon />} {n.signed ? 'Signed' : 'Draft'}
+            </span>
+            <span className={n.shareable ? 'tnp-shared-pill' : 'tnp2-private-pill'}>
+              {n.shareable && <HomeIcon />} {n.shareable ? 'Shared' : 'Private'}
+            </span>
+          </div>
+          <p className="tnp2-note-preview"><strong>O</strong> · {n.objective ? `${n.objective.slice(0, 90)}…` : '—'}</p>
+          <p className="tnp2-note-preview"><strong>P</strong> · {n.plan ? `${n.plan.slice(0, 90)}…` : '—'}</p>
+          <div className="tnp2-note-actions">
+            <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
+            <button className="tnp2-share-btn" onClick={() => onToggleShare(n)}>
+              {n.shareable ? 'Unshare' : 'Share'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
-    <div className="tnp2-shell">
+    <div className="tnp2-shell" ref={rootRef}>
+      {showList && (<>
       {/* KPI cards */}
       <div className="tnp2-kpi-grid">
         <div className="tnp2-kpi-card">
@@ -488,7 +607,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
       <div className="tnp2-toolbar">
         <div className="tnp2-filter-tabs">
           {PATIENT_FILTERS.map(f => (
-            <button key={f} className={`tnp2-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+            <button key={f} className={`tnp2-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => changeFilter(f)}>
               {f} <span className="tnp2-filter-count">{counts[f]}</span>
             </button>
           ))}
@@ -501,17 +620,19 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
             className="tnp2-search"
             placeholder="Search patient or diagnosis…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => changeSearch(e.target.value)}
           />
         </div>
       </div>
+      </>)}
 
-      {/* Two-pane split */}
-      <div className="tnp2-split">
-        <div className="tnp2-list-pane">
+      {/* Two-pane split (one pane at a time on phones) */}
+      <div className={`tnp2-split${mobileDetail ? ' tnp2-split-detail' : ''}`}>
+        {showList && (
+        <div className="tnp2-list-pane" ref={listRef}>
           {filteredPatients.length === 0 ? (
             <p className="tnp2-list-empty">No patients match.</p>
-          ) : filteredPatients.map(p => {
+          ) : pagedPatients.map(p => {
             const pNotes = notes[p.id] || []
             const status = statusFor(p)
             const pal = paletteFor(p.id)
@@ -520,7 +641,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
                 key={p.id}
                 type="button"
                 className={`tnp2-list-row${selectedId === p.id ? ' active' : ''}`}
-                onClick={() => onSelect(p.id)}
+                onClick={() => openPatient(p.id)}
               >
                 <span className="tnp2-avatar" style={{ background: pal.bg, color: pal.fg }}>
                   {initialsFor(p.name)}
@@ -532,14 +653,52 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
                   </div>
                   <span className="tnp2-list-row-sub">{p.diagnosis} · {pNotes.length} note{pNotes.length === 1 ? '' : 's'}</span>
                 </div>
+                <span className="tnp2-chevron" aria-hidden="true"><ChevronRightIcon /></span>
               </button>
             )
           })}
+          {filteredPatients.length > PAGE_SIZE && (
+            <div className="tnp2-pager">
+              <button type="button" className="tnp2-pager-btn" onClick={togglePaging}>
+                {allShown ? 'Show less ▴' : 'See more ▾'}
+              </button>
+              <span className="tnp2-pager-count">Showing {shown} of {filteredPatients.length} patients</span>
+            </div>
+          )}
         </div>
+        )}
 
         <div className="tnp2-detail-pane">
           {!selectedPatient ? (
             <div className="tnp2-detail-empty">Select a patient to see their notes.</div>
+          ) : isMobile ? (
+            <>
+              <div className="tnp2-m-header">
+                <button type="button" className="tnp2-m-back" onClick={onBack} aria-label="Back to patient list">
+                  <ChevronLeftIcon />
+                </button>
+                <div className="tnp2-m-title">
+                  <h3>{selectedPatient.name}</h3>
+                  <p>Session notes</p>
+                </div>
+              </div>
+              <div className="tnp2-m-patient">
+                <span
+                  className="tnp2-avatar tnp2-avatar-lg"
+                  style={{ background: paletteFor(selectedPatient.id).bg, color: paletteFor(selectedPatient.id).fg }}
+                >
+                  {initialsFor(selectedPatient.name)}
+                </span>
+                <div className="tnp2-detail-meta">
+                  <h3>{selectedPatient.name}</h3>
+                  <p>{selectedPatient.diagnosis} · {patientNotes.length} note{patientNotes.length === 1 ? '' : 's'}</p>
+                </div>
+                <button type="button" className="tnp2-switch-btn" onClick={() => setSheetOpen(true)}>Switch ▾</button>
+              </div>
+              <button type="button" className="tnp2-new-note-btn tnp2-new-note-primary" onClick={onNewNote}>+ New session note</button>
+              <div className="tnp2-m-label">Session notes</div>
+              {notesBlock}
+            </>
           ) : (
             <>
               <div className="tnp2-detail-header">
@@ -555,53 +714,68 @@ function NotesShell({ patients, notes, selectedId, onSelect, onNewNote, onViewNo
                 </div>
                 <button className="tnp2-new-note-btn" onClick={onNewNote}>+ New session note</button>
               </div>
-
-              {patientNotes.length === 0 ? (
-                <div className="tnp2-empty-notes">
-                  <ClipboardListIcon />
-                  <span>No session notes yet for this patient.</span>
-                </div>
-              ) : (
-                <div className="tnp2-note-list">
-                  {patientNotes.map(n => (
-                    <div key={n.id} className="tnp2-note-card">
-                      <div className="tnp2-note-card-top">
-                        <span className="tnp2-note-date">{n.date}</span>
-                        <span className={n.signed ? 'tnp-signed-pill' : 'tnp-pending-pill'}>
-                          {n.signed && <CheckCircleIcon />} {n.signed ? 'Signed' : 'Draft'}
-                        </span>
-                        <span className={n.shareable ? 'tnp-shared-pill' : 'tnp2-private-pill'}>
-                          {n.shareable && <HomeIcon />} {n.shareable ? 'Shared' : 'Private'}
-                        </span>
-                      </div>
-                      <p className="tnp2-note-preview"><strong>O</strong> · {n.objective ? `${n.objective.slice(0, 90)}…` : '—'}</p>
-                      <p className="tnp2-note-preview"><strong>P</strong> · {n.plan ? `${n.plan.slice(0, 90)}…` : '—'}</p>
-                      <div className="tnp2-note-actions">
-                        <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
-                        <button className="tnp2-share-btn" onClick={() => onToggleShare(n)}>
-                          {n.shareable ? 'Unshare' : 'Share'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {notesBlock}
             </>
           )}
         </div>
       </div>
+
+      {sheetOpen && (
+        <div className="tnp2-sheet-backdrop" onClick={closeSheet}>
+          <div className="tnp2-sheet" role="dialog" aria-modal="true" aria-label="Switch patient" onClick={e => e.stopPropagation()}>
+            <div className="tnp2-sheet-grab" aria-hidden="true" />
+            <h3 className="tnp2-sheet-title">Switch patient</h3>
+            <div className="tnp2-search-wrap">
+              <svg className="tnp2-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                className="tnp2-search"
+                placeholder="Search patient…"
+                value={sheetSearch}
+                onChange={e => setSheetSearch(e.target.value)}
+              />
+            </div>
+            <div className="tnp2-sheet-list">
+              {sheetPatients.length === 0 && <p className="tnp2-list-empty">No patients match.</p>}
+              {sheetPatients.map(p => {
+                const n = (notes[p.id] || []).length
+                const pal = paletteFor(p.id)
+                const current = p.id === selectedId
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`tnp2-list-row${current ? ' active' : ''}`}
+                    onClick={() => { if (!current) onSelect(p.id, { replace: true }); closeSheet() }}
+                  >
+                    <span className="tnp2-avatar" style={{ background: pal.bg, color: pal.fg }}>{initialsFor(p.name)}</span>
+                    <div className="tnp2-list-row-info">
+                      <span className="tnp2-list-row-name">{p.name}</span>
+                      <span className="tnp2-list-row-sub">{n} note{n === 1 ? '' : 's'}</span>
+                    </div>
+                    {current && <span className="tnp2-sheet-check" aria-label="Current patient"><CheckIcon /></span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TherapistNotesProgressPage({ user, onLogout, betaTier }) {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [patients,    setPatients]    = useState([])
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState('')
-  const [selectedId,  setSelectedId]  = useState(null)
   const [view,        setView]        = useState('overview')  // 'overview' | 'new' | 'viewer'
   const [viewingNote, setViewingNote] = useState(null)
   const { shareNote, unshareNote } = useSharedProgress()
@@ -652,17 +826,17 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     return () => { cancelled = true }
   }, [user?.email])
 
+  // The selected patient lives in the URL (?patient=<id>; ?patientId= is the
+  // older link format used elsewhere in the app). Desktop falls back to the
+  // first patient so the right pane is never empty; phones start on the list.
+  const urlPatient = searchParams.get('patient') || searchParams.get('patientId')
+  const selectedId = patients.some(p => p.id === urlPatient)
+    ? urlPatient
+    : (!isMobile && patients.length > 0 ? patients[0].id : null)
   const selectedPatient = patients.find(p => p.id === selectedId)
 
-  // The two-pane overview always shows a patient's notes on the right, so
-  // default to the first one once the roster loads rather than starting on
-  // an empty "select a patient" state.
-  useEffect(() => {
-    if (!loading && selectedId === null && patients.length > 0) {
-      const preselect = searchParams.get('patientId')
-      setSelectedId(patients.some((p) => p.id === preselect) ? preselect : patients[0].id)
-    }
-  }, [loading, patients, selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Back/forward (phone back gesture) changes the URL: drop any open note.
+  useEffect(() => { setView('overview'); setViewingNote(null) }, [urlPatient])
 
   // On phones the notebook (new/viewer) renders below the patient list, so
   // opening it would otherwise look like nothing happened — bring it into
@@ -675,7 +849,24 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     }
   }, [view, viewingNote])
 
-  const selectPatient = (id) => { setSelectedId(id); setView('overview'); setViewingNote(null) }
+  const selectPatient = (id, { replace = false } = {}) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('patient', id)
+    next.delete('patientId')
+    // Phones push a history entry so the back gesture returns to the list;
+    // switching patients from the sheet and desktop clicks replace instead.
+    setSearchParams(next, {
+      replace: replace || !isMobile,
+      state: replace ? location.state : { fromList: true },
+    })
+    setView('overview'); setViewingNote(null)
+  }
+  const backToList = () => {
+    if (location.state?.fromList) { navigate(-1); return }
+    const next = new URLSearchParams(searchParams)
+    next.delete('patient'); next.delete('patientId')
+    setSearchParams(next, { replace: true })
+  }
   const openNote  = (note) => { setViewingNote(note); setView('viewer') }
   const startNew  = ()     => { setView('new'); setViewingNote(null) }
 
@@ -785,20 +976,24 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
       ) : (
       <div className="tnp-page">
-        {view === 'overview' && (
-          patients.length === 0 ? (
-            <p className="tnp2-empty-notes">No patients yet — they'll show up here once they book with you.</p>
-          ) : (
+        {patients.length === 0 ? (
+          <p className="tnp2-empty-notes">No patients yet — they'll show up here once they book with you.</p>
+        ) : (
+          // Stays mounted (just hidden) while a note is open so the filter,
+          // search and "See more" count survive coming back.
+          <div style={view === 'overview' ? undefined : { display: 'none' }}>
             <NotesShell
               patients={patients}
               notes={notes}
               selectedId={selectedId}
               onSelect={selectPatient}
+              onBack={backToList}
               onNewNote={startNew}
               onViewNote={openNote}
               onToggleShare={toggleShare}
+              isMobile={isMobile}
             />
-          )
+          </div>
         )}
 
         {view === 'new' && (

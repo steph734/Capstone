@@ -25,10 +25,14 @@ function PhoneIcon() {
 function SearchIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
 }
+function BackIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+}
 
 // Chat header with real online status (Stream's `watcher_count`/presence) and
-// working voice/video buttons — replaces the old hardcoded header.
-function ChatHeader({ onCall }) {
+// working voice/video buttons — replaces the old hardcoded header. `onBack`
+// (mobile only, see .msg-back-btn in MessagesPage.css) returns to the list.
+function ChatHeader({ onCall, onBack }) {
   const { channel } = useChannelStateContext()
   const members = Object.values(channel.state.members || {})
   const other = members.find((m) => m.user?.id !== channel.getClient().userID)?.user
@@ -36,6 +40,9 @@ function ChatHeader({ onCall }) {
 
   return (
     <div className="msg-chat-header">
+      <button className="msg-icon-btn msg-back-btn" onClick={onBack} aria-label="Back to conversations">
+        <BackIcon />
+      </button>
       <div className="msg-chat-header-avatar">
         {other?.image
           ? <img src={other.image} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
@@ -190,7 +197,7 @@ function MessagesInner({ user, mobileView, setMobileView }) {
         {!activeChannel ? <EmptyChat /> : (
           <Channel channel={activeChannel}>
             <Window>
-              <ChatHeader onCall={handleCall} />
+              <ChatHeader onCall={handleCall} onBack={() => setMobileView('list')} />
               <MessageList />
               <MessageComposer />
             </Window>

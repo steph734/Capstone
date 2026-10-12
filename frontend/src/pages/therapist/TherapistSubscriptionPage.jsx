@@ -29,12 +29,19 @@ function LockIcon() {
   )
 }
 
-export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) {
+export default function TherapistSubscriptionPage({ user, onLogout, betaTier, activePlan, planTrialEnds }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [contactOwnerModalOpen, setContactOwnerModalOpen] = useState(false)
   const currentUser = user || { name: 'Therapist', role: 'Therapist', avatar: '/therapy-pro-logo.png', email: 'therapists@gmail.com' }
 
-  const subscriptionTiers = [
+  // The clinic owner pays for the plan, so the therapist sees whichever tier
+  // the owner has active (a lapsed free trial falls back to free).
+  const trialEndMs = planTrialEnds ? new Date(planTrialEnds).getTime() : null
+  const isTrialing = Boolean(trialEndMs) && trialEndMs > Date.now()
+  const isTrialExpired = Boolean(trialEndMs) && !isTrialing
+  const activeTierId = isTrialExpired ? 'free' : (activePlan || 'free')
+
+  const subscriptionTiersRaw = [
     {
       id: 'free',
       name: 'THERAPYPRO: FREE',
@@ -85,6 +92,11 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
       current: false
     }
   ]
+
+  const subscriptionTiers = subscriptionTiersRaw.map((tier) => ({
+    ...tier,
+    current: tier.id === activeTierId,
+  }))
 
   const handleSelectPlan = () => {
     setContactOwnerModalOpen(true)
@@ -176,7 +188,7 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier }) 
 
                   {tier.current ? (
                     <button className="tier-button current-button" disabled>
-                      Current Plan
+                      {tier.id === 'free' ? 'Current Plan' : isTrialing ? 'Trial Active' : 'Active Plan'}
                     </button>
                   ) : (
                     <button

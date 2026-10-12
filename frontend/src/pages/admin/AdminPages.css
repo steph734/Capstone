@@ -362,6 +362,27 @@
 .admin-table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+/* A faint right-edge fade hints there's more to scroll when the table is
+   wider than its container — otherwise a cut-off last column just looks
+   broken instead of scrollable, especially on touch devices with no
+   visible scrollbar. */
+@media (max-width: 768px) {
+  .admin-table-card {
+    position: relative;
+  }
+  .admin-table-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 28px;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95));
+    pointer-events: none;
+  }
 }
 
 .admin-table {

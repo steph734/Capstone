@@ -5,7 +5,7 @@ import {
   Channel,
   Window,
   MessageList,
-  MessageComposerUI,
+  MessageComposer,
   Thread,
   useChannelStateContext,
 } from 'stream-chat-react'
@@ -172,7 +172,7 @@ export default function MessagesPage({ user, onLogout, betaTier }) {
                   <Window>
                     <ChatHeader onCall={handleCall} />
                     <MessageList />
-                    <MessageComposerUI />
+                    <MessageComposer />
                   </Window>
                   <Thread />
                 </Channel>

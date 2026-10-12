@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Channel, Window, MessageList, MessageComposerUI } from 'stream-chat-react'
+import { Channel, Window, MessageList, MessageComposer } from 'stream-chat-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useStreamCtx } from '../../stream/StreamProvider'
@@ -236,7 +236,7 @@ function MessageModal({ patient, therapistEmail, onClose }) {
             <Channel channel={channel}>
               <Window>
                 <MessageList />
-                <MessageComposerUI />
+                <MessageComposer />
               </Window>
             </Channel>
           </div>

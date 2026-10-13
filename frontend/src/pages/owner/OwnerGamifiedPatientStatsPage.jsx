@@ -306,7 +306,7 @@ export default function OwnerGamifiedPatientStatsPage({ user, onLogout, betaTier
         {error && <ErrorBanner message={error} onRetry={() => load()} />}
 
         {loading && !data && (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             <SkeletonBlock style={{ height: 130 }} />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} style={{ height: 128 }} />)}</div>
             <SkeletonBlock style={{ height: 300 }} />
@@ -314,7 +314,7 @@ export default function OwnerGamifiedPatientStatsPage({ user, onLogout, betaTier
         )}
 
         {data && (
-          <div className="grid gap-5" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }} aria-busy={loading}>
+          <div className="grid grid-cols-1 gap-5" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }} aria-busy={loading}>
             {/* Header */}
             <div className="flex flex-wrap items-center gap-4" style={{ ...CARD, minHeight: 130 }}>
               <span className="flex flex-shrink-0 items-center justify-center rounded-full text-[20px] font-extrabold"
@@ -367,7 +367,7 @@ export default function OwnerGamifiedPatientStatsPage({ user, onLogout, betaTier
             </div>
 
             {/* Progress | Compared with branch */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.7fr_1fr]">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
               <div style={CARD}>
                 <CardTitle sub={data.branch ? `Accuracy per week · dashed line = ${data.branch.name} branch average` : 'Accuracy per week'}
                   right={<span className="rounded-full px-3 py-1 text-[12px] font-extrabold" style={{ background: trend.tone === 'up' ? '#D9F2E3' : '#F1F5F3', color: trend.tone === 'up' ? '#16a34a' : MUTED, whiteSpace: 'nowrap' }}>{trend.label}</span>}>

@@ -3,9 +3,10 @@ import { getMongo } from '../mongo.js'
 import { User } from '../models/user.js'
 import { AuditLog } from '../models/auditLog.js'
 import { EmailOtp } from '../models/emailOtp.js'
+import { createSession } from '../session.js'
 import { OTP_TTL_MS, OTP_RESEND_COOLDOWN_MS, generateCode, hashCode, sendOtpEmail } from '../otp.js'
 
-const MAX_FAILED_ATTEMPTS = 3
+const MAX_FAILED_ATTEMPTS = 5
 const LOCK_DURATION_MS = 5 * 60 * 1000
 
 function getClientIp(req) {
@@ -22,6 +23,11 @@ async function logAudit(fields) {
   }
 }
 
+// Therapist and owner accounts hold or oversee clinical records, so a correct
+// password alone isn't enough: they also need the code emailed to them.
+// (REQUIRE_LOGIN_2FA=false switches this off for local development only.)
+const needsSecondFactor = (role) => (role === 'Therapist' || role === 'Owner') && String(process.env.REQUIRE_LOGIN_2FA || '').trim().toLowerCase() !== 'false'
+
 async function issueOtp({ email, name, purpose = 'signup' }) {
   const code = generateCode()
   const code_hash = await hashCode(code)
@@ -31,7 +37,7 @@ async function issueOtp({ email, name, purpose = 'signup' }) {
     { email, purpose, code_hash, attempts: 0, expires_at: new Date(now + OTP_TTL_MS), last_sent_at: new Date(now) },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   )
-  await sendOtpEmail({ email, name, code })
+  await sendOtpEmail({ email, name, code, purpose })
 }
 
 export default async function handler(req, res) {
@@ -131,13 +137,26 @@ export default async function handler(req, res) {
       })
     }
 
+    if (needsSecondFactor(user.role)) {
+      // Password was right; don't clear the failure counter or sign in until the code is too.
+      await user.save()
+      try {
+        await issueOtp({ email: user.email, name: user.full_name, purpose: 'login2fa' })
+      } catch (mailErr) {
+        console.error('login 2FA code send failed:', mailErr.message)
+        return res.status(502).json({ error: 'We could not email your sign-in code. Please try again.' })
+      }
+      return res.status(200).json({ requires2fa: true, email: user.email, message: 'We emailed you a 6-digit sign-in code.' })
+    }
+
     user.failed_login_attempts = 0
     user.is_locked = false
     user.lock_until = null
     user.last_login = now
     await user.save()
 
-    return res.status(200).json({ success: true, user: user.toSafeJSON() })
+    const token = await createSession(user, req, { mfa: false })
+    return res.status(200).json({ success: true, user: user.toSafeJSON(), token })
   } catch (err) {
     console.error('auth/login error:', err)
     return res.status(500).json({ error: 'Could not sign you in.' })

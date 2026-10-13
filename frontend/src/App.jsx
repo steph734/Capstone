@@ -8,6 +8,7 @@ import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessi
 import { getResetPassword } from './utils/passwordResets'
 import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/accounts'
 import { sha256Hex } from './utils/hash'
+import { getSessionToken, setSessionToken } from './utils/session'
 import './GlobalToast.css'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
@@ -53,6 +54,7 @@ import OwnerSpeechFeaturesPage from './pages/owner/OwnerSpeechFeaturesPage'
 import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPage'
 import OwnerGamifiedPatientStatsPage from './pages/owner/OwnerGamifiedPatientStatsPage'
 import OwnerGamePreviewPage from './pages/owner/OwnerGamePreviewPage'
+import GameBuilderPage from './pages/admin/GameBuilderPage'
 import OwnerActivityLibraryPage from './pages/owner/OwnerActivityLibraryPage'
 import OwnerRequestGamePage from './pages/owner/OwnerRequestGamePage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
@@ -93,7 +95,7 @@ const getHomePath = (role) => {
 }
 
 // Login wrapper to handle authentication
-function LoginWrapper({ onLogin }) {
+function LoginWrapper({ onLogin, onVerify2fa }) {
   const navigate = useNavigate()
   
   const handleLogin = async (email, password) => {
@@ -112,6 +114,11 @@ function LoginWrapper({ onLogin }) {
       onSignUpClick={() => navigate('/signup')}
       onForgotPasswordClick={() => navigate('/forgot-password')}
       onLogin={handleLogin}
+      onVerify2fa={async (email, code) => {
+        const result = await onVerify2fa(email, code)
+        if (result.success) navigate(getHomePath(result.user?.role))
+        return result
+      }}
     />
   )
 }
@@ -218,6 +225,11 @@ function App() {
       }
     }
 
+    // Therapist and owner accounts hold or oversee clinical records: they can
+    // only sign in through the server (password + emailed code), never from
+    // the built-in demo list that ships in this bundle.
+    if (matchedUser && (matchedUser.role === 'Therapist' || matchedUser.role === 'Owner')) matchedUser = null
+
     // 3. MongoDB check: accounts created through the Sign Up page live in the
     //    `users` collection, served by the Vercel function at /api/auth/login
     //    (frontend/api/_lib/routes/auth-login.js) — same origin, so it works
@@ -230,7 +242,11 @@ function App() {
           body: JSON.stringify({ email: typedEmail, password: passwordHash }),
         })
         const data = await res.json().catch(() => ({}))
-        if (res.ok && data.user) {
+        if (res.ok && data.requires2fa) {
+          // Right password; now ask for the 6-digit code that was just emailed.
+          return { success: false, requires2fa: true, email: data.email || typedEmail, message: data.message }
+        } else if (res.ok && data.user) {
+          setSessionToken(data.token || '')
           matchedUser = { avatar: '/therapy-pro-logo.png', ...data.user }
         } else if (res.status === 403 && data.requiresVerification) {
           // Right password, but the email was never confirmed. The backend just
@@ -242,7 +258,7 @@ function App() {
             message: data.error || 'Please verify your email to continue.',
           }
         } else if (res.status === 423) {
-          // 3 failed attempts in a row locks the account for 5 minutes.
+          // 5 failed attempts in a row locks the account for 5 minutes.
           const mins = data.lockUntil
             ? Math.max(1, Math.ceil((new Date(data.lockUntil).getTime() - Date.now()) / 60000))
             : 5
@@ -268,7 +284,36 @@ function App() {
     return { success: false, message: 'Invalid email or password' }
   }
 
+  // Second step of a therapist / owner login: the emailed 6-digit code.
+  const handleVerify2fa = async (email, code) => {
+    try {
+      const res = await fetch('/api/auth/verify-login-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.user) {
+        setSessionToken(data.token || '')
+        const user = { avatar: '/therapy-pro-logo.png', ...data.user }
+        setIsAuthenticated(true)
+        setCurrentUser(user)
+        localStorage.setItem('isAuthenticated', 'true')
+        localStorage.setItem('currentUser', JSON.stringify(user))
+        setLoginToast('Login successful!')
+        return { success: true, user }
+      }
+      return { success: false, locked: res.status === 423, message: data.error || 'That code is not valid.' }
+    } catch {
+      return { success: false, message: 'Could not reach the server. Please try again.' }
+    }
+  }
+
   const handleLogout = () => {
+    // End the server session too, so the token stops working immediately.
+    const token = getSessionToken()
+    if (token) fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}' }).catch(() => {})
+    setSessionToken('')
     setIsAuthenticated(false)
     setCurrentUser(null)
     localStorage.removeItem('isAuthenticated')
@@ -319,7 +364,7 @@ function App() {
             isAuthenticated ? (
               <Navigate to={getHomePath(currentUser?.role)} replace />
             ) : (
-              <LoginWrapper onLogin={handleLogin} />
+              <LoginWrapper onLogin={handleLogin} onVerify2fa={handleVerify2fa} />
             )
           } 
         />
@@ -835,6 +880,36 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Owner' ? (
                 <OwnerGamifiedPatientStatsPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/builder/new"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <GameBuilderPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/games-library/builder/:gameId"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <GameBuilderPage user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

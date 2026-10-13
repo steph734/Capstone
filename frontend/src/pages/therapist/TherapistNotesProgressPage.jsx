@@ -1,10 +1,13 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
-import { logActivity } from '../../utils/auditLog'
-import { useSharedProgress } from '../../context/ProgressContext'
 import { manilaDateKey } from '../../utils/manilaTime'
+import NoteViewerSecure from './notes/NoteViewerSecure'
+import ShareDialog from './notes/ShareDialog'
+import LockScreen, { useIdleLock } from './notes/IdleLock'
+import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote } from './notes/notesApi'
+import { unescapeHtml } from '../../utils/session'
 import './TherapistNotesProgressPage.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
@@ -74,22 +77,20 @@ function fmtNoteDateShort(iso) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// therapy_notes doc (see api/_lib/routes/notes-therapist-list.js) -> the
-// shape NoteForm/NoteViewer/NotesShell already expect.
+// Metadata row from GET /api/notes/therapist-list. It never carries note text:
+// the text is fetched one note at a time when it is opened (audited, hash-checked).
 function fromApiNote(n) {
   return {
     id: n.id,
     date: fmtNoteDate(n.date),
     shortDate: fmtNoteDateShort(n.date),
-    subjective: n.subjective || '',
-    objective: n.objective || '',
-    assessment: n.assessment || '',
-    plan: n.plan || '',
-    signatureData: n.signatureImage || null,
-    signed: n.status === 'signed',
-    shareable: !!n.sharedWithGuardian,
+    status: n.status,
+    voided: !!n.voided,
+    signed: n.status === 'signed' && !n.voided,
+    shareable: !!n.shared,
+    sharedSections: n.sharedSections || [],
+    addendaCount: n.addendaCount || 0,
     domain: n.domain || DOMAINS[0],
-    parentSummary: n.sharedSummary || '',
   }
 }
 
@@ -190,46 +191,59 @@ function SignaturePad({ onSign, onClear }) {
 }
 
 // ── Note Form ─────────────────────────────────────────────────────────────────
-function NoteForm({ patient, onSave, onCancel }) {
-  const today      = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const todayShort = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+// Four SOAP sections (10–5000 characters each to sign). Signing needs a drawn
+// signature AND the password typed again; "Save draft" needs neither. The
+// server re-validates everything and encrypts the text before it is stored.
+const SOAP_SECTIONS = [
+  { key: 'subjective', label: '💬 Subjective', hint: 'What the patient or guardian reported or felt...', cls: 'tnp-s' },
+  { key: 'objective', label: '👀 Objective', hint: 'Measured outcomes, ROM, accuracy...', cls: 'tnp-o' },
+  { key: 'assessment', label: '📊 Assessment', hint: 'Clinical interpretation of findings...', cls: 'tnp-a' },
+  { key: 'plan', label: '🌟 Plan', hint: 'Next steps and home program...', cls: 'tnp-p' },
+]
+const fieldErrStyle = { color: '#b91c1c', fontSize: 12, display: 'block', marginTop: 4 }
 
-  const [soap,    setSoap]    = useState({ subjective: '', objective: '', assessment: '', plan: '' })
+function NoteForm({ patient, initial, onSave, onCancel }) {
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const [soap, setSoap] = useState(() => Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, unescapeHtml(initial?.[key] || '')])))
   const [sigData, setSigData] = useState(null)
-  const [saved,   setSaved]   = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [shareWithParent, setShareWithParent] = useState(false)
-  const [parentSummary,   setParentSummary]   = useState('')
-  const [domain,          setDomain]          = useState(DOMAINS[0])
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState('')
+  const [done, setDone] = useState(null) // 'signed' | 'draft'
+  const [errors, setErrors] = useState({})
+  const [formError, setFormError] = useState('')
 
-  const set = (field) => (e) => setSoap(prev => ({ ...prev, [field]: e.target.value }))
-  const allFilled = soap.subjective.trim() && soap.objective.trim() && soap.assessment.trim() && soap.plan.trim()
-  const shareReady = !shareWithParent || parentSummary.trim()
+  const set = (field) => (e) => { setSoap((prev) => ({ ...prev, [field]: e.target.value })); setErrors((x) => ({ ...x, [field]: '' })) }
 
-  const handleSave = async () => {
-    if (!allFilled)  { alert('Please fill in all SOAP fields before saving.'); return }
-    if (!sigData)    { alert('Please sign the note before saving.'); return }
-    if (!shareReady) { alert('Please add a parent-friendly summary before sharing this note.'); return }
-    setSaving(true)
+  const submit = async (sign) => {
+    const e = {}
+    if (sign) {
+      for (const { key } of SOAP_SECTIONS) {
+        const len = soap[key].trim().length
+        if (len < 10) e[key] = len === 0 ? 'This section is required.' : 'Write at least 10 characters.'
+      }
+      if (!sigData) e.signature = 'Draw and confirm your signature.'
+      if (!password) e.password = 'Re-enter your password to sign.'
+    } else if (!Object.values(soap).some((v) => v.trim())) e.subjective = 'Write something before saving a draft.'
+    setErrors(e); setFormError('')
+    if (Object.keys(e).length) { setFormError('Please fix the highlighted fields.'); return }
+    setBusy(sign ? 'sign' : 'draft')
     try {
-      await onSave({
-        ...soap, signatureData: sigData, signed: true,
-        shareable: shareWithParent, domain, parentSummary: shareWithParent ? parentSummary.trim() : '',
-      })
-      setSaved(true)
+      await onSave({ ...soap, sign, signatureData: sigData, password })
+      setPassword('')
+      setDone(sign ? 'signed' : 'draft')
     } catch (err) {
-      alert(err.message || 'Could not save this note. Please try again.')
-    } finally {
-      setSaving(false)
-    }
+      setErrors(err.fields || {})
+      setFormError(err.message || 'Could not save this note.')
+      setPassword('')
+    } finally { setBusy('') }
   }
 
-  if (saved) {
+  if (done) {
     return (
       <div className="tnp-saved-state">
-        <div className="tnp-saved-icon">✅</div>
-        <h3>Note Saved &amp; Signed!</h3>
-        <p>Session note for <strong>{patient.name}</strong> has been signed and saved successfully.</p>
+        <div className="tnp-saved-icon">{done === 'signed' ? '✅' : '📝'}</div>
+        <h3>{done === 'signed' ? 'Note signed & saved' : 'Draft saved'}</h3>
+        <p>{done === 'signed' ? 'It is now read-only. Corrections can only be added as addenda.' : 'You can keep editing it until you sign.'} For <strong>{patient.name}</strong>.</p>
         <button className="tnp-primary-btn" onClick={onCancel}>Back to Patient</button>
       </div>
     )
@@ -237,160 +251,44 @@ function NoteForm({ patient, onSave, onCancel }) {
 
   return (
     <div className="tnp-notebook">
-      <div className="tnp-spiral" aria-hidden="true">
-        {Array.from({ length: 14 }).map((_, i) => <div key={i} className="tnp-ring" />)}
-      </div>
-
+      <div className="tnp-spiral" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <div key={i} className="tnp-ring" />)}</div>
       <div className="tnp-paper">
         <div className="tnp-deco-tr">📋</div>
-
         <div className="tnp-title-row">
-          <h2 className="tnp-title">Session Note</h2>
-          <div className="tnp-date-box">
-            <span className="tnp-field-label">📅 Date:</span>
-            <span className="tnp-field-val tnp-field-line">{today}</span>
-          </div>
+          <h2 className="tnp-title">{initial ? 'Edit Draft' : 'Session Note'}</h2>
+          <div className="tnp-date-box"><span className="tnp-field-label">📅 Date:</span><span className="tnp-field-val tnp-field-line">{today}</span></div>
         </div>
-
-        <div className="tnp-field-row">
-          <span className="tnp-field-label">👤 Patient:</span>
-          <span className="tnp-field-val tnp-field-line">{patient.name}</span>
-        </div>
-        <div className="tnp-field-row tnp-field-row-last">
-          <span className="tnp-field-label">🩺 Diagnosis:</span>
-          <span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span>
-        </div>
-
+        <div className="tnp-field-row"><span className="tnp-field-label">👤 Patient:</span><span className="tnp-field-val tnp-field-line">{patient.name}</span></div>
+        <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label">🩺 Diagnosis:</span><span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span></div>
         <div className="tnp-rule" />
 
-        {[
-          { key: 'subjective', label: '💬 Subjective', hint: 'What the patient reported or felt...', cls: 'tnp-s' },
-          { key: 'objective',  label: '👀 Objective',  hint: 'Measured outcomes, ROM, accuracy...', cls: 'tnp-o' },
-          { key: 'assessment', label: '📊 Assessment', hint: 'Clinical interpretation of findings...', cls: 'tnp-a' },
-          { key: 'plan',       label: '🌟 Plan',       hint: 'Next steps and home program...', cls: 'tnp-p' },
-        ].map(({ key, label, hint, cls }) => (
+        {SOAP_SECTIONS.map(({ key, label, hint, cls }) => (
           <div key={key} className="tnp-section">
             <div className={`tnp-section-label ${cls}`}>{label}</div>
-            <textarea
-              className="tnp-textarea"
-              placeholder={hint}
-              value={soap[key]}
-              onChange={set(key)}
-              rows={3}
-            />
+            <textarea className="tnp-textarea" placeholder={hint} value={soap[key]} onChange={set(key)} rows={3} maxLength={5000} aria-invalid={!!errors[key]} aria-label={label} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#6b7c75' }}>
+              <span>{errors[key] && <span role="alert" style={fieldErrStyle}>{errors[key]}</span>}</span>
+              <span>{soap[key].length} / 5000</span>
+            </div>
           </div>
         ))}
-
-        <div className="tnp-share-section">
-          <label className="tnp-share-toggle">
-            <input
-              type="checkbox"
-              checked={shareWithParent}
-              onChange={(e) => setShareWithParent(e.target.checked)}
-            />
-            <span>🏡 Share a parent-friendly summary of this note</span>
-          </label>
-          {shareWithParent && (
-            <div className="tnp-share-fields">
-              <div className="tnp-share-field">
-                <label>Domain</label>
-                <select value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div className="tnp-share-field tnp-share-field-full">
-                <label>Parent-friendly summary (no clinical jargon)</label>
-                <textarea
-                  className="tnp-textarea"
-                  placeholder='e.g. "Getting better at focus games this week!"'
-                  value={parentSummary}
-                  onChange={(e) => setParentSummary(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-        </div>
 
         <div className="tnp-sig-section">
           <div className="tnp-sig-title">✍️ Therapist Signature</div>
-          <p className="tnp-sig-desc">Draw your signature below to certify this session note.</p>
-          <SignaturePad onSign={setSigData} onClear={() => setSigData(null)} />
+          <p className="tnp-sig-desc">Draw your signature, then re-enter your password to certify and lock this note.</p>
+          <SignaturePad onSign={(d) => { setSigData(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSigData(null)} />
+          {errors.signature && <span role="alert" style={fieldErrStyle}>{errors.signature}</span>}
+          <label className="tnp-field-label" htmlFor="sign-pw" style={{ display: 'block', marginTop: 12 }}>🔑 Password</label>
+          <input id="sign-pw" type="password" autoComplete="current-password" className="tnp-textarea" style={{ minHeight: 42 }} value={password}
+            onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: '' })) }} />
+          {errors.password && <span role="alert" style={fieldErrStyle}>{errors.password}</span>}
         </div>
 
-        <div className="tnp-form-footer">
+        {formError && <p role="alert" style={{ ...fieldErrStyle, fontSize: 13 }}>{formError}</p>}
+        <div className="tnp-form-footer" style={{ flexWrap: 'wrap', gap: 8 }}>
           <button className="tnp-ghost-btn" onClick={onCancel} type="button">Cancel</button>
-          <button
-            className={`tnp-primary-btn${(saving || !allFilled || !sigData || !shareReady) ? ' tnp-btn-dim' : ''}`}
-            onClick={handleSave}
-            disabled={saving}
-            type="button"
-          >
-            {saving ? 'Saving…' : '💾 Save & Sign Note'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Note Viewer (read-only) ───────────────────────────────────────────────────
-function NoteViewer({ note, patient, onBack }) {
-  return (
-    <div className="tnp-notebook">
-      <div className="tnp-spiral" aria-hidden="true">
-        {Array.from({ length: 14 }).map((_, i) => <div key={i} className="tnp-ring" />)}
-      </div>
-
-      <div className="tnp-paper">
-        <div className="tnp-deco-tr">📋</div>
-
-        <div className="tnp-title-row">
-          <h2 className="tnp-title">Session Note</h2>
-          <div className="tnp-date-box">
-            <span className="tnp-field-label">📅 Date:</span>
-            <span className="tnp-field-val tnp-field-line">{note.date}</span>
-          </div>
-        </div>
-
-        <div className="tnp-field-row">
-          <span className="tnp-field-label">👤 Patient:</span>
-          <span className="tnp-field-val tnp-field-line">{patient.name}</span>
-        </div>
-        <div className="tnp-field-row tnp-field-row-last">
-          <span className="tnp-field-label">🩺 Diagnosis:</span>
-          <span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span>
-        </div>
-
-        <div className="tnp-rule" />
-
-        {[
-          { key: 'subjective', label: '💬 Subjective', cls: 'tnp-s' },
-          { key: 'objective',  label: '👀 Objective',  cls: 'tnp-o' },
-          { key: 'assessment', label: '📊 Assessment', cls: 'tnp-a' },
-          { key: 'plan',       label: '🌟 Plan',       cls: 'tnp-p' },
-        ].map(({ key, label, cls }) => (
-          <div key={key} className="tnp-section">
-            <div className={`tnp-section-label ${cls}`}>{label}</div>
-            <div className="tnp-view-body">{note[key]}</div>
-          </div>
-        ))}
-
-        <div className="tnp-sig-section">
-          <div className="tnp-sig-row">
-            <span className="tnp-sig-cheer">✨ Great session!</span>
-            <div className="tnp-sig-right">
-              {note.signatureData
-                ? <img src={note.signatureData} alt="Therapist signature" className="tnp-sig-img" />
-                : <div className="tnp-sig-placeholder-line" />
-              }
-              <span className="tnp-sig-text">Therapist Signature</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="tnp-form-footer">
-          <button className="tnp-ghost-btn" onClick={onBack}>← Back</button>
+          <button className="tnp-ghost-btn" onClick={() => submit(false)} disabled={!!busy} type="button">{busy === 'draft' ? 'Saving…' : '📝 Save draft'}</button>
+          <button className="tnp-primary-btn" onClick={() => submit(true)} disabled={!!busy} type="button">{busy === 'sign' ? 'Signing…' : '💾 Sign & lock note'}</button>
         </div>
       </div>
     </div>
@@ -450,7 +348,7 @@ function CheckIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="5 12 10 17 19 7" /></svg>
 }
 
-function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, onViewNote, onToggleShare, isMobile }) {
+function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, onViewNote, onEditDraft, onShareNote, onUnshare, isMobile }) {
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -549,19 +447,20 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
           <div className="tnp2-note-card-top">
             <span className="tnp2-note-date">{n.date}</span>
             <span className={n.signed ? 'tnp-signed-pill' : 'tnp-pending-pill'}>
-              {n.signed && <CheckCircleIcon />} {n.signed ? 'Signed' : 'Draft'}
+              {n.voided ? 'Void' : n.signed ? <><CheckCircleIcon /> Signed</> : 'Draft'}
             </span>
             <span className={n.shareable ? 'tnp-shared-pill' : 'tnp2-private-pill'}>
-              {n.shareable && <HomeIcon />} {n.shareable ? 'Shared' : 'Private'}
+              {n.shareable ? <><HomeIcon /> Shared · {n.sharedSections.length ? n.sharedSections.join(', ') : 'summary'}</> : 'Private'}
             </span>
+            {n.addendaCount > 0 && <span className="tnp2-private-pill">{n.addendaCount} addend{n.addendaCount === 1 ? 'um' : 'a'}</span>}
           </div>
-          <p className="tnp2-note-preview"><strong>O</strong> · {n.objective ? `${n.objective.slice(0, 90)}…` : '—'}</p>
-          <p className="tnp2-note-preview"><strong>P</strong> · {n.plan ? `${n.plan.slice(0, 90)}…` : '—'}</p>
+          <p className="tnp2-note-preview">Open the note to read it — every view is logged.</p>
           <div className="tnp2-note-actions">
             <button className="tnp-table-view-btn" onClick={() => onViewNote(n)}>View</button>
-            <button className="tnp2-share-btn" onClick={() => onToggleShare(n)}>
-              {n.shareable ? 'Unshare' : 'Share'}
-            </button>
+            {n.status === 'draft' && !n.voided && <button className="tnp2-share-btn" onClick={() => onEditDraft(n)}>Edit</button>}
+            {n.signed && (n.shareable
+              ? <button className="tnp2-share-btn" onClick={() => onUnshare(n)}>Unshare</button>
+              : <button className="tnp2-share-btn" onClick={() => onShareNote(n)}>Share…</button>)}
           </div>
         </div>
       ))}
@@ -776,21 +675,37 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState('')
-  const [view,        setView]        = useState('overview')  // 'overview' | 'new' | 'viewer'
-  const [viewingNote, setViewingNote] = useState(null)
-  const { shareNote, unshareNote } = useSharedProgress()
+  const [view,        setView]        = useState('overview')  // 'overview' | 'new' | 'edit' | 'viewer'
+  const [viewingId,   setViewingId]   = useState(null)
+  const [editing,     setEditing]     = useState(null)        // a draft opened for editing
+  const [shareTarget, setShareTarget] = useState(null)
+  const [locked,      setLocked]      = useState(null)        // { reason } while the page is locked
+  const [reloadKey,   setReloadKey]   = useState(0)
 
-  // Every patient who has actually booked with this therapist (see
-  // api/_lib/routes/patients-therapist-list.js) plus every signed session
-  // note they've written for those patients (api/_lib/routes/notes-*.js),
-  // straight from the `therapy_notes` collection — replacing the old
-  // hardcoded demo roster/notes.
+  // Everything on this page comes from the secured API with the session
+  // token. Note text lives only in React state — never in browser storage —
+  // and is dropped the moment the page locks.
+  const lockPage = useCallback((reason) => {
+    setLocked({ reason })
+    setNotes({})
+    setViewingId(null)
+    setEditing((e) => (e && view !== 'edit' ? null : e))
+    setView((v) => (v === 'viewer' ? 'overview' : v))
+  }, [view])
+  const handleSessionError = useCallback((err) => {
+    if (err.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity.')
+    else setLoadError('Your session has ended. Please sign in again with your clinic account.')
+  }, [lockPage])
+
+  useIdleLock(!locked && !loading, () => lockPage('This page locked after 15 minutes of inactivity.'))
+
   useEffect(() => {
+    if (locked) return undefined
     let cancelled = false
     if (!user?.email) {
       setLoading(false)
       setLoadError('Your account isn’t linked to a staff record yet.')
-      return
+      return undefined
     }
     setLoading(true)
     Promise.all([
@@ -800,20 +715,12 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
           if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
           return body.patients || []
         }),
-      fetch(`/api/notes/therapist-list?email=${encodeURIComponent(user.email)}`)
-        .then(async (r) => {
-          const body = await r.json().catch(() => ({}))
-          if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-          return body.notes || []
-        }),
+      listNotes(),
     ])
       .then(([apiPatients, apiNotes]) => {
         if (cancelled) return
-        setPatients(apiPatients.map((p) => ({
-          id: p.id,
-          name: p.name,
-          diagnosis: p.condition || 'No condition on file',
-        })))
+        setLoadError('')
+        setPatients(apiPatients.map((p) => ({ id: p.id, name: p.name, diagnosis: p.condition || 'No condition on file' })))
         const grouped = {}
         for (const n of apiNotes) {
           if (!grouped[n.patientId]) grouped[n.patientId] = []
@@ -821,14 +728,19 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         }
         setNotes(grouped)
       })
-      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load notes.') })
+      .catch((e) => {
+        if (cancelled) return
+        if (e.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity.')
+        else if (e.code === 'NO_SESSION') setLoadError('Please sign in again with your clinic account to open session notes.')
+        else setLoadError(e.message || 'Could not load notes.')
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [user?.email])
+  }, [user?.email, reloadKey, locked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The selected patient lives in the URL (?patient=<id>; ?patientId= is the
-  // older link format used elsewhere in the app). Desktop falls back to the
-  // first patient so the right pane is never empty; phones start on the list.
+  // older link format). Desktop falls back to the first patient; phones start
+  // on the list. The server never trusts this value: it re-checks assignment.
   const urlPatient = searchParams.get('patient') || searchParams.get('patientId')
   const selectedId = patients.some(p => p.id === urlPatient)
     ? urlPatient
@@ -836,30 +748,21 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const selectedPatient = patients.find(p => p.id === selectedId)
 
   // Back/forward (phone back gesture) changes the URL: drop any open note.
-  useEffect(() => { setView('overview'); setViewingNote(null) }, [urlPatient])
+  useEffect(() => { setView('overview'); setViewingId(null); setEditing(null) }, [urlPatient])
 
-  // On phones the notebook (new/viewer) renders below the patient list, so
-  // opening it would otherwise look like nothing happened — bring it into
-  // view once it mounts / changes.
+  // On phones the notebook renders below the patient list, so bring it into view.
   const detailRef = useRef(null)
   useEffect(() => {
     if (view === 'overview') return
-    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [view, viewingNote])
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [view, viewingId])
 
   const selectPatient = (id, { replace = false } = {}) => {
     const next = new URLSearchParams(searchParams)
     next.set('patient', id)
     next.delete('patientId')
-    // Phones push a history entry so the back gesture returns to the list;
-    // switching patients from the sheet and desktop clicks replace instead.
-    setSearchParams(next, {
-      replace: replace || !isMobile,
-      state: replace ? location.state : { fromList: true },
-    })
-    setView('overview'); setViewingNote(null)
+    setSearchParams(next, { replace: replace || !isMobile, state: replace ? location.state : { fromList: true } })
+    setView('overview'); setViewingId(null); setEditing(null)
   }
   const backToList = () => {
     if (location.state?.fromList) { navigate(-1); return }
@@ -867,99 +770,48 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     next.delete('patient'); next.delete('patientId')
     setSearchParams(next, { replace: true })
   }
-  const openNote  = (note) => { setViewingNote(note); setView('viewer') }
-  const startNew  = ()     => { setView('new'); setViewingNote(null) }
 
-  const saveNote = async (formNote) => {
-    const sessionDate = manilaDateKey()
-    const res = await fetch('/api/notes/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        patientId: selectedId,
-        patientName: selectedPatient?.name,
-        diagnosis: selectedPatient?.diagnosis,
-        employeeEmail: user?.email,
-        sessionDate,
-        subjective: formNote.subjective,
-        objective: formNote.objective,
-        assessment: formNote.assessment,
-        plan: formNote.plan,
-        signatureImage: formNote.signatureData,
-        domain: formNote.domain,
-        shareWithGuardian: formNote.shareable,
-        parentSummary: formNote.parentSummary,
-      }),
-    })
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-
-    const note = {
-      id: body.id,
-      date: fmtNoteDate(sessionDate),
-      shortDate: fmtNoteDateShort(sessionDate),
-      subjective: formNote.subjective,
-      objective: formNote.objective,
-      assessment: formNote.assessment,
-      plan: formNote.plan,
-      signatureData: formNote.signatureData,
-      signed: true,
-      shareable: formNote.shareable,
-      domain: formNote.domain,
-      parentSummary: formNote.parentSummary,
-    }
-    setNotes(prev => ({ ...prev, [selectedId]: [note, ...(prev[selectedId] || [])] }))
-
-    // Alvrin is the shared demo patient wired to the parent-facing Progress
-    // page via ProgressContext — matched by name since real patient ids are
-    // now Mongo ObjectId strings, not the old fixed demo index.
-    if (selectedPatient?.name === 'Alvrin' && note.shareable) {
-      shareNote({ id: `sn-${note.id}`, date: note.date, domain: note.domain, summary: note.parentSummary })
-    }
-    logActivity({
-      role: 'Therapist',
-      user: user?.name || 'Therapist',
-      email: user?.email || '—',
-      actionIcon: '📝',
-      action: 'Patient Notes',
-      description: `Added a signed SOAP note for ${selectedPatient?.name || 'a patient'}`,
-      entity: `Patient #${selectedId}`,
-      status: 'Success',
-    })
+  const openNote = (note) => { setViewingId(note.id); setView('viewer') }
+  const startNew = () => { setView('new'); setViewingId(null); setEditing(null) }
+  const startEditDraft = (noteOrMeta) => {
+    // From the list we only have metadata; the viewer passes the full note.
+    if (noteOrMeta.subjective !== undefined) { setEditing(noteOrMeta); setView('edit'); return }
+    setViewingId(noteOrMeta.id); setView('viewer')
   }
+  const reload = () => setReloadKey((k) => k + 1)
+  const backToOverview = () => { setView('overview'); setViewingId(null); setEditing(null); reload() }
 
-  const toggleShare = async (note) => {
-    const nextShareable = !note.shareable
-    const domain = note.domain || DOMAINS[0]
-    const summary = note.parentSummary || note.assessment
+  const saveNote = async (form) => {
+    const payload = {
+      patientId: selectedId,
+      sessionDate: manilaDateKey(),
+      diagnosis: selectedPatient?.diagnosis,
+      subjective: form.subjective, objective: form.objective, assessment: form.assessment, plan: form.plan,
+      sign: form.sign, signatureImage: form.signatureData, password: form.password,
+    }
     try {
-      const res = await fetch(`/api/notes/${note.id}/share`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shared: nextShareable, domain, summary }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      if (editing) {
+        if (form.sign) await signDraft(editing.id, payload)
+        else await updateDraft(editing.id, payload)
+      } else {
+        await createNote(payload)
+      }
     } catch (err) {
-      alert(err.message || 'Could not update sharing for this note.')
-      return
-    }
-
-    setNotes(prev => ({
-      ...prev,
-      [selectedId]: prev[selectedId].map(n => (
-        n.id === note.id
-          ? { ...n, shareable: nextShareable, domain, parentSummary: nextShareable ? summary : n.parentSummary }
-          : n
-      )),
-    }))
-    if (selectedPatient?.name === 'Alvrin') {
-      if (nextShareable) shareNote({ id: `sn-${note.id}`, date: note.date, domain, summary })
-      else unshareNote(`sn-${note.id}`)
+      if (err.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity. Your text is still here.')
+      throw err
     }
   }
 
-  const backToOverview = () => { setView('overview'); setViewingNote(null) }
+  const doShare = async (sections, summary, domain) => {
+    await shareNote(shareTarget.id, sections, summary, domain)
+    setShareTarget(null)
+    reload()
+  }
+  const doUnshare = async (note) => {
+    if (!window.confirm('Unshare this note? The guardian will no longer be able to read it.')) return
+    try { await unshareNote(note.id); reload() } catch (err) { if (!handleSessionErrorOnce(err)) alert(err.message) }
+  }
+  const handleSessionErrorOnce = (err) => { if (err.code === 'SESSION_LOCKED' || err.code === 'NO_SESSION') { handleSessionError(err); return true } return false }
 
   return (
     <TherapistPageShell
@@ -973,7 +825,10 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       {loading ? (
         <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your patients and notes…</p>
       ) : loadError ? (
-        <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
+        <div>
+          <p role="alert" style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
+          {loadError.includes('sign in again') && <button className="tnp-primary-btn" onClick={onLogout}>Go to sign in</button>}
+        </div>
       ) : (
       <div className="tnp-page">
         {patients.length === 0 ? (
@@ -990,25 +845,38 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
               onBack={backToList}
               onNewNote={startNew}
               onViewNote={openNote}
-              onToggleShare={toggleShare}
+              onEditDraft={startEditDraft}
+              onShareNote={setShareTarget}
+              onUnshare={doUnshare}
               isMobile={isMobile}
             />
           </div>
         )}
 
-        {view === 'new' && (
+        {(view === 'new' || view === 'edit') && selectedPatient && (
           <div className="tnp-scroll-area" ref={detailRef}>
-            <NoteForm patient={selectedPatient} onSave={saveNote} onCancel={backToOverview} />
+            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onCancel={backToOverview} />
           </div>
         )}
 
-        {view === 'viewer' && viewingNote && (
+        {view === 'viewer' && viewingId && (
           <div className="tnp-scroll-area" ref={detailRef}>
-            <NoteViewer note={viewingNote} patient={selectedPatient} onBack={backToOverview} />
+            <NoteViewerSecure
+              noteId={viewingId}
+              patient={selectedPatient}
+              therapistName={user?.name}
+              onBack={backToOverview}
+              onEditDraft={startEditDraft}
+              onChanged={reload}
+              onSessionError={handleSessionError}
+            />
           </div>
         )}
       </div>
       )}
+
+      {shareTarget && <ShareDialog note={shareTarget} onShare={doShare} onClose={() => setShareTarget(null)} />}
+      {locked && <LockScreen reason={locked.reason} userName={user?.name} onUnlocked={() => setLocked(null)} onSignOut={onLogout} />}
     </TherapistPageShell>
   )
 }

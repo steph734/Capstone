@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import './PageWithSidebar.css'
+import { authFetch, unescapeHtml } from '../utils/session'
 import './NotesPage.css'
 
 // ── API mapping ──────────────────────────────────────────────────────────────
@@ -23,15 +24,18 @@ function mapNote(n) {
     title: n.domain ? `${n.domain} Session Note` : `Session Note – ${formatShortDate(n.date)}`,
     date: n.date,
     shortDate: formatShortDate(n.date),
-    preview: n.assessment || n.subjective || '',
+    // Only the sections the therapist chose to share arrive from the server;
+    // a missing key means "not shared", never an empty section.
+    preview: unescapeHtml(n.sharedSummary || n.sections?.assessment || n.sections?.plan || n.sections?.subjective || n.sections?.objective || ''),
     soap: {
       name: n.patientName,
       date: formatFullDate(n.date),
-      diagnosis: n.diagnosis,
-      subjective: n.subjective,
-      objective: n.objective,
-      assessment: n.assessment,
-      plan: n.plan,
+      diagnosis: unescapeHtml(n.diagnosis),
+      subjective: n.sections?.subjective !== undefined ? unescapeHtml(n.sections.subjective) : undefined,
+      objective: n.sections?.objective !== undefined ? unescapeHtml(n.sections.objective) : undefined,
+      assessment: n.sections?.assessment !== undefined ? unescapeHtml(n.sections.assessment) : undefined,
+      plan: n.sections?.plan !== undefined ? unescapeHtml(n.sections.plan) : undefined,
+      summary: unescapeHtml(n.sharedSummary || ''),
       therapistName: n.therapistName,
     },
   }
@@ -138,7 +142,6 @@ function SoapDetail({ note, onBack, onTogglePin }) {
             <span className="nd-pin-detail-star">{note.pinned ? '⭐' : '☆'}</span>
             <span className="nd-pin-detail-label">{note.pinned ? 'Unpin' : 'Pin'}</span>
           </button>
-          <button className="nd-action-btn" aria-label="Share"><ShareIcon /></button>
           <button className="nd-action-btn" aria-label="More"><MoreVertIcon /></button>
         </div>
       </div>
@@ -182,7 +185,10 @@ function SoapDetail({ note, onBack, onTogglePin }) {
             {/* Divider rule */}
             <div className="nd-rule" />
 
-            {/* S — Subjective */}
+            {s.summary && (
+              <div className="nd-section"><div className="nd-section-label">🏡 Summary for you</div><div className="nd-section-body">{s.summary}</div></div>
+            )}
+            {s.subjective !== undefined && (
             <div className="nd-section">
               <div className="nd-section-label nd-s">
                 💬 Subjective
@@ -190,8 +196,8 @@ function SoapDetail({ note, onBack, onTogglePin }) {
               </div>
               <div className="nd-section-body">{s.subjective}</div>
             </div>
-
-            {/* O — Objective */}
+            )}
+            {s.objective !== undefined && (
             <div className="nd-section">
               <div className="nd-section-label nd-o">
                 👀 Objective
@@ -199,8 +205,8 @@ function SoapDetail({ note, onBack, onTogglePin }) {
               </div>
               <div className="nd-section-body">{s.objective}</div>
             </div>
-
-            {/* A — Assessment */}
+            )}
+            {s.assessment !== undefined && (
             <div className="nd-section">
               <div className="nd-section-label nd-a">
                 📊 Assessment
@@ -208,8 +214,8 @@ function SoapDetail({ note, onBack, onTogglePin }) {
               </div>
               <div className="nd-section-body">{s.assessment}</div>
             </div>
-
-            {/* P — Plan */}
+            )}
+            {s.plan !== undefined && (
             <div className="nd-section">
               <div className="nd-section-label nd-p">
                 🌟 Plan
@@ -217,6 +223,7 @@ function SoapDetail({ note, onBack, onTogglePin }) {
               </div>
               <div className="nd-section-body">{s.plan}</div>
             </div>
+            )}
 
             {/* Signature block */}
             <div className="nd-sig-block">
@@ -263,19 +270,14 @@ export default function NotesPage({ user, onLogout, betaTier }) {
     let cancelled = false
     setLoading(true)
     setError('')
-    fetch(`/api/notes/patient-list?email=${encodeURIComponent(email)}`)
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(data.error || 'Could not load your session notes.')
-        return data
-      })
+    authFetch('/api/notes/patient-list')
       .then((data) => {
         if (cancelled) return
         setNotes((data.notes || []).map(mapNote))
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err.message || 'Could not load your session notes.')
+        setError(err.code === 'NO_SESSION' ? 'Please sign in again to read your notes.' : (err.message || 'Could not load your session notes.'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

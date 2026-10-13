@@ -7,10 +7,14 @@
 // got nothing). The matching endpoints have since been ported to this app's
 // own Vercel serverless functions under api/_lib/routes/, so same-origin
 // (relative path, no host) is now the correct default.
+import { getSessionToken } from './session'
+
 export const API_BASE = import.meta.env.VITE_API_URL || ''
 
+const authHeaders = () => { const t = getSessionToken(); return t ? { Authorization: `Bearer ${t}` } : {} }
+
 export async function apiGet(path) {
-  const res = await fetch(`${API_BASE}${path}`)
+  const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || `GET ${path} failed: ${res.status}`)
   return data
@@ -19,7 +23,7 @@ export async function apiGet(path) {
 export async function apiPost(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -30,7 +34,7 @@ export async function apiPost(path, body) {
 export async function apiPatch(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -41,8 +45,9 @@ export async function apiPatch(path, body) {
 export async function apiDelete(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'DELETE',
+    headers: authHeaders(),
     ...(body !== undefined && {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(body),
     }),
   })
@@ -56,6 +61,7 @@ export async function apiDelete(path, body) {
 export async function apiPostForm(path, formData) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
+    headers: authHeaders(),
     body: formData,
   })
   const data = await res.json().catch(() => ({}))

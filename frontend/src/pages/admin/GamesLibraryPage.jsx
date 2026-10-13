@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
-import { initialGameRequests } from './gamifiedLibraryData'
 import { GameControllerIcon, PencilIcon, TrashIcon } from './gamifiedIcons'
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../utils/api'
 
@@ -43,10 +43,17 @@ function fromApiGame(g) {
 }
 
 export default function GamesLibraryPage({ user, onLogout }) {
+  const navigate = useNavigate()
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [requests, setRequests] = useState(initialGameRequests)
+  // Real owner requests (GET /api/admin/game-requests, Super Admin only). Only
+  // pending and approved-but-not-yet-built ones show here.
+  const [requests, setRequests] = useState([])
+  const [sourceRequestId, setSourceRequestId] = useState(null)
+  const [declineMessage, setDeclineMessage] = useState('')
+  const [replyText, setReplyText] = useState('')
+  const [requestError, setRequestError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -67,6 +74,25 @@ export default function GamesLibraryPage({ user, onLogout }) {
 
   useEffect(loadGames, [])
 
+  const loadRequests = () => {
+    if (!user?.email) return
+    apiGet(`/api/admin/game-requests?email=${encodeURIComponent(user.email)}`)
+      .then((data) => setRequests((data.requests || [])
+        .filter((r) => r.status === 'pending' || r.status === 'approved')
+        .map((r) => ({
+          ...r,
+          branch: 'Clinic owner',
+          submitted: new Date(r.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          type: r.therapyType,
+          level: 'Easy',
+          description: r.reason,
+        }))))
+      .catch((err) => setRequestError(err.message))
+  }
+  useEffect(loadRequests, [user?.email]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const patchRequest = (id, body) => apiPatch(`/api/admin/game-requests/${id}`, { email: user?.email, ...body })
+
   const editingGame = useMemo(() => games.find((game) => game.id === editingId) || null, [games, editingId])
 
   const visibleGames = useMemo(() => {
@@ -74,19 +100,10 @@ export default function GamesLibraryPage({ user, onLogout }) {
     return games.filter((game) => game.status === statusFilter)
   }, [games, statusFilter])
 
-  const openCreate = () => {
-    setEditingId(null)
-    setForm(emptyForm)
-    setSaveError('')
-    setShowEditor(true)
-  }
+  // The Game Builder replaced the old Add / Edit dialog.
+  const openCreate = () => navigate('/admin/games-library/builder/new')
 
-  const openEdit = (game) => {
-    setEditingId(game.id)
-    setForm({ name: game.name, type: game.type, level: game.level, gameType: game.gameType, description: game.description, points: game.points ?? 10 })
-    setSaveError('')
-    setShowEditor(true)
-  }
+  const openEdit = (game) => navigate(`/admin/games-library/builder/${game.id}`)
 
   const saveGame = async (event) => {
     event.preventDefault()
@@ -106,10 +123,13 @@ export default function GamesLibraryPage({ user, onLogout }) {
         await apiPatch(`/api/games/${editingGame.id}`, payload)
       } else {
         payload.createdBy = user?.id
+        if (sourceRequestId) payload.sourceRequestId = sourceRequestId
         await apiPost('/api/games', payload)
       }
       setShowEditor(false)
+      setSourceRequestId(null)
       loadGames()
+      loadRequests()
     } catch (err) {
       setSaveError(err.message)
     }
@@ -138,17 +158,42 @@ export default function GamesLibraryPage({ user, onLogout }) {
 
   // Approving opens the creation workspace (the Add/Edit Game form) prefilled
   // with what the owner asked for, and clears the request from the pending list.
-  const approveRequest = (request) => {
-    setRequests((current) => current.filter((r) => r.id !== request.id))
-    setEditingId(null)
-    setForm({ name: request.name, type: request.type, level: request.level, description: request.description, points: 10 })
-    setShowEditor(true)
+  const approveRequest = async (request) => {
+    setRequestError('')
+    try {
+      // A pending request is approved first (this notifies the owner); an
+      // already-approved one just reopens the workspace.
+      if (request.status === 'pending') await patchRequest(request.id, { status: 'approved' })
+    } catch (err) {
+      setRequestError(err.message)
+      return
+    }
+    // Open the builder pre-filled from the request; the first autosave links the game to it.
+    const q = new URLSearchParams({ request: request.id, name: request.name, type: String(request.therapyType || '').toLowerCase(), desc: request.description || '' })
+    navigate(`/admin/games-library/builder/new?${q}`)
   }
 
-  const confirmDecline = () => {
+  const confirmDecline = async () => {
     if (!declineTarget) return
-    setRequests((current) => current.filter((r) => r.id !== declineTarget.id))
+    try {
+      await patchRequest(declineTarget.id, { status: 'declined', message: declineMessage })
+      setRequests((current) => current.filter((r) => r.id !== declineTarget.id))
+    } catch (err) {
+      setRequestError(err.message)
+    }
     setDeclineTarget(null)
+    setDeclineMessage('')
+  }
+
+  const sendReply = async () => {
+    if (!viewRequest || !replyText.trim()) return
+    try {
+      const { request } = await patchRequest(viewRequest.id, { message: replyText })
+      setViewRequest((v) => ({ ...v, replies: request.replies }))
+      setReplyText('')
+    } catch (err) {
+      setRequestError(err.message)
+    }
   }
 
   const filters = [
@@ -166,12 +211,13 @@ export default function GamesLibraryPage({ user, onLogout }) {
       icon={<GameControllerIcon />}
       menuItems={adminMenuItems}
     >
+      {requestError && <p role="alert" style={{ color: '#b91c1c', fontWeight: 700 }}>{requestError}</p>}
       {requests.length > 0 && (
         <section className="grq-panel">
           <div className="grq-panel-header">
             <div className="grq-panel-title-row">
               <h3>Requests from owners</h3>
-              <span className="grq-pending-badge">{requests.length} pending</span>
+              <span className="grq-pending-badge">{requests.length} open</span>
             </div>
             <p className="grq-panel-hint">Approve to open the request in the creation workspace</p>
           </div>
@@ -187,7 +233,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
                     <span className="grq-owner-name">{request.ownerName}</span>
                     <span className="grq-owner-meta">({request.branch}) · {request.submitted}</span>
                   </div>
-                  <span className="grq-pending-pill">Pending</span>
+                  <span className="grq-pending-pill">{request.status === 'approved' ? 'Approved' : 'Pending'}</span>
                 </div>
 
                 <h4 className="grq-card-title">{request.name}</h4>
@@ -406,13 +452,25 @@ export default function GamesLibraryPage({ user, onLogout }) {
               </div>
               <div className="branch-view-field">
                 <span className="branch-view-label">Status</span>
-                <p>Pending</p>
+                <p>{viewRequest.status === 'approved' ? 'Approved' : 'Pending'}</p>
               </div>
             </div>
 
             <div className="admin-field" style={{ marginTop: '16px' }}>
               <span>Description</span>
               <p style={{ margin: 0, color: '#4a5b53', fontSize: '14px', lineHeight: 1.6 }}>{viewRequest.description}</p>
+            </div>
+
+            {viewRequest.replies?.length > 0 && (
+              <div className="admin-field" style={{ marginTop: '16px' }}>
+                <span>Replies so far</span>
+                {viewRequest.replies.map((r, i) => <p key={i} style={{ margin: '0 0 6px', fontSize: '13px', color: '#4a5b53' }}><strong>{r.name}:</strong> {r.message}</p>)}
+              </div>
+            )}
+            <div className="admin-field" style={{ marginTop: '16px' }}>
+              <span>Reply to the owner (they are notified in-app and by email)</span>
+              <textarea value={replyText} maxLength={1000} rows={2} onChange={(e) => setReplyText(e.target.value)} placeholder="Write a message…" />
+              <button className="admin-btn-secondary" type="button" onClick={sendReply} disabled={!replyText.trim()} style={{ marginTop: '8px' }}>Send reply</button>
             </div>
 
             <div className="admin-button-row admin-view-modal-footer">
@@ -431,8 +489,10 @@ export default function GamesLibraryPage({ user, onLogout }) {
             <p className="admin-confirm-msg">
               <strong>{declineTarget.ownerName}</strong>&apos;s request for <strong>{declineTarget.name}</strong> will be removed from the pending list.
             </p>
+            <textarea value={declineMessage} maxLength={1000} rows={3} onChange={(e) => setDeclineMessage(e.target.value)}
+              placeholder="Tell the owner why (optional)" aria-label="Reason for declining" style={{ width: '100%', boxSizing: 'border-box', margin: '8px 0' }} />
             <div className="admin-confirm-actions">
-              <button className="admin-confirm-cancel" onClick={() => setDeclineTarget(null)}>Cancel</button>
+              <button className="admin-confirm-cancel" onClick={() => { setDeclineTarget(null); setDeclineMessage('') }}>Cancel</button>
               <button className="admin-confirm-ok" onClick={confirmDecline}>Yes, Decline</button>
             </div>
           </div>

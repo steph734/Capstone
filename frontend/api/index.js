@@ -60,7 +60,10 @@ import attendanceRemind from './_lib/routes/attendance-remind.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
 import notesPatientList from './_lib/routes/notes-patient-list.js'
 import notesCreate from './_lib/routes/notes-create.js'
-import notesShare from './_lib/routes/notes-share.js'
+import notesItem from './_lib/routes/notes-item.js'
+import notesOwnerSummary from './_lib/routes/notes-owner-summary.js'
+import authVerifyLoginOtp from './_lib/routes/auth-verify-login-otp.js'
+import authReauth from './_lib/routes/auth-reauth.js'
 import exercisesTherapistList from './_lib/routes/exercises-therapist-list.js'
 import exercisesCreate from './_lib/routes/exercises-create.js'
 import exercisesDelete from './_lib/routes/exercises-delete.js'
@@ -84,6 +87,12 @@ import ownerGamifiedOverview from './_lib/routes/owner-gamified-overview.js'
 import ownerGamifiedPatient from './_lib/routes/owner-gamified-patient.js'
 import ownerGamifiedNotify from './_lib/routes/owner-gamified-notify.js'
 import ownerGamifiedLibrary from './_lib/routes/owner-gamified-library.js'
+import ownerGameRequests from './_lib/routes/owner-game-requests.js'
+import ownerGameRequestItem from './_lib/routes/owner-game-request-item.js'
+import adminGameRequests from './_lib/routes/admin-game-requests.js'
+import notifications from './_lib/routes/notifications.js'
+import adminBuilder from './_lib/routes/admin-builder.js'
+import adminBuilderAssets from './_lib/routes/admin-builder-assets.js'
 import gamesAdminItem from './_lib/routes/games-admin-item.js'
 import speechRecordingsCreate from './_lib/routes/speech-recordings-create.js'
 import speechRecordingsList from './_lib/routes/speech-recordings-list.js'
@@ -104,6 +113,10 @@ import employeesDocumentFile from './_lib/routes/employees-document-file.js'
 import employeesPhoto from './_lib/routes/employees-photo.js'
 import employeesItem from './_lib/routes/employees-item.js'
 import branchesList from './_lib/routes/branches-list.js'
+import adminDashboard from './_lib/routes/admin-dashboard.js'
+import adminBranches from './_lib/routes/admin-branches.js'
+import adminBranchItem from './_lib/routes/admin-branch-item.js'
+import adminBranchOwners from './_lib/routes/admin-branch-owners.js'
 import paoProfile from './_lib/routes/pao-profile.js'
 import paoBadges from './_lib/routes/pao-badges.js'
 import paoWardrobe from './_lib/routes/pao-wardrobe.js'
@@ -163,6 +176,9 @@ app.all('/api/auth/signup', authSignup)
 app.all('/api/auth/verify-otp', authVerifyOtp)
 app.all('/api/auth/resend-otp', authResendOtp)
 app.all('/api/auth/login', authLogin)
+app.all('/api/auth/verify-login-otp', authVerifyLoginOtp)
+app.all('/api/auth/reauth', authReauth)
+app.all('/api/auth/logout', authReauth)
 app.all('/api/auth/change-password', authChangePassword)
 app.all('/api/auth/send-reset-otp', sendResetOtp)
 app.all('/api/auth/verify-reset-otp', verifyResetOtp)
@@ -177,7 +193,9 @@ app.all('/api/attendance/remind', attendanceRemind)
 app.all('/api/notes/therapist-list', notesTherapistList)
 app.all('/api/notes/patient-list', notesPatientList)
 app.all('/api/notes/create', notesCreate)
-app.all('/api/notes/:id/share', notesShare)
+app.all('/api/notes/owner-summary', notesOwnerSummary) // static segments before :id
+app.all('/api/notes/:id/:action', notesItem)
+app.all('/api/notes/:id', notesItem)
 app.all('/api/exercises/therapist-list', exercisesTherapistList)
 app.all('/api/exercises/create', exercisesCreate)
 app.all('/api/exercises/:id', exercisesDelete)
@@ -191,6 +209,17 @@ app.all('/api/owner/gamified/overview', ownerGamifiedOverview)
 app.all('/api/owner/gamified/patients/:patientId', ownerGamifiedPatient)
 app.all('/api/owner/gamified/notify', ownerGamifiedNotify)
 app.all('/api/owner/gamified/library', ownerGamifiedLibrary)
+app.all('/api/owner/game-requests/:id/file', ownerGameRequestItem)
+app.all('/api/owner/game-requests/:id', ownerGameRequestItem)
+app.all('/api/owner/game-requests', ownerGameRequests)
+app.all('/api/admin/game-requests/:id', adminGameRequests)
+app.all('/api/admin/game-requests', adminGameRequests)
+app.all('/api/notifications', notifications)
+app.all('/api/admin/builder/assets', adminBuilderAssets)
+app.all('/api/game-assets/:assetId', adminBuilderAssets)
+app.all('/api/admin/builder/games/:id/:action', adminBuilder)
+app.all('/api/admin/builder/games/:id', adminBuilder)
+app.all('/api/admin/builder/games', adminBuilder)
 app.all('/api/pao-items/list', paoItemsList)
 app.all('/api/pao-items/create', paoItemsCreate)
 app.all('/api/pao-items/:id', paoItemsItem)
@@ -225,6 +254,10 @@ app.all('/api/employees/:id/photo', employeesPhoto)
 app.all('/api/employees/:id', employeesItem)
 app.all('/api/employees', employeesCollection)
 app.all('/api/branches', branchesList)
+app.all('/api/admin/dashboard', adminDashboard)
+app.all('/api/admin/branch-owners', adminBranchOwners)
+app.all('/api/admin/branches/:id', adminBranchItem)
+app.all('/api/admin/branches', adminBranches)
 
 // Pao progression (XP, levels, stats, badges, wardrobe unlocks).
 app.all('/api/pao', paoProfile)

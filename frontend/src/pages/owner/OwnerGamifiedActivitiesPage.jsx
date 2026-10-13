@@ -239,7 +239,7 @@ export default function OwnerGamifiedActivitiesPage({ user, onLogout, betaTier }
         {error && <ErrorBanner message={error} onRetry={() => load()} />}
 
         {loading && !data && (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} style={{ height: 104 }} />)}</div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <SkeletonBlock key={i} style={{ height: 260 }} />)}</div>
             <SkeletonBlock style={{ height: 380 }} />
@@ -247,7 +247,7 @@ export default function OwnerGamifiedActivitiesPage({ user, onLogout, betaTier }
         )}
 
         {data && (
-          <div className="grid gap-5" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }} aria-busy={loading}>
+          <div className="grid grid-cols-1 gap-5" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }} aria-busy={loading}>
             {/* KPI cards */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <KpiCard icon="🧒" bg="#E3F0FD" iconBg="#CFE5FB" label="Patients playing" value={k.patientsPlaying} delta={k.patientsDelta}
@@ -261,7 +261,7 @@ export default function OwnerGamifiedActivitiesPage({ user, onLogout, betaTier }
             </div>
 
             {/* Row 1 */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1.2fr_1fr_0.9fr]">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
               <div style={CARD}>
                 <CardTitle sub={data.weekly.by === 'therapist' ? 'By therapist' : 'By branch'}>Games played each week</CardTitle>
                 <WeeklyChart weekly={data.weekly} />

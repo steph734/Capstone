@@ -59,7 +59,7 @@ function GoogleIcon() {
   )
 }
 
-export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick, onLogin }) {
+export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClick, onLogin, onVerify2fa }) {
   const navigate = useNavigate()
   const location = useLocation()
   const signupEmail = location.state?.signupEmail || ''
@@ -74,6 +74,9 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
   )
   const [socialProvider, setSocialProvider] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Therapist / owner accounts get a second step: the 6-digit code we email.
+  const [twoFactorEmail, setTwoFactorEmail] = useState('')
+  const [code, setCode] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -90,11 +93,28 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     if (result?.success) return
 
     setIsSubmitting(false)
+    if (result?.requires2fa) {
+      setTwoFactorEmail(result.email || email)
+      setNotice(result.message || 'We emailed you a 6-digit sign-in code.')
+      return
+    }
     if (result?.requiresVerification) {
       // The wrapper redirects to /verify-otp — no error to show.
       return
     }
     setLoginError(result?.message || 'Login failed')
+  }
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault()
+    if (!onVerify2fa || isSubmitting) return
+    setLoginError('')
+    setIsSubmitting(true)
+    const result = await onVerify2fa(twoFactorEmail, code.trim())
+    if (result?.success) return
+    setIsSubmitting(false)
+    setLoginError(result?.message || 'That code is not valid.')
+    if (result?.locked) { setTwoFactorEmail(''); setCode(''); setPassword('') }
   }
 
   const handleSocialSuccess = async () => {
@@ -117,6 +137,35 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
           <p className="login-subtitle">Login to continue your journey</p>
         </div>
 
+        {twoFactorEmail ? (
+          <form className="login-form" onSubmit={handleVerifyCode}>
+            <div className="form-group">
+              <label htmlFor="login-code">Sign-in code</label>
+              <div className="input-wrapper">
+                <span className="input-icon"><LockIcon /></span>
+                <input
+                  id="login-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  autoFocus
+                />
+              </div>
+            </div>
+            {notice && <p className="login-notice">{notice}</p>}
+            {loginError && <p className="login-error" role="alert">{loginError}</p>}
+            <button type="submit" className="login-btn" disabled={isSubmitting || code.length !== 6} aria-busy={isSubmitting}>
+              {isSubmitting ? 'Verifying…' : 'Verify and sign in'}
+            </button>
+            <button type="button" className="forgot-link" style={{ marginTop: 12 }} onClick={() => { setTwoFactorEmail(''); setCode(''); setNotice(''); setLoginError('') }}>
+              Use a different account
+            </button>
+          </form>
+        ) : (
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email</label>
@@ -185,6 +234,7 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
             )}
           </button>
         </form>
+        )}
 
         <p className="divider-text">or continue with</p>
 

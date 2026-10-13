@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const allStatuses = String(req.query.scope || '') === 'all'
     const docs = await db.collection('games')
       .find(allStatuses ? {} : { status: 'published' })
-      .project({ name: 1, status: 1, therapy_type: 1, difficulty: 1, points_per_play: 1, unlocks_badge_id: 1, game_type: 1, unlock_level: 1 })
+      .project({ name: 1, status: 1, therapy_type: 1, difficulty: 1, points_per_play: 1, unlocks_badge_id: 1, game_type: 1, unlock_level: 1, description: 1, 'builder.doc.meta.icon': 1, 'builder.doc.meta.color': 1, 'builder.doc.levels.id': 1 })
       .sort({ name: 1 })
       .toArray()
 
@@ -48,6 +48,11 @@ export default async function handler(req, res) {
           unlocksBadgeId: d.unlocks_badge_id ? String(d.unlocks_badge_id) : null,
           gameType: d.game_type || null,
           unlockLevel,
+          // Games made in the Game Builder carry a playable document; the rest are built-in screens.
+          hasBuilder: Array.isArray(d.builder?.doc?.levels) && d.builder.doc.levels.length > 0,
+          description: d.description || '',
+          icon: d.builder?.doc?.meta?.icon || null,
+          color: d.builder?.doc?.meta?.color || null,
           locked: patientLevel == null ? null : patientLevel < unlockLevel,
         }
       }),

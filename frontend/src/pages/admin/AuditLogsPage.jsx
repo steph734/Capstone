@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { getAuditLogs } from '../../utils/auditLog'
@@ -46,6 +47,9 @@ export default function AuditLogsPage({ user, onLogout }) {
   const [toDate, setToDate] = useState('2026-07-06')
   const [search, setSearch] = useState('')
   const [selectedLog, setSelectedLog] = useState(null)
+  // /admin/audit-logs?filter=security (linked from the dashboard) shows only lockouts and repeated failed logins.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const securityOnly = searchParams.get('filter') === 'security'
 
   useEffect(() => {
     let cancelled = false
@@ -78,6 +82,7 @@ export default function AuditLogsPage({ user, onLogout }) {
   const visibleLogs = useMemo(() => {
     return logs.filter((log) => {
       const matchesRole = roleFilter === 'All' || log.role === roleFilter
+      if (securityOnly && !Object.values(SERVER_ACTION_META).some((m) => m.label === log.action)) return false
       const query = search.trim().toLowerCase()
       const matchesSearch =
         !query ||
@@ -87,7 +92,7 @@ export default function AuditLogsPage({ user, onLogout }) {
         String(log.id).includes(query)
       return matchesRole && matchesSearch
     })
-  }, [logs, roleFilter, search])
+  }, [logs, roleFilter, search, securityOnly])
 
   const handleClear = () => {
     setRoleFilter('All')
@@ -137,6 +142,12 @@ export default function AuditLogsPage({ user, onLogout }) {
         </div>
       </div>
 
+      {securityOnly && (
+        <p className="al-banner-meta" role="status">
+          Showing security events only (lockouts and repeated failed sign-ins).{' '}
+          <button type="button" className="al-filter-btn" onClick={() => setSearchParams({}, { replace: true })}>Show all</button>
+        </p>
+      )}
       {/* ── Role filter pills ── */}
       <div className="al-filter-row">
         {ROLE_FILTERS.map((f) => (

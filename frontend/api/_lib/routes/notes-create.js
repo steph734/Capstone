@@ -1,116 +1,96 @@
-import mongoose from 'mongoose'
-import { getMongo, getDb } from '../mongo.js'
-import { Employee } from '../models/employee.js'
-import { TherapyNote } from '../models/therapyNote.js'
-import { sendNoteCreatedEmail } from '../noteEmail.js'
+// POST /api/notes/create -> a new SOAP note: a draft, or (sign: true) a signed one.
+// Authorisation comes from the session, never from the request body: the
+// therapist must have an appointment with the patient, or this is a 403.
+// The four SOAP fields are encrypted (AES-256-GCM) before they reach the
+// database; signing re-checks the password and stores signed_by, signed_at and
+// a SHA-256 content hash. Every version is kept in `soap_note_versions`.
+import { ObjectId } from 'mongodb'
+import { getMongo } from '../mongo.js'
+import { requireSession } from '../session.js'
+import { checkPasswordReentry } from '../passwordCheck.js'
+import { SOAP_FIELDS, encryptField, contentHash, validateSoap, cleanText } from '../soapCrypto.js'
+import { employeeFor, isAssigned, audit } from '../noteAccess.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const str = (v) => (v == null ? '' : String(v).trim())
+export const SIGNATURE_RE = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/
 
-// POST /api/notes/create -> a signed SOAP session note, written straight to
-// the `therapy_notes` collection. The Notes & Progress page always signs on
-// save (there's no separate "save as draft" step in the UI yet), so this
-// always writes status: 'signed' with a signature image and a signed_at/by.
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
-
-  const {
-    patientId, patientName, diagnosis, employeeEmail, sessionDate,
-    subjective, objective, assessment, plan, signatureImage,
-    domain, shareWithGuardian, parentSummary,
-  } = req.body || {}
-
-  const email = str(employeeEmail).toLowerCase()
-  if (!email) return res.status(400).json({ error: 'Missing employeeEmail.' })
-  if (!mongoose.isValidObjectId(patientId)) return res.status(400).json({ error: 'Invalid patientId.' })
-  if (!DATE_RE.test(str(sessionDate))) return res.status(400).json({ error: 'Invalid sessionDate.' })
-  if (!str(subjective) || !str(objective) || !str(assessment) || !str(plan)) {
-    return res.status(400).json({ error: 'All SOAP fields (subjective/objective/assessment/plan) are required.' })
-  }
-  if (!str(signatureImage)) {
-    return res.status(400).json({ error: 'A signature is required to save a session note.' })
-  }
-  const share = !!shareWithGuardian
-  if (share && !str(parentSummary)) {
-    return res.status(400).json({ error: 'A parent-friendly summary is required when sharing this note.' })
-  }
-
   try {
     await getMongo()
-    const employee = await Employee.findOne({ email })
-    if (!employee) {
-      return res.status(404).json({ error: 'No staff record is linked to this account yet.' })
+    const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+    if (!ctx) return
+    const { db, user, ip } = ctx
+    const body = req.body || {}
+
+    const employee = await employeeFor(db, user)
+    if (!employee) return res.status(403).json({ error: 'Your account is not linked to a staff record.' })
+    if (!ObjectId.isValid(body.patientId)) return res.status(400).json({ error: 'Invalid patient.' })
+    const patientId = new ObjectId(String(body.patientId))
+    if (!(await isAssigned(db, employee._id, patientId))) {
+      await audit(db, { user, action: 'denied', patientId, ip, meta: { attempted: 'create' } })
+      return res.status(403).json({ error: 'You are not assigned to this patient.' })
     }
+    if (!DATE_RE.test(String(body.sessionDate || ''))) return res.status(400).json({ error: 'Invalid session date.' })
+    const sign = body.sign === true
 
-    // Confirm the patient actually exists (raw driver — `patients` isn't
-    // modeled via Mongoose anywhere in this app yet).
-    const db = await getDb()
-    const patientObjId = new mongoose.Types.ObjectId(patientId)
-    const patient = await db.collection('patients').findOne(
-      { _id: patientObjId },
-      { projection: { _id: 1, email: 1, guardian_first_name: 1, guardian_last_name: 1 } }
-    )
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found.' })
-    }
-
-    const employeeName = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ')
-    const now = new Date()
-
-    const doc = await TherapyNote.create({
-      employee_id: employee._id,
-      employee_name: employeeName,
-      patient_id: patientObjId,
-      patient_name: str(patientName) || null,
-      diagnosis: str(diagnosis) || null,
-      title: share ? (str(domain) || null) : null,
-      session_date: sessionDate,
-      timezone: 'Asia/Manila',
-      subjective: str(subjective),
-      objective: str(objective),
-      assessment: str(assessment),
-      plan: str(plan),
-      status: 'signed',
-      signature_image: signatureImage,
-      signed_at: now,
-      signed_by: employee._id,
-      shared_with_guardian: share,
-      shared_summary: share ? str(parentSummary) : null,
-      shared_at: share ? now : null,
-      is_archived: false,
-    })
-
-    // Best-effort: let the patient/guardian know a new note was written. Must
-    // never fail the note save — the note is already persisted at this point.
-    let emailSent = false
-    if (patient.email) {
-      try {
-        const guardianName = [patient.guardian_first_name, patient.guardian_last_name].filter(Boolean).join(' ')
-        await sendNoteCreatedEmail({
-          email: patient.email,
-          guardianName,
-          patientName: str(patientName),
-          therapistName: employeeName,
-          sessionDate,
-          summary: share ? str(parentSummary) : '',
-        })
-        emailSent = true
-      } catch (err) {
-        console.error('notes/create: failed to send note notification email:', err)
+    const { errors, value } = validateSoap(body, { complete: sign })
+    if (Object.keys(errors).length) return res.status(400).json({ error: 'Please fix the highlighted sections.', fields: errors })
+    if (sign) {
+      if (!SIGNATURE_RE.test(String(body.signatureImage || '')) || body.signatureImage.length > 600000) {
+        return res.status(400).json({ error: 'Draw your signature to sign this note.', fields: { signature: 'A signature is required.' } })
       }
+      const check = await checkPasswordReentry(db, user, body.password)
+      if (!check.ok) return res.status(check.locked ? 423 : 401).json({ error: check.error, locked: !!check.locked, fields: { password: check.error } })
     }
 
-    return res.status(201).json({
-      id: String(doc._id),
-      date: doc.session_date,
-      createdAt: doc.created_at,
-      emailSent,
+    const patient = await db.collection('patients').findOne({ _id: patientId }, { projection: { first_name: 1, last_name: 1 } })
+    if (!patient) return res.status(404).json({ error: 'Patient not found.' })
+
+    const _id = new ObjectId()
+    const id = String(_id)
+    const now = new Date()
+    const encrypted = Object.fromEntries(SOAP_FIELDS.map((f) => [f, value[f] ? encryptField(value[f], id, f) : null]))
+    const hash = sign ? contentHash(value) : null
+    const doc = {
+      _id, NoteID: id,
+      appointment_id: null,
+      employee_id: employee._id,
+      employee_name: [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' '),
+      patient_id: patientId,
+      patient_name: [patient.first_name, patient.last_name].filter(Boolean).join(' ') || null,
+      diagnosis: cleanText(body.diagnosis).slice(0, 150) || null,
+      title: null,
+      session_date: body.sessionDate,
+      timezone: 'Asia/Manila',
+      ...encrypted,
+      status: sign ? 'signed' : 'draft',
+      signature_image: sign ? body.signatureImage : null,
+      signed_at: sign ? now : null,
+      signed_by: sign ? employee._id : null,
+      content_hash: hash,
+      shared_with_guardian: false, shared_summary: null, shared_at: null,
+      addendum_to: null,
+      voided: false,
+      version: 1,
+      enc: 1,
+      is_archived: false, archived_at: null,
+      created_at: now, updated_at: now,
+    }
+    await db.collection('therapy_notes').insertOne(doc)
+    await db.collection('soap_note_versions').insertOne({
+      note_id: _id, version: 1, kind: sign ? 'sign' : 'create', ...encrypted, content_hash: hash,
+      created_by: user._id, created_at: now,
     })
+    await audit(db, { user, action: 'create', patientId, noteId: _id, ip })
+    if (sign) await audit(db, { user, action: 'sign', patientId, noteId: _id, ip })
+
+    return res.status(201).json({ id, status: doc.status, signedAt: doc.signed_at, createdAt: now, version: 1 })
   } catch (err) {
     console.error('notes/create error:', err)
-    return res.status(500).json({ error: err.message || 'Could not save the session note.' })
+    return res.status(err.status || 500).json({ error: err.message || 'Could not save the session note.' })
   }
 }

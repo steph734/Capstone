@@ -29,6 +29,7 @@ import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLanguage'
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
 import { fetchGameBadge } from '../utils/gameProgress'
+import BuilderGamePage from './BuilderGamePage'
 
 // ─── Intro stages ──────────────────────────────────────────────────────────────
 
@@ -475,6 +476,28 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       .catch(() => { if (!cancelled) setDbGameStatus(new Map()) })
     return () => { cancelled = true }
   }, [])
+  // Games published from the Game Builder aren't in the built-in GAMES list;
+  // they come from the database and are played by BuilderGamePage.
+  const [builderGames, setBuilderGames] = useState([])
+  const [builderTitle, setBuilderTitle] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/games/list')
+      .then((r) => r.json())
+      .then((body) => { if (!cancelled) setBuilderGames((body.games || []).filter((g) => g.hasBuilder)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  const allGames = [
+    ...GAMES,
+    ...builderGames
+      .filter((g) => !GAMES.some((h) => h.title.trim().toLowerCase() === String(g.name).trim().toLowerCase()))
+      .map((g) => ({
+        id: `db-${g.id}`, title: g.name, emoji: g.icon || '🎮', desc: g.description || '', color: g.color || '#1FA58A',
+        requiredLevel: g.unlockLevel || 1, category: g.therapyType, difficulty: g.difficulty || 'easy',
+        badge: 'Star Player', badgeEmoji: '⭐', xp: g.pointsPerPlay, builder: true,
+      })),
+  ]
   const isGamePublished = (title) => {
     if (!dbGameStatus) return true // still loading: don't hide anything yet
     const status = dbGameStatus.get(String(title).trim().toLowerCase())
@@ -616,6 +639,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   const startGame = (game) => {
     setPreviewGame(null)
+    if (game.builder) { stopPaoVoice(); setBuilderTitle(game.title); setPhase('builder'); return }
     if (game.id === 'echo') { stopPaoVoice(); setPhase('echo') }
     else if (game.id === 'picture-word') { stopPaoVoice(); setPhase('picture-word') }
     else if (game.id === 'puzzle-pieces') { stopPaoVoice(); setPuzzlePicker(true) }
@@ -711,6 +735,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'spot-difference') {
     return <SpotDifferencePage onExit={backToGames}/>
+  }
+
+  if (phase === 'builder') {
+    return <BuilderGamePage gameName={builderTitle} lang={lang} onExit={backToGames}/>
   }
 
   if (phase === 'story-select') {
@@ -1000,7 +1028,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
             </div>
 
             <div className="gf-games-grid">
-              {GAMES.filter(g =>
+              {allGames.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&
                 (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter) &&
                 isGamePublished(g.title)

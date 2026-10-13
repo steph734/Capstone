@@ -33,6 +33,12 @@ const COPY = {
     footer: (brand) => `If you didn't try to sign up for ${brand}, you can ignore this email.`,
     subject: (brand) => `Your ${brand} verification code`,
   },
+  login2fa: {
+    heading: 'Your sign-in code',
+    intro: (brand) => `Use this code to finish signing in to ${brand}. It expires in 10 minutes.`,
+    footer: () => "If you didn't just try to sign in, someone may know your password — please change it.",
+    subject: (brand) => `Your ${brand} sign-in code`,
+  },
   reset: {
     heading: 'Reset your password',
     intro: (brand) => `Use this code to reset your ${brand} password. It expires in 10 minutes.`,

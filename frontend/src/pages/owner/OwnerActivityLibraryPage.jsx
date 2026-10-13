@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { GAMES } from '../GamifiedFullPage'
-import { INITIAL_REQUESTS } from './OwnerRequestGamePage'
+import { AREAS, AREA_BY_ID, areaOf } from './gamified/areas'
 import {
   GREEN_900, GREEN_700, MUTED, BORDER, CARD, FONT,
   ErrorBanner, PrimaryButton, SecondaryButton, SkeletonBlock, fmtDate,
@@ -12,20 +12,6 @@ import {
 // /owner/gamified-activities/library — every game in the `games` collection,
 // with this month's usage (GET /api/owner/gamified/library, owner role checked
 // on the server). All filters, sort and view live in the URL.
-const AREAS = [
-  { id: 'speech', label: 'Speech & language', color: '#1FA58A', tint: '#D9F2EC' },
-  { id: 'cognitive', label: 'Cognitive', color: '#7C5CE0', tint: '#E6DFFB' },
-  { id: 'sel', label: 'Attention / SEL', color: '#EC4899', tint: '#FBDDEB' },
-  { id: 'motor', label: 'Physical / motor', color: '#F59E0B', tint: '#FDEBC8' },
-]
-const AREA_BY_ID = Object.fromEntries(AREAS.map((a) => [a.id, a]))
-function areaOf(game) {
-  const t = String(game.therapyType || '').toLowerCase()
-  if (t === 'speech') return 'speech'
-  if (t === 'cognitive') return 'cognitive'
-  if (t === 'physical' || t === 'occupational') return 'motor'
-  return 'sel'
-}
 // DB status -> the three buckets the owner sees. A draft that has been
 // test-played is "Beta"; an untested draft is "Coming soon".
 function statusOf(game) {
@@ -218,6 +204,7 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [requestCounts, setRequestCounts] = useState({ pending: 0, total: 0 })
   const [notify, setNotify] = useState(() => {
     try { return JSON.parse(localStorage.getItem(NOTIFY_KEY) || '[]') } catch { return [] }
   })
@@ -242,6 +229,14 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
     load(ctrl.signal)
     return () => ctrl.abort()
   }, [user?.email]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!user?.email) return
+    fetch(`/api/owner/game-requests?${new URLSearchParams({ email: user.email })}`)
+      .then((r) => r.json())
+      .then((b) => setRequestCounts({ pending: (b.requests || []).filter((x) => x.status === 'pending').length, total: (b.requests || []).length }))
+      .catch(() => {})
+  }, [user?.email])
 
   // Attach the derived fields + the local game-hub entry used for the icon and Preview.
   const items = useMemo(() => (games || []).map((g) => {
@@ -282,7 +277,7 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
     const top = [...items].sort((a, b) => b.usage.plays - a.usage.plays)[0]
     return { live, beta, soon, top: top && top.usage.plays > 0 ? top : null }
   }, [items])
-  const pendingRequests = INITIAL_REQUESTS.filter((r) => r.status === 'pending').length
+  const pendingRequests = requestCounts.pending
 
   const toggleNotify = (id) => {
     setNotify((cur) => {
@@ -291,6 +286,12 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
       return next
     })
   }
+  const gameParam = params.get('game')
+  useEffect(() => {
+    if (!gameParam || items.length === 0) return
+    const g = items.find((x) => x.id === gameParam)
+    if (g) setDetail(g)
+  }, [gameParam, items])
   const closeDetail = useCallback(() => setDetail(null), [])
   const preview = (g) => navigate(`/owner/gamified-activities/preview/${g.previewKey}`)
   const sortBy = (key) => {
@@ -307,14 +308,14 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
         {error && <ErrorBanner message={error} onRetry={() => load()} />}
 
         {loading && !games && (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} style={{ height: 96 }} />)}</div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} style={{ height: 330 }} />)}</div>
           </div>
         )}
 
         {games && (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             {/* Summary strip */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
@@ -446,7 +447,7 @@ export default function OwnerActivityLibraryPage({ user, onLogout, betaTier }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link to="/owner/gamified-activities/request" style={{ background: GREEN_700, color: '#fff', borderRadius: 999, padding: '0 18px', minHeight: 44, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>Request a game</Link>
-                <Link to="/owner/gamified-activities/request" style={{ background: '#fff', color: GREEN_900, border: `1px solid ${BORDER}`, borderRadius: 999, padding: '0 18px', minHeight: 44, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>View requests ({INITIAL_REQUESTS.length})</Link>
+                <Link to="/owner/gamified-activities/request" style={{ background: '#fff', color: GREEN_900, border: `1px solid ${BORDER}`, borderRadius: 999, padding: '0 18px', minHeight: 44, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>View requests ({requestCounts.total})</Link>
               </div>
             </div>
 

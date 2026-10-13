@@ -35,6 +35,8 @@ export default async function handler(req, res) {
         levels: g.levels || [],
         support: g.support || {},
         status: g.status,
+        // Present for games authored in the Game Builder: the document the player renders.
+        builder: g.builder?.doc ? { version: g.builder.version || 1, doc: g.builder.doc } : null,
       },
     })
   } catch (err) {

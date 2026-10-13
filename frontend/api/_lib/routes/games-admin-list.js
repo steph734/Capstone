@@ -2,6 +2,8 @@ import mongoose from 'mongoose'
 import { Int32 } from 'mongodb'
 import { getMongo, getDb } from '../mongo.js'
 import { Badge } from '../models/badge.js'
+import { applyRequestUpdate, oid } from '../gameRequests.js'
+import { requireSession } from '../session.js'
 
 // GET  /api/games -> every game in the `games` collection (drafts, published
 //      and archived), for the admin Games library. The published-only picker
@@ -70,7 +72,9 @@ export default async function handler(req, res) {
     }
 
     // POST: create the game, then its badge, then link them together.
-    const body = req.body || {}
+    const adminCtx = await requireSession(req, res, { roles: ['Super Admin'] })
+    if (!adminCtx) return
+    const body = { ...(req.body || {}), createdBy: String(adminCtx.user._id) }
     const name = str(body.name)
     if (!name) return res.status(400).json({ error: 'Name is required.' })
 
@@ -97,6 +101,7 @@ export default async function handler(req, res) {
           points_per_play: new Int32(Number(body.pointsPerPlay) || 0),
           status: 'draft',
           test_played: false,
+          source_request_id: oid(body.sourceRequestId),
           created_by: createdBy,
           updated_by: createdBy,
           published_at: null,
@@ -108,6 +113,20 @@ export default async function handler(req, res) {
         const badge = await createGameBadge(name, gameId, createdBy, session)
         await db.collection('games').updateOne({ _id: gameId }, { $set: { unlocks_badge_id: badge._id } }, { session })
       })
+      // Building a game for an owner's request moves that request to "In
+      // development" and tells the owner. Best-effort: the game is saved either way.
+      const sourceId = oid(body.sourceRequestId)
+      if (sourceId) {
+        try {
+          await db.collection('game_requests').updateOne({ _id: sourceId }, { $set: { linked_game_id: gameId } })
+          const reqDoc = await db.collection('game_requests').findOne({ _id: sourceId })
+          if (reqDoc && reqDoc.status === 'approved') {
+            await applyRequestUpdate(db, sourceId, { status: 'dev', message: 'We have started building this game.' })
+          }
+        } catch (err) {
+          console.error('linking game to request failed:', err.message)
+        }
+      }
       return res.status(201).json({ id: String(gameId) })
     } finally {
       await session.endSession()

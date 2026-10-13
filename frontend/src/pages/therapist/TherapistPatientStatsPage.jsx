@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
@@ -97,10 +97,24 @@ function KpiTile({ icon, bg, label, value, caption }) {
 // Accuracy-over-time line chart with axes, gridlines, hover tooltip and a
 // "View as table" toggle. Smoothing: 3-point moving average, per the
 // analytics rules (plotted as a dashed trend line alongside the real series).
+function useContainerWidth(fallback) {
+  const ref = useRef(null)
+  const [width, setWidth] = useState(fallback)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(([entry]) => setWidth(Math.max(260, Math.floor(entry.contentRect.width))))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width]
+}
+
 function ProgressChart({ points, trend }) {
   const [hover, setHover] = useState(null)
   const [asTable, setAsTable] = useState(false)
-  const w = 760, h = 200, padL = 36, padR = 10, padT = 10, padB = 26
+  const [boxRef, boxWidth] = useContainerWidth(760)
+  const w = Math.min(760, boxWidth), h = 200, padL = 36, padR = 10, padT = 10, padB = 26
   const innerW = w - padL - padR, innerH = h - padT - padB
 
   if (points.length === 0) {
@@ -119,12 +133,12 @@ function ProgressChart({ points, trend }) {
   const area = `${line} L${xy[xy.length - 1][0]},${padT + innerH} L${xy[0][0]},${padT + innerH} Z`
 
   // Thin x-axis down to ~6 labels so dates stay legible.
-  const labelEvery = Math.max(1, Math.ceil(points.length / 6))
+  const labelEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(innerW / 64))))
 
   if (asTable) {
     return (
-      <div>
-        <button type="button" onClick={() => setAsTable(false)} className="mb-2 text-[12.5px] font-bold" style={{ color: GREEN_700 }}>← Back to chart</button>
+      <div ref={boxRef}>
+        <button type="button" onClick={() => setAsTable(false)} className="mb-2 text-[12.5px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>← Back to chart</button>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
             <thead><tr style={{ color: MUTED, textAlign: 'left' }}><th className="pb-1 pr-4">Date</th><th className="pb-1">Accuracy</th></tr></thead>
@@ -136,7 +150,7 @@ function ProgressChart({ points, trend }) {
   }
 
   return (
-    <div>
+    <div ref={boxRef}>
       <div className="relative" style={{ height: h }}>
         <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" role="img"
           aria-label={`Accuracy per session: ${points.map((p) => `${p.date} ${p.value}%`).join(', ')}`}>
@@ -168,7 +182,7 @@ function ProgressChart({ points, trend }) {
           </div>
         )}
       </div>
-      <button type="button" onClick={() => setAsTable(true)} className="mt-1 text-[12px] font-bold" style={{ color: GREEN_700 }}>View as table</button>
+      <button type="button" onClick={() => setAsTable(true)} className="mt-1 text-[12px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>View as table</button>
     </div>
   )
 }
@@ -264,21 +278,21 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
         )}
 
         {loading && !data && (
-          <div className="grid gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <SkeletonBlock style={{ height: 130 }} />
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4"><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /></div>
+            <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4"><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /></div>
             <SkeletonBlock style={{ height: 280 }} />
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3"><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /></div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3"><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /></div>
           </div>
         )}
 
         {data && (
-          <div className="grid gap-6">
+          <div className="grid grid-cols-1 gap-6">
             {/* Header — single baseline row, ~130px tall */}
             <div className="flex flex-wrap items-center gap-4" style={{ ...CARD, minHeight: 130 }}>
               <span className="flex flex-shrink-0 items-center justify-center rounded-full text-[20px] font-extrabold"
                 style={{ width: 72, height: 72, background: '#E3F6EA', border: `3px solid ${GREEN_700}`, color: GREEN_700 }}>{initials(data.profile.name)}</span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1" style={{ minWidth: 200 }}>
                 <h1 style={{ fontSize: 28, fontWeight: 700, color: GREEN_900, margin: 0, letterSpacing: 'normal', lineHeight: 1.15 }}>{data.profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {data.profile.age != null && <span className="rounded-full px-2.5 py-0.5 text-[12px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>Age {data.profile.age}</span>}
@@ -324,7 +338,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
             ) : (
               <>
                 {/* KPI tiles */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
                   <KpiTile icon="🎮" bg="#DCEBFC"
                     label="Games completed"
                     value={data.kpis.games.assigned ? `${data.kpis.games.value} / ${data.kpis.games.assigned}` : data.kpis.games.value}
@@ -371,7 +385,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                 </div>
 
                 {/* Character stats | Session analytics | Time by therapy type */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <div style={CARD}>
                     <CardTitle right={<span style={{ fontSize: 12, color: MUTED }}>vs. last month</span>}>Character stats</CardTitle>
                     <div className="flex flex-col gap-3">
@@ -431,7 +445,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                     </div>
                   </div>
 
-                  <div style={CARD}>
+                  <div style={CARD} className="md:col-span-2 lg:col-span-1">
                     <CardTitle>Time by therapy type</CardTitle>
                     <Donut segments={data.shareByType} total={data.totalMinutes} unit="minutes" />
                     {data.typeNote && <p className="mt-3 text-[13px]" style={{ color: MUTED, maxWidth: '28ch', lineHeight: 1.4 }}>💡 {data.typeNote}</p>}
@@ -439,7 +453,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                 </div>
 
                 {/* Recent games | Weekly completion | Badges */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <div style={CARD}>
                     <CardTitle right={data.recentGames.length > 0 ? (
                       <button type="button" onClick={() => setShowAllGames((v) => !v)} className="text-[12px] font-extrabold" style={{ color: GREEN_700 }}>{showAllGames ? 'Show less' : 'View all →'}</button>
@@ -487,7 +501,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                     </div>
                   </div>
 
-                  <div style={CARD}>
+                  <div style={CARD} className="md:col-span-2 lg:col-span-1">
                     <CardTitle right={
                       <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>
                         {data.badges.filter((b) => b.earned).length} of {data.badges.length}{data.newThisRange ? ` · ${data.newThisRange} new` : ''}

@@ -205,10 +205,10 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
       <div style={{ fontFamily: "'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif" }}>
         {/* Range picker */}
         <div className="mb-5 flex justify-end">
-          <div className="flex gap-1 rounded-full bg-white p-1 shadow-sm" style={{ border: `1px solid ${BORDER}` }} role="group" aria-label="Date range">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-white p-1 shadow-sm" style={{ border: `1px solid ${BORDER}` }} role="group" aria-label="Date range">
             {RANGE_OPTIONS.map((r) => (
               <button key={r.id} type="button" aria-pressed={rangeId === r.id} onClick={() => setRange(r.id)}
-                className="h-9 rounded-full px-4 text-[13px] font-extrabold"
+                className="h-11 whitespace-nowrap rounded-full px-3 text-[13px] font-extrabold sm:px-4"
                 style={{ background: rangeId === r.id ? GREEN_700 : 'transparent', color: rangeId === r.id ? '#fff' : '#3a4a45' }}>
                 {r.label}
               </button>
@@ -224,17 +224,17 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
         )}
 
         {loading && !data && (
-          <div className="grid gap-5">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4"><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /></div>
+          <div className="grid grid-cols-1 gap-5">
+            <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4"><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /><SkeletonBlock className="h-[88px]" /></div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3"><SkeletonBlock className="h-[220px]" /><SkeletonBlock className="h-[220px]" /><SkeletonBlock className="h-[220px]" /></div>
             <SkeletonBlock className="h-[420px]" />
           </div>
         )}
 
         {data && (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             {/* KPI row */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
               <KpiCard icon="🧑‍🤝‍🧑" bg="#E3F0FD" iconBg="#CFE5FB" label="Patients playing" value={data.kpis.patientsPlaying} delta={data.kpis.patientsDelta} />
               <KpiCard icon="⭐" bg="#FFF1D6" iconBg="#FFE1A6" label="Average level" value={data.kpis.avgLevel} delta={data.kpis.avgLevelDelta} />
               <KpiCard icon="🎮" bg="#E3F6EA" iconBg="#C4EBD2" label="Games completed" value={data.kpis.games} delta={data.kpis.gamesDelta} />
@@ -242,7 +242,7 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
             </div>
 
             {/* Charts row */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1fr_0.9fr]">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
               <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
                 <h2 className="text-[15px] font-extrabold" style={{ color: GREEN_900 }}>Games played each week</h2>
                 <p className="mb-2 text-[12px] font-bold" style={{ color: '#5D7770' }}>All patients</p>
@@ -253,7 +253,7 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
                 <p className="mb-2 text-[12px] font-bold" style={{ color: '#5D7770' }}>Times completed</p>
                 <BarList items={data.topGames} />
               </div>
-              <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
+              <div className="rounded-[22px] bg-white p-5 md:col-span-2 lg:col-span-1" style={{ border: `1px solid ${BORDER}` }}>
                 <h2 className="text-[15px] font-extrabold" style={{ color: GREEN_900 }}>By therapy type</h2>
                 <p className="mb-2 text-[12px] font-bold" style={{ color: '#5D7770' }}>Share of games played</p>
                 <DonutChart segments={data.byType} total={data.kpis.games} />
@@ -264,19 +264,19 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
             <div className="rounded-[22px] bg-white p-5" style={{ border: `1px solid ${BORDER}` }}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[18px] font-extrabold" style={{ color: GREEN_900 }}>Patients</h2>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search patients..."
                     aria-label="Search patients"
-                    className="h-11 w-[220px] rounded-full px-4 text-[14px]"
+                    className="h-11 w-full rounded-full px-4 text-[14px] sm:w-[220px]"
                     style={{ border: `1px solid ${BORDER}`, background: '#F8FAF9' }}
                   />
-                  <div className="flex gap-1 rounded-full bg-[#F8FAF9] p-1" role="group" aria-label="Sort patients by">
+                  <div className="flex flex-wrap gap-1 rounded-full bg-[#F8FAF9] p-1" role="group" aria-label="Sort patients by">
                     {SORT_PILLS.map((s) => (
                       <button key={s.id} type="button" aria-pressed={sort === s.id} onClick={() => setSort(s.id)}
-                        className="h-9 rounded-full px-3.5 text-[12.5px] font-extrabold"
+                        className="h-11 rounded-full px-3.5 text-[12.5px] font-extrabold"
                         style={{ background: sort === s.id ? GREEN_700 : 'transparent', color: sort === s.id ? '#fff' : '#3a4a45' }}>
                         {s.label}
                       </button>
@@ -290,7 +290,8 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
                   {data.patients.length === 0 ? 'No patients are playing yet. Assign a game to get started.' : 'No patients match your search.'}
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div>
+                  <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[720px] border-collapse">
                     <thead>
                       <tr className="text-left text-[11px] font-extrabold uppercase tracking-wide" style={{ color: '#5D7770' }}>
@@ -336,9 +337,33 @@ export default function TherapistGamifiedStatsPage({ user, onLogout, betaTier })
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                  <ul className="flex flex-col gap-3 md:hidden" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {visible.map((p) => (
+                      <li key={p.id} className="rounded-2xl p-4" style={{ border: `1px solid ${BORDER}` }}>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-white" style={{ background: GREEN_700 }} aria-hidden="true">{initials(p.name)}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[15px] font-extrabold" style={{ color: GREEN_900, margin: 0 }}>{p.name}</p>
+                            {p.age != null && <p className="text-[12px]" style={{ color: '#5D7770', margin: 0 }}>Age {p.age}</p>}
+                          </div>
+                          <span className="rounded-full px-2.5 py-1 text-[12.5px] font-extrabold" style={{ background: '#FFE1A6', color: '#92400E' }}>⭐ {p.level}</span>
+                        </div>
+                        <p className="mt-3 text-[12px] font-bold" style={{ color: GREEN_900, margin: '12px 0 0' }}>XP {p.xp} / {p.xpMax}</p>
+                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full" style={{ background: '#F1F5F3' }}>
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, (p.xp / p.xpMax) * 100)}%`, background: 'linear-gradient(90deg,#7C5CE0,#4A90D9)' }} />
+                        </div>
+                        <p className="text-[12.5px]" style={{ color: '#5D7770', margin: '10px 0 0' }}>
+                          Games <strong style={{ color: GREEN_900 }}>{p.games}</strong> · 🏆 <strong style={{ color: GREEN_900 }}>{p.badges}</strong> · Last played {fmtDate(p.lastPlayedAt)}
+                        </p>
+                        <button type="button" onClick={() => navigate(`/therapist/gamified-activities/patients/${p.id}?${params.toString()}`)} aria-label={`View stats for ${p.name}`}
+                          className="mt-3 w-full rounded-xl px-4 text-[13px] font-extrabold text-white" style={{ background: GREEN_700, minHeight: 44 }}>View Stats →</button>
+                      </li>
+                    ))}
+                  </ul>
                   {visible.length < filteredSorted.length && (
                     <div className="mt-4 flex justify-center">
-                      <button type="button" onClick={() => setPage((p) => p + 1)} className="rounded-full px-5 py-2.5 text-[13px] font-extrabold" style={{ border: `1px solid ${BORDER}`, color: GREEN_900 }}>Show more</button>
+                      <button type="button" onClick={() => setPage((p) => p + 1)} className="rounded-full px-5 text-[13px] font-extrabold" style={{ minHeight: 44, border: `1px solid ${BORDER}`, color: GREEN_900 }}>Show more</button>
                     </div>
                   )}
                 </div>

@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 // Fixed, server-side Stripe Price IDs — the client only ever sends a tier id
 // and billing period, never a price or amount, so what gets charged can't be
 // tampered with from the browser. Yearly Price IDs aren't set up yet.
-const PRICE_IDS = {
+export const PRICE_IDS = {
   silver: { monthly: 'price_1U8LYZ6BClqAeYB0rj0RWvMp' },
   gold: { monthly: 'price_1U8LYt6BClqAeYB0t0Ps5kNO' },
 }

@@ -1,3 +1,5 @@
+import { LifeBuoy } from 'lucide-react'
+
 const Icon = ({ children }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
     {children}
@@ -108,7 +110,9 @@ const GAMIFIED_ITEM = {
   ],
 }
 
-export const therapistMenuItems = BASE_THERAPIST_MENU_ITEMS
+const HELP_ITEM = { id: 'help', label: 'Help & Support', icon: <LifeBuoy size={24} aria-hidden="true" />, path: '/help' }
+
+export const therapistMenuItems = [...BASE_THERAPIST_MENU_ITEMS, HELP_ITEM]
 
 const TIER_RANK = { silver: 1, gold: 2 }
 
@@ -138,7 +142,7 @@ function resolveUnlock(betaTier, activePlan) {
 export function getTherapistMenuItems(betaTier, activePlan) {
   const { tier, trialing } = resolveUnlock(betaTier, activePlan)
   const mark = (items) => (trialing ? items.map((it) => ({ ...it, trial: true })) : items)
-  if (tier === 'gold') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM])]
-  if (tier === 'silver') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM])]
-  return BASE_THERAPIST_MENU_ITEMS
+  if (tier === 'gold') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM]), HELP_ITEM]
+  if (tier === 'silver') return [...BASE_THERAPIST_MENU_ITEMS, ...mark([SPEECH_ITEM]), HELP_ITEM]
+  return [...BASE_THERAPIST_MENU_ITEMS, HELP_ITEM]
 }

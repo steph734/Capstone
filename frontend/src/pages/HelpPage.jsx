@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
+import SupportCenter from '../components/support/SupportCenter'
 import './PageWithSidebar.css'
 import './HelpPage.css'
 
@@ -160,6 +161,12 @@ export default function HelpPage({ user, onLogout, betaTier }) {
         </div>
 
         <div className="help-container">
+          {/* Support tickets */}
+          <section className="help-section">
+            <h2 className="help-section-title">My support tickets</h2>
+            <SupportCenter />
+          </section>
+
           {/* Quick contact */}
           <div className="help-contact-cards">
             <a className="help-contact-card" href="tel:+18005551234">

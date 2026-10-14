@@ -1,3 +1,5 @@
+import { LifeBuoy } from 'lucide-react'
+
 const Icon = ({ children }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
     {children}
@@ -119,7 +121,9 @@ const GAMIFIED_ITEM = {
 }
 const SETTINGS_ITEM = { id: 'settings', label: 'Settings', icon: <SettingsIcon />, path: '/owner/settings' }
 
-export const ownerMenuItems = [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM]
+const HELP_ITEM = { id: 'help', label: 'Help & Support', icon: <LifeBuoy size={24} aria-hidden="true" />, path: '/help' }
+
+export const ownerMenuItems = [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM, HELP_ITEM]
 
 const TIER_RANK = { silver: 1, gold: 2 }
 
@@ -149,7 +153,7 @@ function resolveUnlock(betaTier, activePlan) {
 export function getOwnerMenuItems(betaTier, activePlan) {
   const { tier, trialing } = resolveUnlock(betaTier, activePlan)
   const mark = (items) => (trialing ? items.map((it) => ({ ...it, trial: true })) : items)
-  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM]), SETTINGS_ITEM]
-  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM]), SETTINGS_ITEM]
-  return [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM]
+  if (tier === 'gold') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM, GAMIFIED_ITEM]), SETTINGS_ITEM, HELP_ITEM]
+  if (tier === 'silver') return [...BASE_OWNER_MENU_ITEMS, ...mark([SPEECH_ITEM]), SETTINGS_ITEM, HELP_ITEM]
+  return [...BASE_OWNER_MENU_ITEMS, SETTINGS_ITEM, HELP_ITEM]
 }

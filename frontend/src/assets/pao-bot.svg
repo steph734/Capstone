@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 126 124" role="img" aria-label="Pao help bot">
+  <!-- ears -->
+  <circle cx="27" cy="30" r="17" fill="#3a2a24"/>
+  <circle cx="93" cy="30" r="17" fill="#3a2a24"/>
+  <circle cx="28" cy="31" r="8.5" fill="#f2a0b5"/>
+  <circle cx="92" cy="31" r="8.5" fill="#f2a0b5"/>
+  <!-- head -->
+  <ellipse cx="60" cy="64" rx="44" ry="41" fill="#ffffff" stroke="#2b1f1a" stroke-width="3"/>
+  <!-- eye patches -->
+  <ellipse cx="41" cy="58" rx="14" ry="12.5" transform="rotate(-18 41 58)" fill="#3a2a24"/>
+  <ellipse cx="79" cy="58" rx="14" ry="12.5" transform="rotate(18 79 58)" fill="#3a2a24"/>
+  <!-- eyes -->
+  <circle cx="42" cy="58" r="8.5" fill="#fff"/><circle cx="78" cy="58" r="8.5" fill="#fff"/>
+  <circle cx="42.5" cy="59" r="6.2" fill="#8a5a3c"/><circle cx="77.5" cy="59" r="6.2" fill="#8a5a3c"/>
+  <circle cx="42.5" cy="59" r="3.4" fill="#1b120e"/><circle cx="77.5" cy="59" r="3.4" fill="#1b120e"/>
+  <circle cx="40.5" cy="56.5" r="2" fill="#fff"/><circle cx="75.5" cy="56.5" r="2" fill="#fff"/>
+  <!-- blush -->
+  <ellipse cx="28" cy="76" rx="7" ry="4.5" fill="#f7b6c6" opacity=".85"/>
+  <ellipse cx="92" cy="76" rx="7" ry="4.5" fill="#f7b6c6" opacity=".85"/>
+  <!-- nose -->
+  <ellipse cx="60" cy="71" rx="5" ry="3.6" fill="#2b1f1a"/>
+  <!-- mouth -->
+  <path d="M49 79 Q60 94 71 79 Q60 83 49 79Z" fill="#2b1f1a"/>
+  <path d="M53 84.5 Q60 90.5 67 84.5 Q60 86.5 53 84.5Z" fill="#f2849c"/>
+  <!-- help bubble -->
+  <g transform="translate(86 76)">
+    <path d="M2 0h26a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H14l-8 7v-7H2a8 8 0 0 1-8-8V8a8 8 0 0 1 8-8z" fill="#2f5546" stroke="#fff" stroke-width="2.5"/>
+    <text x="15" y="21" text-anchor="middle" font-family="Nunito,Segoe UI,Arial,sans-serif" font-size="19" font-weight="900" fill="#fff">?</text>
+  </g>
+</svg>

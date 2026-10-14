@@ -4,6 +4,7 @@
 // `game_request_files`, never inside the request document, so listing stays light.
 import multer from 'multer'
 import { getMongo } from '../mongo.js'
+import { createTicket } from '../support.js'
 import { requireRole, validateRequestInput, serializeRequest, oid, MAX_FILE_BYTES, FILE_TYPES } from '../gameRequests.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 1 } }).single('file')
@@ -60,6 +61,14 @@ export default async function handler(req, res) {
     if (file) {
       await db.collection('game_request_files').insertOne({ request_id: insertedId, name: file.originalname, type: file.mimetype, size: file.size, data: file.buffer, created_at: now })
       await db.collection('game_requests').updateOne({ _id: insertedId }, { $set: { attachment: { name: file.originalname, type: file.mimetype, size: file.size } } })
+    }
+    try {
+      await createTicket(db, {
+        user, category: 'game_request', subject: `Game request: ${value.name}`.slice(0, 150), message: value.reason, priority: 'normal', type: 'owner_request',
+        source: 'auto', relatedId: insertedId, branchId: null,
+      })
+    } catch (err) {
+      console.error('linking a support ticket to the game request failed:', err.message)
     }
     const saved = await db.collection('game_requests').findOne({ _id: insertedId })
     return res.status(201).json({ request: serializeRequest(saved) })

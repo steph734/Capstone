@@ -91,6 +91,10 @@ import ownerGameRequests from './_lib/routes/owner-game-requests.js'
 import ownerGameRequestItem from './_lib/routes/owner-game-request-item.js'
 import adminGameRequests from './_lib/routes/admin-game-requests.js'
 import notifications from './_lib/routes/notifications.js'
+import faq from './_lib/routes/faq.js'
+import support from './_lib/routes/support.js'
+import adminSupport from './_lib/routes/admin-support.js'
+import adminFaqs from './_lib/routes/admin-faqs.js'
 import adminGames from './_lib/routes/admin-games.js'
 import adminBuilder from './_lib/routes/admin-builder.js'
 import adminBuilderAssets from './_lib/routes/admin-builder-assets.js'
@@ -221,6 +225,21 @@ app.all('/api/admin/game-requests/:id/:action', adminGameRequests)
 app.all('/api/admin/game-requests/:id', adminGameRequests)
 app.all('/api/admin/game-requests', adminGameRequests)
 app.all('/api/notifications', notifications)
+app.all('/api/faq/quick', faq)
+app.all('/api/faq/ask', faq)
+app.all('/api/faq/:id/feedback', faq)
+app.all('/api/support/tickets/:id/messages', support)
+app.all('/api/support/tickets/:id', support)
+app.all('/api/support/tickets', support)
+app.all('/api/support/attachments/:messageId/:index', support)
+app.all('/api/admin/support/stats', adminSupport)
+app.all('/api/admin/support/attachments/:messageId/:index', adminSupport)
+app.all('/api/admin/support/tickets/:id/messages', adminSupport)
+app.all('/api/admin/support/tickets/:id', adminSupport)
+app.all('/api/admin/support/tickets', adminSupport)
+app.all('/api/admin/faqs/misses', adminFaqs)
+app.all('/api/admin/faqs/:id', adminFaqs)
+app.all('/api/admin/faqs', adminFaqs)
 app.all('/api/admin/games/overview', adminGames)
 app.all('/api/admin/games/:id/:action', adminGames)
 app.all('/api/admin/games/:id', adminGames)

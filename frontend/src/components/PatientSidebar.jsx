@@ -249,6 +249,7 @@ export default function PatientSidebar({
                   {item.id === 'email' && emailUnreadCount > 0 && (
                     <span className="nav-unread-badge">{emailUnreadCount > 99 ? '99+' : emailUnreadCount}</span>
                   )}
+                  {item.badge > 0 && <span className="nav-unread-badge" aria-label={`${item.badge} unread`}>{item.badge > 99 ? '99+' : item.badge}</span>}
                   {item.trial && <span className="nav-trial-tag">Trial</span>}
                   {hasChildren && (
                     <span className={`nav-chevron ${isExpanded ? 'open' : ''}`}>

@@ -44,7 +44,7 @@ function AuditIcon() {
   )
 }
 
-import { Award, BarChart3, Gamepad2, LayoutDashboard } from 'lucide-react'
+import { Award, BarChart3, Gamepad2, HelpCircle, LayoutDashboard, LifeBuoy, Ticket } from 'lucide-react'
 
 export const adminMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
@@ -60,6 +60,16 @@ export const adminMenuItems = [
       { id: 'gl-games', label: 'Games', icon: <Gamepad2 size={16} aria-hidden="true" />, path: '/admin/games-library/games' },
       { id: 'gl-badges', label: 'Badges', icon: <Award size={16} aria-hidden="true" />, path: '/admin/games-library/badges' },
       { id: 'gl-stats', label: 'Stats & Points', icon: <BarChart3 size={16} aria-hidden="true" />, path: '/admin/games-library/stats' },
+    ],
+  },
+  {
+    id: 'support-tickets',
+    label: 'Support Tickets',
+    icon: <LifeBuoy size={24} aria-hidden="true" />,
+    path: '/admin/support-tickets',
+    children: [
+      { id: 'st-tickets', label: 'Tickets', icon: <Ticket size={16} aria-hidden="true" />, path: '/admin/support-tickets' },
+      { id: 'st-faqs', label: 'FAQs', icon: <HelpCircle size={16} aria-hidden="true" />, path: '/admin/support-faqs' },
     ],
   },
   { id: 'audit-logs', label: 'Audit Logs', icon: <AuditIcon />, path: '/admin/audit-logs' },

@@ -55,6 +55,11 @@ import OwnerGamifiedActivitiesPage from './pages/owner/OwnerGamifiedActivitiesPa
 import OwnerGamifiedPatientStatsPage from './pages/owner/OwnerGamifiedPatientStatsPage'
 import OwnerGamePreviewPage from './pages/owner/OwnerGamePreviewPage'
 import GameBuilderPage from './pages/admin/GameBuilderPage'
+import SupportTicketsPage from './pages/admin/SupportTicketsPage'
+import SupportFaqsPage from './pages/admin/SupportFaqsPage'
+import SupportHelpPage from './pages/SupportHelpPage'
+import PaoBot from './components/PaoBot/PaoBot'
+import { clearPaoSession } from './components/PaoBot/api'
 import OwnerActivityLibraryPage from './pages/owner/OwnerActivityLibraryPage'
 import OwnerRequestGamePage from './pages/owner/OwnerRequestGamePage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
@@ -335,6 +340,7 @@ function App() {
     setCurrentUser(null)
     localStorage.removeItem('isAuthenticated')
     localStorage.removeItem('currentUser')
+    clearPaoSession() // Pao's chat history is session-only and ends with the login
   }
 
   const handleUpdateUser = (updates) => {
@@ -907,6 +913,36 @@ function App() {
         />
 
         <Route
+          path="/admin/support-tickets"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <SupportTicketsPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/support-faqs"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <SupportFaqsPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
           path="/admin/games-library/builder/new"
           element={
             isAuthenticated ? (
@@ -1360,6 +1396,8 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Patient' ? (
                 <HelpPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (currentUser?.role === 'Owner' || currentUser?.role === 'Therapist') ? (
+                <SupportHelpPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )
@@ -1399,6 +1437,7 @@ function App() {
           } 
         />
       </Routes>
+      {isAuthenticated && ['Owner', 'Therapist', 'Patient'].includes(currentUser?.role) && <PaoBot user={currentUser} />}
     </Router>
     </AnalyticsProvider>
     </ProgressProvider>

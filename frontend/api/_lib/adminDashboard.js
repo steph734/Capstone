@@ -2,8 +2,9 @@
 // pass: branches / appointments / users / game_sessions / audit trails in
 // MongoDB, subscribers from Stripe (the only place subscriptions live),
 // subscription revenue from the `payments` collection.
-import { getStripeClient } from './stripeClient.js'
-import { PRICE_IDS } from './createSubscription.js'
+import {
+  loadSubscriptions, loadAccounts, loadPlansAndFeatures, planBreakdown, accountsAt, planName, isLive,
+} from './plans.js'
 import { getStreamServerClient } from './stream/serverClient.js'
 import { loadBranchStats, normalizeStatus } from './adminBranches.js'
 
@@ -35,32 +36,6 @@ const withTimeout = (promise, ms, label) => Promise.race([
   new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms)),
 ])
 
-// ── Stripe subscribers ─────────────────────────────────────────────────────
-const PLAN_BY_PRICE = Object.fromEntries(
-  Object.entries(PRICE_IDS).flatMap(([slug, periods]) => Object.values(periods).map((id) => [id, slug]))
-)
-const planOf = (sub) => {
-  const price = sub.items?.data?.[0]?.price
-  return PLAN_BY_PRICE[price?.id] || (price?.nickname ? String(price.nickname).toLowerCase() : 'other')
-}
-const planLabel = (slug) => (slug === 'other' ? 'Other' : slug.charAt(0).toUpperCase() + slug.slice(1))
-
-async function loadSubscriptions() {
-  try {
-    const stripe = getStripeClient()
-    const subs = []
-    for await (const s of stripe.subscriptions.list({ status: 'all', limit: 100 })) {
-      if (s.status !== 'incomplete' && s.status !== 'incomplete_expired') subs.push(s)
-      if (subs.length >= 3000) break
-    }
-    return subs
-  } catch (err) {
-    console.error('dashboard: stripe subscriptions unavailable:', err.message)
-    return null
-  }
-}
-
-const activeAt = (subs, t) => subs.filter((s) => s.created * 1000 <= t && !(s.ended_at && s.ended_at * 1000 <= t)).length
 const periodEnd = (s) => (s.cancel_at || s.current_period_end || s.items?.data?.[0]?.current_period_end || 0) * 1000
 
 // ── Chart buckets ──────────────────────────────────────────────────────────
@@ -90,13 +65,13 @@ function buildBuckets(kind, start, end) {
   return out
 }
 
-function buildSeries(kind, range, subs, payments) {
+function buildSeries(kind, range, accounts, payments) {
   // Trend context: never show fewer than 6 months / 8 weeks, whatever the range.
   const minStart = new Date(range.end.getTime() - (kind === 'monthly' ? 180 : 56) * DAY)
   const start = range.start < minStart ? range.start : minStart
   return buildBuckets(kind, start, range.end).map((b) => ({
     label: b.label,
-    subscribers: subs ? activeAt(subs, b.to.getTime()) : null,
+    subscribers: accountsAt(accounts, b.to.getTime()),
     revenue: Math.round(payments.filter((p) => p.at >= b.from && p.at <= b.to).reduce((n, p) => n + p.amount, 0) * 100) / 100,
   }))
 }
@@ -178,9 +153,11 @@ async function checkHealth(db) {
 export async function buildDashboard(db, range) {
   const now = new Date()
   const todayStart = dayStart(manilaDay(now))
-  const [branchRows, subs, payRows, lockedAccounts, repeatedFailed, pendingRequests, gameDocs, draftGames, topRaw, recent, health, branchStats] = await Promise.all([
+  const [branchRows, subs, accounts, planData, payRows, lockedAccounts, repeatedFailed, pendingRequests, gameDocs, draftGames, topRaw, recent, health, branchStats] = await Promise.all([
     db.collection('branchs').find({}).toArray(),
     loadSubscriptions(),
+    loadAccounts(db),
+    loadPlansAndFeatures(db),
     db.collection('payments').find(
       { payment_for: 'subscription', status: 'completed', payment_date: { $gte: new Date(range.end.getTime() - 400 * DAY), $lte: range.end } },
       { projection: { amount: 1, payment_date: 1 } }
@@ -219,18 +196,19 @@ export async function buildDashboard(db, range) {
     }
   }).sort((a, b) => b.therapists - a.therapists || a.name.localeCompare(b.name)).slice(0, 8)
 
-  // Subscribers + plans (null when Stripe can't be reached; the UI says so).
-  const activeNow = subs ? activeAt(subs, Math.min(range.end.getTime(), now.getTime())) : null
-  const activePrev = subs ? activeAt(subs, range.prevEnd.getTime()) : null
-  const activeSubs = subs ? subs.filter((s) => !s.ended_at) : []
-  const planCounts = {}
-  for (const s of activeSubs) planCounts[planOf(s)] = (planCounts[planOf(s)] || 0) + 1
-  const planTotal = Object.values(planCounts).reduce((n, c) => n + c, 0)
-  const plans = Object.entries(planCounts).sort((a, b) => b[1] - a[1]).map(([slug, count]) => ({
-    key: slug, label: planLabel(slug), count, pct: planTotal ? Math.round((count / planTotal) * 100) : 0,
-  }))
+  // Subscribers = every active account (each is on Free or a paid plan); plans come from the
+  // `subscription` collection, with paid counts from Stripe (unavailable when Stripe can't be reached).
+  const activeNow = accountsAt(accounts, Math.min(range.end.getTime(), now.getTime()))
+  const activePrev = accountsAt(accounts, range.prevEnd.getTime())
+  const breakdown = planBreakdown(planData.plans, subs, accounts)
+  const planRows = planData.plans.filter((p) => (p.status || 'live') !== 'hidden' || (breakdown.stats.get(String(p._id))?.subscribers || 0) > 0)
+  const planTotal = planRows.reduce((n, p) => n + (breakdown.stats.get(String(p._id))?.subscribers || 0), 0)
+  const plans = planRows.map((p) => {
+    const count = breakdown.stats.get(String(p._id))?.subscribers || 0
+    return { key: p.slug, label: planName(p), count, pct: planTotal ? Math.round((count / planTotal) * 100) : 0 }
+  }).filter((p) => p.count > 0)
   const expiring = subs
-    ? activeSubs.filter((s) => s.cancel_at_period_end && periodEnd(s) > now.getTime() && periodEnd(s) <= now.getTime() + 7 * DAY).length
+    ? subs.filter((s) => isLive(s) && s.cancel_at_period_end && periodEnd(s) > now.getTime() && periodEnd(s) <= now.getTime() + 7 * DAY).length
     : 0
 
   // Games.
@@ -264,15 +242,16 @@ export async function buildDashboard(db, range) {
   return {
     range: { from: range.fromDay, to: range.toDay, days: range.days },
     generatedAt: now,
-    subscribersAvailable: Boolean(subs),
+    subscribersAvailable: true,
+    planDataAvailable: Boolean(subs),
     stats: {
       branches: { total: live.length, active: byStatus('Active').length, review: byStatus('Under review').length },
-      subscribers: { value: activeNow, changePct: subs ? pctChange(activeNow, activePrev) : null },
+      subscribers: { value: activeNow, changePct: pctChange(activeNow, activePrev) },
       revenue: { value: Math.round(revenue * 100) / 100, changePct: pctChange(revenue, prevRevenue) },
       games: { total: gameDocs.length, updated: updatedInRange },
       security: { alerts, locked: lockedAccounts, repeatedFailed },
     },
-    series: { weekly: buildSeries('weekly', range, subs, payments), monthly: buildSeries('monthly', range, subs, payments) },
+    series: { weekly: buildSeries('weekly', range, accounts, payments), monthly: buildSeries('monthly', range, accounts, payments) },
     attention,
     branches: performance,
     plans: { total: planTotal, items: plans },

@@ -3,7 +3,7 @@ import PatientSidebar from '../../components/PatientSidebar'
 import '../PageWithSidebar.css'
 import './AdminPages.css'
 
-export default function AdminPageShell({ user, onLogout, title, subtitle, icon, children, menuItems }) {
+export default function AdminPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, headerActions }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -29,9 +29,12 @@ export default function AdminPageShell({ user, onLogout, title, subtitle, icon, 
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
-          <div className="admin-header-badge">
-            <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Super Admin'} />
-            <span>{user?.name || 'Super Admin'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {headerActions}
+            <div className="admin-header-badge">
+              <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Super Admin'} />
+              <span>{user?.name || 'Super Admin'}</span>
+            </div>
           </div>
         </div>
 

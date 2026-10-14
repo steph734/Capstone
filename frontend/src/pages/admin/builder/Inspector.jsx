@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ANIMATIONS, DIFFICULTIES, LANGUAGES, SOUNDS, THERAPY_TYPES, checklist } from './model'
 import { cropToRatio, listAssets, uploadAsset } from './builderApi'
 import { speak } from './speak'
+import { GAME_ICON_NAMES, GameIcon } from '../games/gameIcons'
 
 // Right-hand inspector: Element / Level / Game tabs plus the "Ready to
 // publish" checklist. Everything calls back with small patches; the page owns
@@ -241,12 +242,18 @@ function GameTab({ meta, onMeta, legacy }) {
       <Field title="Badge name (earned for finishing)"><input style={input} value={meta.badgeName} maxLength={80} placeholder={meta.name} onChange={(e) => onMeta({ badgeName: e.target.value })} /></Field>
       <span style={label}>Icon / thumbnail</span>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input style={{ ...input, width: 70, textAlign: 'center', fontSize: 22 }} value={meta.icon} maxLength={8} onChange={(e) => onMeta({ icon: e.target.value })} aria-label="Icon emoji" />
         {meta.thumbnailUrl && <img src={meta.thumbnailUrl} alt="Game thumbnail" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />}
         <button type="button" style={smallBtn} onClick={() => setPicker(true)}>{meta.thumbnailUrl ? 'Change image' : 'Upload image'}</button>
         <input type="color" aria-label="Card colour" value={meta.color} onChange={(e) => onMeta({ color: e.target.value })} style={{ width: 40, height: 36 }} />
       </div>
       {picker && <ImagePicker onClose={() => setPicker(false)} onPick={(a) => { onMeta({ thumbnailUrl: a.url }); setPicker(false) }} />}
+      <span style={label}>Game icon</span>
+      <div role="radiogroup" aria-label="Game icon" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+        {GAME_ICON_NAMES.map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={meta.icon === n} aria-label={n.replace('-', ' ')} onClick={() => onMeta({ icon: n })}
+            style={{ minHeight: 40, borderRadius: 10, border: `2px solid ${meta.icon === n ? GREEN : '#e3e8e4'}`, background: meta.icon === n ? '#e4f2ec' : '#fff', color: GREEN, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GameIcon name={n} size={18} /></button>
+        ))}
+      </div>
       <Field title="Note for therapists"><textarea style={{ ...input, padding: 10, minHeight: 80 }} rows={3} maxLength={1000} value={meta.therapistNote} onChange={(e) => onMeta({ therapistNote: e.target.value })} /></Field>
     </div>
   )

@@ -44,6 +44,8 @@ function AuditIcon() {
   )
 }
 
+import { Award, BarChart3, Gamepad2, LayoutDashboard } from 'lucide-react'
+
 export const adminMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
   { id: 'branches', label: 'Branches', icon: <BranchesIcon />, path: '/admin/branches' },
@@ -54,10 +56,10 @@ export const adminMenuItems = [
     icon: <GamesIcon />,
     path: '/admin/games-library',
     children: [
-      { id: 'gl-dashboard', label: 'Dashboard', path: '/admin/games-library' },
-      { id: 'gl-games', label: 'Games', path: '/admin/games-library/games' },
-      { id: 'gl-badges', label: 'Badges', path: '/admin/games-library/badges' },
-      { id: 'gl-stats', label: 'Stats & Points', path: '/admin/games-library/stats' },
+      { id: 'gl-dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} aria-hidden="true" />, path: '/admin/games-library' },
+      { id: 'gl-games', label: 'Games', icon: <Gamepad2 size={16} aria-hidden="true" />, path: '/admin/games-library/games' },
+      { id: 'gl-badges', label: 'Badges', icon: <Award size={16} aria-hidden="true" />, path: '/admin/games-library/badges' },
+      { id: 'gl-stats', label: 'Stats & Points', icon: <BarChart3 size={16} aria-hidden="true" />, path: '/admin/games-library/stats' },
     ],
   },
   { id: 'audit-logs', label: 'Audit Logs', icon: <AuditIcon />, path: '/admin/audit-logs' },

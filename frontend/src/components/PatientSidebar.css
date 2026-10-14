@@ -356,3 +356,15 @@
 .patient-sidebar.open {
   animation: slideIn 0.3s ease;
 }
+
+/* Optional icon in front of a sub-item's label (e.g. the admin Gamified Library group). */
+.nav-subitem:has(.nav-subitem-icon) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 44px;
+}
+.nav-subitem-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}

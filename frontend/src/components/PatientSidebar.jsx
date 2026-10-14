@@ -265,6 +265,7 @@ export default function PatientSidebar({
                         className={`nav-subitem ${location.pathname === child.path ? 'active' : ''}`}
                         onClick={() => handleNavigation(child.path)}
                       >
+                        {child.icon && <span className="nav-subitem-icon">{child.icon}</span>}
                         {child.label}
                       </button>
                     ))}

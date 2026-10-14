@@ -14,28 +14,14 @@
 import { ObjectId, Int32 } from 'mongodb'
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
-import { Badge } from '../models/badge.js'
 import { applyRequestUpdate } from '../gameRequests.js'
 import { sanitizeDoc, checklist, gameFields, blankDoc } from '../builderDoc.js'
+import { createDraftGame } from '../gameCreate.js'
+import { audit } from '../noteAccess.js'
 
 const CHECKPOINT_MS = 10 * 60 * 1000
 const MAX_VERSIONS = 100
 const fail = (res, status, error, extra = {}) => res.status(status).json({ error, ...extra })
-
-function slugify(name) {
-  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'badge'
-}
-async function createGameBadge(name, gameId, userId) {
-  let code = slugify(name)
-  for (let n = 2; await Badge.exists({ code }); n += 1) code = `${slugify(name)}_${n}`
-  const badge = await Badge.create({
-    code, name, description: `Finishes ${name}.`, emoji: '🏅',
-    art: { shape: 'circle', color: 'gold', symbol: 'star', banner: false },
-    criteria: { type: 'complete_specific_game', game_id: gameId, value: new Int32(1) },
-    is_active: true, created_by: userId || null,
-  })
-  return badge
-}
 
 async function addVersion(db, gameId, version, kind, doc, userId, note = null) {
   await db.collection('game_versions').insertOne({ game_id: gameId, version, kind, doc, saved_by: userId, saved_at: new Date(), note })
@@ -77,21 +63,9 @@ export default async function handler(req, res) {
     if (!idParam) {
       if (req.method !== 'POST') return fail(res, 405, 'Method not allowed')
       const doc = sanitizeDoc(body.doc || blankDoc())
-      const now = new Date()
       const sourceId = ObjectId.isValid(body.sourceRequestId) ? new ObjectId(String(body.sourceRequestId)) : null
-      const _id = new ObjectId()
-      const badge = await createGameBadge(doc.meta.name, _id, user._id)
-      await db.collection('games').insertOne({
-        _id, ...gameFields(doc), status: 'draft', test_played: false, source_request_id: sourceId,
-        unlocks_badge_id: badge._id, builder: { version: 1, doc }, created_by: user._id, updated_by: user._id,
-        published_at: null, created_at: now, updated_at: now,
-      })
-      await addVersion(db, _id, 1, 'create', doc, user._id)
-      if (sourceId) {
-        await db.collection('game_requests').updateOne({ _id: sourceId }, { $set: { linked_game_id: _id } })
-        await advanceRequest(db, sourceId, 'dev', 'We have started building this game.')
-      }
-      return res.status(201).json({ id: String(_id), version: 1, savedAt: now })
+      const made = await createDraftGame(db, user, doc, { sourceId })
+      return res.status(201).json({ id: String(made.id), version: made.version, savedAt: made.savedAt })
     }
 
     if (!ObjectId.isValid(idParam)) return fail(res, 400, 'Invalid game id.')
@@ -152,6 +126,7 @@ export default async function handler(req, res) {
       const now = new Date()
       await db.collection('games').updateOne({ _id }, { $set: { status: 'published', published_at: now, updated_by: user._id, updated_at: now } })
       if (!legacy) await addVersion(db, _id, version, 'publish', game.builder.doc, user._id)
+      await audit(db, { user, action: 'game_publish', ip: ctx.ip, meta: { gameId: idParam, name: game.name } })
       await advanceRequest(db, game.source_request_id, 'live', `"${game.name}" is now live in the Activity Library.`)
       return res.status(200).json({ ok: true, status: 'published' })
     }
@@ -159,6 +134,7 @@ export default async function handler(req, res) {
     if (action === 'unpublish') {
       // Hidden from patients and therapists; sessions, scores and badges already earned stay.
       await db.collection('games').updateOne({ _id }, { $set: { status: 'draft', updated_by: user._id, updated_at: new Date() } })
+      await audit(db, { user, action: 'game_unpublish', ip: ctx.ip, meta: { gameId: idParam, name: game.name } })
       return res.status(200).json({ ok: true, status: 'draft' })
     }
 

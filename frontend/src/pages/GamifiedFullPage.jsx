@@ -493,7 +493,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     ...builderGames
       .filter((g) => !GAMES.some((h) => h.title.trim().toLowerCase() === String(g.name).trim().toLowerCase()))
       .map((g) => ({
-        id: `db-${g.id}`, title: g.name, emoji: g.icon || '🎮', desc: g.description || '', color: g.color || '#1FA58A',
+        id: `db-${g.id}`, title: g.name, emoji: g.icon && !/^[a-z0-9-]+$/.test(g.icon) ? g.icon : '🎮', desc: g.description || '', color: g.color || '#1FA58A',
         requiredLevel: g.unlockLevel || 1, category: g.therapyType, difficulty: g.difficulty || 'easy',
         badge: 'Star Player', badgeEmoji: '⭐', xp: g.pointsPerPlay, builder: true,
       })),

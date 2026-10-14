@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { getDb } from './mongo.js'
 
 // Fixed, server-side Stripe Price IDs — the client only ever sends a tier id
 // and billing period, never a price or amount, so what gets charged can't be
@@ -12,7 +13,19 @@ export async function createSubscription({ tierId, billingPeriod, email, name })
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not set on the server')
   }
-  const priceId = PRICE_IDS[tierId]?.[billingPeriod]
+  // The newest price version saved from the Super Admin Subscription page wins
+  // for new subscribers; the hardcoded IDs remain the fallback.
+  let priceId = PRICE_IDS[tierId]?.[billingPeriod]
+  if (billingPeriod === 'monthly') {
+    try {
+      const db = await getDb()
+      const plan = await db.collection('subscription').findOne({ slug: String(tierId).toLowerCase() }, { projection: { price_versions: 1 } })
+      const latest = (plan?.price_versions || []).filter((v) => v.stripe_price_id).pop()
+      if (latest) priceId = latest.stripe_price_id
+    } catch (err) {
+      console.error('createSubscription: plan price lookup failed, using default price:', err.message)
+    }
+  }
   if (!priceId) {
     throw new Error(`No Stripe price configured for ${tierId} / ${billingPeriod} billing yet`)
   }

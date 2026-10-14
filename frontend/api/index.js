@@ -91,6 +91,7 @@ import ownerGameRequests from './_lib/routes/owner-game-requests.js'
 import ownerGameRequestItem from './_lib/routes/owner-game-request-item.js'
 import adminGameRequests from './_lib/routes/admin-game-requests.js'
 import notifications from './_lib/routes/notifications.js'
+import adminGames from './_lib/routes/admin-games.js'
 import adminBuilder from './_lib/routes/admin-builder.js'
 import adminBuilderAssets from './_lib/routes/admin-builder-assets.js'
 import gamesAdminItem from './_lib/routes/games-admin-item.js'
@@ -114,6 +115,10 @@ import employeesPhoto from './_lib/routes/employees-photo.js'
 import employeesItem from './_lib/routes/employees-item.js'
 import branchesList from './_lib/routes/branches-list.js'
 import adminDashboard from './_lib/routes/admin-dashboard.js'
+import adminPlans from './_lib/routes/admin-plans.js'
+import adminPlanItem from './_lib/routes/admin-plan-item.js'
+import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
+import adminPlanSubscribers from './_lib/routes/admin-plan-subscribers.js'
 import adminBranches from './_lib/routes/admin-branches.js'
 import adminBranchItem from './_lib/routes/admin-branch-item.js'
 import adminBranchOwners from './_lib/routes/admin-branch-owners.js'
@@ -212,9 +217,13 @@ app.all('/api/owner/gamified/library', ownerGamifiedLibrary)
 app.all('/api/owner/game-requests/:id/file', ownerGameRequestItem)
 app.all('/api/owner/game-requests/:id', ownerGameRequestItem)
 app.all('/api/owner/game-requests', ownerGameRequests)
+app.all('/api/admin/game-requests/:id/:action', adminGameRequests)
 app.all('/api/admin/game-requests/:id', adminGameRequests)
 app.all('/api/admin/game-requests', adminGameRequests)
 app.all('/api/notifications', notifications)
+app.all('/api/admin/games/overview', adminGames)
+app.all('/api/admin/games/:id/:action', adminGames)
+app.all('/api/admin/games/:id', adminGames)
 app.all('/api/admin/builder/assets', adminBuilderAssets)
 app.all('/api/game-assets/:assetId', adminBuilderAssets)
 app.all('/api/admin/builder/games/:id/:action', adminBuilder)
@@ -255,6 +264,11 @@ app.all('/api/employees/:id', employeesItem)
 app.all('/api/employees', employeesCollection)
 app.all('/api/branches', branchesList)
 app.all('/api/admin/dashboard', adminDashboard)
+app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
+app.all('/api/admin/plans/:id', adminPlanItem)
+app.all('/api/admin/plans', adminPlans)
+app.all('/api/admin/plan-features/:id', adminPlanFeatures)
+app.all('/api/admin/plan-features', adminPlanFeatures)
 app.all('/api/admin/branch-owners', adminBranchOwners)
 app.all('/api/admin/branches/:id', adminBranchItem)
 app.all('/api/admin/branches', adminBranches)

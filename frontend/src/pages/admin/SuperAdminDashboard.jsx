@@ -332,7 +332,7 @@ export default function SuperAdminDashboard({ user, onLogout }) {
             </Panel>
 
             <Panel title="Plans" icon={CreditCard} sub={first ? ' ' : `${data.plans.total} active subscriber${data.plans.total === 1 ? '' : 's'}`}>
-              {first ? <Skel h={150} r={12} /> : !data.subscribersAvailable ? <Empty icon={TriangleAlert}>Plan data comes from Stripe and is unavailable right now.</Empty>
+              {first ? <Skel h={150} r={12} /> : !data.planDataAvailable ? <Empty icon={TriangleAlert}>Paid plan counts come from Stripe and are unavailable right now.</Empty>
                 : data.plans.total === 0 ? <Empty icon={CreditCard}>No paid subscribers yet.</Empty> : (
                   <div className="sd-plans">
                     <div className="sd-donut" role="img" aria-label={`Plans: ${donut.map((p) => `${p.label} ${p.count}`).join(', ')}`}>

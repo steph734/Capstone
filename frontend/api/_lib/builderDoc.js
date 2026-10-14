@@ -16,7 +16,9 @@ export const TEMPLATE_GAME_TYPE = {
   sort_groups: 'sort_place', find_sound: 'choose_picture', say_word: 'say_it',
 }
 export const ELEMENT_TYPES = ['image_card', 'text', 'drop_slot', 'voice_prompt', 'speak_answer', 'button', 'timer', 'star_reward', 'pao_helper', 'sound_effect', 'animation', 'hint']
-export const THERAPY_TYPES = ['cognitive', 'speech', 'physical', 'occupational']
+// 'sel' (Attention / SEL) is a skill area of its own; in the games collection it is stored
+// as therapy_type 'cognitive' plus skill_area 'sel'.
+export const THERAPY_TYPES = ['cognitive', 'speech', 'physical', 'occupational', 'sel']
 export const DIFFICULTIES = ['easy', 'medium', 'hard']
 const LANGS = ['en', 'fil', 'ceb']
 const MAX_LEVELS = 30
@@ -83,7 +85,7 @@ export function sanitizeDoc(input) {
       ageMax: m.ageMax === '' || m.ageMax == null ? null : clamp(m.ageMax, 0, 99, null),
       pointsPerPlay: m.pointsPerPlay === '' || m.pointsPerPlay == null ? null : clamp(m.pointsPerPlay, 0, 10000, null),
       badgeName: str(m.badgeName, 80),
-      icon: str(m.icon, 8) || '🎮',
+      icon: typeof m.icon === 'string' && /^[a-z0-9-]{2,30}$/.test(m.icon) ? m.icon : 'gamepad-2', // a lucide icon name
       thumbnailUrl: url(m.thumbnailUrl),
       color: color(m.color, '#1FA58A'),
       therapistNote: str(m.therapistNote, 1000),
@@ -135,7 +137,9 @@ export function gameFields(doc) {
   const m = doc.meta
   const f = {
     name: m.name,
-    therapy_type: m.therapyType || 'cognitive',
+    therapy_type: m.therapyType === 'sel' ? 'cognitive' : (m.therapyType || 'cognitive'),
+    skill_area: m.therapyType || 'cognitive',
+    icon: m.icon,
     difficulty: m.difficulty,
     game_type: TEMPLATE_GAME_TYPE[m.template] || 'step_by_step',
     points_per_play: new Int32(m.pointsPerPlay ?? 100),

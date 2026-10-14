@@ -1,484 +1,209 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Check, ChevronRight, CircleCheck, CircleAlert, CreditCard, Download, FlaskConical, Plus, RefreshCw, TrendingDown, TrendingUp, TriangleAlert, Users, X,
+} from 'lucide-react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
+import PlanCard from './subscription/PlanCard'
+import PlanModal from './subscription/PlanModal'
+import { BetaDialog, DeleteDialog, FeaturesDialog, SubscribersDialog } from './subscription/PlanDialogs'
+import { peso, tierTag } from './subscription/planConstants'
+import { API_BASE } from '../../utils/api'
+import { authFetch, getSessionToken } from '../../utils/session'
+import './branches/Branches.css'
+import './subscription/Subscription.css'
 
-const initialPlans = [
-  {
-    id: 1,
-    name: 'Free',
-    price: '₱0',
-    notes: 'Core booking and notes access',
-    status: 'Current',
-    icon: '🌱',
-    accent: 'neutral',
-    features: ['Core booking & scheduling', 'Session notes', '1 branch included'],
-  },
-  {
-    id: 2,
-    name: 'Silver',
-    price: '₱299',
-    notes: 'Adds voice-assisted support',
-    status: 'Locked',
-    icon: '🥈',
-    accent: 'silver',
-    features: ['Everything in Free', 'Voice-assisted support', 'Priority scheduling'],
-  },
-  {
-    id: 3,
-    name: 'Gold',
-    price: '₱499',
-    notes: 'Adds games and avatar tools',
-    status: 'Popular',
-    icon: '🥇',
-    accent: 'gold',
-    features: ['Everything in Silver', 'Gamified exercises', 'Custom patient avatars'],
-  },
-]
+const EVENT_ICON = { upgrade: TrendingUp, new: Plus, downgrade: TrendingDown, cancel: X, warning: TriangleAlert }
+const EVENT_TONE = { upgrade: 'green', new: 'green', downgrade: 'red', cancel: 'gray', warning: 'amber' }
 
-const allUsers = [
-  { name: 'Alvrin', role: 'Patient', email: 'patient@gmail.com' },
-  { name: 'Super Admin', role: 'Super Admin', email: 'superadmin@gmail.com' },
-  { name: 'Owner', role: 'Owner', email: 'owner@gmail.com' },
-  { name: 'Therapist', role: 'Therapist', email: 'therapists@gmail.com' },
-]
-
-const buildDefaultBetaStatus = () => ({
-  Free: {
-    'patient@gmail.com': true,
-    'superadmin@gmail.com': false,
-    'owner@gmail.com': false,
-    'therapists@gmail.com': false,
-  },
-  Silver: {
-    'patient@gmail.com': false,
-    'superadmin@gmail.com': false,
-    'owner@gmail.com': true,
-    'therapists@gmail.com': true,
-  },
-  Gold: {
-    'patient@gmail.com': false,
-    'superadmin@gmail.com': true,
-    'owner@gmail.com': true,
-    'therapists@gmail.com': false,
-  },
-})
-
-const ICON_PRESETS = [
-  { value: 'neutral', icon: '🌱', label: 'Sprout — Neutral' },
-  { value: 'silver', icon: '🥈', label: 'Silver Medal' },
-  { value: 'gold', icon: '🥇', label: 'Gold Medal' },
-  { value: 'diamond', icon: '💎', label: 'Diamond' },
-]
-
-const emptyForm = { name: '', price: '', notes: '', features: '', status: 'Locked', accent: 'neutral' }
-
-const iconForAccent = (accent) => ICON_PRESETS.find((preset) => preset.value === accent)?.icon || '🌱'
-
-const applyExclusiveStatus = (list, id, status) => {
-  if (status !== 'Current' && status !== 'Popular') return list
-  return list.map((plan) => (plan.id === id ? plan : plan.status === status ? { ...plan, status: 'Locked' } : plan))
+function Skel({ h = 16, w = '100%', r = 8 }) {
+  return <span className="sp-skel" style={{ height: h, width: w, borderRadius: r }} aria-hidden="true" />
 }
 
-function CheckIcon() {
+function Stat({ tile, icon: Icon, value, label, meta, metaTone = 'up' }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
+    <div className="sp-stat">
+      <span className={`br-tile ${tile}`}><Icon size={22} aria-hidden="true" /></span>
+      <div><strong>{value}</strong><span>{label}</span>{meta && <em className={metaTone}>{meta}</em>}</div>
+    </div>
   )
 }
 
-function FlaskIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 3h6M10 3v6l-5.5 9.5A1 1 0 0 0 5.36 20h13.28a1 1 0 0 0 .86-1.5L14 9V3" />
-    </svg>
-  )
-}
+const signed = (n) => `${n >= 0 ? '+' : '−'}${peso(Math.abs(n), { compact: true })}`
 
 export default function AdminSubscriptionPage({ user, onLogout }) {
-  const [plans, setPlans] = useState(initialPlans)
-  const [betaModalPlan, setBetaModalPlan] = useState(null)
-  const [betaStatusByPlan, setBetaStatusByPlan] = useState(buildDefaultBetaStatus)
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  const [menuId, setMenuId] = useState(null)
+  const [dialog, setDialog] = useState(null) // { type, plan? }
+  const [toast, setToast] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const toastTimer = useRef(null)
 
-  const [formMode, setFormMode] = useState(null) // 'add' | 'edit' | null
-  const [formTarget, setFormTarget] = useState(null)
-  const [form, setForm] = useState(emptyForm)
-  const [viewTarget, setViewTarget] = useState(null)
+  const flash = useCallback((msg) => {
+    setToast(msg)
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 5000)
+  }, [])
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
 
-  const hasActiveBetaTesters = (planName) => {
-    return Object.values(betaStatusByPlan[planName] || {}).some(Boolean)
+  const load = useCallback(async () => {
+    setError('')
+    try { setData(await authFetch('/api/admin/plans')) } catch (err) { setError(err.message) }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (menuId == null) return undefined
+    const close = () => setMenuId(null)
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    window.addEventListener('click', close)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', onKey) }
+  }, [menuId])
+
+  const open = (type, plan) => { setMenuId(null); setDialog({ type, plan }) }
+  const close = useCallback(() => setDialog(null), [])
+  const done = (msg, warning) => { setDialog(null); flash(warning ? `${msg} ${warning}` : msg); load() }
+
+  const toggleHidden = async (plan) => {
+    setMenuId(null)
+    try {
+      await authFetch(`/api/admin/plans/${plan.id}`, { method: 'PATCH', body: { action: plan.status === 'hidden' ? 'show' : 'hide' } })
+      flash(plan.status === 'hidden' ? `${plan.name} is now Live.` : `${plan.name} is now hidden.`)
+      load()
+    } catch (err) { flash(err.message) }
+  }
+  const duplicate = async (plan) => {
+    setMenuId(null)
+    try {
+      await authFetch('/api/admin/plans', { method: 'POST', body: { duplicateOf: plan.id } })
+      flash(`${plan.name} duplicated as a hidden plan.`)
+      load()
+    } catch (err) { flash(err.message) }
   }
 
-  const countActiveBetaTesters = (planName) => {
-    return Object.values(betaStatusByPlan[planName] || {}).filter(Boolean).length
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/plans/subscribers?format=csv`, { headers: { Authorization: `Bearer ${getSessionToken()}` } })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not export subscribers.')
+      const url = URL.createObjectURL(await res.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `therapypro-subscribers-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) { flash(err.message) } finally { setExporting(false) }
   }
 
-  const stats = useMemo(() => {
-    const currentPlan = plans.find((plan) => plan.status === 'Current')
-    const popularPlan = plans.find((plan) => plan.status === 'Popular')
-    const totalBetaTesters = Object.values(betaStatusByPlan).reduce(
-      (sum, testers) => sum + Object.values(testers).filter(Boolean).length,
-      0
-    )
-    return {
-      totalPlans: plans.length,
-      currentPlan: currentPlan?.name || '—',
-      popularPlan: popularPlan?.name || '—',
-      totalBetaTesters,
-    }
-  }, [plans, betaStatusByPlan])
-
-  const handleOpenBetaModal = (planName) => {
-    setBetaModalPlan(planName)
-  }
-
-  const handleCloseBetaModal = () => {
-    setBetaModalPlan(null)
-  }
-
-  const handleToggleBetaStatus = (planName, email) => {
-    setBetaStatusByPlan((currentStatus) => ({
-      ...currentStatus,
-      [planName]: {
-        ...currentStatus[planName],
-        [email]: !currentStatus[planName]?.[email],
-      },
-    }))
-  }
-
-  const openAdd = () => {
-    setFormTarget(null)
-    setForm(emptyForm)
-    setFormMode('add')
-  }
-
-  const openEdit = (plan) => {
-    setFormTarget(plan)
-    setForm({
-      name: plan.name,
-      price: plan.price,
-      notes: plan.notes,
-      features: plan.features.join('\n'),
-      status: plan.status,
-      accent: plan.accent,
-    })
-    setFormMode('edit')
-  }
-
-  const closeForm = () => {
-    setFormMode(null)
-    setFormTarget(null)
-  }
-
-  const openView = (plan) => {
-    setViewTarget(plan)
-  }
-
-  const closeView = () => {
-    setViewTarget(null)
-  }
-
-  const savePlan = (event) => {
-    event.preventDefault()
-    const featureList = form.features
-      .split('\n')
-      .map((feature) => feature.trim())
-      .filter(Boolean)
-
-    const payload = {
-      name: form.name.trim(),
-      price: form.price.trim(),
-      notes: form.notes.trim(),
-      features: featureList,
-      status: form.status,
-      accent: form.accent,
-      icon: iconForAccent(form.accent),
-    }
-
-    if (formMode === 'edit' && formTarget) {
-      setPlans((current) => {
-        const updated = current.map((plan) => (plan.id === formTarget.id ? { ...plan, ...payload } : plan))
-        return applyExclusiveStatus(updated, formTarget.id, payload.status)
-      })
-    } else {
-      const newId = Date.now()
-      setPlans((current) => applyExclusiveStatus([...current, { id: newId, ...payload }], newId, payload.status))
-    }
-    closeForm()
-  }
-
-  const isFormModal = formMode === 'add' || formMode === 'edit'
+  const plans = data?.plans || []
+  const features = data?.features || []
+  const s = data?.stats
+  const shown = plans.filter((p) => p.status !== 'hidden')
+  const finite = (k) => shown.some((p) => p.limits[k] != null)
 
   return (
-    <AdminPageShell
-      user={user}
-      onLogout={onLogout}
-      title="Subscription"
-      subtitle="Review active plans and upgrade options"
-      icon="💳"
-      menuItems={adminMenuItems}
-    >
-      <div className="admin-stats-grid">
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Total Plans</p>
-          <h3 className="admin-stat-value">{stats.totalPlans}</h3>
-          <p className="admin-stat-meta">Available tiers</p>
-        </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Current Plan</p>
-          <h3 className="admin-stat-value">{stats.currentPlan}</h3>
-          <p className="admin-stat-meta">Active for this account</p>
-        </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Most Popular</p>
-          <h3 className="admin-stat-value">{stats.popularPlan}</h3>
-          <p className="admin-stat-meta">Highest adoption</p>
-        </section>
-        <section className="admin-stat-card">
-          <p className="admin-stat-label">Beta Testers</p>
-          <h3 className="admin-stat-value">{stats.totalBetaTesters}</h3>
-          <p className="admin-stat-meta">Active across all plans</p>
-        </section>
-      </div>
-
-      <div className="admin-toolbar admin-subscription-toolbar">
-        <div>
-          <h3 className="admin-subscription-toolbar-title">Plan controls</h3>
-          <p className="admin-subscription-toolbar-text">Manage tier access from a single place for all users.</p>
+    <AdminPageShell user={user} onLogout={onLogout} title="Subscription" subtitle="Plans, prices and features for every clinic on TherapyPro" icon="" menuItems={adminMenuItems}>
+      <div className="sp-page br-page">
+        <div className="sp-toolbar">
+          <button type="button" className="br-btn outline" onClick={exportCsv} disabled={exporting || !data}><Download size={16} aria-hidden="true" /> {exporting ? 'Exporting…' : 'Export'}</button>
+          <button type="button" className="br-btn primary" onClick={() => open('plan', null)} disabled={!data}><Plus size={17} aria-hidden="true" /> Add plan</button>
         </div>
-        <button className="admin-btn admin-subscription-add-btn" onClick={openAdd}>
-          Add Subscription
-        </button>
-      </div>
 
-      <div className="admin-grid-2 plan-grid">
-        {plans.map((plan) => (
-          <section
-            key={plan.id}
-            className={`plan-card admin-panel ${plan.status === 'Current' ? 'plan-card-current' : ''} ${plan.status === 'Popular' ? 'plan-card-popular' : ''} ${plan.status === 'Locked' ? 'plan-card-locked' : ''}`}
-          >
-            {plan.status === 'Popular' && <span className="plan-ribbon">Most Popular</span>}
+        {error && (
+          <div className="br-callout red" role="alert"><CircleAlert size={16} aria-hidden="true" /><span>{error}</span>
+            <button type="button" className="br-btn outline sm sp-retry" onClick={load}><RefreshCw size={14} /> Try again</button></div>
+        )}
+        {data && !data.stripeAvailable && (
+          <div className="br-callout" role="status"><TriangleAlert size={16} aria-hidden="true" /><span>Stripe could not be reached, so paid subscriber counts, revenue and recent changes are unavailable. Plans and Free accounts still come from the database.</span></div>
+        )}
 
-            <div className="admin-panel-header">
-              <div className="plan-card-heading">
-                <span className={`plan-icon-badge plan-icon-${plan.accent}`}>{plan.icon}</span>
-                <div>
-                  <h3>{plan.name} Plan</h3>
-                  <p>{plan.notes}</p>
-                </div>
+        <section className="sp-stats" aria-label="Summary">
+          {!s ? Array.from({ length: 4 }, (_, i) => <div key={i} className="sp-stat"><Skel h={46} w={46} r={14} /><div style={{ flex: 1 }}><Skel h={26} w="40%" /><span style={{ display: 'block', marginTop: 8 }}><Skel w="70%" /></span></div></div>) : (
+            <>
+              <Stat tile="green" icon={Users} value={s.subscribers.value} label="Active subscribers"
+                meta={s.subscribers.changePct == null ? 'No prior data' : `${s.subscribers.changePct >= 0 ? '+' : ''}${s.subscribers.changePct}% from last month`} metaTone={s.subscribers.changePct != null && s.subscribers.changePct < 0 ? 'down' : s.subscribers.changePct == null ? 'flat' : 'up'} />
+              <Stat tile="yellow" icon={CreditCard} value={s.mrr.value == null ? '—' : peso(s.mrr.value, { compact: true })} label="Monthly recurring revenue"
+                meta={s.mrr.change == null ? 'Unavailable' : `${signed(s.mrr.change)} from last month`} metaTone={s.mrr.change == null ? 'flat' : s.mrr.change < 0 ? 'down' : 'up'} />
+              <Stat tile="blue" icon={CreditCard} value={s.plans.total} label="Plans" meta={s.plans.popular ? `Most popular: ${s.plans.popular}` : 'No subscribers yet'} metaTone={s.plans.popular ? 'up' : 'flat'} />
+              <Stat tile="purple" icon={FlaskConical} value={s.beta.count} label="Beta testers" meta={s.beta.plan ? `Testing the ${s.beta.plan}` : 'No beta plans'} metaTone={s.beta.plan ? 'up' : 'flat'} />
+            </>
+          )}
+        </section>
+
+        <section className="sp-grid" aria-label="Plans">
+          {!data ? [0, 1, 2].map((i) => <div key={i} className="sp-card"><Skel h={48} w={48} r={14} /><Skel h={28} w="50%" /><Skel h={90} r={12} /><Skel h={120} r={12} /></div>)
+            : plans.length === 0 ? <div className="sp-empty">No plans yet. Use Add plan to create the first one.</div>
+            : plans.map((p) => (
+              <PlanCard key={p.id} plan={p} features={features} menuOpen={menuId === p.id} onMenu={setMenuId}
+                onSubscribers={(pl) => open('subscribers', pl)} onEdit={(pl) => open('plan', pl)} onBeta={(pl) => open('beta', pl)}
+                onToggleHidden={toggleHidden} onDuplicate={duplicate} onDelete={(pl) => open('delete', pl)} />
+            ))}
+        </section>
+
+        <div className="sp-row">
+          <section className="sp-panel">
+            <header className="sp-panel-head">
+              <div><h2><CircleCheck size={17} aria-hidden="true" /> Compare plans</h2><p>What each plan includes</p></div>
+              <button type="button" className="sp-link" onClick={() => open('features')} disabled={!data}>Edit features <ChevronRight size={15} aria-hidden="true" /></button>
+            </header>
+            {!data ? <Skel h={180} r={12} /> : shown.length === 0 || features.length === 0 ? <div className="sp-empty">Nothing to compare yet.</div> : (
+              <div className="sp-table-wrap">
+                <table className="sp-table compare">
+                  <thead><tr><th scope="col">Feature</th>{shown.map((p) => <th key={p.id} scope="col" className="c">{p.name}</th>)}</tr></thead>
+                  <tbody>
+                    {features.map((f) => (
+                      <tr key={f.id}>
+                        <th scope="row">{f.label}<small>{tierTag(f, plans)}</small></th>
+                        {shown.map((p) => (
+                          <td key={p.id} className="c">{p.featureKeys.includes(f.key) ? <Check size={17} className="yes" aria-label="Included" /> : <X size={17} className="no" aria-label="Not included" />}</td>
+                        ))}
+                      </tr>
+                    ))}
+                    {[['branches', 'Branches'], ['therapists', 'Therapists'], ['patients', 'Patients']].filter(([k]) => k === 'branches' || finite(k)).map(([k, label]) => (
+                      <tr key={k}>
+                        <th scope="row">{label}</th>
+                        {shown.map((p) => <td key={p.id} className="c val">{p.limits[k] == null ? 'Unlimited' : p.limits[k]}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="admin-panel-tags">
-                {hasActiveBetaTesters(plan.name) && <span className="admin-pill beta">Beta</span>}
-                <span className={`admin-pill ${plan.status === 'Current' ? 'green' : plan.status === 'Popular' ? 'yellow' : 'red'}`}>{plan.status}</span>
-              </div>
-            </div>
-
-            <div className="plan-price-row">
-              <span className="plan-price">{plan.price}</span>
-              <span className="plan-price-suffix">/month</span>
-            </div>
-
-            <ul className="plan-features">
-              {plan.features.map((feature) => (
-                <li key={feature}>
-                  <CheckIcon />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            <div className="admin-button-row">
-              <button className="admin-btn" onClick={() => openView(plan)}>View Details</button>
-              <button className="admin-btn-secondary" onClick={() => openEdit(plan)}>Edit Plan</button>
-              <button className="admin-btn-beta" onClick={() => handleOpenBetaModal(plan.name)}>
-                <FlaskIcon /> Beta Testing
-              </button>
-            </div>
+            )}
           </section>
-        ))}
+
+          <section className="sp-panel">
+            <header className="sp-panel-head">
+              <div><h2><RefreshCw size={17} aria-hidden="true" /> Recent changes</h2><p>Upgrades, downgrades and cancellations</p></div>
+            </header>
+            {!data ? <div className="sp-skel-list">{[0, 1, 2, 3].map((i) => <Skel key={i} h={44} r={10} />)}</div> : data.changes.length === 0 ? (
+              <div className="sp-empty">{data.stripeAvailable ? 'No subscription changes yet.' : 'Subscription events come from Stripe, which is unavailable right now.'}</div>
+            ) : (
+              <ul className="sp-changes">
+                {data.changes.map((c, i) => {
+                  const Icon = EVENT_ICON[c.kind] || RefreshCw
+                  return (
+                    <li key={`${c.kind}-${i}`}>
+                      <span className={`sp-ico ${EVENT_TONE[c.kind]}`}><Icon size={18} aria-hidden="true" /></span>
+                      <div><strong>{c.title}</strong><small>{c.detail}</small></div>
+                      {c.amount != null ? <b className={c.amount >= 0 ? 'up' : 'down'}>{signed(c.amount)}</b>
+                        : c.action ? <button type="button" className="sp-link" onClick={() => open('subscribers', null)}>View</button> : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
 
-      {isFormModal && (
-        <div className="admin-modal-backdrop" onClick={closeForm}>
-          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div className="admin-modal-title">
-                <span className="admin-modal-icon">💳</span>
-                <div>
-                  <h3>{formMode === 'edit' ? 'Edit Plan' : 'Add Subscription'}</h3>
-                  <p>{formMode === 'edit' ? 'Update this plan\'s pricing and features' : 'Create a new subscription tier'}</p>
-                </div>
-              </div>
-              <button className="admin-modal-close" onClick={closeForm} aria-label="Close">✕</button>
-            </div>
-
-            <form className="admin-modal-form" onSubmit={savePlan}>
-              <label className="admin-field">
-                <span>Plan Name</span>
-                <input
-                  value={form.name}
-                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="e.g. Platinum"
-                  required
-                />
-              </label>
-
-              <label className="admin-field">
-                <span>Short Description</span>
-                <input
-                  value={form.notes}
-                  onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                  placeholder="e.g. Adds priority support and analytics"
-                  required
-                />
-              </label>
-
-              <div className="admin-field-grid">
-                <label className="admin-field">
-                  <span>Price</span>
-                  <input
-                    value={form.price}
-                    onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))}
-                    placeholder="e.g. ₱699"
-                    required
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Status</span>
-                  <select
-                    value={form.status}
-                    onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                  >
-                    <option>Locked</option>
-                    <option>Current</option>
-                    <option>Popular</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="admin-field">
-                <span>Icon Theme</span>
-                <select
-                  value={form.accent}
-                  onChange={(event) => setForm((current) => ({ ...current, accent: event.target.value }))}
-                >
-                  {ICON_PRESETS.map((preset) => (
-                    <option key={preset.value} value={preset.value}>
-                      {preset.icon} {preset.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="admin-field">
-                <span>Features (one per line)</span>
-                <textarea
-                  value={form.features}
-                  onChange={(event) => setForm((current) => ({ ...current, features: event.target.value }))}
-                  placeholder={'Everything in Gold\nDedicated account manager\nAdvanced analytics'}
-                  required
-                />
-              </label>
-
-              <div className="admin-button-row">
-                <button className="admin-btn" type="submit">{formMode === 'edit' ? 'Save Changes' : 'Save Plan'}</button>
-                <button className="admin-btn-secondary" type="button" onClick={closeForm}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {viewTarget && (
-        <div className="admin-modal-backdrop" onClick={closeView}>
-          <div className="admin-modal admin-view-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div className="admin-modal-title">
-                <span className={`plan-icon-badge plan-icon-${viewTarget.accent}`}>{viewTarget.icon}</span>
-                <div>
-                  <h3>{viewTarget.name} Plan</h3>
-                  <p>{viewTarget.notes}</p>
-                </div>
-              </div>
-              <button className="admin-modal-close" onClick={closeView} aria-label="Close">✕</button>
-            </div>
-
-            <div className="branch-view-grid">
-              <div className="branch-view-field">
-                <span className="branch-view-label">Price</span>
-                <p>{viewTarget.price} <span style={{ fontSize: '12px', color: '#8a9a92', fontWeight: 600 }}>/month</span></p>
-              </div>
-              <div className="branch-view-field">
-                <span className="branch-view-label">Status</span>
-                <p><span className={`admin-pill ${viewTarget.status === 'Current' ? 'green' : viewTarget.status === 'Popular' ? 'yellow' : 'red'}`}>{viewTarget.status}</span></p>
-              </div>
-              <div className="branch-view-field">
-                <span className="branch-view-label">Beta Testers</span>
-                <p>{countActiveBetaTesters(viewTarget.name)} active</p>
-              </div>
-              <div className="branch-view-field">
-                <span className="branch-view-label">Features Included</span>
-                <p>{viewTarget.features.length}</p>
-              </div>
-            </div>
-
-            <ul className="plan-features" style={{ marginTop: '16px' }}>
-              {viewTarget.features.map((feature) => (
-                <li key={feature}>
-                  <CheckIcon />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            <div className="admin-button-row admin-view-modal-footer">
-              <button className="admin-btn-secondary" type="button" onClick={closeView}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {betaModalPlan && (
-        <div className="admin-modal-backdrop" onClick={handleCloseBetaModal}>
-          <div className="admin-modal admin-beta-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div>
-                <h3>Beta Testing - {betaModalPlan} Plan</h3>
-                <p>All registered user emails with Active or Inactive beta tester status.</p>
-              </div>
-              <button className="admin-btn-secondary" onClick={handleCloseBetaModal}>
-                Close
-              </button>
-            </div>
-
-            <div className="admin-list">
-              {allUsers.map((betaUser) => {
-                const isActive = betaStatusByPlan[betaModalPlan]?.[betaUser.email]
-
-                return (
-                <div key={betaUser.email} className="admin-list-item admin-beta-user-item">
-                  <div>
-                    <h4>{betaUser.name}</h4>
-                    <p>{betaUser.email}</p>
-                  </div>
-                  <div className="admin-beta-user-actions">
-                    <span className={`admin-pill ${isActive ? 'green' : 'red'}`}>
-                      {isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    <button
-                      className={`admin-btn-secondary admin-beta-toggle-btn ${isActive ? 'admin-beta-toggle-active' : 'admin-beta-toggle-inactive'}`}
-                      onClick={() => handleToggleBetaStatus(betaModalPlan, betaUser.email)}
-                    >
-                      {isActive ? 'Set Inactive' : 'Set Active'}
-                    </button>
-                  </div>
-                </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {dialog?.type === 'plan' && <PlanModal plan={dialog.plan} plans={plans} features={features} onClose={close} onSaved={done} />}
+      {dialog?.type === 'subscribers' && <SubscribersDialog plan={dialog.plan} onClose={close} />}
+      {dialog?.type === 'beta' && <BetaDialog plan={dialog.plan} onClose={close} onSaved={done} />}
+      {dialog?.type === 'delete' && <DeleteDialog plan={dialog.plan} onClose={close} onDeleted={done} />}
+      {dialog?.type === 'features' && <FeaturesDialog features={features} plans={plans} onClose={close} onChanged={load} />}
+      {toast && <div className="br-toast" role="status"><CircleCheck size={16} /> {toast}</div>}
     </AdminPageShell>
   )
 }

@@ -14,7 +14,7 @@ export const DEVICES = {
   desktop: { label: 'Desktop', icon: '▭', w: 1280, h: 720, radius: 14, bezel: 10 },
 }
 export const LANGUAGES = [['en', 'English'], ['fil', 'Filipino'], ['ceb', 'Bisaya']]
-export const THERAPY_TYPES = [['speech', 'Speech & language'], ['cognitive', 'Cognitive'], ['occupational', 'Occupational'], ['physical', 'Physical / motor']]
+export const THERAPY_TYPES = [['speech', 'Speech & language'], ['cognitive', 'Cognitive'], ['sel', 'Attention / SEL'], ['occupational', 'Occupational'], ['physical', 'Physical / motor']]
 export const DIFFICULTIES = ['easy', 'medium', 'hard']
 export const ANIMATIONS = [['none', 'None'], ['bounce_in', 'Bounce in'], ['fade_in', 'Fade in'], ['pulse', 'Pulse'], ['confetti', 'Confetti'], ['sparkle', 'Sparkle']]
 export const SOUNDS = [['ding', 'Ding'], ['cheer', 'Cheer'], ['pop', 'Pop'], ['none', 'None']]
@@ -60,7 +60,7 @@ export function newLevel(n = 1, elements = []) {
 export function blankDoc() {
   return {
     schema: 1,
-    meta: { name: 'Untitled game', description: '', template: null, therapyType: null, skillArea: '', difficulty: 'easy', ageMin: null, ageMax: null, pointsPerPlay: 100, badgeName: '', icon: '🎮', thumbnailUrl: '', color: '#1FA58A', therapistNote: '', testPlayed: false },
+    meta: { name: 'Untitled game', description: '', template: null, therapyType: null, skillArea: '', difficulty: 'easy', ageMin: null, ageMax: null, pointsPerPlay: 100, badgeName: '', icon: 'gamepad-2', thumbnailUrl: '', color: '#1FA58A', therapistNote: '', testPlayed: false },
     settings: { language: 'en', device: 'tablet', grid: 8, snap: true, readAloud: true },
     levels: [newLevel(1)],
   }

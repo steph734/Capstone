@@ -36,7 +36,9 @@ function ago(ts) {
 }
 
 export default function GameBuilderPage({ user, onLogout }) {
-  const { gameId } = useParams()
+  const { gameId: routeGameId } = useParams()
+  // The /builder/new route has no :gameId at all.
+  const gameId = routeGameId || 'new'
   const [params] = useSearchParams()
   const navigate = useNavigate()
 

@@ -197,6 +197,7 @@ function App() {
       const resetPassword = getResetPassword(user.email)
       return resetPassword ? password === resetPassword : password === user.password
     })
+    if (matchedUser) matchedUser = { ...matchedUser, localDemo: true }
 
     // Hash before it ever hits the wire — the network payload (and any request
     // logs) should never carry the raw password, only this digest. The server
@@ -271,6 +272,22 @@ function App() {
       } catch {
         // /api not reachable (plain `npm run dev`) — fall through to "invalid" below.
       }
+    }
+
+    if (matchedUser && matchedUser.localDemo) {
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: typedEmail, password: passwordHash }),
+        })
+        const data = await res.json().catch(() => ({}))
+        setSessionToken(res.ok && data.token ? data.token : '')
+      } catch {
+        setSessionToken('')
+      }
+      matchedUser = { ...matchedUser }
+      delete matchedUser.localDemo
     }
 
     if (matchedUser) {

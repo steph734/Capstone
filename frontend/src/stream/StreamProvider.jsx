@@ -34,7 +34,8 @@ export default function StreamProvider({ user, children }) {
   const [error, setError] = useState('')
   const clientsRef = useRef({ chat: null, video: null })
 
-  const email = user?.email || null
+  // Messaging is only for therapists and guardians; other roles have no chat identity.
+  const email = user?.email && (user.role === 'Therapist' || user.role === 'Patient') ? user.email : null
   const apiKeyFallback = import.meta.env.VITE_STREAM_API_KEY || ''
 
   useEffect(() => {

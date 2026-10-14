@@ -2,6 +2,7 @@ import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { LeaveRequest } from '../models/leaveRequest.js'
 import '../models/branch.js'
+import { getDb } from '../mongo.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const LEAVE_TYPES = ['Sick Leave', 'Vacation Leave', 'Emergency Leave', 'Other']
@@ -64,6 +65,24 @@ async function handleGet(req, res) {
   }
 }
 
+// In-app notice for the branch's owner(s). Best-effort: never fails the request.
+async function notifyOwners(employee, name, doc, startDate, endDate) {
+  try {
+    const db = await getDb()
+    const branch = await db.collection('branches').findOne({ _id: employee.branch_id?._id }, { projection: { owner_id: 1 } })
+    const owners = branch?.owner_id ? await db.collection('users').find({ _id: branch.owner_id }).toArray() : await db.collection('users').find({ role: 'Owner', is_archived: { $ne: true } }).toArray()
+    const range = startDate === endDate ? startDate : startDate + ' to ' + endDate
+    const docs = owners.filter((o) => o.email).map((o) => ({
+      recipient_email: String(o.email).toLowerCase(), type: 'leave_request', title: 'New leave request',
+      body: name + ' requested ' + doc.leave_type + ' (' + range + ').', link: '/owner/staff',
+      request_id: doc._id, read: false, created_at: new Date(),
+    }))
+    if (docs.length) await db.collection('notifications').insertMany(docs)
+  } catch (err) {
+    console.error('leave request owner notice failed:', err.message)
+  }
+}
+
 async function handlePost(req, res) {
   const email = String(req.body?.email || '').trim().toLowerCase()
   const leaveType = String(req.body?.leaveType || '').trim()
@@ -103,6 +122,8 @@ async function handlePost(req, res) {
       status: 'pending',
       requested_at: new Date(),
     })
+
+    await notifyOwners(employee, name, doc, startDate, endDate)
 
     return res.status(201).json({
       id: doc._id,

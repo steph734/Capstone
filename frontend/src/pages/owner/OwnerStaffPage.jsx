@@ -5,6 +5,7 @@ import Calendar from 'react-calendar'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
+import { authFetch, getSessionToken } from '../../utils/session'
 import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import { generateUniqueId } from '../../utils/idGenerator'
 import ScanIdModal from '../../components/ScanIdModal'
@@ -34,9 +35,8 @@ const REJECT_REASONS = [
   'Duplicate application',
   'Other',
 ]
-const INITIAL_LEAVE_REQUESTS = [
-  { id: 'lr1', staffId: 2, type: 'Vacation Leave', range: 'May 15 – May 17, 2026', days: 3, reason: 'Family vacation' },
-]
+const fmtLeaveDay = (k) => new Date(k + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+const leaveRange = (r) => (r.startDate === r.endDate ? fmtLeaveDay(r.startDate) : fmtLeaveDay(r.startDate) + ' – ' + fmtLeaveDay(r.endDate))
 
 function initialsFromName(name) {
   return (
@@ -306,7 +306,7 @@ function DayDots({ week }) {
 }
 
 /* ── Pending Leave Requests panel ──────────────────────────── */
-function LeaveRequestsPanel({ requests, staff, onApprove, onDecline }) {
+function LeaveRequestsPanel({ requests, onApprove, onDecline }) {
   const [collapsed, setCollapsed] = useState(false)
   if (requests.length === 0) return null
 
@@ -327,27 +327,25 @@ function LeaveRequestsPanel({ requests, staff, onApprove, onDecline }) {
       </div>
 
       {!collapsed && requests.map((req) => {
-        const member = staff.find((s) => s.id === req.staffId)
-        if (!member) return null
         return (
           <div key={req.id} className="os-lr-row">
             <div className="os-lr-person">
-              <img src={member.avatar} alt={member.name} className="os-avatar" />
+              <div className="os-ap-detail-avatar">{initialsFromName(req.name)}</div>
               <div>
-                <div className="os-table-name">{member.name}</div>
-                <SpecialtyBadge specialty={member.specialty} />
+                <div className="os-table-name">{req.name}</div>
+                <SpecialtyBadge specialty={req.specialty} />
               </div>
             </div>
             <div className="os-lr-field">
               <span className="os-pill os-pill-yellow">On Leave</span>
-              <span className="os-lr-sub">{req.type}</span>
+              <span className="os-lr-sub">{req.leaveType}</span>
             </div>
             <div className="os-lr-field">
-              <span className="os-lr-strong"><CalendarSmallIcon /> {req.range}</span>
-              <span className="os-lr-sub">{req.days} days</span>
+              <span className="os-lr-strong"><CalendarSmallIcon /> {leaveRange(req)}</span>
+              <span className="os-lr-sub">{req.days} day{req.days > 1 ? 's' : ''}</span>
             </div>
             <div className="os-lr-field">
-              <span className="os-lr-strong">{req.reason}</span>
+              <span className="os-lr-strong">{req.reason || '—'}</span>
               <span className="os-lr-sub">Reason</span>
             </div>
             <div className="os-lr-actions">
@@ -355,7 +353,7 @@ function LeaveRequestsPanel({ requests, staff, onApprove, onDecline }) {
                 <CheckCircleIcon /> Approve
               </button>
               <button className="os-lr-decline" onClick={() => onDecline(req)}>
-                ✕ Decline
+                ✕ Reject
               </button>
             </div>
           </div>
@@ -2062,7 +2060,11 @@ function mapEmployeeToApplicant(emp) {
 /* ── Main Page ─────────────────────────────────────────────── */
 export default function OwnerStaffPage({ user, onLogout, betaTier }) {
   const [staff, setStaff] = useState([])
-  const [leaveRequests, setLeaveRequests] = useState(INITIAL_LEAVE_REQUESTS)
+  const [leaveRequests, setLeaveRequests] = useState([])
+  const [leaveConfirm, setLeaveConfirm] = useState(null) // { req, action }
+  const [leaveNote, setLeaveNote] = useState('')
+  const [leaveBusy, setLeaveBusy] = useState(false)
+  const [leaveError, setLeaveError] = useState('')
   const [applicants, setApplicants] = useState([])
   const [activeTab, setActiveTab] = useState('list')
   const [search, setSearch] = useState('')
@@ -2098,6 +2100,19 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       })
       .catch(() => {})
     return () => { cancelled = true }
+  }, [])
+
+  // Pending leave requests are therapists' real submissions, refreshed every
+  // minute. Without a server session (demo login) there is nothing to load.
+  useEffect(() => {
+    if (!getSessionToken()) return undefined
+    let cancelled = false
+    const load = () => authFetch('/api/owner/leave-requests')
+      .then((d) => { if (!cancelled) setLeaveRequests(d.pending || []) })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 60000)
+    return () => { cancelled = true; clearInterval(t) }
   }, [])
 
   const activeStaff = staff.filter((s) => !s.archived)
@@ -2244,17 +2259,25 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     setAttendanceResult(result)
   }
 
-  const handleApproveLeave = (req) => {
-    const member = staff.find((s) => s.id === req.staffId)
-    setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
-    if (member) logStaff('✅', `Approved ${req.type.toLowerCase()} for ${member.name} (${req.range})`, member.id)
-  }
+  const handleApproveLeave = (req) => { setLeaveNote(''); setLeaveError(''); setLeaveConfirm({ req, action: 'approve' }) }
+  const handleDeclineLeave = (req) => { setLeaveNote(''); setLeaveError(''); setLeaveConfirm({ req, action: 'reject' }) }
+  const closeLeaveConfirm = () => { if (!leaveBusy) setLeaveConfirm(null) }
 
-  const handleDeclineLeave = (req) => {
-    const member = staff.find((s) => s.id === req.staffId)
-    setStaff((prev) => prev.map((s) => (s.id === req.staffId ? { ...s, status: 'On Duty' } : s)))
-    setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
-    if (member) logStaff('❌', `Declined ${req.type.toLowerCase()} for ${member.name}`, member.id, 'Review')
+  const runLeaveDecision = async () => {
+    const { req, action } = leaveConfirm
+    setLeaveBusy(true)
+    setLeaveError('')
+    try {
+      await authFetch('/api/owner/leave-requests', { method: 'PATCH', query: { id: req.id }, body: { action, note: leaveNote.trim() } })
+      setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
+      logStaff(action === 'approve' ? '✅' : '❌', (action === 'approve' ? 'Approved ' : 'Rejected ') + req.leaveType.toLowerCase() + ' for ' + req.name + ' (' + leaveRange(req) + ')', req.employeeId, action === 'approve' ? undefined : 'Review')
+      setLeaveConfirm(null)
+    } catch (err) {
+      setLeaveError(err.message || 'Could not save your decision.')
+      if (err.status === 409) setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
+    } finally {
+      setLeaveBusy(false)
+    }
   }
 
   const handleApproveApplicant = async (applicant) => {
@@ -2392,7 +2415,6 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
       {activeTab === 'attendance' && (
         <LeaveRequestsPanel
           requests={leaveRequests}
-          staff={staff}
           onApprove={handleApproveLeave}
           onDecline={handleDeclineLeave}
         />
@@ -2633,6 +2655,46 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
           existingIds={[...staff, ...applicants].map((s) => s.employeeId).filter(Boolean)}
         />
       )}
+      {leaveConfirm && (
+        <div className="os-modal-backdrop" onClick={closeLeaveConfirm}>
+          <div className="os-reject-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="os-reject-top">
+              {leaveConfirm.action === 'approve'
+                ? <div className="os-success-check" style={{ margin: 0 }}><CheckCircleIcon /></div>
+                : <div className="os-reject-icon"><AlertCircleIcon /></div>}
+              <button className="os-reject-close" onClick={closeLeaveConfirm} disabled={leaveBusy} aria-label="Close">✕</button>
+            </div>
+            <h3 className="os-reject-title">{leaveConfirm.action === 'approve' ? 'Approve this leave request?' : 'Reject this leave request?'}</h3>
+            <div className="os-reject-card">
+              <div className="os-ap-detail-avatar">{initialsFromName(leaveConfirm.req.name)}</div>
+              <div>
+                <div className="os-reject-card-name">{leaveConfirm.req.name}</div>
+                <div className="os-reject-card-sub">{leaveConfirm.req.leaveType} · {leaveRange(leaveConfirm.req)} · {leaveConfirm.req.days} day{leaveConfirm.req.days > 1 ? 's' : ''}</div>
+              </div>
+            </div>
+            <p className="os-hire-desc" style={{ margin: '12px 0' }}>
+              {leaveConfirm.action === 'approve'
+                ? 'The therapist will be notified that their leave is approved. This decision cannot be changed afterwards.'
+                : 'The therapist will be notified that their request was declined, along with your reason. This decision cannot be changed afterwards.'}
+            </p>
+            <div className="os-reject-field">
+              <label>
+                {leaveConfirm.action === 'approve' ? 'Note to therapist' : 'Reason for rejecting'}{' '}
+                {leaveConfirm.action === 'approve' ? <span className="os-reject-optional">(optional)</span> : <span className="os-reject-req">*</span>}
+              </label>
+              <textarea className="os-reject-textarea" maxLength={500} value={leaveNote} onChange={(e) => setLeaveNote(e.target.value)} placeholder={leaveConfirm.action === 'approve' ? 'Add a short note' : 'Tell the therapist why'} />
+            </div>
+            {leaveError && <p role="alert" style={{ color: '#dc2626', fontSize: 13, margin: '0 0 8px' }}>{leaveError}</p>}
+            <div className="os-reject-footer">
+              <button className="os-reject-cancel" onClick={closeLeaveConfirm} disabled={leaveBusy}>Cancel</button>
+              {leaveConfirm.action === 'approve'
+                ? <button className="os-ap-approve" onClick={runLeaveDecision} disabled={leaveBusy}>{leaveBusy ? 'Approving…' : 'Approve leave'}</button>
+                : <button className="os-reject-confirm" onClick={runLeaveDecision} disabled={leaveBusy || !leaveNote.trim()}>{leaveBusy ? 'Rejecting…' : 'Reject leave'}</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {addSuccess && (
         <AddStaffSuccessModal
           name={addSuccess.name}

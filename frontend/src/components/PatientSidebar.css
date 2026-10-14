@@ -1,6 +1,7 @@
 .patient-sidebar {
   width: 260px;
   height: 100vh;
+  height: 100dvh; /* the visible height: 100vh is taller than a phone screen while the browser bar is showing */
   background: #f8faf9;
   border-right: 1px solid #e8f5f0;
   display: flex;
@@ -239,6 +240,12 @@
     transform: translateX(-100%);
     width: 270px;
     box-shadow: none;
+  }
+
+  /* Keep Logout reachable: the menu scrolls as one column and the bottom block clears the phone toolbar / home bar. */
+  .sidebar-nav-bottom {
+    margin-top: 0;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   .patient-sidebar.open {

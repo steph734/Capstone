@@ -1,31 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
+import { authFetch } from '../../utils/session'
 import './OwnerPatientsPage.css'
 
-const PATIENTS = [
-  { id: 1, name: 'Aira Lopez', age: 8, condition: 'Speech Delay', status: 'Active', branch: 'Main', therapist: 'Marco Reyes', avatar: 'https://i.pravatar.cc/150?img=47', lastVisit: 'Today', nextSession: 'Jul 9, 2026', sessions: 24, guardian: 'Maria Lopez', contact: '+63 912 345 6789', joined: 'Jan 15, 2026', notes: 'Responding well to structured articulation drills. Guardian reports steady progress at home.' },
-  { id: 2, name: 'Noah Cruz', age: 10, condition: 'Developmental Delay', status: 'Needs Review', branch: 'Main', therapist: 'Marco Reyes', avatar: 'https://i.pravatar.cc/150?img=11', lastVisit: 'Yesterday', nextSession: 'Jul 8, 2026', sessions: 18, guardian: 'Roberto Cruz', contact: '+63 920 876 5432', joined: 'Feb 10, 2026', notes: 'Progress has plateaued this month. Care team recommends a plan review at next check-in.' },
-  { id: 3, name: 'Mika Santos', age: 6, condition: 'Articulation Disorder', status: 'Active', branch: 'Main', therapist: 'Marco Reyes', avatar: 'https://i.pravatar.cc/150?img=45', lastVisit: '2 days ago', nextSession: 'Jul 10, 2026', sessions: 31, guardian: 'Ana Santos', contact: '+63 917 234 5678', joined: 'Nov 3, 2025', notes: 'Now forming 3–4 word sentences consistently. Continue current speech exercise plan.' },
-  { id: 4, name: 'Lily Santos', age: 9, condition: 'Speech Delay', status: 'Active', branch: 'North', therapist: 'Jade Tan', avatar: 'https://i.pravatar.cc/150?img=32', lastVisit: 'Today', nextSession: 'Jul 9, 2026', sessions: 20, guardian: 'Carmen Santos', contact: '+63 918 222 4455', joined: 'Dec 1, 2025', notes: 'Vocabulary expanding well. Guardian engaged and reinforcing exercises at home.' },
-  { id: 5, name: 'Jasper Reyes', age: 11, condition: 'Motor Delay', status: 'Active', branch: 'North', therapist: 'Jade Tan', avatar: 'https://i.pravatar.cc/150?img=14', lastVisit: 'Yesterday', nextSession: 'Jul 8, 2026', sessions: 28, guardian: 'Elena Reyes', contact: '+63 921 333 8899', joined: 'Oct 20, 2025', notes: 'Gross motor coordination improving steadily with weekly PT sessions.' },
-  { id: 6, name: 'Sofia Reyes', age: 12, condition: 'Anxiety Disorder', status: 'Active', branch: 'North', therapist: 'Jade Tan', avatar: 'https://i.pravatar.cc/150?img=49', lastVisit: 'Jul 3, 2026', nextSession: 'Jul 10, 2026', sessions: 42, guardian: 'Carmen Reyes', contact: '+63 918 654 3210', joined: 'Sep 20, 2025', notes: 'Applying coping strategies independently at school. Beginning discharge planning.' },
-  { id: 7, name: 'Emma Villanueva', age: 9, condition: 'PTSD', status: 'Critical', branch: 'Cebu', therapist: 'Andre Lim', avatar: 'https://i.pravatar.cc/150?img=44', lastVisit: 'Jun 25, 2026', nextSession: 'Jul 5, 2026', sessions: 15, guardian: 'Lisa Villanueva', contact: '+63 921 999 8877', joined: 'Mar 1, 2026', notes: 'Sleep disturbances continue. Care team escalated for supervision review this week.' },
-  { id: 8, name: 'Carlos Mendez', age: 11, condition: 'Down Syndrome', status: 'Active', branch: 'Cebu', therapist: 'Andre Lim', avatar: 'https://i.pravatar.cc/150?img=13', lastVisit: 'Jul 2, 2026', nextSession: 'Jul 9, 2026', sessions: 28, guardian: 'Pedro Mendez', contact: '+63 916 444 5566', joined: 'Oct 12, 2025', notes: 'Adaptive skills and communication improving. Guardian highly engaged.' },
-  { id: 9, name: 'Isabella Park', age: 5, condition: 'Selective Mutism', status: 'Active', branch: 'Cebu', therapist: 'Andre Lim', avatar: 'https://i.pravatar.cc/150?img=48', lastVisit: 'Jun 29, 2026', nextSession: 'Jul 6, 2026', sessions: 22, guardian: 'Jenny Park', contact: '+63 919 777 6655', joined: 'Jan 8, 2026', notes: 'Now speaking in full sentences with familiar adults. Generalizing to school setting.' },
-  { id: 10, name: 'Maya Torres', age: 7, condition: 'Autism Spectrum Disorder', status: 'Critical', branch: 'Main', therapist: 'Marco Reyes', avatar: 'https://i.pravatar.cc/150?img=46', lastVisit: 'Jun 20, 2026', nextSession: 'Jul 5, 2026', sessions: 12, guardian: 'Rosa Torres', contact: '+63 922 555 4433', joined: 'Apr 14, 2026', notes: 'Regression observed over the past two weeks. Urgent review scheduled with care team.' },
-  { id: 11, name: 'Liam Tan', age: 7, condition: 'Dyslexia', status: 'Active', branch: 'North', therapist: 'Jade Tan', avatar: 'https://i.pravatar.cc/150?img=15', lastVisit: 'Jun 30, 2026', nextSession: 'Jul 7, 2026', sessions: 20, guardian: 'Kevin Tan', contact: '+63 915 111 2233', joined: 'Dec 5, 2025', notes: 'Steady improvement in phonological awareness. School accommodations in place.' },
-  { id: 12, name: 'Jake Rivera', age: 8, condition: 'ADHD', status: 'Needs Review', branch: 'Cebu', therapist: 'Andre Lim', avatar: 'https://i.pravatar.cc/150?img=12', lastVisit: 'Jul 1, 2026', nextSession: 'Jul 8, 2026', sessions: 19, guardian: 'Diana Rivera', contact: '+63 913 321 0987', joined: 'Feb 28, 2026', notes: 'Impulse control improving but organizational skills still need reinforcement.' },
-]
-
+// Clinical status isn't tracked, so status reflects activity: a session in the last 60 days
+// or one booked ahead (Active), no recent sessions (Inactive), or never booked (New).
 const STATUS_CONFIG = {
-  Active:         { cls: 'op-pill-green', dot: 'op-dot-green' },
-  'Needs Review': { cls: 'op-pill-yellow', dot: 'op-dot-yellow' },
-  Critical:       { cls: 'op-pill-red', dot: 'op-dot-red' },
+  Active:   { cls: 'op-pill-green', dot: 'op-dot-green' },
+  Inactive: { cls: 'op-pill-yellow', dot: 'op-dot-yellow' },
+  New:      { cls: 'op-pill-green', dot: 'op-dot-green' },
 }
 
-const BRANCHES = ['All', 'Main', 'North', 'Cebu']
-const FILTERS = ['All', 'Active', 'Needs Review', 'Critical']
+const FILTERS = ['All', 'Active', 'Inactive', 'New']
+
+const fmtDate = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
+function fmtVisit(iso) {
+  if (!iso) return '—'
+  const days = Math.round((new Date(new Date().toDateString()) - new Date(`${iso}T00:00:00`)) / 86400000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 14) return `${days} days ago`
+  return fmtDate(iso)
+}
+const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
+
+function Avatar({ patient, className, size }) {
+  const [broken, setBroken] = useState(false)
+  if (patient.avatar && !broken) return <img src={patient.avatar} alt={patient.name} className={className} onError={() => setBroken(true)} />
+  return (
+    <span className={className} style={{ width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#e8f5f0', color: '#2c4a3e', fontWeight: 800, fontSize: size * 0.36 }} role="img" aria-label={patient.name}>
+      {initials(patient.name)}
+    </span>
+  )
+}
 
 function ProfileModal({ patient, onClose }) {
   const sc = STATUS_CONFIG[patient.status] || STATUS_CONFIG.Active
@@ -34,9 +42,9 @@ function ProfileModal({ patient, onClose }) {
       <div className="op-profile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="op-profile-hero">
           <button className="op-profile-close" onClick={onClose} aria-label="Close">✕</button>
-          <img src={patient.avatar} alt={patient.name} className="op-profile-avatar" />
+          <Avatar patient={patient} className="op-profile-avatar" size={88} />
           <h2 className="op-profile-name">{patient.name}</h2>
-          <p className="op-profile-meta">Age {patient.age} &nbsp;·&nbsp; {patient.condition}</p>
+          <p className="op-profile-meta">{patient.age != null ? `Age ${patient.age}` : 'Age not recorded'}{patient.condition ? <> &nbsp;·&nbsp; {patient.condition}</> : null}</p>
           <span className={`op-pill ${sc.cls}`}>{patient.status}</span>
         </div>
 
@@ -45,23 +53,23 @@ function ProfileModal({ patient, onClose }) {
           <div className="op-detail-grid">
             <div className="op-detail-row">
               <span className="op-detail-lbl">Branch</span>
-              <span className="op-detail-val">{patient.branch}</span>
+              <span className="op-detail-val">{patient.branch || 'Unassigned'}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Assigned Therapist</span>
-              <span className="op-detail-val">{patient.therapist}</span>
+              <span className="op-detail-val">{patient.therapist || 'Not assigned'}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Guardian</span>
-              <span className="op-detail-val">{patient.guardian}</span>
+              <span className="op-detail-val">{patient.guardian || '—'}{patient.guardianRelationship ? ` (${patient.guardianRelationship})` : ''}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Contact</span>
-              <span className="op-detail-val">{patient.contact}</span>
+              <span className="op-detail-val">{patient.contact || '—'}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Joined</span>
-              <span className="op-detail-val">{patient.joined}</span>
+              <span className="op-detail-val">{fmtDate(patient.joined)}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Total Sessions</span>
@@ -69,16 +77,19 @@ function ProfileModal({ patient, onClose }) {
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Last Visit</span>
-              <span className="op-detail-val">{patient.lastVisit}</span>
+              <span className="op-detail-val">{fmtVisit(patient.lastVisit)}</span>
             </div>
             <div className="op-detail-row">
               <span className="op-detail-lbl">Next Session</span>
-              <span className="op-detail-val">{patient.nextSession}</span>
+              <span className="op-detail-val">{fmtDate(patient.nextSession)}</span>
             </div>
           </div>
 
-          <h4 className="op-section-title" style={{ marginTop: 20 }}>Clinical Notes</h4>
-          <p className="op-notes-box">{patient.notes}</p>
+          <div className="op-detail-grid" style={{ marginTop: 12 }}>
+            <div className="op-detail-row"><span className="op-detail-lbl">Email</span><span className="op-detail-val">{patient.email || '—'}</span></div>
+            <div className="op-detail-row"><span className="op-detail-lbl">Address</span><span className="op-detail-val">{patient.address || '—'}</span></div>
+          </div>
+          <p className="op-notes-box" style={{ marginTop: 16 }}>Clinical notes are encrypted and only visible to the assigned therapist.</p>
         </div>
 
         <div className="op-modal-footer">
@@ -94,20 +105,35 @@ export default function OwnerPatientsPage({ user, onLogout, betaTier }) {
   const [filter, setFilter] = useState('All')
   const [branch, setBranch] = useState('All')
   const [profilePt, setProfilePt] = useState(null)
+  const [patients, setPatients] = useState([])
+  const [branchNames, setBranchNames] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const filtered = PATIENTS.filter((p) => {
+  const load = () => {
+    setLoading(true)
+    setError('')
+    authFetch('/api/owner/patients')
+      .then((d) => { setPatients(d.patients); setBranchNames(d.branches) })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }
+  useEffect(load, [])
+  const BRANCHES = useMemo(() => ['All', ...branchNames], [branchNames])
+
+  const filtered = patients.filter((p) => {
     const q = search.toLowerCase()
-    const matchSearch = p.name.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q)
+    const matchSearch = p.name.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q) || p.guardian.toLowerCase().includes(q)
     const matchFilter = filter === 'All' || p.status === filter
     const matchBranch = branch === 'All' || p.branch === branch
     return matchSearch && matchFilter && matchBranch
   })
 
   const counts = {
-    total: PATIENTS.length,
-    active: PATIENTS.filter((p) => p.status === 'Active').length,
-    review: PATIENTS.filter((p) => p.status === 'Needs Review').length,
-    critical: PATIENTS.filter((p) => p.status === 'Critical').length,
+    total: patients.length,
+    active: patients.filter((p) => p.status === 'Active').length,
+    review: patients.filter((p) => p.status === 'Inactive').length,
+    critical: patients.filter((p) => p.status === 'New').length,
   }
 
   return (
@@ -133,12 +159,12 @@ export default function OwnerPatientsPage({ user, onLogout, betaTier }) {
         <div className="op-stat-sep" />
         <div className="op-stat-item op-stat-review">
           <span className="op-stat-num">{counts.review}</span>
-          <span className="op-stat-lbl">Needs Review</span>
+          <span className="op-stat-lbl">Inactive</span>
         </div>
         <div className="op-stat-sep" />
-        <div className="op-stat-item op-stat-critical">
+        <div className="op-stat-item op-stat-active">
           <span className="op-stat-num">{counts.critical}</span>
-          <span className="op-stat-lbl">Critical</span>
+          <span className="op-stat-lbl">New (no sessions)</span>
         </div>
       </div>
 
@@ -150,14 +176,14 @@ export default function OwnerPatientsPage({ user, onLogout, betaTier }) {
           </svg>
           <input
             className="op-search"
-            placeholder="Search by name or condition…"
+            placeholder="Search by name, condition or guardian…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select className="op-branch-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
           {BRANCHES.map((b) => (
-            <option key={b} value={b}>{b === 'All' ? 'All Branches' : `${b} Branch`}</option>
+            <option key={b} value={b}>{b === 'All' ? 'All Branches' : b}</option>
           ))}
         </select>
         <div className="op-filter-tabs">
@@ -171,38 +197,42 @@ export default function OwnerPatientsPage({ user, onLogout, betaTier }) {
 
       {/* Patient Cards */}
       <div className="op-patients-grid">
-        {filtered.length === 0 ? (
-          <p className="op-empty">No patients match your search.</p>
+        {loading ? (
+          <p className="op-empty">Loading patients…</p>
+        ) : error ? (
+          <p className="op-empty">{error} <button type="button" className="op-action-btn" style={{ width: 'auto', padding: '6px 14px' }} onClick={load}>Try again</button></p>
+        ) : filtered.length === 0 ? (
+          <p className="op-empty">{patients.length ? 'No patients match your search.' : 'No patients have been recorded yet.'}</p>
         ) : filtered.map((p) => {
           const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.Active
           return (
             <div key={p.id} className="op-patient-card">
               <div className="op-card-top">
                 <div className="op-avatar-wrap">
-                  <img src={p.avatar} alt={p.name} className="op-avatar" />
+                  <Avatar patient={p} className="op-avatar" size={54} />
                   <span className={`op-status-dot ${sc.dot}`} />
                 </div>
                 <div className="op-card-info">
                   <h3 className="op-patient-name">{p.name}</h3>
-                  <span className="op-patient-age">Age {p.age}</span>
+                  <span className="op-patient-age">{p.age != null ? `Age ${p.age}` : 'Age not recorded'}</span>
                 </div>
                 <span className={`op-pill ${sc.cls}`}>{p.status}</span>
               </div>
 
               <div className="op-badge-row">
-                <span className="op-condition-badge">{p.condition}</span>
-                <span className="op-branch-badge">{p.branch}</span>
+                {p.condition && <span className="op-condition-badge">{p.condition}</span>}
+                <span className="op-branch-badge">{p.branch || 'Unassigned'}</span>
               </div>
-              <p className="op-therapist-line">Therapist: <strong>{p.therapist}</strong></p>
+              <p className="op-therapist-line">Therapist: <strong>{p.therapist || 'Not assigned'}</strong></p>
 
               <div className="op-session-info">
                 <div className="op-session-item">
                   <span className="op-session-lbl">Last Visit</span>
-                  <span className="op-session-val">{p.lastVisit}</span>
+                  <span className="op-session-val">{fmtVisit(p.lastVisit)}</span>
                 </div>
                 <div className="op-session-item">
                   <span className="op-session-lbl">Next Session</span>
-                  <span className="op-session-val">{p.nextSession}</span>
+                  <span className="op-session-val">{fmtDate(p.nextSession)}</span>
                 </div>
                 <div className="op-session-item">
                   <span className="op-session-lbl">Sessions</span>

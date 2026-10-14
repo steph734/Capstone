@@ -90,6 +90,7 @@ import ownerGamifiedLibrary from './_lib/routes/owner-gamified-library.js'
 import ownerGameRequests from './_lib/routes/owner-game-requests.js'
 import ownerGameRequestItem from './_lib/routes/owner-game-request-item.js'
 import adminGameRequests from './_lib/routes/admin-game-requests.js'
+import ownerLeaveRequests from './_lib/routes/owner-leave-requests.js'
 import notifications from './_lib/routes/notifications.js'
 import faq from './_lib/routes/faq.js'
 import support from './_lib/routes/support.js'
@@ -119,6 +120,7 @@ import employeesPhoto from './_lib/routes/employees-photo.js'
 import employeesItem from './_lib/routes/employees-item.js'
 import branchesList from './_lib/routes/branches-list.js'
 import adminDashboard from './_lib/routes/admin-dashboard.js'
+import ownerPatients from './_lib/routes/owner-patients.js'
 import adminPlans from './_lib/routes/admin-plans.js'
 import adminPlanItem from './_lib/routes/admin-plan-item.js'
 import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
@@ -224,6 +226,7 @@ app.all('/api/owner/game-requests', ownerGameRequests)
 app.all('/api/admin/game-requests/:id/:action', adminGameRequests)
 app.all('/api/admin/game-requests/:id', adminGameRequests)
 app.all('/api/admin/game-requests', adminGameRequests)
+app.all('/api/owner/leave-requests', ownerLeaveRequests)
 app.all('/api/notifications', notifications)
 app.all('/api/faq/quick', faq)
 app.all('/api/faq/ask', faq)
@@ -283,6 +286,7 @@ app.all('/api/employees/:id', employeesItem)
 app.all('/api/employees', employeesCollection)
 app.all('/api/branches', branchesList)
 app.all('/api/admin/dashboard', adminDashboard)
+app.all('/api/owner/patients', ownerPatients)
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
 app.all('/api/admin/plans/:id', adminPlanItem)
 app.all('/api/admin/plans', adminPlans)

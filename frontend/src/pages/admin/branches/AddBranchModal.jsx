@@ -346,9 +346,9 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
             <button type="button" className="br-btn ghost" onClick={() => setStep((s) => s - 1)} disabled={saving}><ArrowLeft size={16} /> Back</button>
           )}
           <span className="br-spacer" />
-          <button type="button" className="br-btn outline" onClick={requestClose} disabled={saving}>Cancel</button>
+          <button type="button" className="br-btn btn-line" onClick={requestClose} disabled={saving}>Cancel</button>
           {isDraftOrNew && (
-            <button type="button" className="br-btn outline" onClick={saveDraft} disabled={saving}>Save as draft</button>
+            <button type="button" className="br-btn btn-line" onClick={saveDraft} disabled={saving}>Save as draft</button>
           )}
           {last ? (
             <button type="button" className="br-btn primary" onClick={submit} disabled={saving}>
@@ -367,7 +367,7 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
               <h3 id="br-discard-title">Discard changes?</h3>
               <p>You have unsaved changes. If you close now they will be lost.</p>
               <div className="br-confirm-actions">
-                <button type="button" className="br-btn outline" onClick={() => setConfirmDiscard(false)} autoFocus>Keep editing</button>
+                <button type="button" className="br-btn btn-line" onClick={() => setConfirmDiscard(false)} autoFocus>Keep editing</button>
                 <button type="button" className="br-btn danger" onClick={onClose}>Discard</button>
               </div>
             </div>

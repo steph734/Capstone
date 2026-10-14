@@ -3,7 +3,10 @@ import PatientSidebar from '../../components/PatientSidebar'
 import '../PageWithSidebar.css'
 import './AdminPages.css'
 
-export default function AdminPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, headerActions }) {
+// `headerActions` puts buttons on the right of the title row. `bare` drops the
+// white wrapper (and the profile badge) so the page's own cards sit directly on
+// the mint page background.
+export default function AdminPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, headerActions, bare }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -24,21 +27,23 @@ export default function AdminPageShell({ user, onLogout, title, subtitle, icon, 
           ☰
         </button>
 
-        <div className="page-header admin-page-header">
+        <div className={`page-header admin-page-header${bare && headerActions ? ' has-actions' : ''}`}>
           <div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="admin-header-actions">
             {headerActions}
-            <div className="admin-header-badge">
-              <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Super Admin'} />
-              <span>{user?.name || 'Super Admin'}</span>
-            </div>
+            {!bare && (
+              <div className="admin-header-badge">
+                <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Super Admin'} />
+                <span>{user?.name || 'Super Admin'}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="content-container admin-content-container">
+        <div className={`content-container admin-content-container${bare ? ' admin-content-bare' : ''}`}>
           {children}
         </div>
       </main>

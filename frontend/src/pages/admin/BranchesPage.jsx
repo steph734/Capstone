@@ -120,14 +120,14 @@ function BranchCard({ b, menuOpen, onMenu, onView, onEdit, onArchive, onRestore,
           {review ? (
             <>
               <button type="button" className="br-btn primary" onClick={() => onReview(b)}><ClipboardCheck size={16} /> Review application</button>
-              <button type="button" className="br-btn outline" onClick={() => onView(b)}><Eye size={16} /> View</button>
+              <button type="button" className="br-btn btn-line" onClick={() => onView(b)}><Eye size={16} /> View</button>
             </>
           ) : (
             <>
               <button type="button" className="br-btn primary" onClick={() => onView(b)}><Eye size={16} /> View branch</button>
               {archived
-                ? <button type="button" className="br-btn outline" onClick={() => onRestore(b)}><ArchiveRestore size={16} /> Restore</button>
-                : <button type="button" className="br-btn outline" onClick={() => onEdit(b)}><Pencil size={16} /> {b.status === 'Draft' ? 'Finish' : 'Edit'}</button>}
+                ? <button type="button" className="br-btn btn-line" onClick={() => onRestore(b)}><ArchiveRestore size={16} /> Restore</button>
+                : <button type="button" className="br-btn btn-line" onClick={() => onEdit(b)}><Pencil size={16} /> {b.status === 'Draft' ? 'Finish' : 'Edit'}</button>}
             </>
           )}
         </div>
@@ -219,7 +219,7 @@ function ViewDialog({ b, onClose }) {
         ) : <p className="br-hint">No hours set.</p>}
         {b.declineReason && b.status === 'Declined' && <p className="br-callout red"><X size={16} /> Declined: {b.declineReason}</p>}
       </div>
-      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn outline" onClick={onClose}>Close</button></footer>
+      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn btn-line" onClick={onClose}>Close</button></footer>
     </Dialog>
   )
 }
@@ -255,12 +255,12 @@ function ReviewDialog({ b, onClose, onDone, run }) {
         <span className="br-spacer" />
         {declining ? (
           <>
-            <button type="button" className="br-btn outline" onClick={() => { setDeclining(false); setError('') }} disabled={busy}>Back</button>
+            <button type="button" className="br-btn btn-line" onClick={() => { setDeclining(false); setError('') }} disabled={busy}>Back</button>
             <button type="button" className="br-btn danger" onClick={() => act({ action: 'decline', reason })} disabled={busy}>Decline application</button>
           </>
         ) : (
           <>
-            <button type="button" className="br-btn outline" onClick={() => setDeclining(true)} disabled={busy}>Decline</button>
+            <button type="button" className="br-btn btn-line" onClick={() => setDeclining(true)} disabled={busy}>Decline</button>
             <button type="button" className="br-btn primary" onClick={() => act({ action: 'approve' })} disabled={busy || b.missing.length > 0}>Approve and activate</button>
           </>
         )}
@@ -286,7 +286,7 @@ function ArchiveDialog({ b, restore, onClose, run, onDone }) {
       </div>
       <footer className="br-modal-foot">
         <span className="br-spacer" />
-        <button type="button" className="br-btn outline" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="br-btn btn-line" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className={`br-btn ${restore ? 'primary' : 'danger'}`} onClick={go} disabled={busy}>{restore ? 'Restore' : 'Archive'}</button>
       </footer>
     </Dialog>
@@ -473,7 +473,7 @@ export default function BranchesPage({ user, onLogout }) {
         {loading ? (
           <p className="br-empty">Loading branches…</p>
         ) : loadError ? (
-          <div className="br-empty"><p>{loadError}</p><button type="button" className="br-btn outline" onClick={() => { setLoading(true); load() }}>Try again</button></div>
+          <div className="br-empty"><p>{loadError}</p><button type="button" className="br-btn btn-line" onClick={() => { setLoading(true); load() }}>Try again</button></div>
         ) : visible.length === 0 ? (
           <div className="br-empty">
             <Building2 size={28} aria-hidden="true" />

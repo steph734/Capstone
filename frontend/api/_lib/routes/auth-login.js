@@ -23,10 +23,11 @@ async function logAudit(fields) {
   }
 }
 
-// Therapist and owner accounts hold or oversee clinical records, so a correct
+// Patient and therapist accounts hold or access clinical records, so a correct
 // password alone isn't enough: they also need the code emailed to them.
+// Super Admin and Owner accounts sign in with email and password only.
 // (REQUIRE_LOGIN_2FA=false switches this off for local development only.)
-const needsSecondFactor = (role) => (role === 'Therapist' || role === 'Owner') && String(process.env.REQUIRE_LOGIN_2FA || '').trim().toLowerCase() !== 'false'
+const needsSecondFactor = (role) => (role === 'Therapist' || role === 'Patient') && String(process.env.REQUIRE_LOGIN_2FA || '').trim().toLowerCase() !== 'false'
 
 async function issueOtp({ email, name, purpose = 'signup' }) {
   const code = generateCode()

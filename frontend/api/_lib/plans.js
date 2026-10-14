@@ -253,6 +253,7 @@ export function planBreakdown(plans, subs, accounts) {
     mrr: subs ? Math.round(live.reduce((n, s) => n + monthlyAmount(s), 0)) : null,
     mrrChange: subs ? Math.round(live.reduce((n, s) => n + monthlyAmount(s), 0) - mrrAt(now - 30 * DAY)) : null,
     subscribers: accounts.length,
+    subscribersPrev: accountsAt(accounts, now - 30 * DAY),
     subscribersChangePct: (() => { const prev = accountsAt(accounts, now - 30 * DAY); return prev > 0 ? Math.round(((accounts.length - prev) / prev) * 1000) / 10 : null })(),
   }
 }

@@ -1,5 +1,5 @@
 // POST /api/auth/verify-login-otp { email, code } -> second step of a
-// therapist / owner login. A wrong code counts toward the same five-strikes
+// patient / therapist login. A wrong code counts toward the same five-strikes
 // account lock as a wrong password.
 import { getMongo, getDb } from '../mongo.js'
 import { User } from '../models/user.js'

@@ -100,7 +100,7 @@ function DateRange({ from, to, onChange }) {
 
   return (
     <div className="sd-range" ref={wrap}>
-      <button type="button" className="br-btn outline" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setCustom({ from, to }); setOpen(!open) }}>
+      <button type="button" className="br-btn btn-line" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setCustom({ from, to }); setOpen(!open) }}>
         <Calendar size={16} aria-hidden="true" /> {label} <ChevronDown size={15} aria-hidden="true" />
       </button>
       {open && (
@@ -242,15 +242,15 @@ export default function SuperAdminDashboard({ user, onLogout }) {
       <div className="sd-page br-page">
         <div className="sd-toolbar">
           <DateRange from={from} to={to} onChange={setRange} />
-          <Link to="/admin/audit-logs" className="br-btn outline"><List size={16} aria-hidden="true" /> Review logs</Link>
-          <Link to="/admin/games-library/builder/new" className="br-btn outline"><Gamepad2 size={16} aria-hidden="true" /> Create game</Link>
+          <Link to="/admin/audit-logs" className="br-btn btn-line"><List size={16} aria-hidden="true" /> Review logs</Link>
+          <Link to="/admin/games-library/builder/new" className="br-btn btn-line"><Gamepad2 size={16} aria-hidden="true" /> Create game</Link>
           <button type="button" className="br-btn primary" onClick={openAddBranch}><Plus size={17} aria-hidden="true" /> Add branch</button>
         </div>
 
         {error && (
           <div className="br-callout red" role="alert">
             <CircleAlert size={16} aria-hidden="true" /><span>{error}</span>
-            <button type="button" className="br-btn outline sd-retry" onClick={load}>Try again</button>
+            <button type="button" className="br-btn btn-line sd-retry" onClick={load}>Try again</button>
           </div>
         )}
 
@@ -296,7 +296,7 @@ export default function SuperAdminDashboard({ user, onLogout }) {
                         <li key={a.key}>
                           <span className={`sd-ico ${ATTENTION_TONE[a.key]}`}><Icon size={18} aria-hidden="true" /></span>
                           <div><strong>{a.title}</strong>{a.detail && <small>{a.detail}</small>}</div>
-                          <button type="button" className="br-btn outline sm" onClick={() => navigate(a.to)}>{a.action}</button>
+                          <button type="button" className="br-btn btn-line sm" onClick={() => navigate(a.to)}>{a.action}</button>
                         </li>
                       )
                     })}

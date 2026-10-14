@@ -24,7 +24,7 @@ export async function buildPlansPayload(db) {
   return {
     stripeAvailable: Boolean(subs),
     stats: {
-      subscribers: { value: bd.subscribers, changePct: bd.subscribersChangePct },
+      subscribers: { value: bd.subscribers, previous: bd.subscribersPrev, changePct: bd.subscribersChangePct },
       mrr: { value: bd.mrr, change: bd.mrrChange },
       plans: { total: list.length, popular: list.find((p) => p.mostPopular)?.name || null },
       beta: { count: beta.reduce((n, p) => n + p.betaTesters.length, 0), plan: beta.length === 1 ? beta[0].name : beta.length ? `${beta.length} plans` : null },

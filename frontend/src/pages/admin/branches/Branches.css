@@ -1,4 +1,5 @@
-.br-page {
+.br-page,
+.admin-header-actions {
   --g-900: #24352d;
   --g-700: #2c4a3e;
   --g-600: #3e6354;
@@ -9,11 +10,14 @@
   --amber-line: #f3dca0;
   --amber-ink: #8a5a00;
   --red-ink: #b91c1c;
+}
+.br-page {
   color: var(--g-900);
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
+.admin-header-actions .br-btn { text-decoration: none; }
 .br-page *, .br-backdrop * { box-sizing: border-box; }
 .br-page button, .br-backdrop button { font-family: inherit; cursor: pointer; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -27,8 +31,8 @@
 .br-btn:disabled { opacity: .55; cursor: not-allowed; }
 .br-btn.primary { background: var(--g-700); color: #fff; }
 .br-btn.primary:hover:not(:disabled) { background: #1f3a30; }
-.br-btn.outline { background: #fff; color: var(--g-900); border-color: var(--line); }
-.br-btn.outline:hover:not(:disabled) { background: #f4f9f6; }
+.br-btn.btn-line { background: #fff; color: var(--g-900); border-color: var(--line); }
+.br-btn.btn-line:hover:not(:disabled) { background: #f4f9f6; }
 .br-btn.ghost { background: transparent; color: var(--muted); }
 .br-btn.danger { background: #fee2e2; color: var(--red-ink); }
 .br-btn.danger:hover:not(:disabled) { background: #fecaca; }
@@ -264,3 +268,6 @@
   .br-row-actions::before { content: none; }
 }
 @media (prefers-reduced-motion: reduce) { .br-progress div { transition: none; } }
+
+/* The app's global h1/h2 style (index.css) would otherwise tint headings inside these pages and modals. */
+.br-page h2, .br-page h3, .br-backdrop h2, .br-backdrop h3 { color: #24352d; font-family: inherit; letter-spacing: 0; }

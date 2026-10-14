@@ -12,7 +12,7 @@ export function Dialog({ title, icon: Icon, onClose, wide, children }) {
   }, [onClose])
   return (
     <div className="br-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={`br-modal small${wide ? ' wide sp-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`br-modal small${wide ? ' wide pcx-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <header className="br-modal-head">
           {Icon && <span className="br-tile dark"><Icon size={22} aria-hidden="true" /></span>}
           <div><h2>{title}</h2></div>
@@ -45,19 +45,19 @@ export function SubscribersDialog({ plan, onClose }) {
     <Dialog title={plan ? `${plan.name} subscribers` : 'All subscribers'} icon={Users} onClose={onClose} wide>
       <div className="br-modal-body">
         {!state.available && <p className="br-callout"><span>Paid subscribers come from Stripe, which could not be reached. Only the list of Free accounts is shown.</span></p>}
-        <label className="br-search sp-search"><Search size={16} aria-hidden="true" /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…" aria-label="Search subscribers" /></label>
+        <label className="br-search pcx-search"><Search size={16} aria-hidden="true" /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…" aria-label="Search subscribers" /></label>
         {state.loading ? <p className="br-hint">Loading…</p> : state.error ? <p className="br-form-error" role="alert">{state.error}</p> : rows.length === 0 ? (
           <p className="br-hint">No subscribers match.</p>
         ) : (
-          <div className="sp-table-wrap">
-            <table className="sp-table">
+          <div className="pcx-table-wrap">
+            <table className="pcx-table">
               <thead><tr><th scope="col">Subscriber</th><th scope="col">Plan</th><th scope="col">Status</th><th scope="col">Since</th><th scope="col">Renews</th><th scope="col">Monthly</th></tr></thead>
               <tbody>
                 {rows.slice(0, 200).map((r, i) => (
                   <tr key={`${r.email}-${i}`}>
                     <th scope="row"><span>{r.name}</span><small>{r.email}</small></th>
                     <td>{r.plan}</td>
-                    <td><span className={`sp-pill ${r.status === 'active' || r.status === 'free' ? 'green' : r.status === 'past_due' ? 'red' : 'gray'} soft`}>{r.status.replace('_', ' ')}</span></td>
+                    <td><span className={`pcx-pill ${r.status === 'active' || r.status === 'free' ? 'green' : r.status === 'past_due' ? 'red' : 'gray'} soft`}>{r.status.replace('_', ' ')}</span></td>
                     <td>{fmtDate(r.since)}</td>
                     <td>{fmtDate(r.renews)}</td>
                     <td>{r.monthly ? peso(r.monthly) : '—'}</td>
@@ -69,7 +69,7 @@ export function SubscribersDialog({ plan, onClose }) {
           </div>
         )}
       </div>
-      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn outline" onClick={onClose}>Close</button></footer>
+      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn btn-line" onClick={onClose}>Close</button></footer>
     </Dialog>
   )
 }
@@ -97,7 +97,7 @@ export function BetaDialog({ plan, onClose, onSaved }) {
     <Dialog title={`${plan.name} beta testers`} icon={FlaskConical} onClose={onClose}>
       <div className="br-modal-body">
         <p className="br-hint" style={{ marginTop: 0 }}>Beta plans are only visible to these accounts. Each email must belong to an existing TherapyPro account.</p>
-        <div className="sp-add-feature">
+        <div className="pcx-add-feature">
           <div className={`br-input${error ? ' has-error' : ''}`}>
             <input type="email" value={input} placeholder="tester@example.com" aria-label="Tester email" autoFocus onChange={(e) => { setInput(e.target.value); setError('') }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
@@ -106,16 +106,16 @@ export function BetaDialog({ plan, onClose, onSaved }) {
         </div>
         {error && <p className="br-error" role="alert">{error}</p>}
         {emails.length === 0 ? <p className="br-hint">No beta testers yet.</p> : (
-          <ul className="sp-tester-list">
+          <ul className="pcx-tester-list">
             {emails.map((e) => (
-              <li key={e}><span>{e}</span><button type="button" className="sp-icon-btn" aria-label={`Remove ${e}`} onClick={() => setEmails(emails.filter((x) => x !== e))}><X size={15} /></button></li>
+              <li key={e}><span>{e}</span><button type="button" className="pcx-icon-btn" aria-label={`Remove ${e}`} onClick={() => setEmails(emails.filter((x) => x !== e))}><X size={15} /></button></li>
             ))}
           </ul>
         )}
       </div>
       <footer className="br-modal-foot">
         <span className="br-spacer" />
-        <button type="button" className="br-btn outline" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="br-btn btn-line" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="br-btn primary" onClick={save} disabled={busy}>Save testers</button>
       </footer>
     </Dialog>
@@ -137,7 +137,7 @@ export function DeleteDialog({ plan, onClose, onDeleted }) {
       </div>
       <footer className="br-modal-foot">
         <span className="br-spacer" />
-        <button type="button" className="br-btn outline" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="br-btn btn-line" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="br-btn danger" onClick={go} disabled={busy}>Delete plan</button>
       </footer>
     </Dialog>
@@ -171,7 +171,7 @@ export function FeaturesDialog({ features, plans, onClose, onChanged }) {
     <Dialog title="Edit features" icon={ListChecks} onClose={onClose} wide>
       <div className="br-modal-body">
         <p className="br-hint" style={{ marginTop: 0 }}>These features are shared by every plan. Rename them or set the lowest plan that includes them. Tick them on each plan with Edit plan.</p>
-        <ul className="sp-edit-features">
+        <ul className="pcx-edit-features">
           {rows.map((f) => (
             <li key={f.id}>
               <input defaultValue={f.label} maxLength={60} aria-label={`Name of ${f.label}`}
@@ -182,17 +182,17 @@ export function FeaturesDialog({ features, plans, onClose, onChanged }) {
                 <option value="all">All plans</option>
                 {plans.map((p) => <option key={p.slug} value={p.slug}>{tierTag({ minTier: p.slug }, plans)}</option>)}
               </select>
-              <button type="button" className="sp-icon-btn" disabled={used(f.key)} aria-label={`Delete ${f.label}`} title={used(f.key) ? 'A plan still includes this feature' : 'Delete feature'} onClick={() => remove(f)}><Trash2 size={15} /></button>
+              <button type="button" className="pcx-icon-btn" disabled={used(f.key)} aria-label={`Delete ${f.label}`} title={used(f.key) ? 'A plan still includes this feature' : 'Delete feature'} onClick={() => remove(f)}><Trash2 size={15} /></button>
             </li>
           ))}
         </ul>
-        <div className="sp-add-feature" style={{ marginTop: 12 }}>
+        <div className="pcx-add-feature" style={{ marginTop: 12 }}>
           <div className="br-input"><input value={newLabel} placeholder="New feature name" aria-label="New feature name" maxLength={60} onChange={(e) => setNewLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} /></div>
           <button type="button" className="br-btn primary sm" onClick={add}><Plus size={15} /> Add</button>
         </div>
         {error && <p className="br-form-error" role="alert">{error}</p>}
       </div>
-      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn outline" onClick={onClose}>Done</button></footer>
+      <footer className="br-modal-foot"><span className="br-spacer" /><button type="button" className="br-btn btn-line" onClick={onClose}>Done</button></footer>
     </Dialog>
   )
 }

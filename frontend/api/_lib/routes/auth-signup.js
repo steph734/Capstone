@@ -71,10 +71,18 @@ export default async function handler(req, res) {
       console.error('signup OTP send failed, rolling back user:', mailErr.message)
       await User.deleteOne({ _id: user._id }).catch(() => {})
       await EmailOtp.deleteOne({ email, purpose: 'signup' }).catch(() => {})
+      // The most common cause is that the recipient email address has been
+      // previously blocked by our email provider (e.g. a bounce or spam
+      // report). Give the user a clearer message so they can try a different
+      // address rather than retrying indefinitely with the same one.
+      const isBlocked = /blocked|unsubscribed|bounce/i.test(mailErr.message)
       return res.status(502).json({
-        error: 'Could not send the verification email. Please try again in a moment.',
+        error: isBlocked
+          ? 'We could not send a verification email to that address — it may have been marked as undeliverable. Please try signing up with a different email address.'
+          : 'Could not send the verification email. Please try again in a moment.',
       })
     }
+
 
     return res.status(201).json({
       success: true,

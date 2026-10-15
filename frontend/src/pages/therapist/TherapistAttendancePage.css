@@ -9,6 +9,9 @@
 .ta-status-ontime { background: #dcfce7; color: #166534; }
 .ta-status-active  { background: #eff6ff; color: #3b82f6; }
 .ta-status-late    { background: #fef3c7; color: #92400e; }
+.ta-leave-pending  { background: #fef3c7; color: #92400e; }
+.ta-leave-approved { background: #dcfce7; color: #166534; }
+.ta-leave-rejected { background: #fee2e2; color: #991b1b; }
 
 .ta-empty-state {
   display: flex;

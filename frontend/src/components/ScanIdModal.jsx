@@ -30,8 +30,11 @@ async function apiPost(path, body) {
 // Restricting formats (vs. every format the detector supports) keeps the
 // scan loop cheap and avoids false positives from unrelated codes in frame.
 // Mirrors the server rule (api/_lib/routes/attendance-scan.js): only BrickPath cards.
-const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-d{4,10}$/
-const INVALID_MESSAGE = 'Invalid ID. This scanner only accepts BrickPath staff ID cards issued by TherapyPro.'
+const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-\d{4,10}$/
+// Decoders can leave stray whitespace, control or zero-width characters around a code.
+// eslint-disable-next-line no-control-regex
+const cleanCode = (v) => String(v || '').replace(/[\u0000-\u001f\u007f\u200b-\u200d\ufeff\s]+/g, '').toUpperCase()
+const INVALID_MESSAGE = 'Invalid ID card. Please try another ID card.'
 
 const SCAN_OPTIONS = { formats: ['code_128', 'qr_code'], delay: 350 }
 
@@ -112,13 +115,17 @@ function ScanIdModal({ onClose, onLogged }) {
 
   const handleCapture = (barcodes) => {
     if (busyRef.current || !barcodes?.length) return
-    const code = (barcodes[0].rawValue || '').trim()
-    if (!code) return
+    // A camera pointed at a screen often decodes several symbols per frame (some of
+    // them stray fragments), so look at every one and take the first real BrickPath code.
+    const reads = barcodes.map((b) => cleanCode(b.rawValue)).filter(Boolean)
+    if (!reads.length) return
+    const code = reads.find((r) => BRICKPATH_CODE.test(r)) || reads[0]
 
     busyRef.current = true
     // Anything that isn't a BrickPath card code (national ID QR, other barcodes…)
     // is rejected on the spot, without calling the server.
     if (!BRICKPATH_CODE.test(code)) {
+      console.debug('Rejected scan:', code)
       setNotFoundCode(INVALID_MESSAGE)
       setPhase('invalid')
       setTimeout(() => {

@@ -32,7 +32,13 @@ async function apiPost(path, body) {
 // definition — 9:00 AM is a simple, visible stand-in cutoff used only for the
 // punctuality stat/pill/dot, not a configured business rule.
 const LATE_CUTOFF_MINUTES = 9 * 60
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const LEAVE_STATUS_LABEL = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }
+
+function leaveDays(start, end) {
+  return Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000) + 1
+}
+
+const WEEKDAY_LABELS =['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -104,7 +110,6 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
 
   const [leaveRequests, setLeaveRequests] = useState([])
   const [showLeaveModal, setShowLeaveModal] = useState(false)
-  const [leaveNote, setLeaveNote] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -225,9 +230,6 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
       reason,
     })
     setLeaveRequests((prev) => [created, ...prev])
-    setShowLeaveModal(false)
-    setLeaveNote(`Leave request submitted — awaiting the owner's approval.`)
-    setTimeout(() => setLeaveNote(''), 6000)
   }
 
   const monthLabel = new Date(viewedMonth.year, viewedMonth.month, 1)
@@ -407,8 +409,6 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
               </div>
             </div>
 
-            {leaveNote && <p className="ta-leave-note">✓ {leaveNote}</p>}
-
             {viewedAvailabilityLoading ? (
               <p className="ta-avail-empty-note">Loading…</p>
             ) : plannedSlots.length > 0 ? (
@@ -502,6 +502,45 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
                 <span><i className="ta-calendar-dot ta-calendar-dot-leave" /> On leave</span>
               </div>
               <p className="ta-calendar-total">{monthLabel} total: {monthStats.present} day{monthStats.present === 1 ? '' : 's'} logged</p>
+            </div>
+          </div>
+
+          <div className="admin-panel">
+            <div className="admin-panel-header">
+              <div>
+                <h3>My leave requests</h3>
+                <p>Decisions made by the owner appear here.</p>
+              </div>
+            </div>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Dates</th>
+                    <th>Days</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Owner's note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaveRequests.length === 0 ? (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: '#6b7c75' }}>You haven't requested any leave yet.</td></tr>
+                  ) : leaveRequests.map((r) => (
+                    <tr key={r.id}>
+                      <td data-label="Type">{r.leaveType}</td>
+                      <td data-label="Dates">{r.startDate === r.endDate ? formatDate(r.startDate) : `${formatDate(r.startDate)} – ${formatDate(r.endDate)}`}</td>
+                      <td data-label="Days">{leaveDays(r.startDate, r.endDate)}</td>
+                      <td data-label="Reason">{r.reason || '—'}</td>
+                      <td data-label="Status">
+                        <span className={`ta-status-pill ta-leave-${r.status}`}>{LEAVE_STATUS_LABEL[r.status] || r.status}</span>
+                      </td>
+                      <td data-label="Owner's note">{r.reviewNote || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 

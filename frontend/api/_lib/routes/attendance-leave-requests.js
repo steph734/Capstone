@@ -57,6 +57,8 @@ async function handleGet(req, res) {
         reason: r.reason,
         status: r.status,
         requestedAt: r.requested_at,
+        reviewNote: r.review_note || null,
+        reviewedAt: r.reviewed_at || null,
       })),
     })
   } catch (err) {

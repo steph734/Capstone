@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
 import { saveAudioBlob, getAudioBlob, deleteAudioBlob, newAudioKey } from '../utils/recordingsDb'
+import { pickRecorderMime, extensionForMime, blobToWavBlob, canDecodeAudio } from '../utils/audioUtils'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import PandaMascot from './games/PandaMascot'
 import {
@@ -364,12 +365,24 @@ function FullRecordingCard({ rec, index, total, cardRef, onRequestDelete, onRequ
     : -1
 
   const copyTranscript = () => navigator.clipboard?.writeText(rec.transcript || '').catch(() => {})
-  const downloadAudio = () => {
+  // Downloads a WAV copy (plays in every player, including Windows Media Player);
+  // falls back to the original file if it cannot be converted.
+  const downloadAudio = async () => {
     if (!rec.audioUrl) return
-    const a = document.createElement('a')
-    a.href = rec.audioUrl
-    a.download = `${rec.title || 'recording'}.webm`
-    a.click()
+    const save = (href, ext) => {
+      const a = document.createElement('a')
+      a.href = href
+      a.download = `${rec.title || 'recording'}.${ext}`
+      a.click()
+    }
+    try {
+      const original = await (await fetch(rec.audioUrl)).blob()
+      const wavUrl = URL.createObjectURL(await blobToWavBlob(original))
+      save(wavUrl, 'wav')
+      setTimeout(() => URL.revokeObjectURL(wavUrl), 10000)
+    } catch {
+      save(rec.audioUrl, extensionForMime(rec.mimeType))
+    }
   }
 
   return (
@@ -1327,19 +1340,29 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     }
     streamRef.current = stream
 
-    const mediaRecorder = new MediaRecorder(stream)
+    // Record in a format this browser definitely supports, and label the blob with what
+    // the recorder really produced (a wrong label makes the file unplayable).
+    const recorderMime = pickRecorderMime()
+    const mediaRecorder = new MediaRecorder(stream, recorderMime ? { mimeType: recorderMime } : undefined)
     audioChunksRef.current = []
     mediaRecorderRef.current = mediaRecorder
 
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
     mediaRecorder.onstop = async () => {
-      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+      const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || recorderMime || 'audio/webm' })
       const audioUrl = URL.createObjectURL(blob)
       const audioKey = newAudioKey()
       const finalTranscript = transcriptRef.current
       const durationSec = elapsedRef.current
       const words = wordCount(finalTranscript)
       streamRef.current?.getTracks().forEach(t => t.stop())
+
+      // Make sure the captured audio is actually playable; if the microphone was held by
+      // another app/tab the recorder can produce an empty or broken file.
+      if (!(await canDecodeAudio(blob))) {
+        console.error('Recorded audio is not playable', { size: blob.size, type: blob.type, chunks: audioChunksRef.current.length })
+        setSttError('The audio was not captured properly (the microphone may be in use by another app or tab). The transcript was saved. Close other apps using the microphone and record again.')
+      }
 
       try {
         await saveAudioBlob(audioKey, blob)
@@ -1433,7 +1456,7 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
     if (playingId === rec.id) { setPlayingId(null); return }
     if (!rec.audioUrl) return
     const audio = new Audio(rec.audioUrl)
-    audio.play(); audio.onended = () => setPlayingId(null); audio.onerror = () => setPlayingId(null)
+    audio.play().catch(() => setPlayingId(null)); audio.onended = () => setPlayingId(null); audio.onerror = () => setPlayingId(null)
     playingAudioRef.current = audio; setPlayingId(rec.id)
   }
 

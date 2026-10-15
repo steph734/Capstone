@@ -15,6 +15,18 @@ function PalmIcon() {
   )
 }
 
+function CheckIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
+function fmt(d) {
+  return new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 function dayCount(from, to) {
   if (!from || !to) return 0
   const a = new Date(`${from}T00:00:00`)
@@ -34,6 +46,7 @@ export default function LeaveRequestModal({ minDate, defaultFrom, onClose, onSub
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [submitted, setSubmitted] = useState(null)
 
   const days = useMemo(() => dayCount(from, to), [from, to])
   const valid = from && to && to >= from
@@ -49,10 +62,32 @@ export default function LeaveRequestModal({ minDate, defaultFrom, onClose, onSub
     setError('')
     try {
       await onSubmit({ leaveType, startDate: from, endDate: to, reason: reason.trim() })
+      setSubmitted({ leaveType, from, to, days })
     } catch (err) {
       setError(err.message || 'Could not submit your request.')
       setSubmitting(false)
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="lrm-backdrop" onClick={onClose}>
+        <div className="lrm-modal lrm-success" role="dialog" aria-modal="true" aria-labelledby="lrm-success-title" onClick={(e) => e.stopPropagation()}>
+          <div className="lrm-check lrm-check-success"><CheckIcon /></div>
+          <h3 className="lrm-title" id="lrm-success-title">Leave request submitted</h3>
+          <p className="lrm-sub">Your request has been sent to the owner. You'll be notified once it's approved or declined.</p>
+          <div className="lrm-summary">
+            <div><span>Type</span><b>{submitted.leaveType}</b></div>
+            <div><span>Dates</span><b>{submitted.from === submitted.to ? fmt(submitted.from) : `${fmt(submitted.from)} – ${fmt(submitted.to)}`}</b></div>
+            <div><span>Duration</span><b>{submitted.days} day{submitted.days === 1 ? '' : 's'}</b></div>
+            <div><span>Status</span><b className="lrm-pending">Pending approval</b></div>
+          </div>
+          <div className="lrm-footer">
+            <button type="button" className="lrm-btn-submit" onClick={onClose} autoFocus>Done</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

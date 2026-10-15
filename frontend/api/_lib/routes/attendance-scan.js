@@ -43,8 +43,8 @@ const BRICKPATH_PREFIX = 'BRICKPATH-'
 // The exact shape of a code on a card this app prints: BRICKPATH-<employee id>,
 // where the employee id is a letter, a dash and digits (e.g. T-893848). Anything
 // else (a national ID QR, a product barcode, a hand-typed string) is invalid.
-const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-d{4,10}$/
-const INVALID_MESSAGE = 'Invalid ID. This scanner only accepts BrickPath staff ID cards issued by TherapyPro.'
+const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-\d{4,10}$/
+const INVALID_MESSAGE = 'Invalid ID card. Please try another ID card.'
 // Employees whose card must no longer clock in.
 const INACTIVE_STATUSES = new Set(['inactive', 'terminated', 'for_review'])
 

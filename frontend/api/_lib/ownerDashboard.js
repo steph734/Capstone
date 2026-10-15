@@ -32,13 +32,18 @@ export async function buildOwnerDashboard(db) {
   const activeCutoff = new Date(now.getTime() - ACTIVE_WINDOW_DAYS * DAY)
   const nowHm = new Date(now.getTime() + PH_OFFSET_MS).toISOString().slice(11, 16)
 
-  const [apptsRecent, patients, employees, attendanceToday, attendanceHist, payments, pendingPayments, pendingLeave, recentPayments, recentAttendance] = await Promise.all([
+  const [apptStatusCounts, apptsRecent, patients, employees, attendanceToday, attendanceHist, payments, pendingPayments, pendingLeave, recentPayments, recentAttendance] = await Promise.all([
+    // Same population as the Owner Appointments page: every non-archived appointment, any status.
+    db.collection('appointments').aggregate([
+      { $match: { is_archived: { $ne: true } } },
+      { $group: { _id: '$status', n: { $sum: 1 } } },
+    ]).toArray(),
     db.collection('appointments').find(
       { is_archived: { $ne: true }, session_date: { $gte: new Date(Math.min(sixMonthsAgo.getTime(), activeCutoff.getTime())) } },
       { projection: { patient_id: 1, employee_id: 1, session_date: 1, start_time: 1, end_time: 1, status: 1, patient_name: 1, created_at: 1 } }
     ).toArray(),
     db.collection('patients').find({}, { projection: { first_name: 1, last_name: 1, created_at: 1 } }).toArray(),
-    db.collection('employees').find({}, { projection: { status: 1, first_name: 1, last_name: 1 } }).toArray(),
+    db.collection('employees').find({}, { projection: { status: 1, approved_at: 1, first_name: 1, last_name: 1 } }).toArray(),
     db.collection('attendance').find({ attendance_date: today, is_archived: { $ne: true } }, { projection: { employee: 1, type: 1 } }).toArray(),
     db.collection('attendance').aggregate([
       { $match: { type: 'time_in', is_archived: { $ne: true }, attendance_date: { $gte: phDay(now.getTime() - 14 * DAY), $lt: today } } },
@@ -90,6 +95,10 @@ export async function buildOwnerDashboard(db) {
   const clockedOut = new Set(attendanceToday.filter((a) => a.type === 'time_out').map((a) => String(a.employee)))
   const online = [...clockedIn].filter((e) => !clockedOut.has(e))
   const inSession = new Set(todays.filter((a) => a.start_time && a.end_time && a.start_time <= nowHm && nowHm < a.end_time && a.employee_id).map((a) => String(a.employee_id)))
+  // Same rule as the Owner Staff page's "Total Staff": approved hires who haven't been terminated.
+  const totalStaff = employees.filter((e) => e.approved_at && e.status !== 'terminated').length
+  const apptTotal = apptStatusCounts.reduce((n, r) => n + r.n, 0)
+  const apptByStatus = (st) => apptStatusCounts.find((r) => r._id === st)?.n || 0
   const workingStaff = employees.filter((e) => ['active', 'on_leave'].includes(e.status)).length
   const avgOnline = attendanceHist.length ? attendanceHist.reduce((n, d) => n + d.n, 0) / attendanceHist.length : null
 
@@ -147,9 +156,9 @@ export async function buildOwnerDashboard(db) {
   return {
     generatedAt: now,
     kpis: {
-      appointmentsToday: { value: todays.length, pending: pendingToday, yesterday: yesterdays.length, changePct: pct(todays.length, yesterdays.length) },
-      activePatients: { value: active, newThisMonth, newThisWeek },
-      staffOnline: { value: online.length, inSession: inSession.size, average: avgOnline == null ? null : Math.round(avgOnline * 10) / 10 },
+      totalAppointments: { value: apptTotal, today: todays.length, pending: apptByStatus('Pending'), confirmed: apptByStatus('Confirmed') },
+      totalPatients: { value: patients.length, active, newThisMonth, newThisWeek },
+      totalStaff: { value: totalStaff, online: online.length, inSession: inSession.size, average: avgOnline == null ? null : Math.round(avgOnline * 10) / 10 },
       grossSales: { value: thisMonthSales, lastMonth: lastMonthSales, changePct: pct(thisMonthSales, lastMonthSales) },
     },
     revenueTrend,

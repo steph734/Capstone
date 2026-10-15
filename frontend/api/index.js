@@ -121,6 +121,7 @@ import employeesItem from './_lib/routes/employees-item.js'
 import branchesList from './_lib/routes/branches-list.js'
 import adminDashboard from './_lib/routes/admin-dashboard.js'
 import ownerPatients from './_lib/routes/owner-patients.js'
+import ownerAppointments from './_lib/routes/owner-appointments.js'
 import ownerDashboard from './_lib/routes/owner-dashboard.js'
 import adminPlans from './_lib/routes/admin-plans.js'
 import adminPlanItem from './_lib/routes/admin-plan-item.js'
@@ -288,6 +289,7 @@ app.all('/api/employees', employeesCollection)
 app.all('/api/branches', branchesList)
 app.all('/api/admin/dashboard', adminDashboard)
 app.all('/api/owner/patients', ownerPatients)
+app.all('/api/owner/appointments', ownerAppointments)
 app.all('/api/owner/dashboard', ownerDashboard)
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
 app.all('/api/admin/plans/:id', adminPlanItem)

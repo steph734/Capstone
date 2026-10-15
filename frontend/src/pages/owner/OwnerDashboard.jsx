@@ -77,18 +77,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 // Builds the four KPI cards from the API response. A percentage is only shown when
 // the earlier figure is large enough for it to mean something; otherwise the plain change.
 function buildKpis(k) {
-  const appt = k.appointmentsToday
-  const apptDiff = appt.value - appt.yesterday
-  const apptTrend = appt.yesterday >= 10 && appt.changePct != null
-    ? { text: `${appt.changePct >= 0 ? '+' : ''}${appt.changePct}% vs yesterday`, tone: appt.changePct > 0 ? 'up' : appt.changePct < 0 ? 'down' : 'flat' }
-    : { text: apptDiff === 0 ? 'Same as yesterday' : `${apptDiff > 0 ? '+' : '−'}${Math.abs(apptDiff)} vs yesterday`, tone: apptDiff > 0 ? 'up' : apptDiff < 0 ? 'down' : 'flat' }
-
-  const staff = k.staffOnline
-  const staffDiff = staff.average == null ? 0 : staff.value - staff.average
-  const staffTrend = staff.average == null
-    ? { text: 'No average yet', tone: 'flat' }
-    : Math.abs(staffDiff) < 1 ? { text: 'On par with avg', tone: 'flat' }
-      : { text: `${staffDiff > 0 ? '+' : '−'}${Math.round(Math.abs(staffDiff))} vs avg`, tone: staffDiff > 0 ? 'up' : 'down' }
+  const appt = k.totalAppointments
+  const pts = k.totalPatients
+  const staff = k.totalStaff
 
   const sales = k.grossSales
   const salesDiff = sales.value - sales.lastMonth
@@ -97,14 +88,14 @@ function buildKpis(k) {
     : { text: salesDiff === 0 ? 'Same as last month' : `${salesDiff > 0 ? '+' : '−'}${peso(Math.abs(salesDiff))} vs last month`, tone: salesDiff > 0 ? 'up' : salesDiff < 0 ? 'down' : 'flat' }
 
   return [
-    { label: 'Appointments Today', value: String(appt.value), meta: `${appt.pending} pending confirmation`, trend: apptTrend.text, trendTone: apptTrend.tone, color: 'teal', Icon: CalendarIcon, path: '/owner/appointments' },
-    { label: 'Active Patients', value: String(k.activePatients.value), meta: `${plural(k.activePatients.newThisMonth, 'new patient', 'new patients')} this month`, trend: `+${k.activePatients.newThisWeek} this week`, trendTone: k.activePatients.newThisWeek > 0 ? 'up' : 'flat', color: 'blue', Icon: PatientsIcon, path: '/owner/patients' },
-    { label: 'Staff Online', value: String(staff.value), meta: `${staff.inSession} currently in session`, trend: staffTrend.text, trendTone: staffTrend.tone, color: 'purple', Icon: StaffIcon, path: '/owner/staff' },
+    { label: 'Total Appointments', value: String(appt.value), meta: `${appt.confirmed} confirmed · ${appt.pending} pending`, trend: `${appt.today} today`, trendTone: appt.today > 0 ? 'up' : 'flat', color: 'teal', Icon: CalendarIcon, path: '/owner/appointments' },
+    { label: 'Total Patients', value: String(pts.value), meta: `${pts.active} active · ${plural(pts.newThisMonth, 'new patient', 'new patients')} this month`, trend: `+${pts.newThisWeek} this week`, trendTone: pts.newThisWeek > 0 ? 'up' : 'flat', color: 'blue', Icon: PatientsIcon, path: '/owner/patients' },
+    { label: 'Total Staff', value: String(staff.value), meta: `${staff.online} clocked in today`, trend: `${staff.inSession} in session`, trendTone: staff.inSession > 0 ? 'up' : 'flat', color: 'purple', Icon: StaffIcon, path: '/owner/staff' },
     { label: 'Gross Sales', value: peso(sales.value), meta: 'This month', trend: salesTrend.text, trendTone: salesTrend.tone, color: 'amber', Icon: SalesIcon, path: '/owner/billing' },
   ]
 }
 
-const PLACEHOLDER_KPIS = ['Appointments Today', 'Active Patients', 'Staff Online', 'Gross Sales'].map((label, i) => ({
+const PLACEHOLDER_KPIS = ['Total Appointments', 'Total Patients', 'Total Staff', 'Gross Sales'].map((label, i) => ({
   label, value: '—', meta: 'Loading…', trend: '', trendTone: 'flat', color: ['teal', 'blue', 'purple', 'amber'][i], Icon: [CalendarIcon, PatientsIcon, StaffIcon, SalesIcon][i], path: null,
 }))
 

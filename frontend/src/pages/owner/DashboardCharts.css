@@ -507,3 +507,5 @@
 @media (max-width: 380px) {
   .viz-kpi-grid { grid-template-columns: 1fr; }
 }
+
+.viz-empty { margin: 0; padding: 18px 6px; color: #6b7c75; font-size: 14px; font-weight: 600; text-align: center; }

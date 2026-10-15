@@ -3,7 +3,7 @@ const DEFAULT_BAR_COLORS = ['#3b82f6', '#2a9d8f', '#f59e0b', '#22c55e', '#8b5cf6
 
 /* ---------- Vertical bar chart (dashed gridlines, value-on-cap, pill labels) ---------- */
 export function CategoryBarChart({ data, formatValue = (v) => v, colors = DEFAULT_BAR_COLORS, markToday = false }) {
-  const max = Math.max(...data.map((d) => d.value))
+  const max = Math.max(...data.map((d) => d.value)) || 1
 
   return (
     <div className="viz-bar-chart">
@@ -76,7 +76,7 @@ export function TrendLineChart({ data, formatValue = (v) => v, lineColor = 'var(
 
 /* ---------- Donut chart (conic-gradient ring + legend) ---------- */
 export function DonutChart({ data, centerValue, centerSub }) {
-  const total = data.reduce((sum, d) => sum + d.value, 0)
+  const total = data.reduce((sum, d) => sum + d.value, 0) || 1
   let cursor = 0
   const stops = data.map((d) => {
     const start = cursor

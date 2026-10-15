@@ -1,7 +1,9 @@
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { CategoryBarChart, TrendLineChart, DonutChart } from './DashboardCharts'
+import { authFetch } from '../../utils/session'
 import './DashboardCharts.css'
 
 // ── Icons ──────────────────────────────────────────────
@@ -54,92 +56,77 @@ function TrendDownIcon() {
   )
 }
 
-// ── Data ───────────────────────────────────────────────
-const KPI_DATA = [
-  {
-    label: 'Appointments Today',
-    value: '34',
-    meta: '6 pending confirmation',
-    trend: '+9% vs yesterday',
-    trendTone: 'up',
-    color: 'teal',
-    Icon: CalendarIcon,
-    path: '/owner/appointments',
-  },
-  {
-    label: 'Active Patients',
-    value: '218',
-    meta: '18 new intakes this month',
-    trend: '+14 this week',
-    trendTone: 'up',
-    color: 'blue',
-    Icon: PatientsIcon,
-    path: '/owner/patients',
-  },
-  {
-    label: 'Staff Online',
-    value: '19',
-    meta: '4 currently in session',
-    trend: 'On par with avg',
-    trendTone: 'flat',
-    color: 'purple',
-    Icon: StaffIcon,
-    path: '/owner/staff',
-  },
-  {
-    label: 'Gross Sales',
-    value: '₱86K',
-    meta: 'This month',
-    trend: '+8% vs last month',
-    trendTone: 'up',
-    color: 'amber',
-    Icon: SalesIcon,
-    path: '/owner/billing',
-  },
-]
+// ── Formatting ─────────────────────────────────────────
+const peso = (n) => {
+  const v = Number(n) || 0
+  if (v >= 10000) return `₱${Math.round(v / 100) / 10}K`
+  return `₱${Math.round(v).toLocaleString('en-PH')}`
+}
 
-const revenueTrend = [
-  { label: 'Feb', value: 62 },
-  { label: 'Mar', value: 68 },
-  { label: 'Apr', value: 71 },
-  { label: 'May', value: 75 },
-  { label: 'Jun', value: 80 },
-  { label: 'Jul', value: 86 },
-]
+function ago(iso) {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  if (mins < 1440) return `${Math.round(mins / 60)}h ago`
+  const days = Math.round(mins / 1440)
+  return days === 1 ? 'Yesterday' : `${days} days ago`
+}
 
-const weeklyAppointments = [
-  { label: 'Mon', value: 28 },
-  { label: 'Tue', value: 31 },
-  { label: 'Wed', value: 30 },
-  { label: 'Thu', value: 34, isToday: true },
-  { label: 'Fri', value: 33 },
-  { label: 'Sat', value: 21 },
-  { label: 'Sun', value: 9 },
-]
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
-const patientMix = [
-  { label: 'Active', value: 218, color: '#4a6b5d' },
-  { label: 'New this month', value: 18, color: 'var(--viz-series-blue)' },
-  { label: 'Inactive', value: 26, color: 'var(--viz-series-amber)' },
-]
+// Builds the four KPI cards from the API response. A percentage is only shown when
+// the earlier figure is large enough for it to mean something; otherwise the plain change.
+function buildKpis(k) {
+  const appt = k.appointmentsToday
+  const apptDiff = appt.value - appt.yesterday
+  const apptTrend = appt.yesterday >= 10 && appt.changePct != null
+    ? { text: `${appt.changePct >= 0 ? '+' : ''}${appt.changePct}% vs yesterday`, tone: appt.changePct > 0 ? 'up' : appt.changePct < 0 ? 'down' : 'flat' }
+    : { text: apptDiff === 0 ? 'Same as yesterday' : `${apptDiff > 0 ? '+' : '−'}${Math.abs(apptDiff)} vs yesterday`, tone: apptDiff > 0 ? 'up' : apptDiff < 0 ? 'down' : 'flat' }
 
-const ACTION_ITEMS = [
-  { text: 'Follow up on ₱7,400 in outstanding invoices', priority: 'high' },
-  { text: '6 appointments awaiting confirmation today', priority: 'medium' },
-  { text: 'Staffing gap tomorrow, 2:00–4:00 PM shift', priority: 'medium' },
-  { text: 'Review Q3 subscription renewal terms', priority: 'low' },
-]
+  const staff = k.staffOnline
+  const staffDiff = staff.average == null ? 0 : staff.value - staff.average
+  const staffTrend = staff.average == null
+    ? { text: 'No average yet', tone: 'flat' }
+    : Math.abs(staffDiff) < 1 ? { text: 'On par with avg', tone: 'flat' }
+      : { text: `${staffDiff > 0 ? '+' : '−'}${Math.round(Math.abs(staffDiff))} vs avg`, tone: staffDiff > 0 ? 'up' : 'down' }
 
-const ACTIVITY = [
-  { time: '1h ago', text: 'Invoice paid — ₱54,200 collected', icon: '💳' },
-  { time: '3h ago', text: 'New patient intake completed — Lily Santos', icon: '👤' },
-  { time: '4h ago', text: '19 staff clocked in for today’s shift', icon: '🧑‍⚕️' },
-  { time: 'Yesterday', text: 'Payment retry resolved — no failed cards', icon: '✅' },
-]
+  const sales = k.grossSales
+  const salesDiff = sales.value - sales.lastMonth
+  const salesTrend = sales.lastMonth >= 1000 && sales.changePct != null
+    ? { text: `${sales.changePct >= 0 ? '+' : ''}${sales.changePct}% vs last month`, tone: sales.changePct > 0 ? 'up' : sales.changePct < 0 ? 'down' : 'flat' }
+    : { text: salesDiff === 0 ? 'Same as last month' : `${salesDiff > 0 ? '+' : '−'}${peso(Math.abs(salesDiff))} vs last month`, tone: salesDiff > 0 ? 'up' : salesDiff < 0 ? 'down' : 'flat' }
+
+  return [
+    { label: 'Appointments Today', value: String(appt.value), meta: `${appt.pending} pending confirmation`, trend: apptTrend.text, trendTone: apptTrend.tone, color: 'teal', Icon: CalendarIcon, path: '/owner/appointments' },
+    { label: 'Active Patients', value: String(k.activePatients.value), meta: `${plural(k.activePatients.newThisMonth, 'new patient', 'new patients')} this month`, trend: `+${k.activePatients.newThisWeek} this week`, trendTone: k.activePatients.newThisWeek > 0 ? 'up' : 'flat', color: 'blue', Icon: PatientsIcon, path: '/owner/patients' },
+    { label: 'Staff Online', value: String(staff.value), meta: `${staff.inSession} currently in session`, trend: staffTrend.text, trendTone: staffTrend.tone, color: 'purple', Icon: StaffIcon, path: '/owner/staff' },
+    { label: 'Gross Sales', value: peso(sales.value), meta: 'This month', trend: salesTrend.text, trendTone: salesTrend.tone, color: 'amber', Icon: SalesIcon, path: '/owner/billing' },
+  ]
+}
+
+const PLACEHOLDER_KPIS = ['Appointments Today', 'Active Patients', 'Staff Online', 'Gross Sales'].map((label, i) => ({
+  label, value: '—', meta: 'Loading…', trend: '', trendTone: 'flat', color: ['teal', 'blue', 'purple', 'amber'][i], Icon: [CalendarIcon, PatientsIcon, StaffIcon, SalesIcon][i], path: null,
+}))
 
 // ── Main Component ─────────────────────────────────────
 export default function OwnerDashboard({ user, onLogout, betaTier }) {
   const navigate = useNavigate()
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(() => {
+    setError('')
+    authFetch('/api/owner/dashboard').then(setData).catch((err) => setError(err.message))
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const kpis = data ? buildKpis(data.kpis) : PLACEHOLDER_KPIS
+  const mix = data ? data.patientMix : null
+  const patientMix = mix ? [
+    { label: 'Active', value: mix.active, color: '#4a6b5d' },
+    { label: 'New (no sessions)', value: mix.new, color: 'var(--viz-series-blue)' },
+    { label: 'Inactive', value: mix.inactive, color: 'var(--viz-series-amber)' },
+  ] : []
 
   return (
     <OwnerPageShell
@@ -151,24 +138,33 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
     >
       <div className="owner-dashboard-charts">
+        {error && (
+          <div className="admin-list-item" role="alert" style={{ marginBottom: 12 }}>
+            <div><h4>Could not load the dashboard</h4><p>{error}</p></div>
+            <button type="button" className="admin-btn-secondary" onClick={load}>Try again</button>
+          </div>
+        )}
+
         {/* ── KPI Cards ── */}
         <div className="viz-kpi-grid">
-          {KPI_DATA.map(({ label, value, meta, trend, trendTone, color, Icon, path }) => (
+          {kpis.map(({ label, value, meta, trend, trendTone, color, Icon, path }) => (
             <div
               key={label}
-              className={`viz-kpi-card ${color} viz-kpi-clickable`}
-              onClick={() => navigate(path)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && navigate(path)}
+              className={`viz-kpi-card ${color} ${path ? 'viz-kpi-clickable' : ''}`}
+              onClick={path ? () => navigate(path) : undefined}
+              role={path ? 'button' : undefined}
+              tabIndex={path ? 0 : undefined}
+              onKeyDown={path ? (e) => e.key === 'Enter' && navigate(path) : undefined}
             >
               <div className="viz-kpi-top">
                 <div className="viz-kpi-icon"><Icon /></div>
-                <span className={`viz-kpi-trend ${trendTone}`}>
-                  {trendTone === 'up' && <TrendUpIcon />}
-                  {trendTone === 'down' && <TrendDownIcon />}
-                  {trend}
-                </span>
+                {trend && (
+                  <span className={`viz-kpi-trend ${trendTone}`}>
+                    {trendTone === 'up' && <TrendUpIcon />}
+                    {trendTone === 'down' && <TrendDownIcon />}
+                    {trend}
+                  </span>
+                )}
               </div>
               <div className="viz-kpi-value">{value}</div>
               <div className="viz-kpi-label">{label}</div>
@@ -188,7 +184,7 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
                 </div>
               </div>
               <div className="viz-panel-body">
-                <TrendLineChart data={revenueTrend} formatValue={(v) => `₱${v}K`} />
+                {data ? <TrendLineChart data={data.revenueTrend} formatValue={peso} /> : <p className="viz-empty">Loading…</p>}
               </div>
             </section>
 
@@ -196,11 +192,11 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
               <div className="admin-panel-header">
                 <div>
                   <h3>Weekly Appointments</h3>
-                  <p>Busiest day: Thursday, 34 booked</p>
+                  <p>{data?.busiest ? `Busiest day: ${data.busiest.label}, ${data.busiest.value} booked` : 'No appointments booked this week'}</p>
                 </div>
               </div>
               <div className="viz-panel-body">
-                <CategoryBarChart data={weeklyAppointments} markToday />
+                {data ? <CategoryBarChart data={data.weekly} markToday /> : <p className="viz-empty">Loading…</p>}
               </div>
             </section>
           </div>
@@ -213,7 +209,7 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
                   <p>Roster breakdown by status</p>
                 </div>
               </div>
-              <DonutChart data={patientMix} centerValue="262" centerSub="Patients" />
+              {mix ? <DonutChart data={patientMix} centerValue={String(mix.total)} centerSub="Patients" /> : <p className="viz-empty">Loading…</p>}
             </section>
 
             <section className="admin-panel">
@@ -224,8 +220,13 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
                 </div>
               </div>
               <div className="admin-list">
-                <div className="admin-list-item"><div><h4>Morning sessions fully booked</h4><p>Bookings at 92% capacity</p></div><span className="admin-pill green">Good</span></div>
-                <div className="admin-list-item"><div><h4>Payment processing healthy</h4><p>No failed card retries</p></div><span className="admin-pill green">OK</span></div>
+                {(data?.operations || []).map((o) => (
+                  <div key={o.title} className="admin-list-item">
+                    <div><h4>{o.title}</h4><p>{o.detail}</p></div>
+                    <span className={`admin-pill ${o.tone === 'good' ? 'green' : 'yellow'}`}>{o.pill}</span>
+                  </div>
+                ))}
+                {!data && <p className="viz-empty">Loading…</p>}
               </div>
             </section>
           </div>
@@ -241,8 +242,11 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
               </div>
             </div>
             <div className="viz-task-list">
-              {ACTION_ITEMS.map((t, i) => (
-                <div key={i} className="viz-task-row">
+              {!data && <p className="viz-empty">Loading…</p>}
+              {data && data.actionItems.length === 0 && <p className="viz-empty">Nothing needs your attention right now.</p>}
+              {(data?.actionItems || []).map((t) => (
+                <div key={t.text} className="viz-task-row" role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(t.path)} onKeyDown={(e) => e.key === 'Enter' && navigate(t.path)}>
                   <span className={`viz-task-dot ${t.priority}`} />
                   <span className="viz-task-text">{t.text}</span>
                   <span className={`viz-task-pri ${t.priority}`}>
@@ -261,12 +265,14 @@ export default function OwnerDashboard({ user, onLogout, betaTier }) {
               </div>
             </div>
             <div className="viz-activity-list">
-              {ACTIVITY.map((a, i) => (
-                <div key={i} className="viz-activity-row">
+              {!data && <p className="viz-empty">Loading…</p>}
+              {data && data.activity.length === 0 && <p className="viz-empty">No activity yet.</p>}
+              {(data?.activity || []).map((a, i) => (
+                <div key={`${a.at}-${i}`} className="viz-activity-row">
                   <div className="viz-activity-icon">{a.icon}</div>
                   <div className="viz-activity-info">
                     <div className="viz-activity-text">{a.text}</div>
-                    <div className="viz-activity-time">{a.time}</div>
+                    <div className="viz-activity-time">{ago(a.at)}</div>
                   </div>
                 </div>
               ))}

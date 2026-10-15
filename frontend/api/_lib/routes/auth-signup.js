@@ -16,7 +16,7 @@ async function issueOtp({ email, name, purpose = 'signup' }) {
   await EmailOtp.findOneAndUpdate(
     { email, purpose },
     { email, purpose, code_hash, attempts: 0, expires_at: new Date(now + OTP_TTL_MS), last_sent_at: new Date(now) },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   )
   await sendOtpEmail({ email, name, code })
 }

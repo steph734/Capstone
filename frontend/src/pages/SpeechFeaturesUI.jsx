@@ -9,6 +9,9 @@ import {
   MessageIcon, PenIcon, PlusIcon, ClockIcon, RepeatIcon, TurtleIcon, SaveIcon, ArrowLeftIcon,
 } from '../components/icons/SpeechIcons'
 
+// A recording may run for up to an hour; at the limit it stops and saves by itself.
+const MAX_RECORDING_SEC = 60 * 60
+
 // ─── "Talk to {patient}" — phrase groups, picture cues ────────────────────────
 
 const PHRASE_GROUPS = [
@@ -1158,6 +1161,13 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   const segmentsRef = useRef([])
   const elapsedRef = useRef(0)
   const playingAudioRef = useRef(null)
+  // Recording lifecycle (see startListening): true while a recording is in progress, so the
+  // speech recognizer can be restarted whenever Chrome ends its session on its own.
+  const recordingActiveRef = useRef(false)
+  const committedTranscriptRef = useRef('')
+  const restartTimerRef = useRef(null)
+  const restartFailuresRef = useRef(0)
+  const lastRecErrorRef = useRef('')
 
   const userEmail = (user?.email || '').trim().toLowerCase()
 
@@ -1315,6 +1325,26 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
   }, [])
 
   // ── Start recording ──
+  // Stop and save automatically at the time limit.
+  useEffect(() => {
+    if (isListening && elapsed >= MAX_RECORDING_SEC) {
+      setSttError('You reached the 1-hour limit, so the recording was stopped and saved.')
+      stopListening()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed, isListening])
+
+  // Warn before closing the tab mid-recording, and save whatever was captured if the page unmounts.
+  useEffect(() => {
+    const warn = (e) => { if (recordingActiveRef.current) { e.preventDefault(); e.returnValue = '' } }
+    window.addEventListener('beforeunload', warn)
+    return () => {
+      window.removeEventListener('beforeunload', warn)
+      if (recordingActiveRef.current) stopListening()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const startListening = async () => {
     if (toolsLocked) return
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -1339,14 +1369,27 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
       return
     }
     streamRef.current = stream
+    // If the microphone disappears (unplugged, taken by another app), save what we have.
+    stream.getAudioTracks().forEach((track) => {
+      track.onended = () => {
+        if (!recordingActiveRef.current) return
+        setSttError('The microphone stopped, so your recording was saved.')
+        stopListening()
+      }
+    })
 
     // Record in a format this browser definitely supports, and label the blob with what
     // the recorder really produced (a wrong label makes the file unplayable).
     const recorderMime = pickRecorderMime()
-    const mediaRecorder = new MediaRecorder(stream, recorderMime ? { mimeType: recorderMime } : undefined)
+    const mediaRecorder = new MediaRecorder(stream, { ...(recorderMime ? { mimeType: recorderMime } : {}), audioBitsPerSecond: 32000 })
     audioChunksRef.current = []
     mediaRecorderRef.current = mediaRecorder
 
+    mediaRecorder.onerror = () => {
+      if (!recordingActiveRef.current) return
+      setSttError('A recording error occurred. Saving what was captured so far.')
+      stopListening()
+    }
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
     mediaRecorder.onstop = async () => {
       const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || recorderMime || 'audio/webm' })
@@ -1418,35 +1461,79 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
             .catch(() => {})
         }
       } catch (err) {
-        setSttError(err.message || 'Could not save the recording.')
+        // The server could not be reached: keep the recording in the Recordings list (audio is already in
+        // this browser's storage) instead of losing it.
+        setRecordings(prev => [{
+          id: `local-${Date.now()}`, title: defaultSessionTitle(new Date()), transcript: finalTranscript,
+          segments: [...segmentsRef.current], audioUrl, audioKey, durationSec, wordCount: words,
+          summaryStatus: 'none', summary: null, patientId: patient?.id || null, patientName: patient?.name || null,
+          isArchived: false, createdAt: new Date().toISOString(),
+        }, ...prev])
+        setSttError(`Saved on this device only (${err.message || 'could not reach the server'}).`)
       }
     }
 
-    const recognition = new SR()
-    recognition.lang = 'en-US'; recognition.continuous = true; recognition.interimResults = true
-    recognition.onresult = (e) => {
-      const text = Array.from(e.results).map(r => r[0].transcript).join('')
-      setTranscript(text); transcriptRef.current = text
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const result = e.results[i]
-        if (result.isFinal) {
-          const t = result[0].transcript.trim()
-          if (t) segmentsRef.current.push({ t: elapsedRef.current, text: t })
+    // Chrome's recognizer ends its session on its own (silence, a network blip, an internal
+    // time limit of a few minutes). The audio keeps recording; the recognizer is restarted and
+    // its text appended, so a transcription hiccup never ends the recording.
+    committedTranscriptRef.current = ''
+    restartFailuresRef.current = 0
+    lastRecErrorRef.current = ''
+    const startRecognition = () => {
+      const recognition = new SR()
+      recognition.lang = 'en-US'; recognition.continuous = true; recognition.interimResults = true
+      recognition.onresult = (e) => {
+        restartFailuresRef.current = 0
+        setSttError('')
+        const sessionText = Array.from(e.results).map(r => r[0].transcript).join('')
+        const text = (committedTranscriptRef.current + ' ' + sessionText).trim()
+        setTranscript(text); transcriptRef.current = text
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const result = e.results[i]
+          if (result.isFinal) {
+            const t = result[0].transcript.trim()
+            if (t) segmentsRef.current.push({ t: elapsedRef.current, text: t })
+          }
         }
       }
+      recognition.onerror = (e) => { lastRecErrorRef.current = e.error || '' }
+      recognition.onend = () => {
+        committedTranscriptRef.current = transcriptRef.current
+        if (!recordingActiveRef.current) return
+        const err = lastRecErrorRef.current
+        lastRecErrorRef.current = ''
+        if (err === 'not-allowed' || err === 'service-not-allowed') {
+          setSttError('Speech recognition was blocked. The audio was saved.')
+          stopListening()
+          return
+        }
+        if (err && err !== 'no-speech' && err !== 'aborted') restartFailuresRef.current += 1
+        if (restartFailuresRef.current > 8) {
+          setSttError('Live transcription stopped (connection problem). The audio is still being recorded.')
+          return
+        }
+        if (err === 'network') setSttError('Reconnecting live transcription…')
+        restartTimerRef.current = setTimeout(() => {
+          if (!recordingActiveRef.current) return
+          try { startRecognition() } catch { /* already running: the next end event retries */ }
+        }, err === 'network' ? 1500 : 250)
+      }
+      recognitionRef.current = recognition
+      recognition.start()
     }
-    recognition.onerror = (e) => { if (e.error !== 'no-speech') setSttError(`Oops! ${e.error} 😅`); setIsListening(false) }
-    recognition.onend = () => setIsListening(false)
-    recognitionRef.current = recognition
 
-    mediaRecorder.start(200); recognition.start()
+    recordingActiveRef.current = true
+    mediaRecorder.start(1000); startRecognition()
     setIsListening(true); setElapsed(0); elapsedRef.current = 0
     setTranscript(''); transcriptRef.current = ''; segmentsRef.current = []; setSttError('')
   }
 
   const stopListening = () => {
-    recognitionRef.current?.stop()
-    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
+    recordingActiveRef.current = false
+    clearTimeout(restartTimerRef.current)
+    try { recognitionRef.current?.stop() } catch { /* not running */ }
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
     else streamRef.current?.getTracks().forEach(t => t.stop())
     setIsListening(false)
   }

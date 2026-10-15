@@ -23,11 +23,10 @@ async function logAudit(fields) {
   }
 }
 
-// Patient and therapist accounts hold or access clinical records, so a correct
-// password alone isn't enough: they also need the code emailed to them.
-// Super Admin and Owner accounts sign in with email and password only.
-// (REQUIRE_LOGIN_2FA=false switches this off for local development only.)
-const needsSecondFactor = (role) => (role === 'Therapist' || role === 'Patient') && String(process.env.REQUIRE_LOGIN_2FA || '').trim().toLowerCase() !== 'false'
+// Emailed sign-in codes are off for every role: a correct password signs you in.
+// (Signup email verification is separate and unchanged.) To bring the second
+// step back for patients and therapists, set REQUIRE_LOGIN_2FA=true.
+const needsSecondFactor = (role) => (role === 'Therapist' || role === 'Patient') && String(process.env.REQUIRE_LOGIN_2FA || '').trim().toLowerCase() === 'true'
 
 async function issueOtp({ email, name, purpose = 'signup' }) {
   const code = generateCode()

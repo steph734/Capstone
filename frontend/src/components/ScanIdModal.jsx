@@ -29,6 +29,10 @@ async function apiPost(path, body) {
 
 // Restricting formats (vs. every format the detector supports) keeps the
 // scan loop cheap and avoids false positives from unrelated codes in frame.
+// Mirrors the server rule (api/_lib/routes/attendance-scan.js): only BrickPath cards.
+const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-d{4,10}$/
+const INVALID_MESSAGE = 'Invalid ID. This scanner only accepts BrickPath staff ID cards issued by TherapyPro.'
+
 const SCAN_OPTIONS = { formats: ['code_128', 'qr_code'], delay: 350 }
 
 function ScanBadgeIcon({ size = 20 }) {
@@ -112,6 +116,18 @@ function ScanIdModal({ onClose, onLogged }) {
     if (!code) return
 
     busyRef.current = true
+    // Anything that isn't a BrickPath card code (national ID QR, other barcodes…)
+    // is rejected on the spot, without calling the server.
+    if (!BRICKPATH_CODE.test(code)) {
+      setNotFoundCode(INVALID_MESSAGE)
+      setPhase('invalid')
+      setTimeout(() => {
+        if (!mountedRef.current) return
+        busyRef.current = false
+        setPhase('scanning')
+      }, 2200)
+      return
+    }
     setPhase('checking')
     apiPost('/api/attendance/scan', { employee_id: code })
       .then((data) => {
@@ -123,7 +139,7 @@ function ScanIdModal({ onClose, onLogged }) {
         if (!mountedRef.current) return
         const nextPhase = apiErr.reason === 'duplicate' || apiErr.reason === 'completed'
           ? 'duplicate'
-          : apiErr.reason === 'invalid_badge'
+          : apiErr.reason === 'invalid_badge' || apiErr.reason === 'inactive_badge'
             ? 'invalid'
             : 'not-found'
         setNotFoundCode(apiErr.message || `No staff member matches badge "${code}".`)
@@ -151,7 +167,7 @@ function ScanIdModal({ onClose, onLogged }) {
   const showCamera = phase === 'starting' || phase === 'scanning' || phase === 'checking' || phase === 'not-found' || phase === 'duplicate' || phase === 'invalid'
   const showPermissionError = phase === 'denied' || phase === 'no-camera'
   const scanningPaused = phase === 'checking' || phase === 'not-found' || phase === 'duplicate' || phase === 'invalid'
-  const isWarnPhase = phase === 'duplicate' || phase === 'invalid'
+  const isWarnPhase = phase === 'duplicate'
 
   return (
     <div className="sim-backdrop" onClick={onClose}>
@@ -166,7 +182,7 @@ function ScanIdModal({ onClose, onLogged }) {
             <button className="sim-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
           <h3 className="sim-title">Scan ID to log attendance</h3>
-          <p className="sim-sub">Point the staff badge's barcode at the camera.</p>
+          <p className="sim-sub">Point the barcode on a BrickPath staff ID card at the camera.</p>
 
           {showCamera && (
             <>
@@ -185,8 +201,8 @@ function ScanIdModal({ onClose, onLogged }) {
                 )}
               </div>
 
-              <div className={`sim-status ${phase === 'not-found' ? 'error' : isWarnPhase ? 'warn' : ''}`}>
-                <span className={`sim-status-dot ${phase === 'not-found' ? 'error' : isWarnPhase ? 'warn' : ''}`} />
+              <div className={`sim-status ${phase === 'not-found' || phase === 'invalid' ? 'error' : isWarnPhase ? 'warn' : ''}`}>
+                <span className={`sim-status-dot ${phase === 'not-found' || phase === 'invalid' ? 'error' : isWarnPhase ? 'warn' : ''}`} />
                 {phase === 'starting' && 'Connecting to camera…'}
                 {phase === 'scanning' && 'Waiting for scan…'}
                 {phase === 'checking' && 'Checking badge…'}

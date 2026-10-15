@@ -40,6 +40,14 @@ function clockOf(d) {
 // place a scannable badge is generated.
 const BRICKPATH_PREFIX = 'BRICKPATH-'
 
+// The exact shape of a code on a card this app prints: BRICKPATH-<employee id>,
+// where the employee id is a letter, a dash and digits (e.g. T-893848). Anything
+// else (a national ID QR, a product barcode, a hand-typed string) is invalid.
+const BRICKPATH_CODE = /^BRICKPATH-[A-Z]-d{4,10}$/
+const INVALID_MESSAGE = 'Invalid ID. This scanner only accepts BrickPath staff ID cards issued by TherapyPro.'
+// Employees whose card must no longer clock in.
+const INACTIVE_STATUSES = new Set(['inactive', 'terminated', 'for_review'])
+
 // A scan within this many minutes of the employee's own last scan is treated
 // as an accidental duplicate (camera re-triggering, badge held up twice)
 // rather than a deliberate time-out — see the check below.
@@ -71,25 +79,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No badge code was provided.' })
   }
 
-  if (!raw.startsWith(BRICKPATH_PREFIX)) {
-    return res.status(422).json({
-      error: "This isn't a valid BrickPath staff ID. Scan the barcode on a BrickPath ID card.",
-      reason: 'invalid_badge',
-    })
+  if (raw.length > 40 || !BRICKPATH_CODE.test(raw)) {
+    return res.status(422).json({ error: INVALID_MESSAGE, reason: 'invalid_badge' })
   }
-  const code = raw.slice(BRICKPATH_PREFIX.length).trim()
-  if (!code) {
-    return res.status(422).json({
-      error: "This isn't a valid BrickPath staff ID. Scan the barcode on a BrickPath ID card.",
-      reason: 'invalid_badge',
-    })
-  }
+  const code = raw.slice(BRICKPATH_PREFIX.length)
 
   try {
     await getMongo()
     const employee = await Employee.findOne({ employee_id: code }).populate('branch_id', 'branch_name')
+    // A well-formed code that isn't on file is a forgery or a deleted record: invalid too.
     if (!employee) {
-      return res.status(404).json({ error: `No staff member matches badge "${code}".` })
+      return res.status(422).json({ error: INVALID_MESSAGE, reason: 'invalid_badge' })
+    }
+    if (INACTIVE_STATUSES.has(employee.status) || employee.is_archived) {
+      return res.status(403).json({ error: 'This ID is no longer active. Please contact the owner.', reason: 'inactive_badge' })
     }
 
     const now = new Date()

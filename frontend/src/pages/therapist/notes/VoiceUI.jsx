@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, File, FileText, Globe, Info, Mic, MicOff, Pause, Play, Sheet, Square, TriangleAlert, Undo2, Volume2 } from 'lucide-react'
+import { AudioLines, Check, ChevronDown, Download, File, FileText, Globe, Info, Mic, MicOff, Pause, Play, Sheet, Square, TriangleAlert, Undo2, Volume2 } from 'lucide-react'
 import { COMMAND_HELP, SECTION_LABELS, SECTION_LETTER } from '../../../utils/voiceCommands'
 import { downloadVoiceLog } from './voiceApi'
 import './voice.css'
@@ -81,10 +81,14 @@ export function VoiceBar({ voice, enabled, disabledReason }) {
       </button>
       <div className="vn-bar-text">
         <strong>{heading}</strong>
-        <span>{enabled ? (isListening ? 'Speak naturally. Say "next section" to move on.' : 'Tap the mic, then speak. Typing still works.') : disabledReason}</span>
+        <span>{enabled ? (isListening ? (voice.noiseFilter && voice.noiseIgnored > 0 ? `Speak naturally. Background noise ignored: ${voice.noiseIgnored}` : 'Speak naturally. Say "next section" to move on.') : 'Tap the mic, then speak. Typing still works.') : disabledReason}</span>
       </div>
       <div className={`vn-wave${live ? ' on' : ''}`} aria-hidden="true">{Array.from({ length: 22 }, (_, i) => <i key={i} style={{ '--i': i }} />)}</div>
       <div className="vn-bar-actions">
+        <label className="vn-noise" title="Ignores background noise and low-confidence guesses">
+          <input type="checkbox" checked={voice.noiseFilter} onChange={(e) => voice.setNoiseFilter(e.target.checked)} disabled={!enabled} />
+          <span className="vn-box" aria-hidden="true"><Check size={12} /></span><AudioLines size={14} aria-hidden="true" /> Noise filter
+        </label>
         <label className="vn-lang"><Globe size={14} aria-hidden="true" />
           <select value={language} onChange={(e) => voice.setLanguage(e.target.value)} aria-label="Dictation language" disabled={!enabled}>
             <option value="en-US">English</option>

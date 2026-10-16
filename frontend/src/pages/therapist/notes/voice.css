@@ -113,3 +113,9 @@
 .vn-password:focus { border-color: #3e6354; box-shadow: 0 0 0 3px rgba(62, 99, 84, .15); }
 .vn-password[aria-invalid="true"] { border-color: #dc2626; }
 .vn-pw-hint { margin: 6px 0 0; font-size: 12px; color: #6b7c75; }
+
+.vn-noise { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 10px; background: rgba(255, 255, 255, .14); font-weight: 800; font-size: 13px; cursor: pointer; position: relative; }
+.vn-bar:not(.active) .vn-noise { background: #e2ebe6; }
+.vn-noise input { position: absolute; opacity: 0; width: 0; height: 0; }
+.vn-noise input:checked + .vn-box { background: #1fa37a; border-color: #1fa37a; color: #fff; }
+.vn-noise input:focus-visible + .vn-box { outline: 2px solid #fff; outline-offset: 2px; }

@@ -7,8 +7,15 @@ import NoteViewerSecure from './notes/NoteViewerSecure'
 import ShareDialog from './notes/ShareDialog'
 import LockScreen, { useIdleLock } from './notes/IdleLock'
 import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote } from './notes/notesApi'
+import { sendVoiceEntries, fetchVoiceLog, useVoiceAccess } from './notes/voiceApi'
+import { VoiceBar, VoicePanel, SectionVoicePill, ClearSectionConfirm, VoiceDownloadMenu } from './notes/VoiceUI'
+import useVoiceNotes from '../../hooks/useVoiceNotes'
+import {
+  Calendar, ChartColumn, CircleCheck, ClipboardList, Download, Eye, FileText, KeyRound, Lock, MessageSquare, PenLine, Stethoscope, Sun, TriangleAlert, User,
+} from 'lucide-react'
 import { unescapeHtml } from '../../utils/session'
 import './TherapistNotesProgressPage.css'
+import './notes/voice.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
@@ -91,6 +98,7 @@ function fromApiNote(n) {
     sharedSections: n.sharedSections || [],
     addendaCount: n.addendaCount || 0,
     domain: n.domain || DOMAINS[0],
+    voiceLogCount: n.voiceLogCount || 0,
   }
 }
 
@@ -195,16 +203,19 @@ function SignaturePad({ onSign, onClear }) {
 // signature AND the password typed again; "Save draft" needs neither. The
 // server re-validates everything and encrypts the text before it is stored.
 const SOAP_SECTIONS = [
-  { key: 'subjective', label: '💬 Subjective', hint: 'What the patient or guardian reported or felt...', cls: 'tnp-s' },
-  { key: 'objective', label: '👀 Objective', hint: 'Measured outcomes, ROM, accuracy...', cls: 'tnp-o' },
-  { key: 'assessment', label: '📊 Assessment', hint: 'Clinical interpretation of findings...', cls: 'tnp-a' },
-  { key: 'plan', label: '🌟 Plan', hint: 'Next steps and home program...', cls: 'tnp-p' },
+  { key: 'subjective', label: 'Subjective', Icon: MessageSquare, hint: 'What the patient or guardian reported or felt...', cls: 'tnp-s' },
+  { key: 'objective', label: 'Objective', Icon: Eye, hint: 'Measured outcomes, ROM, accuracy...', cls: 'tnp-o' },
+  { key: 'assessment', label: 'Assessment', Icon: ChartColumn, hint: 'Clinical interpretation of findings...', cls: 'tnp-a' },
+  { key: 'plan', label: 'Plan', Icon: Sun, hint: 'Next steps and home program...', cls: 'tnp-p' },
 ]
 const fieldErrStyle = { color: '#b91c1c', fontSize: 12, display: 'block', marginTop: 4 }
+const VOICE_FLUSH_MS = 30000
 
-function NoteForm({ patient, initial, onSave, onCancel }) {
+function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked }) {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const [soap, setSoap] = useState(() => Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, unescapeHtml(initial?.[key] || '')])))
+  // Latest text, updated synchronously so back-to-back dictated phrases never overwrite each other.
+  const soapRef = useRef(soap)
   const [sigData, setSigData] = useState(null)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState('')
@@ -212,7 +223,85 @@ function NoteForm({ patient, initial, onSave, onCancel }) {
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
 
-  const set = (field) => (e) => { setSoap((prev) => ({ ...prev, [field]: e.target.value })); setErrors((x) => ({ ...x, [field]: '' })) }
+  // ── Voice dictation ──
+  const [noteId, setNoteId] = useState(initial?.id || null)
+  const noteIdRef = useRef(initial?.id || null)
+  const [savedLog, setSavedLog] = useState([])
+  const [voiceMsg, setVoiceMsg] = useState('')
+  const [clearTarget, setClearTarget] = useState(null)
+  const access = useVoiceAccess()
+  const flushingRef = useRef(false)
+  const voiceRef = useRef(null)
+  const saveDraftRef = useRef(() => {})
+
+  const writeSoap = (next) => { soapRef.current = next; setSoap(next) }
+  const setText = (section, text) => { writeSoap({ ...soapRef.current, [section]: text }); setErrors((x) => ({ ...x, [section]: '' })) }
+  const set = (field) => (e) => { writeSoap({ ...soapRef.current, [field]: e.target.value }); setErrors((x) => ({ ...x, [field]: '' })) }
+
+  // A voice log belongs to a saved note: create the draft first when needed.
+  const ensureId = async () => {
+    if (noteIdRef.current) return noteIdRef.current
+    if (!Object.values(soapRef.current).some((v) => v.trim())) return null
+    const id = await onEnsureDraft({ ...soapRef.current })
+    noteIdRef.current = id
+    setNoteId(id)
+    return id
+  }
+
+  // Sends pending voice entries; true when nothing is left to retry.
+  const flushVoice = async () => {
+    const v = voiceRef.current
+    if (!v || flushingRef.current) return false
+    const pending = v.getPending()
+    if (!pending.length) return true
+    flushingRef.current = true
+    try {
+      const id = await ensureId()
+      if (!id) return false
+      for (let i = 0; i < pending.length; i += 100) {
+        const batch = pending.slice(i, i + 100)
+        await sendVoiceEntries(id, batch)
+        v.markSent(batch.length)
+      }
+      setVoiceMsg('')
+      return true
+    } catch (err) {
+      if (err.status === 403 || err.status === 409) { v.dropPending(); setVoiceMsg(err.status === 409 ? 'This note is signed, so its voice log is closed.' : err.message); return true }
+      setVoiceMsg('Voice log not saved, retrying')
+      return false
+    } finally { flushingRef.current = false }
+  }
+
+  const voiceEnabled = access.allowed && !locked && !done
+  const voice = useVoiceNotes({
+    enabled: voiceEnabled,
+    getText: (s) => soapRef.current[s] || '',
+    setText,
+    onSaveDraft: () => saveDraftRef.current(),
+    onRequestClear: (s) => setClearTarget(s),
+    onStopped: () => { flushVoice() },
+  })
+  voiceRef.current = voice
+
+  // Entries already stored for a draft being edited.
+  useEffect(() => {
+    if (!initial?.id) return undefined
+    let alive = true
+    fetchVoiceLog(initial.id).then((rows) => alive && setSavedLog(rows)).catch(() => {})
+    return () => { alive = false }
+  }, [initial?.id])
+
+  // Save unsent entries every 30 seconds while the mic is on.
+  useEffect(() => {
+    if (!voice.isListening) return undefined
+    const t = setInterval(() => { flushVoice() }, VOICE_FLUSH_MS)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.isListening])
+
+  const fullLog = [...savedLog, ...voice.log]
+  const dictatedSections = new Set(fullLog.filter((e) => e.type === 'dictation').map((e) => e.section))
+  const disabledReason = access.loading ? 'Checking your plan…' : 'Available on Silver and Gold'
 
   const submit = async (sign) => {
     const e = {}
@@ -228,7 +317,12 @@ function NoteForm({ patient, initial, onSave, onCancel }) {
     if (Object.keys(e).length) { setFormError('Please fix the highlighted fields.'); return }
     setBusy(sign ? 'sign' : 'draft')
     try {
-      await onSave({ ...soap, sign, signatureData: sigData, password })
+      // The voice log must be stored before signing, because signing closes it.
+      if (sign && !(await flushVoice())) { setFormError('The voice log could not be saved yet. Please try again.'); return }
+      const id = await onSave({ ...soap, sign, signatureData: sigData, password, noteId: noteIdRef.current })
+      if (id) { noteIdRef.current = id; setNoteId(id) }
+      if (sign) voice.stop()
+      else await flushVoice()
       setPassword('')
       setDone(sign ? 'signed' : 'draft')
     } catch (err) {
@@ -237,11 +331,12 @@ function NoteForm({ patient, initial, onSave, onCancel }) {
       setPassword('')
     } finally { setBusy('') }
   }
+  saveDraftRef.current = () => { if (!busy) submit(false) }
 
   if (done) {
     return (
       <div className="tnp-saved-state">
-        <div className="tnp-saved-icon">{done === 'signed' ? '✅' : '📝'}</div>
+        <div className="tnp-saved-icon">{done === 'signed' ? <CircleCheck size={40} aria-hidden="true" /> : <FileText size={40} aria-hidden="true" />}</div>
         <h3>{done === 'signed' ? 'Note signed & saved' : 'Draft saved'}</h3>
         <p>{done === 'signed' ? 'It is now read-only. Corrections can only be added as addenda.' : 'You can keep editing it until you sign.'} For <strong>{patient.name}</strong>.</p>
         <button className="tnp-primary-btn" onClick={onCancel}>Back to Patient</button>
@@ -250,47 +345,76 @@ function NoteForm({ patient, initial, onSave, onCancel }) {
   }
 
   return (
-    <div className="tnp-notebook">
-      <div className="tnp-spiral" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <div key={i} className="tnp-ring" />)}</div>
-      <div className="tnp-paper">
-        <div className="tnp-deco-tr">📋</div>
-        <div className="tnp-title-row">
-          <h2 className="tnp-title">{initial ? 'Edit Draft' : 'Session Note'}</h2>
-          <div className="tnp-date-box"><span className="tnp-field-label">📅 Date:</span><span className="tnp-field-val tnp-field-line">{today}</span></div>
-        </div>
-        <div className="tnp-field-row"><span className="tnp-field-label">👤 Patient:</span><span className="tnp-field-val tnp-field-line">{patient.name}</span></div>
-        <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label">🩺 Diagnosis:</span><span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span></div>
-        <div className="tnp-rule" />
+    <div className="vn-layout">
+      <div className="vn-main">
+        <div className="tnp-notebook">
+          <div className="tnp-spiral" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <div key={i} className="tnp-ring" />)}</div>
+          <div className="tnp-paper">
+            <div className="tnp-deco-tr"><ClipboardList size={22} aria-hidden="true" /></div>
+            <div className="tnp-title-row">
+              <h2 className="tnp-title">{initial ? 'Edit Draft' : 'Session Note'}</h2>
+              <div className="tnp-date-box"><span className="tnp-field-label"><Calendar size={14} aria-hidden="true" /> Date:</span><span className="tnp-field-val tnp-field-line">{today}</span></div>
+            </div>
+            <div className="tnp-field-row"><span className="tnp-field-label"><User size={14} aria-hidden="true" /> Patient:</span><span className="tnp-field-val tnp-field-line">{patient.name}</span></div>
+            <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label"><Stethoscope size={14} aria-hidden="true" /> Diagnosis:</span><span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span></div>
+            <div className="tnp-rule" />
 
-        {SOAP_SECTIONS.map(({ key, label, hint, cls }) => (
-          <div key={key} className="tnp-section">
-            <div className={`tnp-section-label ${cls}`}>{label}</div>
-            <textarea className="tnp-textarea" placeholder={hint} value={soap[key]} onChange={set(key)} rows={3} maxLength={5000} aria-invalid={!!errors[key]} aria-label={label} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#6b7c75' }}>
-              <span>{errors[key] && <span role="alert" style={fieldErrStyle}>{errors[key]}</span>}</span>
-              <span>{soap[key].length} / 5000</span>
+            {voice.supported && <VoiceBar voice={voice} enabled={voiceEnabled} disabledReason={disabledReason} />}
+            {voice.warning && <p className="vn-warn" role="status"><TriangleAlert size={14} aria-hidden="true" /> {voice.warning}</p>}
+
+            {SOAP_SECTIONS.map(({ key, label, Icon, hint, cls }) => {
+              const active = voice.isListening && voice.activeSection === key
+              return (
+                <div key={key} className={`tnp-section vn-section${active ? ' vn-active' : ''}`}>
+                  <div className="vn-section-head">
+                    <div className={`tnp-section-label ${cls}`}><Icon size={14} aria-hidden="true" /> {label}</div>
+                    {voice.supported && (
+                      <SectionVoicePill listening={active} dictated={dictatedSections.has(key)} disabled={!voiceEnabled}
+                        title={voiceEnabled ? `Dictate into ${label}` : disabledReason}
+                        onClick={() => (voice.isListening ? voice.setActive(key) : voice.start(key))} />
+                    )}
+                  </div>
+                  <textarea className="tnp-textarea" placeholder={hint} value={soap[key]} onChange={set(key)} rows={3} maxLength={5000}
+                    onFocus={() => { if (voice.isListening) voice.setActive(key) }} aria-invalid={!!errors[key]} aria-label={label} />
+                  {active && voice.interimText && <p className="vn-interim" aria-live="polite">{voice.interimText}<span className="vn-caret" aria-hidden="true" /></p>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#6b7c75' }}>
+                    <span>{errors[key] && <span role="alert" style={fieldErrStyle}>{errors[key]}</span>}</span>
+                    <span>{soap[key].length} / 5000</span>
+                  </div>
+                </div>
+              )
+            })}
+
+            <div className="tnp-sig-section">
+              <div className="tnp-sig-title"><PenLine size={15} aria-hidden="true" /> Therapist Signature</div>
+              <p className="tnp-sig-desc">Draw your signature, then re-enter your password to certify and lock this note. Signing can't be done by voice.</p>
+              <SignaturePad onSign={(d) => { setSigData(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSigData(null)} />
+              {errors.signature && <span role="alert" style={fieldErrStyle}>{errors.signature}</span>}
+              <label className="tnp-field-label" htmlFor="sign-pw" style={{ display: 'block', marginTop: 12 }}><KeyRound size={14} aria-hidden="true" /> Your account password</label>
+              <input id="sign-pw" type="password" autoComplete="current-password" className="vn-password" value={password}
+                placeholder="Enter the password you use to sign in" aria-describedby="sign-pw-hint" aria-invalid={!!errors.password}
+                onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: '' })) }} />
+              <p id="sign-pw-hint" className="vn-pw-hint">Use the password of the account you are signed in with (not a note password). It is checked by the server and never stored with the note.</p>
+              {errors.password && <span role="alert" style={fieldErrStyle}>{errors.password}</span>}
+            </div>
+
+            {formError && <p role="alert" style={{ ...fieldErrStyle, fontSize: 13 }}>{formError}</p>}
+            <div className="tnp-form-footer" style={{ flexWrap: 'wrap', gap: 8 }}>
+              <button className="tnp-ghost-btn" onClick={onCancel} type="button">Cancel</button>
+              <button className="tnp-ghost-btn" onClick={() => submit(false)} disabled={!!busy} type="button">{busy === 'draft' ? 'Saving…' : <><FileText size={15} aria-hidden="true" /> Save draft</>}</button>
+              <button className="tnp-primary-btn" onClick={() => submit(true)} disabled={!!busy} type="button">{busy === 'sign' ? 'Signing…' : <><Lock size={15} aria-hidden="true" /> Sign &amp; lock note</>}</button>
             </div>
           </div>
-        ))}
-
-        <div className="tnp-sig-section">
-          <div className="tnp-sig-title">✍️ Therapist Signature</div>
-          <p className="tnp-sig-desc">Draw your signature, then re-enter your password to certify and lock this note.</p>
-          <SignaturePad onSign={(d) => { setSigData(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSigData(null)} />
-          {errors.signature && <span role="alert" style={fieldErrStyle}>{errors.signature}</span>}
-          <label className="tnp-field-label" htmlFor="sign-pw" style={{ display: 'block', marginTop: 12 }}>🔑 Password</label>
-          <input id="sign-pw" type="password" autoComplete="current-password" className="tnp-textarea" style={{ minHeight: 42 }} value={password}
-            onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: '' })) }} />
-          {errors.password && <span role="alert" style={fieldErrStyle}>{errors.password}</span>}
-        </div>
-
-        {formError && <p role="alert" style={{ ...fieldErrStyle, fontSize: 13 }}>{formError}</p>}
-        <div className="tnp-form-footer" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <button className="tnp-ghost-btn" onClick={onCancel} type="button">Cancel</button>
-          <button className="tnp-ghost-btn" onClick={() => submit(false)} disabled={!!busy} type="button">{busy === 'draft' ? 'Saving…' : '📝 Save draft'}</button>
-          <button className="tnp-primary-btn" onClick={() => submit(true)} disabled={!!busy} type="button">{busy === 'sign' ? 'Signing…' : '💾 Sign & lock note'}</button>
         </div>
       </div>
+
+      <VoicePanel log={fullLog} noteId={noteId} supported={voice.supported} enabled={access.allowed} disabledReason={access.loading ? '' : 'Voice dictation is available on Silver and Gold.'}
+        notice={voiceMsg} onBeforeDownload={flushVoice} />
+
+      {clearTarget && (
+        <ClearSectionConfirm section={clearTarget} onCancel={() => setClearTarget(null)}
+          onConfirm={() => { setText(clearTarget, ''); voice.clearUndo(clearTarget); setClearTarget(null) }} />
+      )}
     </div>
   )
 }
@@ -354,6 +478,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
   const [visible, setVisible] = useState(PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetSearch, setSheetSearch] = useState('')
+  const [voiceFor, setVoiceFor] = useState(null)
   const rootRef = useRef(null)
   const listRef = useRef(null)
   const savedScroll = useRef(null)
@@ -461,6 +586,12 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
             {n.signed && (n.shareable
               ? <button className="tnp2-share-btn" onClick={() => onUnshare(n)}>Unshare</button>
               : <button className="tnp2-share-btn" onClick={() => onShareNote(n)}>Share…</button>)}
+            {n.voiceLogCount > 0 && (
+              <span className="vn-list-anchor">
+                <button className="tnp2-share-btn" onClick={() => setVoiceFor(voiceFor === n.id ? null : n.id)} aria-expanded={voiceFor === n.id}><Download size={13} aria-hidden="true" /> Voice log</button>
+                {voiceFor === n.id && <VoiceDownloadMenu noteId={n.id} onClose={() => setVoiceFor(null)} floating />}
+              </span>
+            )}
           </div>
         </div>
       ))}
@@ -790,16 +921,28 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       sign: form.sign, signatureImage: form.signatureData, password: form.password,
     }
     try {
-      if (editing) {
-        if (form.sign) await signDraft(editing.id, payload)
-        else await updateDraft(editing.id, payload)
-      } else {
-        await createNote(payload)
+      // An existing draft (opened for editing, or created while dictating) is updated or signed in place.
+      const existingId = editing?.id || form.noteId
+      if (existingId) {
+        if (form.sign) await signDraft(existingId, payload)
+        else await updateDraft(existingId, payload)
+        return existingId
       }
+      const created = await createNote(payload)
+      return created.id
     } catch (err) {
       if (err.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity. Your text is still here.')
       throw err
     }
+  }
+
+  // Dictation needs a saved note to attach its voice log to, so the first flush creates a draft.
+  const ensureDraft = async (soapNow) => {
+    const created = await createNote({
+      patientId: selectedId, sessionDate: manilaDateKey(), diagnosis: selectedPatient?.diagnosis,
+      subjective: soapNow.subjective, objective: soapNow.objective, assessment: soapNow.assessment, plan: soapNow.plan, sign: false,
+    })
+    return created.id
   }
 
   const doShare = async (sections, summary, domain) => {
@@ -855,7 +998,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
 
         {(view === 'new' || view === 'edit') && selectedPatient && (
           <div className="tnp-scroll-area" ref={detailRef}>
-            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onCancel={backToOverview} />
+            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onEnsureDraft={ensureDraft} onCancel={backToOverview} locked={!!locked} />
           </div>
         )}
 

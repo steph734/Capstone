@@ -78,6 +78,8 @@ export function noteMeta(n, extra = {}) {
     createdAt: n.created_at,
     version: n.version || 1,
     domain: n.title,
+    voiceUsed: !!n.voice_used,
+    voiceLogCount: n.voice_log_count || 0,
     ...extra,
   }
 }

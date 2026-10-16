@@ -383,3 +383,15 @@ export function csvCell(v) {
 }
 
 export { ObjectId, isEmail, money }
+
+// Emails with an active paid Silver or Gold subscription (used by the voice-log plan check).
+export function paidTierEmails(plans, subs) {
+  const map = priceMap(plans)
+  const out = new Set()
+  for (const s of (subs || []).filter(isLive)) {
+    const p = planOfSub(map, s)
+    const email = str(customerOf(s)?.email).toLowerCase()
+    if (p && email && ['silver', 'gold'].includes(p.slug)) out.add(email)
+  }
+  return out
+}

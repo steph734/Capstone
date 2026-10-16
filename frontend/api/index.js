@@ -123,6 +123,7 @@ import adminDashboard from './_lib/routes/admin-dashboard.js'
 import ownerPatients from './_lib/routes/owner-patients.js'
 import ownerAppointments from './_lib/routes/owner-appointments.js'
 import ownerDashboard from './_lib/routes/owner-dashboard.js'
+import notesVoiceLog from './_lib/routes/notes-voice-log.js'
 import adminPlans from './_lib/routes/admin-plans.js'
 import adminPlanItem from './_lib/routes/admin-plan-item.js'
 import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
@@ -207,6 +208,9 @@ app.all('/api/notes/therapist-list', notesTherapistList)
 app.all('/api/notes/patient-list', notesPatientList)
 app.all('/api/notes/create', notesCreate)
 app.all('/api/notes/owner-summary', notesOwnerSummary) // static segments before :id
+app.all('/api/notes/voice-access', notesVoiceLog)
+app.all('/api/notes/:noteId/voice-log/export', notesVoiceLog)
+app.all('/api/notes/:noteId/voice-log', notesVoiceLog)
 app.all('/api/notes/:id/:action', notesItem)
 app.all('/api/notes/:id', notesItem)
 app.all('/api/exercises/therapist-list', exercisesTherapistList)

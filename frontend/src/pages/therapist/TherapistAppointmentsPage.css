@@ -1444,3 +1444,26 @@
     right: 8px;
   }
 }
+
+/* ── Mark as completed ─────────────────────────────────────── */
+.tapp2-menu-success { color: #166534; font-weight: 700; }
+.tapp2-menu-success:hover { background: #ecfdf5; }
+.tapp-stats { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { .tapp-stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px)  { .tapp-stats { grid-template-columns: repeat(2, 1fr); } }
+.tapp-complete-modal { max-width: 440px; text-align: left; align-items: stretch; }
+.tapp-complete-modal .tapp-confirm-icon,
+.tapp-complete-modal .tapp-confirm-title { text-align: center; align-self: center; }
+.tapp-complete-summary { background: #f3f6f5; border-radius: 12px; padding: 4px 14px; }
+.tapp-complete-summary > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; font-size: 13px; }
+.tapp-complete-summary > div + div { border-top: 1px solid #e3ebe7; }
+.tapp-complete-summary span { color: #6b7c75; }
+.tapp-complete-summary b { color: #1f2d27; text-align: right; }
+.tapp-complete-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #6b7c75; }
+.tapp-complete-label span { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.tapp-complete-remarks {
+  width: 100%; box-sizing: border-box; border: 1px solid #dfe7e3; border-radius: 12px; padding: 10px 12px;
+  font: inherit; font-size: 14px; resize: vertical; min-height: 76px;
+}
+.tapp-complete-remarks:focus { outline: 2px solid #4a6b5d; outline-offset: 1px; }
+.tapp-complete-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 600; }

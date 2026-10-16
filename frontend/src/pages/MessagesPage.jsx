@@ -13,6 +13,7 @@ import {
 import PatientSidebar from '../components/PatientSidebar'
 import { useStreamCtx } from '../stream/StreamProvider'
 import useContact from '../stream/useContact'
+import { GuardianRecommendationAttachment } from '../components/SessionRecommendationCard'
 import './PageWithSidebar.css'
 import './MessagesPage.css'
 
@@ -195,7 +196,7 @@ function MessagesInner({ user, mobileView, setMobileView }) {
 
       <section className={`msg-center${mobileView === 'list' ? ' msg-center-hidden' : ''}`}>
         {!activeChannel ? <EmptyChat /> : (
-          <Channel channel={activeChannel}>
+          <Channel channel={activeChannel} Attachment={GuardianRecommendationAttachment}>
             <Window>
               <ChatHeader onCall={handleCall} onBack={() => setMobileView('list')} />
               <MessageList />

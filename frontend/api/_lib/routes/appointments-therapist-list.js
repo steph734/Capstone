@@ -15,6 +15,13 @@ function minutesBetween(start, end) {
   return diff > 0 ? diff : 60
 }
 
+// When the session starts (Asia/Manila), so the page can tell whether it has begun.
+function sessionStartIso(doc) {
+  try {
+    return new Date(`${new Date(doc.session_date).toISOString().slice(0, 10)}T${doc.start_time || '00:00'}:00+08:00`).toISOString()
+  } catch { return null }
+}
+
 function ageFromBirthdate(birthdate) {
   if (!birthdate) return null
   const now = new Date()
@@ -66,6 +73,11 @@ export default async function handler(req, res) {
       endTime: doc.end_time,
       duration: `${minutesBetween(doc.start_time, doc.end_time)} min`,
       type: doc.session_type || doc.session_mode || 'Session',
+      sessionType: doc.session_type || null,
+      startedAt: sessionStartIso(doc),
+      completedAt: doc.completed_at || null,
+      completionRemarks: doc.completion_remarks || null,
+      source: doc.source || null,
       sessionMode: doc.session_mode,
       status: doc.is_archived ? 'Archived' : doc.status,
       isArchived: !!doc.is_archived,

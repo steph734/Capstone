@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
+import { apiGet, apiPatch } from '../../utils/api'
+import RecommendSessionModal from '../../components/RecommendSessionModal'
 import './TherapistAppointmentsPage.css'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -84,6 +87,13 @@ const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="
 const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
 const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 const RefreshIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L14 11h7V4l-3.35 2.35z"/></svg>
+const CheckCircleIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+const NotesIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+
+/* Has the session's start time (Asia/Manila, computed server-side) passed? */
+function hasStarted(appt) {
+  return !!appt.startedAt && new Date(appt.startedAt).getTime() <= Date.now()
+}
 
 /* ── Full Calendar ────────────────────────────────────────── */
 function FullCalendar({ appointments, selectedDate, onSelectDate }) {
@@ -194,7 +204,8 @@ function Avatar({ name, id, className = '' }) {
 }
 
 /* ── View Modal ───────────────────────────────────────────── */
-function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick }) {
+function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick, onComplete, onRecommend, canRecommend }) {
+  const canComplete = appt.status === 'Confirmed' && hasStarted(appt)
   return (
     <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="tapp-modal">
@@ -252,9 +263,22 @@ function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick }) {
               </div>
             </div>
           )}
+          {appt.status === 'Completed' && appt.completedAt && (
+            <div className="tapp-view-archived-row">
+              <span className="tapp-view-archived-icon">✅</span>
+              <div>
+                <span className="tapp-view-archived-lbl">Completed on</span>
+                <span className="tapp-view-archived-val">
+                  {new Date(appt.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+                  {' · '}
+                  {new Date(appt.completedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}
+                </span>
+              </div>
+            </div>
+          )}
           <div className="tapp-view-notes">
-            <span className="tapp-view-notes-lbl">Notes</span>
-            <p className="tapp-view-notes-text">{appt.notes || 'No notes for this session.'}</p>
+            <span className="tapp-view-notes-lbl">{appt.completionRemarks ? 'Completion remarks' : 'Notes'}</span>
+            <p className="tapp-view-notes-text">{appt.completionRemarks || appt.notes || 'No notes for this session.'}</p>
           </div>
         </div>
         <div className="tapp-modal-footer">
@@ -266,7 +290,18 @@ function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick }) {
           ) : (
             <>
               <button className="tapp-modal-cancel" onClick={onClose}>Close</button>
-              <button className="tapp-modal-submit" onClick={() => { onClose(); onEdit(appt) }}>Edit Appointment</button>
+              {canComplete && (
+                <button className="tapp-modal-submit" onClick={() => { onClose(); onComplete(appt) }}>
+                  <CheckCircleIcon /> Mark as completed
+                </button>
+              )}
+              {appt.status === 'Completed' ? (
+                canRecommend && (
+                  <button className="tapp-modal-submit" onClick={() => { onClose(); onRecommend(appt) }}>Recommend next session</button>
+                )
+              ) : (
+                <button className={canComplete ? 'tapp-modal-cancel' : 'tapp-modal-submit'} onClick={() => { onClose(); onEdit(appt) }}>Edit Appointment</button>
+              )}
             </>
           )}
         </div>
@@ -351,6 +386,53 @@ function RespondConfirmModal({ req, action, busy, onConfirm, onClose }) {
           <button className="tapp-confirm-ok" onClick={onConfirm} disabled={busy}>
             {busy ? 'Please wait…' : accept ? 'Yes, Accept' : 'Yes, Decline'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Mark-as-completed confirm modal ───────────────────────── */
+function CompleteConfirmModal({ appt, patient, busy, error, onConfirm, onClose }) {
+  const [remarks, setRemarks] = useState('')
+  return (
+    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && !busy && onClose()}>
+      <div className="tapp-confirm-modal tapp-complete-modal" role="dialog" aria-modal="true" aria-labelledby="tapp-complete-title">
+        <div className="tapp-confirm-icon">✅</div>
+        <h3 className="tapp-confirm-title" id="tapp-complete-title">Mark this session as completed?</h3>
+        <div className="tapp-complete-summary">
+          <div><span>Patient</span><b>{patient.name}</b></div>
+          <div><span>Date &amp; time</span><b>{fmtDateShort(appt.date)} · {fmt12(appt.time)}</b></div>
+          <div><span>Session type</span><b>{appt.type}</b></div>
+        </div>
+        <label className="tapp-complete-label" htmlFor="tapp-complete-remarks">Remarks <span>(optional)</span></label>
+        <textarea
+          id="tapp-complete-remarks" className="tapp-complete-remarks" rows={3} maxLength={500}
+          placeholder="How did the session go?" value={remarks} onChange={e => setRemarks(e.target.value)} disabled={busy}
+        />
+        {error && <p className="tapp-complete-error" role="alert">{error}</p>}
+        <div className="tapp-confirm-actions">
+          <button className="tapp-confirm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="tapp-confirm-ok" onClick={() => onConfirm(remarks.trim())} disabled={busy}>
+            {busy ? 'Saving…' : 'Mark as completed'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── "Recommend another session?" follow-up prompt ─────────── */
+function RecommendPromptModal({ patient, onRecommend, onClose }) {
+  return (
+    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="tapp-confirm-modal" role="dialog" aria-modal="true">
+        <div className="tapp-confirm-icon">🎉</div>
+        <h3 className="tapp-confirm-title">Session completed</h3>
+        <p className="tapp-confirm-msg">Recommend another session for <strong>{patient.name}</strong>?</p>
+        <div className="tapp-confirm-actions">
+          <button className="tapp-confirm-cancel" onClick={onClose}>Not now</button>
+          <button className="tapp-confirm-ok" onClick={onRecommend}>Recommend</button>
         </div>
       </div>
     </div>
@@ -509,7 +591,7 @@ function RequestCard({ req, onAccept, onDecline }) {
 }
 
 /* ── Appointment row (with kebab menu) ────────────────────── */
-function AppointmentRow({ appt, name, isToday, viewMode, onView, onEdit, onArchive, onRestoreClick, onStart }) {
+function AppointmentRow({ appt, name, isToday, viewMode, canRecommend, onView, onEdit, onArchive, onRestoreClick, onStart, onComplete, onRecommend, onViewNotes }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef(null)
 
@@ -520,7 +602,58 @@ function AppointmentRow({ appt, name, isToday, viewMode, onView, onEdit, onArchi
     return () => document.removeEventListener('mousedown', close)
   }, [menuOpen])
 
+  const started = hasStarted(appt)
   const showStart = isToday && appt.status === 'Confirmed'
+  const canComplete = appt.status === 'Confirmed' && started
+  const completed = appt.status === 'Completed'
+
+  const kebab = (
+    <div className="tapp2-kebab-wrap" ref={wrapRef}>
+      <button className="tapp2-kebab" onClick={() => setMenuOpen(o => !o)} aria-label="More options" aria-expanded={menuOpen}>
+        <DotsIcon />
+      </button>
+      {menuOpen && (
+        <div className="tapp2-menu">
+          {viewMode === 'archived' ? (
+            <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onRestoreClick() }}>
+              <UnarchiveIcon /> Restore
+            </button>
+          ) : (
+            <>
+              {canComplete && (
+                <button className="tapp2-menu-item tapp2-menu-success" onClick={() => { setMenuOpen(false); onComplete() }}>
+                  <CheckCircleIcon /> Mark as completed
+                </button>
+              )}
+              {completed && canRecommend && (
+                <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onRecommend() }}>
+                  <RefreshIcon /> Recommend next session
+                </button>
+              )}
+              {completed && (
+                <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onViewNotes() }}>
+                  <NotesIcon /> View notes
+                </button>
+              )}
+              {!completed && (
+                <>
+                  <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
+                    <PencilIcon /> Edit
+                  </button>
+                  <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
+                    <RefreshIcon /> Reschedule
+                  </button>
+                </>
+              )}
+              <button className="tapp2-menu-item tapp2-menu-danger" onClick={() => { setMenuOpen(false); onArchive() }}>
+                <ArchiveIcon /> Archive
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div className="tapp2-row">
@@ -532,36 +665,14 @@ function AppointmentRow({ appt, name, isToday, viewMode, onView, onEdit, onArchi
       </div>
       <span className={`tapp-status-badge ${statusClass(appt.status)}`}>{appt.status}</span>
       {showStart ? (
-        <button className="tapp2-btn-start" onClick={onStart}>Start session</button>
+        <>
+          <button className="tapp2-btn-start" onClick={onStart}>Start session</button>
+          {kebab}
+        </>
       ) : (
         <>
           <button className="tapp2-btn-view" onClick={onView}><EyeIcon /> View</button>
-          <div className="tapp2-kebab-wrap" ref={wrapRef}>
-            <button className="tapp2-kebab" onClick={() => setMenuOpen(o => !o)} aria-label="More options">
-              <DotsIcon />
-            </button>
-            {menuOpen && (
-              <div className="tapp2-menu">
-                {viewMode === 'archived' ? (
-                  <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onRestoreClick() }}>
-                    <UnarchiveIcon /> Restore
-                  </button>
-                ) : (
-                  <>
-                    <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
-                      <PencilIcon /> Edit
-                    </button>
-                    <button className="tapp2-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}>
-                      <RefreshIcon /> Reschedule
-                    </button>
-                    <button className="tapp2-menu-item tapp2-menu-danger" onClick={() => { setMenuOpen(false); onArchive() }}>
-                      <ArchiveIcon /> Archive
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {kebab}
         </>
       )}
     </div>
@@ -585,6 +696,16 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [toast,        setToast]        = useState('')
   const [respondTarget, setRespondTarget] = useState(null) // { req, action: 'accept' | 'decline' }
   const [respondBusy,   setRespondBusy]   = useState(false)
+  const navigate = useNavigate()
+  // Mark as completed
+  const [completeTarget, setCompleteTarget] = useState(null)
+  const [completeBusy,   setCompleteBusy]   = useState(false)
+  const [completeError,  setCompleteError]  = useState('')
+  // Recommend another session
+  const [promptRec,       setPromptRec]       = useState(null) // appointment, right after completing one
+  const [recommendTarget, setRecommendTarget] = useState(null) // appointment the modal is open for
+  // Patients with a recommendation still waiting on the parent.
+  const [openRecPatients, setOpenRecPatients] = useState(() => new Set())
 
   // Every appointment patients have actually booked with this therapist,
   // straight from the `appointments` collection (see
@@ -610,9 +731,22 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     return () => { cancelled = true }
   }, [user?.email])
 
+  useEffect(() => {
+    let cancelled = false
+    apiGet('/api/recommendations')
+      .then((body) => {
+        if (cancelled) return
+        const open = (body.recommendations || []).filter(r => r.status === 'Sent' && new Date(r.expiresAt) > new Date())
+        setOpenRecPatients(new Set(open.map(r => r.patientId)))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user?.email])
+
   const today = new Date().toISOString().slice(0,10)
   const todayCount = appointments.filter(a => a.date === today && a.status !== 'Archived').length
-  const schedCount = appointments.filter(a => a.status !== 'Archived' && a.status !== 'Cancelled').length
+  const schedCount = appointments.filter(a => a.status === 'Confirmed' || a.status === 'Pending').length
+  const doneCount  = appointments.filter(a => a.status === 'Completed').length
   const pendCount  = appointments.filter(a => a.status === 'Pending').length
   const archCount  = appointments.filter(a => a.status === 'Archived').length
 
@@ -669,6 +803,52 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       entity: `Appointment #${appt.id}`,
       status,
     })
+  }
+
+  // A completed session can be followed up with a recommendation when it is the
+  // patient's latest completed one, they have nothing upcoming, and no
+  // recommendation is already waiting on the parent (the server re-checks).
+  const canRecommendAppt = (appt) => {
+    if (!appt || appt.status !== 'Completed' || !appt.patientId) return false
+    if (openRecPatients.has(appt.patientId)) return false
+    const mine = appointments.filter(a => a.patientId === appt.patientId && !a.isArchived)
+    if (mine.some(a => (a.status === 'Confirmed' || a.status === 'Pending') && a.date >= today)) return false
+    const latest = mine.filter(a => a.status === 'Completed').sort((x, y) => (y.completedAt || y.date).localeCompare(x.completedAt || x.date))[0]
+    return !latest || latest.id === appt.id
+  }
+
+  const openComplete = (appt) => { setCompleteError(''); setCompleteTarget(appt) }
+
+  const confirmComplete = async (remarks) => {
+    if (!completeTarget) return
+    const appt = completeTarget
+    setCompleteBusy(true)
+    setCompleteError('')
+    try {
+      const body = await apiPatch(`/api/appointments/${appt.id}/complete`, { remarks })
+      const done = body.appointment || {}
+      setAppointments(p => p.map(a => (a.id === appt.id
+        ? { ...a, status: 'Completed', completedAt: done.completedAt || new Date().toISOString(), completionRemarks: done.completionRemarks || null }
+        : a)))
+      setCompleteTarget(null)
+      showToast('Session marked as completed')
+      logAppt('✅', `Marked ${patient(appt).name}'s session as completed`, appt)
+      if (body.canRecommend) setPromptRec({ ...appt, status: 'Completed' })
+    } catch (err) {
+      setCompleteError(err.message || 'Could not mark the session as completed.')
+    } finally {
+      setCompleteBusy(false)
+    }
+  }
+
+  const handleRecommendSent = (appt, result) => {
+    setRecommendTarget(null)
+    if (appt.patientId) setOpenRecPatients(prev => new Set(prev).add(appt.patientId))
+    const failed = Object.keys(result?.failed || {})
+    showToast(failed.length
+      ? `Recommendation sent (couldn't send by ${failed.join(', ')}).`
+      : 'Recommendation sent to the parent')
+    logAppt('🔁', `Recommended another session for ${patient(appt).name}`, appt)
   }
 
   const handleAdd       = (appt) => {
@@ -770,6 +950,13 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
             <div className="tapp-stat-body">
               <span className="tapp-stat-num">{pendCount}</span>
               <span className="tapp-stat-lbl">Pending</span>
+            </div>
+          </div>
+          <div className="tapp-stat">
+            <div className="tapp-stat-icon tapp-stat-blue">✅</div>
+            <div className="tapp-stat-body">
+              <span className="tapp-stat-num">{doneCount}</span>
+              <span className="tapp-stat-lbl">Completed</span>
             </div>
           </div>
           <div className="tapp-stat">
@@ -876,6 +1063,10 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
                       name={p.name}
                       isToday={a.date === today}
                       viewMode={viewMode}
+                      canRecommend={canRecommendAppt(a)}
+                      onComplete={() => openComplete(a)}
+                      onRecommend={() => setRecommendTarget(a)}
+                      onViewNotes={() => navigate('/therapist/notes-progress')}
                       onView={() => setViewAppt(a)}
                       onEdit={() => setEditAppt(a)}
                       onArchive={() => setConfirmArchId(a.id)}
@@ -893,7 +1084,37 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       )}
 
       {showAdd  && <FormModal onClose={() => setShowAdd(false)} onSave={handleAdd} appointments={appointments} />}
-      {viewAppt && <ViewModal appt={viewAppt} patient={patient(viewAppt)} onClose={() => setViewAppt(null)} onEdit={a => setEditAppt(a)} onRestoreClick={a => { setViewAppt(null); setConfirmRestoreAppt(a) }} />}
+      {viewAppt && <ViewModal appt={viewAppt} patient={patient(viewAppt)} onClose={() => setViewAppt(null)} onEdit={a => setEditAppt(a)} onRestoreClick={a => { setViewAppt(null); setConfirmRestoreAppt(a) }} onComplete={openComplete} onRecommend={a => setRecommendTarget(a)} canRecommend={canRecommendAppt(viewAppt)} />}
+      {completeTarget && (
+        <CompleteConfirmModal
+          appt={completeTarget}
+          patient={patient(completeTarget)}
+          busy={completeBusy}
+          error={completeError}
+          onConfirm={confirmComplete}
+          onClose={() => !completeBusy && setCompleteTarget(null)}
+        />
+      )}
+      {promptRec && (
+        <RecommendPromptModal
+          patient={patient(promptRec)}
+          onRecommend={() => { setRecommendTarget(promptRec); setPromptRec(null) }}
+          onClose={() => setPromptRec(null)}
+        />
+      )}
+      {recommendTarget && (
+        <RecommendSessionModal
+          patient={{
+            name: patient(recommendTarget).name,
+            guardian: recommendTarget.guardianName,
+            lastSessionLabel: `${fmtDateShort(recommendTarget.date)} · Completed`,
+          }}
+          appointmentId={recommendTarget.id}
+          defaultType={recommendTarget.sessionType || recommendTarget.type}
+          onClose={() => setRecommendTarget(null)}
+          onSent={(result) => handleRecommendSent(recommendTarget, result)}
+        />
+      )}
       {editAppt && <FormModal initial={editAppt} onClose={() => setEditAppt(null)} onSave={handleSaveEdit} appointments={appointments} />}
       {confirmArchId && (
         <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && setConfirmArchId(null)}>

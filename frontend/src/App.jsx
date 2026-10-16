@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
 import StreamProvider from './stream/StreamProvider'
 import { ProgressProvider } from './context/ProgressContext'
@@ -30,6 +30,7 @@ import HelpPage from './pages/HelpPage'
 import UpdatePaymentPage from './pages/UpdatePaymentPage'
 import PaymentHistoryPage from './pages/PaymentHistoryPage'
 import BookAppointmentPage from './pages/BookAppointmentPage'
+import RecommendationBookingPage from './pages/RecommendationBookingPage'
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard'
 import BranchesPage from './pages/admin/BranchesPage'
 import AdminSubscriptionPage from './pages/admin/AdminSubscriptionPage'
@@ -99,6 +100,32 @@ const getHomePath = (role) => {
   return '/dashboard'
 }
 
+// A parent who opens a "Set next therapy session" link while signed out is sent
+// to /login first; remember the link so they land back on it afterwards.
+const POST_LOGIN_KEY = 'tp_post_login'
+const RECOMMENDATION_PATH = /^\/appointments\/recommendation\/[a-f0-9]{24}$/i
+const rememberPostLogin = (path) => { try { if (RECOMMENDATION_PATH.test(path)) sessionStorage.setItem(POST_LOGIN_KEY, path) } catch { /* storage unavailable */ } }
+const forgetPostLogin = () => { try { sessionStorage.removeItem(POST_LOGIN_KEY) } catch { /* storage unavailable */ } }
+const landingPath = (role) => {
+  if (role === 'Patient') {
+    try { const p = sessionStorage.getItem(POST_LOGIN_KEY); if (p && RECOMMENDATION_PATH.test(p)) return p } catch { /* storage unavailable */ }
+  }
+  return getHomePath(role)
+}
+
+// Signed out: stash this exact link, then go sign in.
+function RecommendationLoginRedirect() {
+  const loc = useLocation()
+  rememberPostLogin(loc.pathname)
+  return <Navigate to="/login" replace />
+}
+
+// Signed in as the guardian: the link has done its job, so stop redirecting back to it.
+function RecommendationBookingRoute(props) {
+  useEffect(() => { forgetPostLogin() }, [])
+  return <RecommendationBookingPage {...props} />
+}
+
 // Login wrapper to handle authentication
 function LoginWrapper({ onLogin, onVerify2fa }) {
   const navigate = useNavigate()
@@ -106,7 +133,7 @@ function LoginWrapper({ onLogin, onVerify2fa }) {
   const handleLogin = async (email, password) => {
     const result = await onLogin(email, password)
     if (result.success) {
-      navigate(getHomePath(result.user?.role))
+      navigate(landingPath(result.user?.role))
     } else if (result.requiresVerification) {
       navigate('/verify-otp', { state: { email: result.email || email } })
     }
@@ -121,7 +148,7 @@ function LoginWrapper({ onLogin, onVerify2fa }) {
       onLogin={handleLogin}
       onVerify2fa={async (email, code) => {
         const result = await onVerify2fa(email, code)
-        if (result.success) navigate(getHomePath(result.user?.role))
+        if (result.success) navigate(landingPath(result.user?.role))
         return result
       }}
     />
@@ -385,7 +412,7 @@ function App() {
           path="/login" 
           element={
             isAuthenticated ? (
-              <Navigate to={getHomePath(currentUser?.role)} replace />
+              <Navigate to={landingPath(currentUser?.role)} replace />
             ) : (
               <LoginWrapper onLogin={handleLogin} onVerify2fa={handleVerify2fa} />
             )
@@ -1313,6 +1340,20 @@ function App() {
               <Navigate to="/login" replace />
             )
           } 
+        />
+        <Route
+          path="/appointments/recommendation/:id"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <RecommendationBookingRoute user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <RecommendationLoginRedirect />
+            )
+          }
         />
 
         <Route 

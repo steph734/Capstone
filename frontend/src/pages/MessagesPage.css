@@ -251,6 +251,23 @@
    — redundant with our own .msg-left-header title + compose button above. */
 .msg-list .str-chat__channel-list__header { display: none; }
 
+/* stream-chat-react hides its channel list at <=767px (visibility:hidden, slid
+   off-screen) and expects its own mobile-nav toggle to reveal it. We run our own
+   list/chat switch (.msg-left / .msg-center), so keep the list visible on phones —
+   otherwise conversations show on desktop but the phone list renders empty. */
+@media (max-width: 767px) {
+  .msg-list .str-chat__channel-list {
+    position: static;
+    transform: none;
+    visibility: visible;
+    pointer-events: auto;
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 auto;
+    box-shadow: none;
+  }
+}
+
 /* Let Stream's own Window/MessageList/MessageComposer fill the remaining
    height of .msg-center at any width, instead of each keeping its own
    intrinsic/min size (which is what caused empty space and overflow). */

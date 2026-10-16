@@ -27,6 +27,11 @@ import tts from './_lib/routes/tts.js'
 import verifyCredentials from './_lib/routes/verify-credentials.js'
 import appointmentsCreate from './_lib/routes/appointments-create.js'
 import appointmentsRespond from './_lib/routes/appointments-respond.js'
+import appointmentsComplete from './_lib/routes/appointments-complete.js'
+import recommendationsCollection from './_lib/routes/recommendations-collection.js'
+import recommendationsItem from './_lib/routes/recommendations-item.js'
+import recommendationsAction from './_lib/routes/recommendations-action.js'
+import recommendationsExpire from './_lib/routes/recommendations-expire.js'
 import appointmentsAvailability from './_lib/routes/appointments-availability.js'
 import appointmentsTherapists from './_lib/routes/appointments-therapists.js'
 import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slots.js'
@@ -169,6 +174,12 @@ app.all('/api/tts', tts)
 app.all('/api/verify-credentials', verifyCredentials)
 app.all('/api/appointments/create', appointmentsCreate)
 app.all('/api/appointments/:id/respond', appointmentsRespond)
+app.all('/api/appointments/:id/complete', appointmentsComplete)
+// Literal paths before the :id routes so "expire" isn't read as an id.
+app.all('/api/recommendations/expire', recommendationsExpire)
+app.all('/api/recommendations/:id/:action', recommendationsAction)
+app.all('/api/recommendations/:id', recommendationsItem)
+app.all('/api/recommendations', recommendationsCollection)
 app.all('/api/appointments/availability', appointmentsAvailability)
 app.all('/api/appointments/therapists', appointmentsTherapists)
 app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)

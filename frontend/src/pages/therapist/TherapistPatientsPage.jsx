@@ -7,6 +7,8 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useStreamCtx } from '../../stream/StreamProvider'
 import useContact from '../../stream/useContact'
 import EmailGuardianModal from '../../components/EmailGuardianModal'
+import RecommendSessionModal from '../../components/RecommendSessionModal'
+import { TherapistRecommendationAttachment } from '../../components/SessionRecommendationCard'
 import { generateUniqueId } from '../../utils/idGenerator'
 
 function fmtDate(iso) {
@@ -233,7 +235,7 @@ function MessageModal({ patient, therapistEmail, onClose }) {
 
         {channel && (
           <div className="tp-msg-stream-body">
-            <Channel channel={channel}>
+            <Channel channel={channel} Attachment={TherapistRecommendationAttachment}>
               <Window>
                 <MessageList />
                 <MessageComposer />
@@ -333,6 +335,11 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [profilePt, setProfilePt] = useState(null)
   const [messagePt, setMessagePt] = useState(null)
   const [emailingPt, setEmailingPt] = useState(null)
+  // Patient the "Recommend next session" modal is open for, and a short success notice.
+  const [recommendPt, setRecommendPt] = useState(null)
+  const [notice, setNotice] = useState('')
+  // "No upcoming session" KPI card toggles this filter.
+  const [noUpcomingOnly, setNoUpcomingOnly] = useState(false)
   // { type: 'archive' | 'delete', patient } while a confirm modal is open.
   const [confirmModal, setConfirmModal] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -420,6 +427,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     if (!matchSearch) return false
     if (filter === 'Archived') return p.archived
     if (p.archived) return false
+    if (noUpcomingOnly && p.nextSessionDate) return false
     return filter === 'All' || p.status === filter
   })
 
@@ -502,13 +510,19 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
             <span className="tp-kpi-lbl">Upcoming booked</span>
           </div>
         </div>
-        <div className="tp-kpi-card">
+        <button
+          type="button"
+          className={`tp-kpi-card tp-kpi-card-btn${noUpcomingOnly ? ' tp-kpi-card-on' : ''}`}
+          onClick={() => { setNoUpcomingOnly(v => !v); setFilter('All') }}
+          aria-pressed={noUpcomingOnly}
+          title={noUpcomingOnly ? 'Show all patients' : 'Show only patients with no upcoming session'}
+        >
           <span className="tp-kpi-icon tp-kpi-icon-alert"><AlertIcon /></span>
           <div className="tp-kpi-text">
             <span className="tp-kpi-num">{counts.noUpcoming}</span>
-            <span className="tp-kpi-lbl">No upcoming session</span>
+            <span className="tp-kpi-lbl">No upcoming session{noUpcomingOnly ? ' · filtered' : ''}</span>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Toolbar */}
@@ -645,6 +659,12 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
               <EmailIcon />
               Send email
             </button>
+            {!p.nextSessionDate && p.canRecommend && p.lastCompletedAppointmentId && (
+              <button onClick={() => { setRecommendPt(p); setOpenMenuId(null); setMenuPos(null) }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+                Recommend next session
+              </button>
+            )}
             <button onClick={() => { setProfilePt(p); setOpenMenuId(null); setMenuPos(null) }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
               View notes
@@ -654,6 +674,22 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
         )
       })()}
 
+      {notice && <div className="tp-notice" role="status">{notice}</div>}
+      {recommendPt && (
+        <RecommendSessionModal
+          patient={{ name: recommendPt.name, guardian: recommendPt.guardian, lastSessionLabel: `${recommendPt.lastSession} · Completed` }}
+          appointmentId={recommendPt.lastCompletedAppointmentId}
+          defaultType={recommendPt.condition}
+          onClose={() => setRecommendPt(null)}
+          onSent={() => {
+            const id = recommendPt.id
+            setPatients(prev => prev.map(pt => (pt.id === id ? { ...pt, canRecommend: false } : pt)))
+            setRecommendPt(null)
+            setNotice('Recommendation sent to the parent')
+            setTimeout(() => setNotice(''), 3500)
+          }}
+        />
+      )}
       {showAdd && (
         <AddPatientModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />
       )}

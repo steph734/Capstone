@@ -1,5 +1,6 @@
 import { getMongo, getDb } from '../mongo.js'
 import { Employee } from '../models/employee.js'
+import { canRecommend } from '../sessionRecommendations.js'
 
 // GET /api/patients/therapist-list?email=... -> every distinct patient who
 // has actually booked an appointment with this therapist, derived from the
@@ -58,13 +59,15 @@ export default async function handler(req, res) {
       byPatient.get(key).push(doc)
     }
 
-    const patients = Array.from(byPatient.entries()).map(([key, appts]) => {
+    const patients = await Promise.all(Array.from(byPatient.entries()).map(async ([key, appts]) => {
       const p = appts[appts.length - 1].patient || {}
       const active = appts.filter((a) => !a.is_archived)
       const iso = (a) => dateIso(a.session_date)
       const past = active.filter((a) => iso(a) && iso(a) <= todayIso).sort((a, b) => iso(b).localeCompare(iso(a)))
       const future = active.filter((a) => iso(a) && iso(a) > todayIso).sort((a, b) => iso(a).localeCompare(iso(b)))
       const latest = appts[appts.length - 1]
+      // Most recent completed session — the one a "recommend next session" follows up on.
+      const lastCompleted = active.filter((a) => a.status === 'Completed').sort((a, b) => iso(b).localeCompare(iso(a)))[0] || null
 
       return {
         id: key,
@@ -76,7 +79,10 @@ export default async function handler(req, res) {
         // anywhere in the schema yet — default everyone to Active rather
         // than invent a signal.
         status: 'Active',
-        lastSessionDate: past[0] ? iso(past[0]) : null,
+        // Only sessions that actually took place count as the "last" one.
+        lastSessionDate: (active.filter((a) => a.status === 'Completed').map(iso).sort().pop()) || (past[0] ? iso(past[0]) : null),
+        lastCompletedAppointmentId: lastCompleted ? String(lastCompleted._id) : null,
+        canRecommend: lastCompleted && p._id ? await canRecommend(db, p._id) : false,
         nextSessionDate: future[0] ? iso(future[0]) : null,
         sessions: active.length,
         guardian: latest.guardian_name || [p.guardian_first_name, p.guardian_last_name].filter(Boolean).join(' ') || 'Not specified',
@@ -85,7 +91,7 @@ export default async function handler(req, res) {
         joinedDate: p.created_at ? dateIso(p.created_at) : dateIso(appts[0].created_at),
         notes: 'No clinical notes yet.',
       }
-    })
+    }))
 
     return res.status(200).json({ patients })
   } catch (err) {

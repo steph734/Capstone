@@ -1,0 +1,22 @@
+.src-card {
+  min-width: 240px; max-width: 320px; background: #fff; border: 1px solid #dcebe4; border-radius: 16px; overflow: hidden; margin: 6px 0;
+}
+.src-head { display: flex; gap: 10px; align-items: center; padding: 12px 14px; background: #eef7f2; }
+.src-icon {
+  width: 38px; height: 38px; border-radius: 10px; background: #2c4a3e; color: #fff; font-size: 20px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.src-title { font-weight: 800; font-size: 14px; color: #1f3d33; line-height: 1.25; }
+.src-from { font-size: 12px; color: #5b6b66; margin-top: 1px; }
+.src-rows { margin: 0; padding: 4px 14px 0; font-size: 13px; }
+.src-rows > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.src-rows > div + div { border-top: 1px solid #edf1ef; }
+.src-rows dt { color: #6b7c75; }
+.src-rows dd { margin: 0; font-weight: 800; color: #1f2d27; text-align: right; }
+.src-btn {
+  display: block; width: calc(100% - 28px); margin: 10px 14px 6px; padding: 12px; border: none; border-radius: 10px;
+  background: #e0508f; color: #fff; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer;
+}
+.src-btn:hover:not(:disabled) { background: #cc417e; }
+.src-btn:disabled { background: #cbd5d0; cursor: not-allowed; }
+.src-note { margin: 4px 14px 12px; font-size: 11.5px; color: #6b7c75; }

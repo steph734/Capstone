@@ -19,7 +19,9 @@ export default async function handler(req, res) {
     await getMongo()
     const identity = await resolveCallerIdentity(email)
     if (!identity) {
-      return res.status(404).json({ error: 'No TherapyPro account is linked to this email yet.' })
+      // 200 (not 404): a brand-new guardian has no patient record until their first booking,
+      // which is expected, not a failed request. The client shows "messaging unavailable".
+      return res.status(200).json({ unavailable: true, error: 'No TherapyPro account is linked to this email yet.' })
     }
 
     const client = getStreamServerClient()

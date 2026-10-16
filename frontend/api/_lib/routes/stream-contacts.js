@@ -1,5 +1,5 @@
 import { getMongo } from '../mongo.js'
-import { resolveCallerIdentity, therapistsForPatient, patientsForTherapist } from '../stream/identity.js'
+import { resolveCallerIdentity, therapistsForPatient, patientsForTherapist, canonicalPatientId } from '../stream/identity.js'
 
 // GET /api/stream/contacts?email=...
 // People this account is allowed to start a conversation with (used by the
@@ -21,13 +21,19 @@ export default async function handler(req, res) {
 
     if (caller.kind === 'therapist') {
       const patients = await patientsForTherapist(caller.employee._id)
-      return res.status(200).json({
-        role: 'therapist',
-        contacts: patients.map((p) => ({ targetPatientId: String(p.patientId), name: `${p.guardianName} (guardian of ${p.patientName})` })),
-      })
+      // One entry per guardian chat identity, even if they booked several times.
+      const seen = new Set()
+      const contacts = []
+      for (const p of patients) {
+        const canon = String(await canonicalPatientId(p.patientId))
+        if (seen.has(canon)) continue
+        seen.add(canon)
+        contacts.push({ targetPatientId: String(p.patientId), name: `${p.guardianName} (guardian of ${p.patientName})` })
+      }
+      return res.status(200).json({ role: 'therapist', contacts })
     }
 
-    const therapists = await therapistsForPatient(caller.patient._id)
+    const therapists = await therapistsForPatient(caller.patientIds)
     return res.status(200).json({
       role: 'patient',
       contacts: therapists.map((e) => ({

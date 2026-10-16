@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb'
 import { getMongo, getDb } from '../mongo.js'
 import { getStreamServerClient, upsertStreamUser, patientStreamId, therapistStreamId } from '../stream/serverClient.js'
-import { resolveCallerIdentity, therapistsForPatient, patientsForTherapist, userIdForStreamId } from '../stream/identity.js'
+import { resolveCallerIdentity, therapistsForPatient, patientsForTherapist, userIdForStreamId, canonicalPatientId } from '../stream/identity.js'
 
 // POST /api/stream/contact  { email, targetPatientId? , targetEmployeeId? }
 // Before a first chat/call, upserts the OTHER person in Stream — but only if
@@ -38,14 +38,16 @@ export default async function handler(req, res) {
       const allowed = await patientsForTherapist(caller.employee._id)
       const match = allowed.find((p) => String(p.patientId) === targetPatientId)
       if (!match) return res.status(403).json({ error: "You don't have an appointment on record with this patient." })
-      otherStreamId = patientStreamId(targetPatientId)
+      // The guardian logs in as their oldest patient row, so chat with THAT identity.
+      const canonId = await canonicalPatientId(targetPatientId)
+      otherStreamId = patientStreamId(canonId)
       otherName = match.guardianName
       otherAppRole = 'patient'
       patientId = new ObjectId(targetPatientId)
       therapistUserId = caller.userId
       guardianUserId = await userIdForStreamId(otherStreamId)
     } else if (caller.kind === 'patient' && targetEmployeeId) {
-      const allowed = await therapistsForPatient(caller.patient._id)
+      const allowed = await therapistsForPatient(caller.patientIds)
       const match = allowed.find((e) => String(e._id) === targetEmployeeId)
       if (!match) return res.status(403).json({ error: "You don't have an appointment on record with this therapist." })
       otherStreamId = therapistStreamId(targetEmployeeId)

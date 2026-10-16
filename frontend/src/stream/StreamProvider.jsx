@@ -19,7 +19,7 @@ async function fetchStreamSession(email) {
     body: JSON.stringify({ email }),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'Could not start a messaging session.')
+  if (!res.ok || data.unavailable) throw new Error(data.error || 'Could not start a messaging session.')
   return data
 }
 

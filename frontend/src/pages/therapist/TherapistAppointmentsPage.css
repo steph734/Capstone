@@ -1467,3 +1467,52 @@
 }
 .tapp-complete-remarks:focus { outline: 2px solid #4a6b5d; outline-offset: 1px; }
 .tapp-complete-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 600; }
+
+/* ── Completion modals (clean, icon-based) ─────────────────── */
+.tapp-cm {
+  background: #fff; color: #1f2d27; border-radius: 20px; width: 100%; max-width: 440px; padding: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22); animation: tapp-slide-up 0.22s ease; color-scheme: light;
+}
+.tapp-cm-narrow { max-width: 400px; }
+.tapp-cm-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+.tapp-cm-badge {
+  width: 48px; height: 48px; border-radius: 14px; background: #e8f5f0; color: #2c6e55;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.tapp-cm-head h3 { margin: 2px 0 4px; font-size: 18px; font-weight: 800; color: #1f3d33; line-height: 1.25; }
+.tapp-cm-head p { margin: 0; font-size: 13.5px; color: #6b7c75; line-height: 1.5; }
+.tapp-cm-rows { margin: 0 0 18px; border: 1px solid #e3ebe7; border-radius: 14px; overflow: hidden; }
+.tapp-cm-rows > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.tapp-cm-rows > div + div { border-top: 1px solid #edf1ef; }
+.tapp-cm-rows dt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7c75; }
+.tapp-cm-rows dt svg { color: #8aa398; }
+.tapp-cm-rows dd { margin: 0; font-size: 13.5px; font-weight: 700; color: #1f2d27; text-align: right; }
+.tapp-cm-label { display: block; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #6b7c75; margin-bottom: 6px; }
+.tapp-cm-label span { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.tapp-cm-text {
+  width: 100%; box-sizing: border-box; border: 1px solid #dfe7e3; border-radius: 12px; padding: 11px 13px;
+  font: inherit; font-size: 14px; color: #1f2d27; background: #fff; resize: vertical; min-height: 84px;
+}
+.tapp-cm-text::placeholder { color: #9aab9f; }
+.tapp-cm-text:focus { outline: 2px solid #2c6e55; outline-offset: 1px; border-color: transparent; }
+.tapp-cm-count { text-align: right; font-size: 11.5px; color: #9aab9f; margin: 4px 2px 14px; }
+.tapp-cm-actions { display: flex; gap: 10px; margin-top: 6px; }
+.tapp-cm-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px;
+  border-radius: 12px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; border: 1px solid transparent;
+}
+.tapp-cm-btn:disabled { opacity: .55; cursor: not-allowed; }
+.tapp-cm-ghost { background: #fff; border-color: #dfe7e3; color: #1f2d27; }
+.tapp-cm-ghost:hover:not(:disabled) { background: #f5faf8; }
+.tapp-cm-primary { background: #2c6e55; color: #fff; }
+.tapp-cm-primary:hover:not(:disabled) { background: #245a47; }
+.tapp-view-done-icon { display: inline-flex; color: #2c6e55; }
+@media (max-width: 480px) { .tapp-cm { padding: 20px; } .tapp-cm-actions { flex-direction: column-reverse; } }
+
+/* Button colours: green = complete, blue = recommend */
+.tapp-cm-primary { background: #16a34a; }
+.tapp-cm-primary:hover:not(:disabled) { background: #15803d; }
+.tapp-cm-badge { background: #dcfce7; color: #15803d; }
+.tapp-cm-blue .tapp-cm-primary { background: #2563eb; }
+.tapp-cm-blue .tapp-cm-primary:hover:not(:disabled) { background: #1d4ed8; }
+.tapp-cm-blue .tapp-cm-badge { background: #dbeafe; color: #1d4ed8; }

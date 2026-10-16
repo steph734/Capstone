@@ -57,3 +57,18 @@
   .rsm-row { grid-template-columns: 1fr; gap: 0; }
   .rsm-foot { flex-direction: column-reverse; }
 }
+
+/* The app resets form controls (appearance: none), so the native checkbox is invisible.
+   Draw a visible box; the real input stays in place, hidden but focusable. */
+.rsm-check { position: relative; display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-weight: 700; color: #24352d; }
+.rsm-check input { position: absolute; opacity: 0; width: 22px; height: 22px; margin: 0; cursor: pointer; }
+.rsm-check::before {
+  content: ''; flex: none; width: 22px; height: 22px; box-sizing: border-box; border-radius: 6px; border: 2px solid #9fb3a9; background: #fff;
+  transition: background .12s, border-color .12s;
+}
+.rsm-check:has(input:checked)::before {
+  background: #2c4a3e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 15px no-repeat;
+  border-color: #2c4a3e;
+}
+.rsm-check:has(input:focus-visible)::before { outline: 2px solid #3e6354; outline-offset: 2px; }
+.rsm-check:has(input:disabled) { opacity: .6; cursor: not-allowed; }

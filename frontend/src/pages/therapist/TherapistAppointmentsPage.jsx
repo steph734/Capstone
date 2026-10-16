@@ -88,6 +88,14 @@ const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="
 const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 const RefreshIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L14 11h7V4l-3.35 2.35z"/></svg>
 const CheckCircleIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+const strokeIcon = (children, size = 18) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+)
+const BadgeCheckIcon  = ({ size = 26 }) => strokeIcon(<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>, size)
+const UserLineIcon    = () => strokeIcon(<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>, 16)
+const CalLineIcon     = () => strokeIcon(<><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>, 16)
+const ClipboardIcon   = () => strokeIcon(<><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /></>, 16)
+const RepeatIcon      = ({ size = 26 }) => strokeIcon(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>, size)
 const NotesIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
 
 /* Has the session's start time (Asia/Manila, computed server-side) passed? */
@@ -265,7 +273,7 @@ function ViewModal({ appt, patient, onClose, onEdit, onRestoreClick, onComplete,
           )}
           {appt.status === 'Completed' && appt.completedAt && (
             <div className="tapp-view-archived-row">
-              <span className="tapp-view-archived-icon">✅</span>
+              <span className="tapp-view-archived-icon tapp-view-done-icon"><BadgeCheckIcon size={20} /></span>
               <div>
                 <span className="tapp-view-archived-lbl">Completed on</span>
                 <span className="tapp-view-archived-val">
@@ -397,24 +405,33 @@ function CompleteConfirmModal({ appt, patient, busy, error, onConfirm, onClose }
   const [remarks, setRemarks] = useState('')
   return (
     <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="tapp-confirm-modal tapp-complete-modal" role="dialog" aria-modal="true" aria-labelledby="tapp-complete-title">
-        <div className="tapp-confirm-icon">✅</div>
-        <h3 className="tapp-confirm-title" id="tapp-complete-title">Mark this session as completed?</h3>
-        <div className="tapp-complete-summary">
-          <div><span>Patient</span><b>{patient.name}</b></div>
-          <div><span>Date &amp; time</span><b>{fmtDateShort(appt.date)} · {fmt12(appt.time)}</b></div>
-          <div><span>Session type</span><b>{appt.type}</b></div>
+      <div className="tapp-cm" role="dialog" aria-modal="true" aria-labelledby="tapp-complete-title">
+        <div className="tapp-cm-head">
+          <span className="tapp-cm-badge"><BadgeCheckIcon /></span>
+          <div>
+            <h3 id="tapp-complete-title">Mark session as completed</h3>
+            <p>This will notify the parent and can't be undone.</p>
+          </div>
         </div>
-        <label className="tapp-complete-label" htmlFor="tapp-complete-remarks">Remarks <span>(optional)</span></label>
+
+        <dl className="tapp-cm-rows">
+          <div><dt><UserLineIcon /> Patient</dt><dd>{patient.name}</dd></div>
+          <div><dt><CalLineIcon /> Date &amp; time</dt><dd>{fmtDateShort(appt.date)} · {fmt12(appt.time)}</dd></div>
+          <div><dt><ClipboardIcon /> Session type</dt><dd>{appt.type}</dd></div>
+        </dl>
+
+        <label className="tapp-cm-label" htmlFor="tapp-complete-remarks">Remarks <span>(optional)</span></label>
         <textarea
-          id="tapp-complete-remarks" className="tapp-complete-remarks" rows={3} maxLength={500}
+          id="tapp-complete-remarks" className="tapp-cm-text" rows={3} maxLength={500}
           placeholder="How did the session go?" value={remarks} onChange={e => setRemarks(e.target.value)} disabled={busy}
         />
+        <div className="tapp-cm-count">{remarks.length}/500</div>
         {error && <p className="tapp-complete-error" role="alert">{error}</p>}
-        <div className="tapp-confirm-actions">
-          <button className="tapp-confirm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="tapp-confirm-ok" onClick={() => onConfirm(remarks.trim())} disabled={busy}>
-            {busy ? 'Saving…' : 'Mark as completed'}
+
+        <div className="tapp-cm-actions">
+          <button className="tapp-cm-btn tapp-cm-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="tapp-cm-btn tapp-cm-primary" onClick={() => onConfirm(remarks.trim())} disabled={busy}>
+            <CheckCircleIcon /> {busy ? 'Saving…' : 'Mark as completed'}
           </button>
         </div>
       </div>
@@ -426,13 +443,17 @@ function CompleteConfirmModal({ appt, patient, busy, error, onConfirm, onClose }
 function RecommendPromptModal({ patient, onRecommend, onClose }) {
   return (
     <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="tapp-confirm-modal" role="dialog" aria-modal="true">
-        <div className="tapp-confirm-icon">🎉</div>
-        <h3 className="tapp-confirm-title">Session completed</h3>
-        <p className="tapp-confirm-msg">Recommend another session for <strong>{patient.name}</strong>?</p>
-        <div className="tapp-confirm-actions">
-          <button className="tapp-confirm-cancel" onClick={onClose}>Not now</button>
-          <button className="tapp-confirm-ok" onClick={onRecommend}>Recommend</button>
+      <div className="tapp-cm tapp-cm-narrow tapp-cm-blue" role="dialog" aria-modal="true">
+        <div className="tapp-cm-head">
+          <span className="tapp-cm-badge"><RepeatIcon /></span>
+          <div>
+            <h3>Session completed</h3>
+            <p>Recommend another session for <strong>{patient.name}</strong>?</p>
+          </div>
+        </div>
+        <div className="tapp-cm-actions">
+          <button className="tapp-cm-btn tapp-cm-ghost" onClick={onClose}>Not now</button>
+          <button className="tapp-cm-btn tapp-cm-primary" onClick={onRecommend}>Recommend</button>
         </div>
       </div>
     </div>
@@ -953,7 +974,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
             </div>
           </div>
           <div className="tapp-stat">
-            <div className="tapp-stat-icon tapp-stat-blue">✅</div>
+            <div className="tapp-stat-icon tapp-stat-blue"><BadgeCheckIcon size={20} /></div>
             <div className="tapp-stat-body">
               <span className="tapp-stat-num">{doneCount}</span>
               <span className="tapp-stat-lbl">Completed</span>

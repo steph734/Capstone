@@ -40,6 +40,8 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
   const [start, setStart] = useState(null)
   const [note, setNote] = useState('')
   const [payMethod, setPayMethod] = useState('online') // online | cash
+  const [cashOpen, setCashOpen] = useState(true)
+  const [received, setReceived] = useState('')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -98,6 +100,9 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
 
   const slot = slots?.find((s) => s.start === start) || null
   const fee = rec?.sessionFee || 0
+  const receivedNum = parseFloat(received) || 0
+  const cashShort = payMethod === 'cash' && receivedNum < fee
+  const change = receivedNum > fee ? receivedNum - fee : 0
   const expired = rec && (rec.expired || rec.status === 'Expired')
 
   const book = async (payment) => {
@@ -119,7 +124,7 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
 
   // "Continue to payment": hold the time first, then pay (online) or confirm (cash).
   const proceed = async () => {
-    if (!date || !start || busy) return
+    if (!date || !start || busy || cashShort) return
     setBusy(true)
     setError('')
     try {
@@ -127,7 +132,7 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
       setHeldUntil(h.heldUntil)
       setNow(Date.now())
       setBusy(false)
-      if (payMethod === 'cash') { await book({ method: 'cash' }); return }
+      if (payMethod === 'cash') { await book({ method: 'cash', amountReceived: receivedNum, amountChange: change }); return }
       paidRef.current = null
       setCheckoutOpen(true)
     } catch (e) {
@@ -222,6 +227,28 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
                   <CashIcon /><span>Pay at the clinic<small>Cash</small></span>
                 </button>
               </div>
+
+              {payMethod === 'cash' && (
+                <div className="rbm-cash">
+                  <button type="button" className="rbm-cash-head" aria-expanded={cashOpen} onClick={() => setCashOpen((o) => !o)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={cashOpen ? 'open' : ''}><polyline points="6 9 12 15 18 9" /></svg>
+                    Cash payment details
+                  </button>
+                  {cashOpen && (
+                    <div className="rbm-cash-body">
+                      <label className="rbm-label" htmlFor="rbm-received">Amount received <em>*</em></label>
+                      <input id="rbm-received" className="rbm-text rbm-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                        value={received} onChange={(e) => setReceived(e.target.value)} />
+                      {received !== '' && cashShort && <p className="rbm-error rbm-cash-err">Must be at least {peso(fee)}</p>}
+                      <dl className="rbm-cash-calc">
+                        <div><dt>Amount received</dt><dd>₱{receivedNum.toFixed(2)}</dd></div>
+                        <div><dt>Less: Rate per Session</dt><dd>− ₱{Number(fee).toFixed(2)}</dd></div>
+                        <div className="rbm-cash-total"><dt>Amount change</dt><dd>₱{change.toFixed(2)}</dd></div>
+                      </dl>
+                    </div>
+                  )}
+                </div>
+              )}
             </aside>
           </div>
         </div>
@@ -232,7 +259,7 @@ export default function RecommendationBookingModal({ recommendationId: id, onClo
             {error && <p className="rbm-error" role="alert">{error}</p>}
             {!error && !(heldUntil && holdLeft > 0) && <p className="rbm-fine">One session only. Your time is held for 30 minutes while you pay.</p>}
           </div>
-          <button className="rbm-btn rbm-btn-primary rbm-cta" onClick={proceed} disabled={!date || !start || busy}>
+          <button className="rbm-btn rbm-btn-primary rbm-cta" onClick={proceed} disabled={!date || !start || busy || cashShort}>
             {busy ? 'Please wait…' : payMethod === 'cash' ? 'Confirm booking' : 'Continue to payment'}
           </button>
         </div>

@@ -1033,7 +1033,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter) &&
                 isGamePublished(g.title)
               ).map((game, i) => {
-                const unlocked = character.level >= game.requiredLevel
+                const unlocked = true // every game is open from level 1
                 const catMeta = GAME_CATEGORIES.find(c => c.id === game.category)
                 const diffMeta = GAME_DIFFICULTIES.find(d => d.id === game.difficulty)
                 return (

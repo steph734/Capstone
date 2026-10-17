@@ -16,6 +16,18 @@ import PuzzlePickerModal from './games/PuzzlePickerModal'
 import MoneyMatchPage from './games/MoneyMatchPage'
 import DailyRoutinesPage from './games/DailyRoutinesPage'
 import FeedPaoPage from './games/FeedPaoPage'
+import AlphabetBlast from '../games/alphabet-blast/AlphabetBlast'
+import AlphabetSettings from '../games/alphabet-blast/SettingsPanel'
+import { loadSettings, saveSettings } from '../games/alphabet-blast/config'
+import RhymeTime from '../games/rhyme-time/RhymeTime'
+import RhymeSettings from '../games/rhyme-time/SettingsPanel'
+import { loadSettings as loadRhymeSettings, saveSettings as saveRhymeSettings } from '../games/rhyme-time/rounds'
+import SoundHunt from '../games/sound-hunt/SoundHunt'
+import SoundSettings from '../games/sound-hunt/SettingsPanel'
+import { loadSettings as loadSoundSettings, saveSettings as saveSoundSettings } from '../games/sound-hunt/rounds'
+import SentenceBuilder from '../games/sentence-builder/SentenceBuilder'
+import SentenceSettings from '../games/sentence-builder/SettingsPanel'
+import { loadSettings as loadSentenceSettings, saveSettings as saveSentenceSettings } from '../games/sentence-builder/sentences'
 import CopyColorsPage from './games/CopyColorsPage'
 import SpotDifferencePage from './games/SpotDifferencePage'
 import EmergencyReadyPage from './games/EmergencyReadyPage'
@@ -176,8 +188,12 @@ function CategoryModal({ onSelect, onClose, lang }) {
 // Games that open their own start screen (or picker) after the card is tapped.
 const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors', 'spot-difference', 'emergency-ready'])
 
-function GameInstructionsModal({ game, onStart, onClose }) {
+function GameInstructionsModal({ game, onStart, onClose, settingsKey = null }) {
   const [realBadge, setRealBadge] = useState(null)
+  const [abSettings, setAbSettings] = useState(null)
+  const [rtSettings, setRtSettings] = useState(null)
+  const [sbSettings, setSbSettings] = useState(null)
+  const [shSettings, setShSettings] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -224,6 +240,30 @@ function GameInstructionsModal({ game, onStart, onClose }) {
         <button onClick={() => onStart(game)} style={{ width:'100%', background:game.color, border:'none', color:'#fff', borderRadius:14, padding:'13px', cursor:'pointer', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:15, fontWeight:800, boxShadow:`0 6px 16px ${game.color}55`, marginBottom:10 }}>
           Start Game 🎮
         </button>
+        {game.id === 'alphabet' && settingsKey && (
+          <button onClick={() => setAbSettings(loadSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
+            Game settings
+          </button>
+        )}
+        {game.id === 'rhyme' && settingsKey && (
+          <button onClick={() => setRtSettings(loadRhymeSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
+            Game settings
+          </button>
+        )}
+        {game.id === 'sentence' && settingsKey && (
+          <button onClick={() => setSbSettings(loadSentenceSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
+            Game settings
+          </button>
+        )}
+        {game.id === 'sound-hunt' && settingsKey && (
+          <button onClick={() => setShSettings(loadSoundSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
+            Game settings
+          </button>
+        )}
+        {shSettings && <SoundSettings value={shSettings} onChange={(v) => { setShSettings(v); saveSoundSettings(settingsKey, v) }} onClose={() => setShSettings(null)}/>}
+        {sbSettings && <SentenceSettings value={sbSettings} onChange={(v) => { setSbSettings(v); saveSentenceSettings(settingsKey, v) }} onClose={() => setSbSettings(null)}/>}
+        {rtSettings && <RhymeSettings value={rtSettings} onChange={(v) => { setRtSettings(v); saveRhymeSettings(settingsKey, v) }} onClose={() => setRtSettings(null)}/>}
+        {abSettings && <AlphabetSettings value={abSettings} onChange={(v) => { setAbSettings(v); saveSettings(settingsKey, v) }} onClose={() => setAbSettings(null)}/>}
         <button onClick={onClose} style={{ width:'100%', background:'rgba(124,79,224,.06)', border:'1px solid rgba(124,79,224,.15)', color:'rgba(58,46,107,.6)', borderRadius:12, padding:'10px', cursor:'pointer', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:600 }}>
           Cancel
         </button>
@@ -651,6 +691,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'story') { stopPaoVoice(); setPhase('story-select') }
     else if (game.id === 'copy-colors') { stopPaoVoice(); setPhase('copy-colors') }
     else if (game.id === 'spot-difference') { stopPaoVoice(); setPhase('spot-difference') }
+    else if (game.id === 'alphabet') { stopPaoVoice(); setPhase('alphabet') }
+    else if (game.id === 'rhyme') { stopPaoVoice(); setPhase('rhyme-time') }
+    else if (game.id === 'sentence') { stopPaoVoice(); setPhase('sentence-builder') }
+    else if (game.id === 'sound-hunt') { stopPaoVoice(); setPhase('sound-hunt') }
     else setShowCatModal(true)
   }
 
@@ -731,6 +775,26 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'copy-colors') {
     return <CopyColorsPage onExit={backToGames}/>
+  }
+
+  if (phase === 'sound-hunt') {
+    const key = patientEmail || String(patientId)
+    return <SoundHunt patientName={progress.patientName} settings={loadSoundSettings(key)} settingsKey={key} onExit={backToGames}/>
+  }
+
+  if (phase === 'sentence-builder') {
+    const key = patientEmail || String(patientId)
+    return <SentenceBuilder patientName={progress.patientName} settings={loadSentenceSettings(key)} settingsKey={key} onExit={backToGames}/>
+  }
+
+  if (phase === 'rhyme-time') {
+    const key = patientEmail || String(patientId)
+    return <RhymeTime patientName={progress.patientName} settings={loadRhymeSettings(key)} settingsKey={key} onExit={backToGames}/>
+  }
+
+  if (phase === 'alphabet') {
+    const key = patientEmail || String(patientId)
+    return <AlphabetBlast patientName={progress.patientName} settings={loadSettings(key)} settingsKey={key} onExit={backToGames}/>
   }
 
   if (phase === 'spot-difference') {
@@ -1072,7 +1136,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                         )}
                         {diffMeta && (
                           <span style={{ background:diffMeta.color, color:'#fff', borderRadius:8, padding:'3px 9px', fontSize:11, fontWeight:800, boxShadow:`0 1px 4px ${diffMeta.color}70` }}>
-                            {diffMeta.label}
+                            {game.id === 'sentence' ? 'Easy to Hard' : diffMeta.label}
                           </span>
                         )}
                       </div>
@@ -1091,7 +1155,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
         </div>
       )}
 
-      {previewGame && <GameInstructionsModal game={previewGame} onStart={startGame} onClose={() => setPreviewGame(null)}/>}
+      {previewGame && <GameInstructionsModal game={previewGame} onStart={startGame} onClose={() => setPreviewGame(null)} settingsKey={therapistEmail ? (patientEmail || String(patientId)) : null}/>}
       {puzzlePicker && (
         <PuzzlePickerModal
           lang={lang}

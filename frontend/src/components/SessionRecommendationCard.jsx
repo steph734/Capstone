@@ -1,12 +1,14 @@
 import { Attachment } from 'stream-chat-react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import RecommendationBookingModal from './RecommendationBookingModal'
 import './SessionRecommendationCard.css'
 
 // The "Another therapy session recommended" card shown in chat. Posted by the
 // server as a message attachment of type 'session_recommendation'; the parent
 // taps the button to pick a date and time.
 function RecommendationCard({ attachment, canBook }) {
-  const navigate = useNavigate()
+  // The button opens the booking popup right here in the chat.
+  const [open, setOpen] = useState(false)
   const expired = attachment.expires_at && new Date(attachment.expires_at) < new Date()
   const fee = Number(attachment.session_fee)
   const by = attachment.expires_at
@@ -26,13 +28,14 @@ function RecommendationCard({ attachment, canBook }) {
         {Number.isFinite(fee) && fee > 0 && <div><dt>Rate</dt><dd>₱{fee.toLocaleString('en-PH')} / session</dd></div>}
       </dl>
       {canBook ? (
-        <button type="button" className="src-btn" disabled={expired} onClick={() => navigate(attachment.link || `/appointments/recommendation/${attachment.recommendation_id}`)}>
+        <button type="button" className="src-btn" disabled={expired} onClick={() => setOpen(true)}>
           {expired ? 'Recommendation expired' : 'Set next therapy session'}
         </button>
       ) : (
         <p className="src-note">Sent to the parent{expired ? ' · expired' : ''}</p>
       )}
       {by && !expired && canBook && <p className="src-note">Pick a date by {by}</p>}
+      {open && <RecommendationBookingModal recommendationId={attachment.recommendation_id} onClose={() => setOpen(false)} />}
     </div>
   )
 }

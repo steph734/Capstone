@@ -1047,3 +1047,26 @@
   background: #1f3d33; color: #fff; padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 700;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
+
+/* ── Message modal: bounded height so the conversation scrolls inside it ─────────── */
+.tp-msg-modal { max-width: 560px; height: min(720px, calc(100dvh - 40px)); max-height: calc(100dvh - 40px); }
+.tp-msg-header { flex: none; }
+.tp-msg-header-info { min-width: 0; flex: 1; }
+.tp-msg-header-name, .tp-msg-header-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-msg-stream-body { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.tp-msg-stream-body .str-chat, .tp-msg-stream-body .str-chat__channel, .tp-msg-stream-body .str-chat__container, .tp-msg-stream-body .str-chat__main-panel, .tp-msg-stream-body .str-chat__main-panel-inner {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; height: 100%; max-height: 100%;
+}
+.tp-msg-stream-body .str-chat__message-list, .tp-msg-stream-body .str-chat__message-list-main-panel { flex: 1 1 auto; min-height: 0; }
+.tp-msg-stream-body .str-chat__message-list-scroll, .tp-msg-stream-body .str-chat__list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.tp-msg-stream-body .str-chat__message-composer, .tp-msg-stream-body .str-chat__message-input { flex: none; }
+.tp-msg-body { flex: 1 1 0; min-height: 0; max-height: none; }
+/* Wide cards (session recommendations) must never push the message list sideways. */
+.tp-msg-stream-body .str-chat__message-list-scroll { overflow-x: hidden; }
+.tp-msg-stream-body .str-chat__message-bubble, .tp-msg-stream-body .str-chat__message-text { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .tp-modal-backdrop:has(.tp-msg-modal) { padding: 0; align-items: flex-end; }
+  .tp-msg-modal { max-width: 100%; height: 92dvh; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+  .tp-msg-header { padding: 12px 14px; gap: 10px; }
+  .tp-msg-header-actions { gap: 4px; flex: none; }
+}

@@ -11,8 +11,7 @@ const SPIRAL = [
   [110, 330], [300, 250], [650, 215], [1000, 225], [1230, 330], [1300, 520], [1200, 730], [900, 825], [550, 830], [300, 740], [240, 560],
   [350, 430], [600, 372], [900, 375], [1090, 470], [1080, 620], [900, 695], [700, 660], [590, 555],
 ]
-export function buildPathD() {
-  const p = SPIRAL
+export function buildPathD(p = SPIRAL) {
   let d = `M ${p[0][0]} ${p[0][1]}`
   for (let i = 0; i < p.length - 1; i += 1) {
     const p0 = p[Math.max(0, i - 1)]
@@ -24,6 +23,16 @@ export function buildPathD() {
     d += ` C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p2[0]} ${p2[1]}`
   }
   return d
+}
+
+// Landscape for wide screens, a taller layout for portrait (phones held upright).
+const SPIRAL_PORTRAIT = [
+  [80, 330], [250, 270], [520, 265], [760, 320], [830, 520], [840, 800], [820, 1100], [740, 1300], [520, 1370], [300, 1360], [140, 1280], [80, 1060], [70, 760],
+  [130, 540], [250, 500], [480, 470], [680, 560], [730, 760], [700, 980], [560, 1110], [380, 1120], [260, 1020], [230, 840], [300, 700], [420, 705],
+]
+export const LAYOUTS = {
+  landscape: { view: VIEW, spiral: SPIRAL, launcher: LAUNCHER, hole: HOLE },
+  portrait: { view: { w: 900, h: 1600 }, spiral: SPIRAL_PORTRAIT, launcher: { x: 500, y: 930 }, hole: { x: 420, y: 705 } },
 }
 
 export const SPEEDS = { 'very-slow': 18, slow: 30, normal: 42 } // px per second along the track

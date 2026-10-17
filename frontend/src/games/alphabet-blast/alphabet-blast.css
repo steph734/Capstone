@@ -95,3 +95,22 @@
 .ab-input { width: 100%; box-sizing: border-box; margin-top: 8px; height: 42px; border-radius: 12px; border: 2px solid #d9d2f5; padding: 0 12px; font-size: 16px; letter-spacing: .1em; }
 
 .ab-reduce * { animation-duration: .01s !important; transition-duration: .01s !important; }
+
+/* Portrait: the board is 900x1600 and the HUD is re-laid out around it. */
+.ab-portrait .ab-top { left: 20px; right: 20px; top: 16px; height: auto; flex-wrap: wrap; gap: 10px 12px; }
+.ab-portrait .ab-sq { width: 58px; height: 58px; border-radius: 16px; }
+.ab-portrait .ab-title { flex: 1; min-width: 0; }
+.ab-portrait .ab-title span { font-size: 12px; }
+.ab-portrait .ab-title strong { font-size: 26px; }
+.ab-portrait .ab-stats-r { gap: 8px; }
+.ab-portrait .ab-stat { height: 58px; padding: 0 14px; font-size: 20px; border-radius: 16px; }
+.ab-portrait .ab-az { order: 3; flex: 1 1 100%; flex-wrap: nowrap; gap: 2px; padding: 6px 8px; }
+.ab-portrait .ab-chip { width: 29px; height: 29px; font-size: 14px; }
+.ab-portrait .ab-target { left: 500px; top: 1428px; width: 380px; height: 156px; padding: 8px 14px; display: grid; grid-template-columns: 120px 1fr; grid-template-rows: auto 1fr; align-items: center; column-gap: 8px; row-gap: 0; border-radius: 18px; }
+.ab-portrait .ab-target-label { grid-column: 2; grid-row: 1; font-size: 13px; align-self: end; }
+.ab-portrait .ab-target-letter { grid-column: 1; grid-row: 1 / span 2; font-size: 104px; text-align: center; }
+.ab-portrait .ab-hear { grid-column: 2; grid-row: 2; height: 46px; font-size: 17px; align-self: start; margin-top: 6px; }
+.ab-portrait .ab-target small, .ab-portrait .ab-speedbar { display: none; }
+.ab-portrait .ab-say { left: 20px; top: 1428px; bottom: auto; width: 450px; height: 156px; box-sizing: border-box; padding: 14px 18px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+.ab-portrait .ab-say p { font-size: 22px; }
+.ab-portrait .ab-how { display: none; }

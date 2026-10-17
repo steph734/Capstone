@@ -24,7 +24,7 @@ export default function RhymeTime({ patientName = 'friend', settings: initial, s
   useEffect(() => { sRef.current = settings })
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
 
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(true) // the loading modal (games/shared) has already preloaded the art
   const [rounds, setRounds] = useState(() => buildGame(initial))
   const [ri, setRi] = useState(0)
   const [stage, setStage] = useState('intro') // intro | asking | done
@@ -207,14 +207,7 @@ export default function RhymeTime({ patientName = 'friend', settings: initial, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round, result, wrongSet, pick])
 
-  if (!ready || !round) {
-    return (
-      <div className="rt-root rt-loading" role="status">
-        <img src={FALLBACK_PAO} alt="Pao" draggable="false" />
-        <p>Getting ready...</p>
-      </div>
-    )
-  }
+  if (!round) return null
 
   const cardState = (w) => {
     if (stage === 'done') return w === picked ? 'correct' : 'faded'

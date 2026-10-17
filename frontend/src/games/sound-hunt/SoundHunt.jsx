@@ -24,7 +24,7 @@ export default function SoundHunt({ patientName = 'friend', settings: initial, s
   useEffect(() => { sRef.current = settings })
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
 
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(true) // the loading modal (games/shared) has already preloaded the art
   const [cardSets, setCardSets] = useState(() => ROUNDS.map(buildCards))
   const [ri, setRi] = useState(0)
   const [stage, setStage] = useState('intro') // intro | play | done
@@ -220,14 +220,6 @@ export default function SoundHunt({ patientName = 'friend', settings: initial, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, result, pick, round])
 
-  if (!ready) {
-    return (
-      <div className="sh-root sh-loading" role="status">
-        <img src={FALLBACK_PAO} alt="Pao" draggable="false" />
-        <p>Getting ready...</p>
-      </div>
-    )
-  }
 
   const cardState = (w, isTarget) => {
     if (stage === 'done') return isTarget ? 'found' : 'faded'

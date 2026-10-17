@@ -1,10 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useState, useRef, useMemo } from 'react'
-import PictureWordGame from '../components/picture-word-game/PictureWordGame'
-import SlowMotionEchoGame from './games/SlowMotionEchoGame'
-import PuzzlePiecesGame from './games/PuzzlePiecesGame'
-import SortTheBasketGame from './games/SortTheBasketGame'
-import StoryBuilder from '../components/story-builder/StoryBuilder'
+import { Suspense, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import PaoBuddy from '../components/pao/PaoBuddy'
@@ -13,24 +8,14 @@ import { resolveItemKey } from '../components/pao/paoLayers'
 import { takeHandoffPose } from '../components/pao/usePaoReaction'
 import { Sun, Cloud, HillsScenery } from './games/SunnyScenery'
 import PuzzlePickerModal from './games/PuzzlePickerModal'
-import MoneyMatchPage from './games/MoneyMatchPage'
-import DailyRoutinesPage from './games/DailyRoutinesPage'
-import FeedPaoPage from './games/FeedPaoPage'
-import AlphabetBlast from '../games/alphabet-blast/AlphabetBlast'
 import AlphabetSettings from '../games/alphabet-blast/SettingsPanel'
 import { loadSettings, saveSettings } from '../games/alphabet-blast/config'
-import RhymeTime from '../games/rhyme-time/RhymeTime'
 import RhymeSettings from '../games/rhyme-time/SettingsPanel'
 import { loadSettings as loadRhymeSettings, saveSettings as saveRhymeSettings } from '../games/rhyme-time/rounds'
-import SoundHunt from '../games/sound-hunt/SoundHunt'
 import SoundSettings from '../games/sound-hunt/SettingsPanel'
 import { loadSettings as loadSoundSettings, saveSettings as saveSoundSettings } from '../games/sound-hunt/rounds'
-import SentenceBuilder from '../games/sentence-builder/SentenceBuilder'
 import SentenceSettings from '../games/sentence-builder/SettingsPanel'
 import { loadSettings as loadSentenceSettings, saveSettings as saveSentenceSettings } from '../games/sentence-builder/sentences'
-import CopyColorsPage from './games/CopyColorsPage'
-import SpotDifferencePage from './games/SpotDifferencePage'
-import EmergencyReadyPage from './games/EmergencyReadyPage'
 import BadgeMedal from '../components/BadgeMedal'
 import { useSharedProgress } from '../context/ProgressContext'
 import { PaoProvider, usePao } from '../context/PaoContext'
@@ -41,7 +26,27 @@ import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLanguage'
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
 import { fetchGameBadge } from '../utils/gameProgress'
-import BuilderGamePage from './BuilderGamePage'
+import GameLauncher from '../games/shared/GameLauncher'
+import { GAME_COMPONENTS as GC } from '../games/shared/gameRegistry'
+import { preloadLoadingPao } from '../games/shared/loading/paoLoadingPoses'
+
+// Game screens are lazy: each game's JS is downloaded by the loading modal (see games/shared/gameRegistry.js).
+const PictureWordGame = GC['picture-word']
+const SlowMotionEchoGame = GC.echo
+const PuzzlePiecesGame = GC['puzzle-pieces']
+const SortTheBasketGame = GC['sort-basket']
+const StoryBuilder = GC.story
+const MoneyMatchPage = GC['money-match']
+const DailyRoutinesPage = GC['daily-routines']
+const FeedPaoPage = GC['feed-pao']
+const AlphabetBlast = GC.alphabet
+const RhymeTime = GC.rhyme
+const SoundHunt = GC['sound-hunt']
+const SentenceBuilder = GC.sentence
+const CopyColorsPage = GC['copy-colors']
+const SpotDifferencePage = GC['spot-difference']
+const EmergencyReadyPage = GC['emergency-ready']
+const BuilderGamePage = GC.builder
 
 // ─── Intro stages ──────────────────────────────────────────────────────────────
 
@@ -432,7 +437,9 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
   return (
     <PaoProvider ident={ident}>
       <AppErrorBoundary label="games" onReset={() => navigate(rest.backPath || '/dashboard')}>
-        <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+        <Suspense fallback={null}>
+          <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+        </Suspense>
       </AppErrorBoundary>
     </PaoProvider>
   )
@@ -494,6 +501,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   const [showCatModal, setShowCatModal] = useState(false)
   const [selCategory,  setSelCategory]  = useState('fruits')
   const [previewGame,  setPreviewGame]  = useState(null)
+  const [launching,    setLaunching]    = useState(null) // the card being loaded by the loading modal
   const [puzzlePicker, setPuzzlePicker] = useState(false)
   const [puzzleConfig, setPuzzleConfig] = useState({ setId: 'animals', level: 'easy' })
   const [showStats,    setShowStats]    = useState(false)
@@ -677,8 +685,10 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     setPhase('picture-word')
   }
 
-  const startGame = (game) => {
-    setPreviewGame(null)
+  // Every card goes through the launcher: loading modal first, then openGame() mounts the game.
+  const startGame = (game) => { setPreviewGame(null); setLaunching(game) }
+  const openGame = (game) => {
+    setLaunching(null)
     if (game.builder) { stopPaoVoice(); setBuilderTitle(game.title); setPhase('builder'); return }
     if (game.id === 'echo') { stopPaoVoice(); setPhase('echo') }
     else if (game.id === 'picture-word') { stopPaoVoice(); setPhase('picture-word') }
@@ -697,6 +707,9 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else if (game.id === 'sound-hunt') { stopPaoVoice(); setPhase('sound-hunt') }
     else setShowCatModal(true)
   }
+
+  useEffect(() => { preloadLoadingPao() }, [])
+  const launcher = launching ? <GameLauncher card={launching} playerName={progress.patientName} onLaunch={openGame} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
 
   // Owner "Preview" (see OwnerGamePreviewPage): launch one game straight
   // away. There's no player / activity session here, so the PaoProvider has no
@@ -820,6 +833,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           />
         )}
         {showCatModal && <CategoryModal onSelect={handleCatSelect} onClose={() => navigate(backPath)} lang={lang}/>}
+        {launcher}
       </div>
     )
   }
@@ -1155,6 +1169,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
         </div>
       )}
 
+      {launcher}
       {previewGame && <GameInstructionsModal game={previewGame} onStart={startGame} onClose={() => setPreviewGame(null)} settingsKey={therapistEmail ? (patientEmail || String(patientId)) : null}/>}
       {puzzlePicker && (
         <PuzzlePickerModal

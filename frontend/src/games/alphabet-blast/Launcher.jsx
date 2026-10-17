@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { LAUNCHER } from './config'
 
 const STAR = 'M0,-16 L4.7,-6.5 L15.2,-5 L7.6,2.4 L9.4,12.9 L0,8 L-9.4,12.9 L-7.6,2.4 L-15.2,-5 L-4.7,-6.5 Z'
 
 // Blue pod with a red cannon that turns to the target, and the star it shoots.
 // Pao himself is drawn by the game screen on top of the pod.
-export default function Launcher({ angle, shot, reduceMotion, onShotDone }) {
+export default function Launcher({ pos: LAUNCHER, angle, shot, reduceMotion, onShotDone }) {
   const star = useRef(null)
   const doneRef = useRef(onShotDone)
   useEffect(() => { doneRef.current = onShotDone })

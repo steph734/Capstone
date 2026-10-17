@@ -48,7 +48,7 @@ function Flyer({ fly, colors, reduceMotion, onDone }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const { from, tile } = fly
   return (
-    <div ref={el} className={`sb-tile sb-flyer ${colors ? `t-${tile.type}` : 't-plain'}`} style={{ left: from.left, top: from.top, width: from.width, height: from.height }}>{tile.text}</div>
+    <div ref={el} className={`sb-tile sb-flyer ${colors ? `t-${tile.type}` : 't-plain'}`} style={{ left: from.left, top: from.top, width: from.width, height: from.height }}><b>{tile.text}</b></div>
   )
 }
 
@@ -59,7 +59,7 @@ export default function SentenceBuilder({ patientName = 'friend', settings: init
   useEffect(() => { sRef.current = settings })
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
 
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(true) // the loading modal (games/shared) has already preloaded the art
   const [puzzles, setPuzzles] = useState(() => buildGame())
   const [pi, setPi] = useState(0)
   const [stage, setStage] = useState('intro') // intro | play | done | levelup
@@ -300,14 +300,7 @@ export default function SentenceBuilder({ patientName = 'friend', settings: init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puzzle, result, pick, undo, placed.length])
 
-  if (!ready || !puzzle) {
-    return (
-      <div className="sb-root sb-loading" role="status">
-        <img src={FALLBACK_PAO} alt="Pao" draggable="false" />
-        <p>Getting ready...</p>
-      </div>
-    )
-  }
+  if (!puzzle) return null
 
   const colors = settings.showColors
   const types = [...new Set(puzzle.words.map((w) => w.type))]

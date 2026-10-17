@@ -1,16 +1,17 @@
 import { memo, useMemo } from 'react'
-import { BALL, HOLE, VIEW, colorFor } from './config'
+import { BALL, colorFor } from './config'
 import Launcher from './Launcher'
 
-const makeStars = () => Array.from({ length: 70 }, (_, i) => {
+const makeStars = (VIEW) => Array.from({ length: 70 }, (_, i) => {
   const r = (n) => { const x = Math.sin(i * 999 + n * 17) * 10000; return x - Math.floor(x) }
   return { x: r(1) * VIEW.w, y: r(2) * VIEW.h, s: 1 + r(3) * 2.2, o: 0.25 + r(4) * 0.6 }
 })
 
 // Letter balls draw on a 1600x900 board. Their positions are written straight to
 // the DOM by useChain, so this only re-renders when the chain's contents change.
-function Board({ balls, pathD, size, registerEl, hintId, wrongId, onTap, angle, shot, onShotDone, bursts, bubble, reduceMotion }) {
-  const stars = useMemo(makeStars, [])
+function Board({ layout, balls, pathD, size, registerEl, hintId, wrongId, onTap, angle, shot, onShotDone, bursts, bubble, reduceMotion }) {
+  const { view: VIEW, hole: HOLE, launcher } = layout
+  const stars = useMemo(() => makeStars(VIEW), [VIEW])
   const r = (BALL * size) / 2
   return (
     <svg className="ab-board" viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label="Alphabet Blast board">
@@ -27,7 +28,7 @@ function Board({ balls, pathD, size, registerEl, hintId, wrongId, onTap, angle, 
       <circle cx={HOLE.x} cy={HOLE.y} r="70" fill="none" stroke="#8e5cff" strokeWidth="10" opacity=".55" />
       <circle cx={HOLE.x} cy={HOLE.y} r="52" fill="#000" stroke="#7b4dff" strokeWidth="4" />
 
-      <Launcher angle={angle} shot={shot} reduceMotion={reduceMotion} onShotDone={onShotDone} />
+      <Launcher pos={launcher} angle={angle} shot={shot} reduceMotion={reduceMotion} onShotDone={onShotDone} />
 
       {balls.map((b) => {
         const text = b.lower ? b.letter.toLowerCase() : b.letter

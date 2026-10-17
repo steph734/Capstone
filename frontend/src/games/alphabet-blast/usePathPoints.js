@@ -4,9 +4,9 @@ import { buildPathD } from './config'
 export const STEP = 2
 
 // Samples the track once (getTotalLength / getPointAtLength) so the game loop only does array lookups.
-export default function usePathPoints() {
+export default function usePathPoints(spiral) {
   return useMemo(() => {
-    const d = buildPathD()
+    const d = buildPathD(spiral)
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path.setAttribute('d', d)
     const length = path.getTotalLength()
@@ -26,5 +26,5 @@ export default function usePathPoints() {
       return out
     }
     return { d, length, at }
-  }, [])
+  }, [spiral])
 }

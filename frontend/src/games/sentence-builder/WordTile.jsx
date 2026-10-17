@@ -12,7 +12,7 @@ export default function WordTile({ tile, index, colors, glow, hidden, used, disa
       onKeyDown={(e) => { if (!disabled && e.key === 'Enter') { e.preventDefault(); onPick(tile) } }}
     >
       <button type="button" className="sb-spk" aria-label={`Hear ${tile.text}`} onClick={(e) => { e.stopPropagation(); onHear(tile.text) }}><Volume2 size={16} aria-hidden="true" /></button>
-      {tile.text}
+      <b>{tile.text}</b>
     </div>
   )
 }

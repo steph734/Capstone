@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCw } from 'lucide-react'
 import PandaMascot from '../../pages/games/PandaMascot'
 import { useGameSession } from '../../hooks/useGameSession'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
@@ -10,7 +9,7 @@ import ResultScreen from './ResultScreen'
 import useChain from './useChain'
 import usePathPoints from './usePathPoints'
 import { sounds } from './sounds/sounds'
-import { BALL, GAP, LAUNCHER, VIEW, lettersFor, saveSettings } from './config'
+import { BALL, GAP, LAYOUTS, lettersFor, saveSettings } from './config'
 import './alphabet-blast.css'
 
 const PRAISE = ['Great pop!', 'Yay!', 'Super!', 'Wow, nice one!', 'You did it!']
@@ -21,8 +20,10 @@ function useStage() {
   const get = () => {
     const w = window.innerWidth
     const h = window.innerHeight
-    const scale = Math.min(w / VIEW.w, h / VIEW.h)
-    return { scale, left: (w - VIEW.w * scale) / 2, top: (h - VIEW.h * scale) / 2, portrait: h > w && w < 700 }
+    const portrait = h > w
+    const view = LAYOUTS[portrait ? 'portrait' : 'landscape'].view
+    const scale = Math.min(w / view.w, h / view.h)
+    return { scale, left: (w - view.w * scale) / 2, top: (h - view.h * scale) / 2, portrait }
   }
   const [s, setS] = useState(get)
   useEffect(() => {
@@ -39,7 +40,9 @@ const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('
 export default function AlphabetBlast({ patientName = 'friend', settings: initial, settingsKey, onExit }) {
   const [settings, setSettings] = useState(initial)
   const stage = useStage()
-  const path = usePathPoints()
+  const layout = LAYOUTS[stage.portrait ? 'portrait' : 'landscape']
+  const { view: VIEW, launcher: LAUNCHER } = layout
+  const path = usePathPoints(layout.spiral)
   const reduceMotion = useMemo(reducedMotion, [])
   const gameSession = useGameSession({ gameName: 'Alphabet Blast' })
 
@@ -232,22 +235,11 @@ export default function AlphabetBlast({ patientName = 'friend', settings: initia
     })
   }
 
-  if (stage.portrait) {
-    return (
-      <div className="ab-root ab-rotate" role="alert">
-        <RotateCw size={56} aria-hidden="true" />
-        <h2>Turn your device sideways</h2>
-        <p>Alphabet Blast plays best in landscape.</p>
-        <button type="button" className="ab-big" onClick={onExit}>Back to games</button>
-      </div>
-    )
-  }
-
   return (
     <div className={`ab-root${reduceMotion ? ' ab-reduce' : ''}`}>
-      <div className="ab-stage" style={{ width: VIEW.w, height: VIEW.h, transform: `translate(${stage.left}px, ${stage.top}px) scale(${stage.scale})` }}>
+      <div className={`ab-stage${stage.portrait ? ' ab-portrait' : ''}`} style={{ width: VIEW.w, height: VIEW.h, transform: `translate(${stage.left}px, ${stage.top}px) scale(${stage.scale})` }}>
         <Board
-          balls={balls} pathD={path.d} size={size} registerEl={registerEl} hintId={hintId} wrongId={wrongId} onTap={tap}
+          layout={layout} balls={balls} pathD={path.d} size={size} registerEl={registerEl} hintId={hintId} wrongId={wrongId} onTap={tap}
           angle={angle} shot={shot} onShotDone={onShotDone} bursts={bursts} bubble={bubble} reduceMotion={reduceMotion}
         />
         <div className="ab-pao" style={{ left: LAUNCHER.x - 64, top: LAUNCHER.y - 64 }} aria-hidden="true">

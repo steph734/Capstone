@@ -15,7 +15,7 @@ export default function PictureCard({ puzzle, slots, done, colors, onHear }) {
           {slots.map((tile, i) => (
             tile
               ? <WordTile key={i} tile={tile} colors={colors} inSlot />
-              : <span key={i} className={`sb-slot${i === nextIdx ? ' next' : ''}`} data-slot={i} aria-label={`word ${i + 1} of ${n}, empty`}>{i === nextIdx ? '?' : ''}</span>
+              : <span key={i} className={`sb-slot${i === nextIdx ? ' next' : ''}`} data-slot={i} aria-label={`word ${i + 1} of ${n}, empty`}>{i === nextIdx && <b>?</b>}</span>
           ))}
           <span className="sb-period" aria-hidden="true" />
         </div>

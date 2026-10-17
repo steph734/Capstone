@@ -23,12 +23,12 @@
 .sh-dots i { width: 1.4em; height: 1.4em; border-radius: 50%; background: rgba(255, 255, 255, .4); }
 .sh-dots i.done { background: #ffc83d; }
 .sh-dots i.now { background: #fff; box-shadow: 0 0 0 .2em rgba(255, 255, 255, .45); }
-.sh-stat { display: flex; align-items: center; gap: .5em; height: 4em; padding: 0 1.4em; border-radius: 1.1em; border: .12em solid rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .28); color: #fff; font-size: 1.4em; }
+.sh-stat { display: flex; align-items: center; gap: .5em; height: 2.9em; padding: 0 .9em; border-radius: 1.1em; border: .12em solid rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .28); color: #fff; font-size: 1.4em; }
 
 .sh-main { position: absolute; top: 7.5em; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 1; padding-left: 12em; box-sizing: border-box; }
 .sh-soundcard { width: 61.5em; display: flex; align-items: center; gap: 1.6em; padding: 1.5em; border-radius: 1.9em; background: #fff; box-shadow: 0 .6em 1.6em rgba(10, 90, 60, .22); box-sizing: border-box; }
-.sh-letter { width: 7.5em; height: 7.5em; border-radius: 1.5em; background: #ff9f1c; box-shadow: 0 .5em 0 #d9810a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 5.6em; font-weight: 800; font-family: 'Baloo 2', 'Atkinson Hyperlegible', system-ui, sans-serif; flex-shrink: 0; line-height: 1; }
-.sh-letter { font-size: 6.2em; }
+.sh-letter { width: 7.5em; height: 7.5em; border-radius: 1.5em; background: #ff9f1c; box-shadow: 0 .5em 0 #d9810a; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: 'Baloo 2', 'Atkinson Hyperlegible', system-ui, sans-serif; flex-shrink: 0; line-height: 1; }
+.sh-letter b { font-size: 5.2em; font-weight: 800; }
 .sh-soundtext { display: flex; flex-direction: column; gap: .3em; flex: 1; align-items: flex-start; min-width: 0; }
 .sh-label { font-size: .95em; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #5d8f7b; }
 .sh-bigsound { font-size: 3.2em; line-height: 1.1; font-weight: 800; color: #134e3a; }
@@ -56,7 +56,7 @@
 @keyframes sh-wiggle { 0%, 100% { transform: rotate(-3deg) translateX(0); } 25% { transform: rotate(-3deg) translateX(-.5em); } 50% { transform: rotate(-3deg) translateX(.5em); } 75% { transform: rotate(-3deg) translateX(-.3em); } }
 @keyframes sh-pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-.sh-banner { margin-top: 1.4em; margin-left: 3.5em; min-height: 4em; padding: 0 1.6em; display: flex; align-items: center; gap: .8em; border-radius: 2em; background: #fff; font-size: 1.6em; font-weight: 800; opacity: 0; transition: opacity .3s; }
+.sh-banner { margin-top: 1.4em; margin-left: 3.5em; min-height: 2.4em; padding: 0 1.6em; display: flex; align-items: center; gap: .8em; border-radius: 2em; background: #fff; font-size: 1.6em; font-weight: 800; opacity: 0; transition: opacity .3s; }
 .sh-banner.show { opacity: 1; box-shadow: 0 .3em .8em rgba(10, 90, 60, .22); }
 .sh-bcheck { width: 1.9em; height: 1.9em; border-radius: 50%; background: #34d27b; color: #fff; display: flex; align-items: center; justify-content: center; }
 
@@ -90,9 +90,9 @@
 @keyframes sh-spark { 0% { transform: scale(0) rotate(0); opacity: 1; } 60% { transform: scale(1.4) rotate(40deg); opacity: 1; } 100% { transform: scale(1) rotate(60deg); opacity: 0; } }
 
 .sh-actions { position: absolute; right: 2em; bottom: 2.2em; display: flex; flex-direction: column; align-items: flex-end; gap: .9em; z-index: 3; }
-.sh-act { display: inline-flex; align-items: center; gap: .6em; height: 3.8em; padding: 0 1.6em; border-radius: 1.2em; border: 0; background: #fff; color: #1f8a56; font-size: 1.15em; font-weight: 800; cursor: pointer; box-shadow: 0 .3em .8em rgba(10, 90, 60, .25); }
+.sh-act { display: inline-flex; align-items: center; gap: .6em; height: 3.1em; padding: 0 1.6em; border-radius: 1.2em; border: 0; background: #fff; color: #1f8a56; font-size: 1.15em; font-weight: 800; cursor: pointer; box-shadow: 0 .3em .8em rgba(10, 90, 60, .25); }
 .sh-act:disabled { opacity: .55; cursor: default; }
-.sh-next { display: inline-flex; align-items: center; gap: .6em; height: 3.4em; padding: 0 2em; border-radius: 1.1em; border: 0; background: #ff9f1c; color: #fff; font-size: 1.5em; font-weight: 800; cursor: pointer; box-shadow: 0 .25em 0 #d9810a; }
+.sh-next { display: inline-flex; align-items: center; gap: .6em; height: 2.3em; padding: 0 2em; border-radius: 1.1em; border: 0; background: #ff9f1c; color: #fff; font-size: 1.5em; font-weight: 800; cursor: pointer; box-shadow: 0 .25em 0 #d9810a; }
 
 .sh-confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
 .sh-confetti i { position: absolute; top: -2em; width: .7em; height: 1.1em; border-radius: .1em; animation: sh-fall 1.6s ease-in forwards; }
@@ -158,7 +158,8 @@
   .sh-pill { order: 3; flex: 1 1 100%; justify-content: center; font-size: .9em; }
   .sh-main { position: relative; top: 9.6em; padding: 0 1em 16em; }
   .sh-soundcard { width: 25em; flex-wrap: wrap; padding: 1em; gap: 1em; }
-  .sh-letter { width: 5em; height: 5em; font-size: 4em; }
+  .sh-letter { width: 5em; height: 5em; }
+  .sh-letter b { font-size: 3.4em; }
   .sh-bigsound { font-size: 2em; }
   .sh-found { flex: 1 1 100%; flex-direction: row; justify-content: space-between; }
   .sh-grid { grid-template-columns: repeat(2, 12em); gap: 1em; margin: 1.2em 0 0; }

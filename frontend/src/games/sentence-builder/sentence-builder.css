@@ -26,7 +26,7 @@
 .sb-dots i { width: 1.4em; height: 1.4em; border-radius: 50%; background: rgba(255, 255, 255, .25); }
 .sb-dots i.done { background: #34d27b; }
 .sb-dots i.now { background: #ffd23f; box-shadow: 0 0 0 .2em rgba(255, 210, 63, .4); }
-.sb-stat { display: flex; align-items: center; gap: .5em; height: 4em; padding: 0 1.4em; border-radius: 1.1em; border: .12em solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); color: #fff; font-size: 1.4em; }
+.sb-stat { display: flex; align-items: center; gap: .5em; height: 2.9em; padding: 0 .9em; border-radius: 1.1em; border: .12em solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); color: #fff; font-size: 1.4em; }
 
 .sb-main { position: absolute; top: 7.8em; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 1; }
 .sb-card { width: 70.5em; display: flex; gap: 1.5em; padding: 1.3em; border-radius: 1.9em; background: #fdf8ec; box-shadow: 0 .6em 1.6em rgba(10, 6, 50, .35); border: .45em solid transparent; box-sizing: border-box; transition: border-color .25s; }
@@ -35,16 +35,17 @@
 .sb-scene svg { width: 100%; height: 100%; display: block; }
 .sb-cardtext { display: flex; flex-direction: column; gap: .9em; min-width: 0; flex: 1; justify-content: center; }
 .sb-label { font-size: .95em; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8d7bd1; }
-.sb-slots { display: flex; align-items: flex-end; gap: .9em; flex-wrap: nowrap; }
-.sb-slot { width: 7.8em; height: 5.5em; border-radius: 1.3em; border: .2em dashed #cfc3f2; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: #cfc3f2; font-size: 1.6em; font-weight: 800; flex-shrink: 0; }
+.sb-slots { display: flex; align-items: flex-end; gap: .9em; flex-wrap: nowrap; max-width: 100%; }
+.sb-slot { width: 7.8em; height: 5.5em; border-radius: 1.3em; border: .2em dashed #cfc3f2; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: #cfc3f2; font-weight: 800; flex-shrink: 0; }
+.sb-slot b { font-size: 1.6em; }
 .sb-slot.next { border-color: #7c5cf0; background: #f1ecff; box-shadow: 0 0 0 .3em #ebe4ff; }
 .sb-slots.n5 .sb-slot, .sb-slots.n5 .sb-tile.in-slot { width: 6.3em; height: 4.8em; }
 .sb-slots.n5 .sb-tile.in-slot b { font-size: 1.9em; }
 .sb-period { width: .6em; height: .6em; border-radius: 50%; background: #2a2150; margin-bottom: .6em; flex-shrink: 0; }
 .sb-hearbtn { align-self: flex-start; display: inline-flex; align-items: center; gap: .6em; border: 0; background: #7c5cf0; color: #fff; border-radius: .9em; padding: .55em 1.2em; font-size: 1.15em; font-weight: 800; cursor: pointer; }
 
-.sb-tile { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 9.4em; height: 5.6em; padding: 0 1.4em; border-radius: 1.5em; font-size: 2.8em; font-weight: 800; box-shadow: 0 .12em 0 rgba(0, 0, 0, .18); box-sizing: border-box; cursor: pointer; transition: transform .15s, opacity .2s; white-space: nowrap; }
-.sb-tile > .sb-spk { font-size: .36em; }
+.sb-tile { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 12em; height: 6em; padding: 0 1.2em; border-radius: 1.4em; font-size: 1em; box-shadow: 0 .12em 0 rgba(0, 0, 0, .18); box-sizing: border-box; cursor: pointer; transition: transform .15s, opacity .2s; white-space: nowrap; }
+.sb-tile b { font-size: 2.8em; font-weight: 800; line-height: 1; }
 .sb-tile.in-slot { width: 7.8em; min-width: 0; height: 5.5em; padding: 0; font-size: 1em; cursor: default; border-radius: 1.3em; flex-shrink: 0; }
 .sb-tile.in-slot b { font-size: 2.4em; font-weight: 800; }
 .t-little { background: #fff1c9; color: #b8860b; }
@@ -101,9 +102,9 @@
 @keyframes sb-spark { 0% { transform: scale(0) rotate(0); opacity: 1; } 60% { transform: scale(1.4) rotate(40deg); opacity: 1; } 100% { transform: scale(1) rotate(60deg); opacity: 0; } }
 
 .sb-actions { position: absolute; right: 2em; bottom: 2.2em; display: flex; gap: .9em; z-index: 3; }
-.sb-act { display: inline-flex; align-items: center; gap: .6em; height: 3.8em; padding: 0 1.4em; border-radius: 1.2em; border: 0; background: #fff; color: #5b3fd0; font-size: 1.15em; font-weight: 800; cursor: pointer; box-shadow: 0 .3em .8em rgba(10, 6, 50, .35); }
+.sb-act { display: inline-flex; align-items: center; gap: .6em; height: 3.1em; padding: 0 1.4em; border-radius: 1.2em; border: 0; background: #fff; color: #5b3fd0; font-size: 1.15em; font-weight: 800; cursor: pointer; box-shadow: 0 .3em .8em rgba(10, 6, 50, .35); }
 .sb-act:disabled { opacity: .55; cursor: default; }
-.sb-next { display: inline-flex; align-items: center; gap: .6em; height: 3.4em; padding: 0 2em; border-radius: 1.1em; border: 0; background: #34d27b; color: #fff; font-size: 1.5em; font-weight: 800; cursor: pointer; box-shadow: 0 .25em 0 #2a9d63; }
+.sb-next { display: inline-flex; align-items: center; gap: .6em; height: 2.3em; padding: 0 2em; border-radius: 1.1em; border: 0; background: #34d27b; color: #fff; font-size: 1.5em; font-weight: 800; cursor: pointer; box-shadow: 0 .25em 0 #2a9d63; }
 
 .sb-levelup { position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(20, 10, 70, .55); }
 .sb-levelup-box { display: flex; align-items: center; gap: .8em; padding: 1em 2em; border-radius: 1.6em; background: #fff; color: #5b3fd0; font-size: 2.2em; box-shadow: 0 .6em 2em rgba(0, 0, 0, .4); animation: sb-fade .25s ease-out; }
@@ -164,36 +165,53 @@
 .sb-tog { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-weight: 700; font-size: 15px; }
 .sb-tog input { width: 20px; height: 20px; accent-color: #7c5cf0; }
 
-/* Phone landscape: tiles may wrap to two rows. */
+/* Phone landscape: smaller tiles, they wrap to a second row if needed. */
 @media (orientation: landscape) and (max-height: 520px) {
   .sb-tray { gap: 1.2em; }
-  .sb-tile { min-width: 7.4em; height: 4.8em; font-size: 2.4em; }
+  .sb-tile { min-width: 8em; height: 4.6em; }
+  .sb-tile b { font-size: 2.3em; }
 }
 
-/* Phones in portrait: picture on top, slots below, tiles in two columns. */
-@media (orientation: portrait) and (max-width: 700px) {
-  .sb-root { font-size: calc(100vw / 27); overflow-y: auto; }
-  .sb-strip { position: fixed; height: 9em; }
-  .sb-top { top: 1em; left: 1em; right: 1em; flex-wrap: wrap; }
-  .sb-top-l { flex: 1 1 100%; flex-wrap: wrap; }
-  .sb-top-r { position: absolute; top: 0; right: 0; flex: 0; }
-  .sb-title strong { font-size: 1.5em; }
-  .sb-pill { order: 3; flex: 1 1 100%; justify-content: center; font-size: .9em; }
-  .sb-main { position: relative; top: 11em; padding-bottom: 16em; }
-  .sb-card { width: 25em; flex-direction: column; padding: 1em; gap: 1em; }
-  .sb-scene { width: 100%; height: 13em; }
-  .sb-slots { flex-wrap: wrap; justify-content: center; }
-  .sb-slot, .sb-slots.n5 .sb-slot { width: 5.2em; height: 3.8em; }
+/* Phones and small tablets in portrait: one clean column. Picture on top, slots below, tiles in two columns. */
+@media (orientation: portrait) and (max-width: 900px) {
+  .sb-root { font-size: calc(100vw / 27); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .sb-strip { position: fixed; height: 8em; }
+  .sb-top { position: static; display: grid; grid-template-columns: 1fr auto; gap: .6em; padding: 1em 1em 0; }
+  .sb-top-l { grid-column: 1; grid-row: 1; flex-wrap: wrap; gap: .6em; min-width: 0; }
+  .sb-top-r { grid-column: 2; grid-row: 1; flex: 0; }
+  .sb-pill { grid-column: 1 / -1; grid-row: 2; justify-content: center; font-size: .85em; }
+  .sb-sq { width: 3em; height: 3em; border-radius: .9em; }
+  .sb-title strong { font-size: 1.45em; }
+  .sb-title span { font-size: .6em; }
+  .sb-level { font-size: .75em; }
+  .sb-stat { font-size: 1em; height: 2.6em; padding: 0 .7em; }
+  .sb-main { position: static; padding: 1em 1em 15em; }
+  .sb-card { width: 100%; max-width: 26em; flex-direction: column; padding: 1em; gap: .9em; }
+  .sb-scene { width: 100%; height: 11em; }
+  .sb-cardtext { gap: .6em; }
+  .sb-label { font-size: .7em; }
+  .sb-slots { flex-wrap: wrap; justify-content: center; gap: .6em; }
+  .sb-slot, .sb-slots.n5 .sb-slot, .sb-tile.in-slot, .sb-slots.n5 .sb-tile.in-slot { width: 5.4em; height: 3.8em; border-radius: 1em; }
   .sb-tile.in-slot b, .sb-slots.n5 .sb-tile.in-slot b { font-size: 1.5em; }
-  .sb-below { margin-top: 1.2em; }
-  .sb-tray { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1em; width: 25em; }
-  .sb-tile { min-width: 0; height: 4.6em; font-size: 1.9em; }
-  .sb-legend { flex-wrap: wrap; justify-content: center; gap: 1em; font-size: .8em; }
-  .sb-guide { position: fixed; left: .6em; bottom: .3em; }
-  .sb-pao { width: 7em; height: 10.5em; }
-  .sb-bubble { font-size: 1em; max-width: 12em; padding: .6em .9em; margin-bottom: 3em; }
-  .sb-actions { position: fixed; right: .8em; bottom: .8em; flex-direction: column; gap: .4em; font-size: .75em; }
+  .sb-slot b { font-size: 1.2em; }
+  .sb-period { display: none; }
+  .sb-hearbtn { align-self: center; font-size: .9em; }
+  .sb-below { margin-top: 1.4em; min-height: 0; width: 100%; max-width: 26em; }
+  .sb-tray { display: grid; grid-template-columns: repeat(2, 1fr); gap: .9em; width: 100%; }
+  .sb-tile { min-width: 0; height: 4.4em; border-radius: 1.1em; padding: 0 .6em; }
+  .sb-tile b { font-size: 1.7em; }
+  .sb-spk { top: -.5em; right: -.4em; width: 2.2em; height: 2.2em; }
+  .sb-legend { flex-wrap: wrap; justify-content: center; gap: .5em 1.2em; font-size: .7em; }
+  .sb-donebar { flex-wrap: wrap; justify-content: center; text-align: center; padding: .8em 1em; gap: .8em; }
   .sb-donebar strong { font-size: 1.3em; }
+  .sb-donecheck { width: 2.6em; height: 2.6em; }
+  .sb-guide { position: fixed; left: .6em; bottom: .3em; gap: .5em; }
+  .sb-pao { width: 7em; height: 10.5em; }
+  .sb-bubble { font-size: .95em; max-width: 11em; padding: .6em .9em; margin-bottom: 3em; }
+  .sb-actions { position: fixed; right: .7em; bottom: .7em; flex-direction: column; gap: .4em; font-size: .72em; }
+  .sb-act { height: 3em; padding: 0 1em; }
+  .sb-next { height: 2.4em; }
+  .sb-levelup-box { font-size: 1.3em; padding: .8em 1.2em; text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

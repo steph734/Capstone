@@ -3,7 +3,7 @@ import { Check, Volume2 } from 'lucide-react'
 export default function SoundCard({ round, found, onHear }) {
   return (
     <div className="sh-soundcard">
-      <div className="sh-letter" aria-hidden="true">{round.letter}</div>
+      <div className="sh-letter" aria-hidden="true"><b>{round.letter}</b></div>
       <div className="sh-soundtext">
         <span className="sh-label">Find the things that start with</span>
         <strong className="sh-bigsound">the <span className="sh-orange">/{round.sound}/</span> sound</strong>

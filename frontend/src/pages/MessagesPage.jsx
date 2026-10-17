@@ -7,6 +7,7 @@ import {
   MessageList,
   MessageComposer,
   Thread,
+  WithComponents,
   useChannelStateContext,
   useChatContext,
 } from 'stream-chat-react'
@@ -196,7 +197,8 @@ function MessagesInner({ user, mobileView, setMobileView }) {
 
       <section className={`msg-center${mobileView === 'list' ? ' msg-center-hidden' : ''}`}>
         {!activeChannel ? <EmptyChat /> : (
-          <Channel channel={activeChannel} Attachment={GuardianRecommendationAttachment}>
+          <WithComponents overrides={{ Attachment: GuardianRecommendationAttachment }}>
+          <Channel channel={activeChannel}>
             <Window>
               <ChatHeader onCall={handleCall} onBack={() => setMobileView('list')} />
               <MessageList />
@@ -204,6 +206,7 @@ function MessagesInner({ user, mobileView, setMobileView }) {
             </Window>
             <Thread />
           </Channel>
+          </WithComponents>
         )}
       </section>
     </div>

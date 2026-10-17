@@ -53,9 +53,38 @@
 .rsm-btn-primary { background: #2c4a3e; color: #fff; }
 .rsm-btn-primary:hover:not(:disabled) { background: #223a31; }
 
+/* Fit the visible screen on phones (dvh excludes browser toolbars) while keeping the web layout. */
+.rsm-modal { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+.rsm-body { min-height: 0; -webkit-overflow-scrolling: touch; }
+.rsm-foot { flex-shrink: 0; border-top: 1px solid #edf1ef; }
+.rsm-field select { text-overflow: ellipsis; }
+
+/* Mobile: same arrangement as web, just tighter — three selects stay on one row,
+   buttons stay side by side, and the footer is always visible under a scrolling body. */
 @media (max-width: 560px) {
-  .rsm-row { grid-template-columns: 1fr; gap: 0; }
-  .rsm-foot { flex-direction: column-reverse; }
+  .rsm-overlay { padding: 12px 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); align-items: center; }
+  .rsm-modal { border-radius: 18px; }
+  .rsm-head { padding: 16px 16px 12px; gap: 8px; }
+  .rsm-head h2 { font-size: 18px; }
+  .rsm-head p { font-size: 12.5px; }
+  .rsm-close { width: 34px; height: 34px; }
+  .rsm-body { padding: 14px 16px 6px; }
+  .rsm-patient { padding: 10px 12px; margin-bottom: 14px; gap: 10px; }
+  .rsm-avatar { width: 40px; height: 40px; font-size: 13px; }
+  .rsm-patient-name { font-size: 14px; }
+  .rsm-row { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.9fr); gap: 8px; }
+  .rsm-field { margin-bottom: 12px; }
+  .rsm-field > span, .rsm-send legend { font-size: 10px; letter-spacing: 0.03em; }
+  .rsm-field select, .rsm-field textarea { padding: 10px 8px; font-size: 14px; border-radius: 10px; }
+  .rsm-field textarea { min-height: 96px; }
+  .rsm-checks { gap: 10px 16px; }
+  .rsm-check { font-size: 14px; }
+  .rsm-foot { flex-direction: row; gap: 10px; padding: 12px 16px 16px; }
+  .rsm-btn { padding: 13px 10px; font-size: 14px; }
+}
+@media (max-width: 360px) {
+  .rsm-row { grid-template-columns: 1fr 1fr; }
+  .rsm-row .rsm-field:first-child { grid-column: 1 / -1; }
 }
 
 /* The app resets form controls (appearance: none), so the native checkbox is invisible.

@@ -2374,3 +2374,25 @@ button.os-dob-input { cursor: pointer; }
 
   .os-staff-table-card .os-empty { text-align: center; }
 }
+
+/* ── Staff profile (View) modal: fits the viewport on desktop and phones ─────────── */
+.os-profile-modal { max-width: 680px; max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+.os-profile-modal .os-profile-hero { flex: none; padding: 28px 24px 18px; }
+.os-profile-modal .os-profile-avatar { width: 88px; height: 88px; flex: none; }
+.os-profile-modal .os-view-tabs { flex: none; overflow-x: auto; }
+.os-profile-modal .os-profile-body { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; }
+.os-profile-modal .os-modal-footer { flex: none; }
+.os-profile-modal .os-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.os-profile-modal .os-detail-row, .os-profile-modal .os-detail-val { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .os-profile-modal { max-width: 100%; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+  .os-profile-modal .os-profile-hero { padding: 24px 16px 14px; gap: 6px; }
+  .os-profile-modal .os-profile-avatar { width: 72px; height: 72px; border-width: 3px; }
+  .os-profile-modal .os-profile-name { font-size: 18px; }
+  .os-profile-modal .os-view-tabs { padding: 0 12px; }
+  .os-profile-modal .os-profile-body { padding: 14px 16px; }
+  .os-profile-modal .os-modal-footer { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .os-profile-modal .os-modal-footer button { width: 100%; }
+}
+@media (max-width: 480px) { .os-profile-modal .os-detail-grid { grid-template-columns: 1fr; gap: 8px; } }
+@media (max-height: 640px) and (min-width: 769px) { .os-profile-modal .os-profile-hero { padding: 16px 24px 12px; } .os-profile-modal .os-profile-avatar { width: 64px; height: 64px; } }

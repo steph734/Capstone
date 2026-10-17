@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Channel, Window, MessageList, MessageComposer } from 'stream-chat-react'
+import { Channel, Window, MessageList, MessageComposer, WithComponents } from 'stream-chat-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { useStreamCtx } from '../../stream/StreamProvider'
@@ -235,12 +235,14 @@ function MessageModal({ patient, therapistEmail, onClose }) {
 
         {channel && (
           <div className="tp-msg-stream-body">
-            <Channel channel={channel} Attachment={TherapistRecommendationAttachment}>
+            <WithComponents overrides={{ Attachment: TherapistRecommendationAttachment }}>
+            <Channel channel={channel}>
               <Window>
                 <MessageList />
                 <MessageComposer />
               </Window>
             </Channel>
+            </WithComponents>
           </div>
         )}
 

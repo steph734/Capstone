@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { CircleCheck, Ban } from 'lucide-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -376,7 +377,7 @@ function RespondConfirmModal({ req, action, busy, onConfirm, onClose }) {
   return (
     <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && !busy && onClose()}>
       <div className="tapp-confirm-modal">
-        <div className="tapp-confirm-icon">{accept ? '✅' : '🚫'}</div>
+        <div className={`tapp-confirm-icon ${accept ? 'is-accept' : 'is-decline'}`}>{accept ? <CircleCheck size={30} aria-hidden="true" /> : <Ban size={30} aria-hidden="true" />}</div>
         <h3 className="tapp-confirm-title">{accept ? 'Accept this request?' : 'Decline this request?'}</h3>
         <p className="tapp-confirm-msg">
           {accept ? (
@@ -391,8 +392,8 @@ function RespondConfirmModal({ req, action, busy, onConfirm, onClose }) {
         </p>
         <div className="tapp-confirm-actions">
           <button className="tapp-confirm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="tapp-confirm-ok" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Please wait…' : accept ? 'Yes, Accept' : 'Yes, Decline'}
+          <button className={`tapp-confirm-ok ${accept ? 'is-accept' : 'is-decline'}`} onClick={onConfirm} disabled={busy}>
+            {busy ? 'Please wait…' : accept ? 'Accept' : 'Decline'}
           </button>
         </div>
       </div>

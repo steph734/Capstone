@@ -1516,3 +1516,11 @@
 .tapp-cm-blue .tapp-cm-primary { background: #2563eb; }
 .tapp-cm-blue .tapp-cm-primary:hover:not(:disabled) { background: #1d4ed8; }
 .tapp-cm-blue .tapp-cm-badge { background: #dbeafe; color: #1d4ed8; }
+
+.tapp-confirm-icon.is-accept, .tapp-confirm-icon.is-decline {
+  width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;
+}
+.tapp-confirm-icon.is-accept { background: #e3eefc; color: #2563eb; }
+.tapp-confirm-icon.is-decline { background: #fde8e8; color: #dc2626; }
+.tapp-confirm-ok.is-accept { background: #2563eb; color: #fff; }
+.tapp-confirm-ok.is-decline { background: #dc2626; color: #fff; }

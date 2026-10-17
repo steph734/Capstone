@@ -71,6 +71,8 @@ export default async function handler(req, res) {
       const durationSeconds = doc?.call_started_at
         ? Math.max(0, Math.round((now - new Date(doc.call_started_at)) / 1000))
         : 0
+      // Idempotent: the first 'end' wins, later duplicates for the same call are ignored.
+      if (doc?.call_ended_at) return res.status(200).json({ ok: true, duplicate: true })
       await db.collection('call_logs').updateOne(
         { stream_call_id: streamCallId },
         { $set: { call_status: status || 'completed', call_ended_at: now, call_duration_seconds: durationSeconds } }

@@ -183,7 +183,15 @@ function MessagesInner({ user, mobileView, setMobileView }) {
           </div>
         )}
 
-        <div className="msg-list">
+        {/* This version of ChannelList renders Stream's own row UI (the custom Preview above is not used), so the
+            phone list/chat switch is driven by taps on those rows. Taps on the row's action buttons are ignored. */}
+        <div
+          className="msg-list"
+          onClick={(e) => {
+            if (e.target.closest('.str-chat__channel-list-item__action-buttons')) return
+            if (e.target.closest('.str-chat__channel-list-item')) setMobileView('chat')
+          }}
+        >
           <ChannelList
             filters={filters}
             sort={sort}

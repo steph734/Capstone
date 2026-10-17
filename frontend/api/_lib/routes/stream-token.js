@@ -30,6 +30,9 @@ export default async function handler(req, res) {
       name: identity.name,
       image: identity.image,
       appRole: identity.kind,
+      extra: identity.kind === 'patient'
+        ? { patientName: [identity.patient?.first_name, identity.patient?.last_name].filter(Boolean).join(' ') }
+        : { roleLabel: identity.employee?.position || identity.employee?.specialty || 'Therapist' },
     })
 
     const token = client.createToken(identity.streamId)

@@ -30,12 +30,12 @@ export function therapistStreamId(employeeId) {
   return `therapist-${String(employeeId)}`
 }
 
-export async function upsertStreamUser(client, { id, name, image, appRole }) {
+export async function upsertStreamUser(client, { id, name, image, appRole, extra = {} }) {
   await client.upsertUser({
     id,
     name: name || 'TherapyPro user',
     image: image || undefined,
     role: 'user',
-    custom: { appRole },
+    custom: { appRole, ...extra },
   })
 }

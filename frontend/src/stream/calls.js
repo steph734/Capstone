@@ -14,7 +14,7 @@ export async function startCall(videoClient, { members, video = true, audioOnly 
     video,
     data: {
       members: members.map((user_id) => ({ user_id })),
-      custom: { audioOnly: Boolean(audioOnly) },
+      custom: { audioOnly: Boolean(audioOnly), ...(meta?.channelId ? { channelId: meta.channelId } : {}) },
     },
   })
 

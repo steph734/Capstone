@@ -733,3 +733,15 @@
   .msg-input-icon { width: 30px; height: 30px; }
   .msg-input-bar { padding: 7px 6px 9px; }
 }
+
+/* ── Phones: conversation rows must be fully visible and tappable ──────────────── */
+@media (max-width: 768px) {
+  /* Hover-only row actions (pin / mute / "...") are always shown on touch screens and cover the message preview. */
+  .msg-list .str-chat__channel-list-item__action-buttons { display: none !important; }
+  .msg-list .str-chat__channel-list-item-container, .msg-list .str-chat__channel-list-item { width: 100%; min-width: 0; }
+  .msg-list .str-chat__channel-list-item { min-height: 64px; cursor: pointer; touch-action: manipulation; padding: 10px 14px; }
+  .msg-list .str-chat__channel-list-item-data { min-width: 0; flex: 1; }
+  .msg-list .str-chat__channel-list-item-data__title, .msg-list .str-chat__channel-list-item-data__first-row { min-width: 0; }
+  .msg-list .str-chat__channel-list-item-data__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg-left { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+}

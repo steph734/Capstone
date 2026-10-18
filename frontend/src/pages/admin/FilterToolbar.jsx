@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowUpDown, Check, ChevronDown, Gamepad2, Lock, Search, SlidersHorizontal, X } from 'lucide-react'
 import './wardrobe-toolbar.css'
 
-export const STATUS_OPTIONS = [['all', 'All'], ['linked', 'Linked to a game'], ['free', 'Free for everyone'], ['custom', 'Custom design']]
-export const SORT_OPTIONS = [['game-asc', 'Game A–Z'], ['game-desc', 'Game Z–A'], ['name-asc', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['newest', 'Newest'], ['oldest', 'Oldest'], ['category', 'Category']]
+// One toolbar for the Pao's wardrobe and the Badge library: search + Game / second filter / Sort dropdowns (bottom sheet on phones).
+// config: { placeholder, searchLabel, gameHeader, gameFilter, second: { label, icon, aria, options: [[value,label]] }, sort: { options, default }, countLabel }
 
 // A small single-select dropdown with keyboard support (arrows, Enter, Esc) and an optional search box.
 function Dropdown({ label, icon: Icon, value, options, onChange, header, searchable, ariaLabel, wide }) {
@@ -57,7 +57,8 @@ function Dropdown({ label, icon: Icon, value, options, onChange, header, searcha
 }
 
 // Search + Game / Status / Sort dropdowns. Phone: search, then a "Filters" button that opens a bottom sheet.
-export default function WardrobeToolbar({ filters, setFilters, gameOptions, total }) {
+export default function FilterToolbar({ filters, setFilters, gameOptions, total, config }) {
+  const { second, sort: sortCfg } = config
   const [text, setText] = useState(filters.q)
   const [sheet, setSheet] = useState(false)
   useEffect(() => { setText(filters.q) }, [filters.q])
@@ -68,34 +69,34 @@ export default function WardrobeToolbar({ filters, setFilters, gameOptions, tota
   }, [text]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const game = (
-    <Dropdown label="Game" icon={Gamepad2} ariaLabel="Filter by game" header="UNLOCKED BY GAME" searchable wide
+    <Dropdown label="Game" icon={Gamepad2} ariaLabel="Filter by game" header={config.gameHeader} searchable wide
       value={filters.game || 'all'} options={gameOptions} onChange={(v) => setFilters({ game: v === 'all' ? '' : v })} />
   )
   const status = (
-    <Dropdown label="Status" icon={Lock} ariaLabel="Filter by status" value={filters.status || 'all'}
-      options={STATUS_OPTIONS.map(([value, label]) => ({ value, label }))} onChange={(v) => setFilters({ status: v === 'all' ? '' : v })} />
+    <Dropdown label={second.label} icon={second.icon || Lock} ariaLabel={second.aria} value={filters.second || 'all'}
+      options={second.options.map(([value, label]) => ({ value, label }))} onChange={(v) => setFilters({ second: v === 'all' ? '' : v })} />
   )
   const sort = (
-    <Dropdown label="Sort" icon={ArrowUpDown} ariaLabel="Sort outfits" value={filters.sort || 'game-asc'}
-      options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))} onChange={(v) => setFilters({ sort: v === 'game-asc' ? '' : v })} />
+    <Dropdown label="Sort" icon={ArrowUpDown} ariaLabel="Sort" value={filters.sort || sortCfg.default}
+      options={sortCfg.options.map(([value, label]) => ({ value, label }))} onChange={(v) => setFilters({ sort: v === sortCfg.default ? '' : v })} />
   )
-  const active = [filters.game, filters.status, filters.sort].filter(Boolean).length
+  const active = [filters.game, filters.second, filters.sort].filter(Boolean).length
 
   return (
     <div className="wt-bar">
       <label className="wt-search">
         <Search size={20} aria-hidden="true" />
-        <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search outfits by name or game…" aria-label="Search outfits" />
+        <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder={config.placeholder} aria-label={config.searchLabel} />
         {text && <button type="button" className="wt-clear" onClick={() => { setText(''); setFilters({ q: '' }) }} aria-label="Clear search"><X size={18} /></button>}
       </label>
       <div className="wt-drops">{game}{status}{sort}</div>
       <button type="button" className="wt-filters-btn" onClick={() => setSheet(true)} aria-label="Open filters"><SlidersHorizontal size={18} aria-hidden="true" /> Filters{active ? <span className="wt-badge">{active}</span> : null}</button>
       {sheet && (
-        <div className="wt-sheet-wrap" role="dialog" aria-modal="true" aria-label="Wardrobe filters" onClick={(e) => { if (e.target === e.currentTarget) setSheet(false) }}>
+        <div className="wt-sheet-wrap" role="dialog" aria-modal="true" aria-label="Filters" onClick={(e) => { if (e.target === e.currentTarget) setSheet(false) }}>
           <div className="wt-sheet">
             <div className="wt-sheet-head"><strong>Filters</strong><button type="button" onClick={() => setSheet(false)} aria-label="Close"><X size={20} /></button></div>
             <div className="wt-sheet-body">{game}{status}{sort}</div>
-            <button type="button" className="wt-done" onClick={() => setSheet(false)}>Show {total} items</button>
+            <button type="button" className="wt-done" onClick={() => setSheet(false)}>Show {total} {config.countLabel || 'items'}</button>
           </div>
         </div>
       )}

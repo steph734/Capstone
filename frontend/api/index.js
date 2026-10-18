@@ -103,6 +103,7 @@ import adminSupport from './_lib/routes/admin-support.js'
 import adminFaqs from './_lib/routes/admin-faqs.js'
 import adminGames from './_lib/routes/admin-games.js'
 import adminOutfits from './_lib/routes/admin-outfits.js'
+import adminBadges from './_lib/routes/admin-badges.js'
 import adminBuilder from './_lib/routes/admin-builder.js'
 import adminBuilderAssets from './_lib/routes/admin-builder-assets.js'
 import gamesAdminItem from './_lib/routes/games-admin-item.js'
@@ -261,6 +262,8 @@ app.all('/api/admin/support/tickets', adminSupport)
 app.all('/api/admin/faqs/misses', adminFaqs)
 app.all('/api/admin/faqs/:id', adminFaqs)
 app.all('/api/admin/faqs', adminFaqs)
+app.all('/api/admin/badges/:sub', adminBadges)
+app.all('/api/admin/badges', adminBadges)
 app.all('/api/admin/outfits/:sub', adminOutfits)
 app.all('/api/admin/outfits', adminOutfits)
 app.all('/api/admin/games/overview', adminGames)

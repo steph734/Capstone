@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { Eye, Gamepad2, Lock, X } from 'lucide-react'
 import { authFetch } from '../../utils/session'
-import WardrobeToolbar, { SORT_OPTIONS } from './WardrobeToolbar'
+import FilterToolbar from './FilterToolbar'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
@@ -162,16 +162,46 @@ function SymbolPicker({ value, shape, colour, onChange }) {
 }
 
 const FILTERS = ['All', 'Game badges', 'Milestones', 'Hidden']
+const TYPE_PARAM = { 'Game badges': 'game', Milestones: 'milestone', Hidden: 'hidden' }
+const OUTFIT_TOOLBAR = {
+  placeholder: 'Search outfits by name or game…', searchLabel: 'Search outfits', gameHeader: 'UNLOCKED BY GAME', countLabel: 'items',
+  second: { label: 'Status', icon: Lock, aria: 'Filter by status', options: [['all', 'All'], ['linked', 'Linked to a game'], ['free', 'Free for everyone'], ['custom', 'Custom design']] },
+  sort: { default: 'game-asc', options: [['game-asc', 'Game A–Z'], ['game-desc', 'Game Z–A'], ['name-asc', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['newest', 'Newest'], ['oldest', 'Oldest'], ['category', 'Category']] },
+}
+const BADGE_TOOLBAR = {
+  placeholder: 'Search badges by name, game or how to earn…', searchLabel: 'Search badges', gameHeader: 'EARNED IN GAME', countLabel: 'badges',
+  second: { label: 'Visibility', icon: Eye, aria: 'Filter by visibility', options: [['all', 'All'], ['active', 'Active (visible to patients)'], ['hidden', 'Hidden (not yet visible)']] },
+  sort: { default: 'earned-desc', options: [['earned-desc', 'Most earned'], ['earned-asc', 'Least earned'], ['name-asc', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['newest', 'Newest'], ['oldest', 'Oldest'], ['game-asc', 'Game A–Z']] },
+}
 
 export default function GamifiedBadgesPage({ user, onLogout }) {
-  const [pageTab, setPageTab] = useState('Badges') // 'Badges' | 'Clothes'
+  // Filters for both tabs live in the URL, so refresh, back and shared links keep them.
+  //   Badges:  ?tab=badges&q=&game=&vis=&sort=&type=&archived=1      Clothes: ?tab=clothes&q=&game=&status=&sort=&cat=
+  const [params, setParams] = useSearchParams()
+  const pageTab = params.get('tab') === 'clothes' ? 'Clothes' : 'Badges'
+  const setPageTab = (tab) => setParams(tab === 'Clothes' ? { tab: 'clothes' } : {}, { replace: true })
 
   const [badges, setBadges] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [games, setGames] = useState([])
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [archiveView, setArchiveView] = useState('active') // 'active' | 'archived'
+  const bFilters = { q: params.get('q') || '', game: params.get('game') || '', vis: params.get('vis') || '', sort: params.get('sort') || '', type: params.get('type') || '' }
+  const [badgePage, setBadgePage] = useState(1)
+  const setBadgeFilters = useCallback((patch) => {
+    setBadgePage(1)
+    setParams((cur) => {
+      const next = new URLSearchParams(cur)
+      Object.entries(patch).forEach(([k, v]) => { if (v) next.set(k, v); else next.delete(k) })
+      return next
+    }, { replace: true })
+  }, [setParams])
+  const statusFilter = ({ game: 'Game badges', milestone: 'Milestones', hidden: 'Hidden' })[bFilters.type] || 'All'
+  const setStatusFilter = (v) => setBadgeFilters({ type: TYPE_PARAM[v] || '' })
+  const archiveView = params.get('archived') === '1' ? 'archived' : 'active'
+  const setArchiveView = (v) => setBadgeFilters({ archived: v === 'archived' ? '1' : '' })
+  const [badgeRes, setBadgeRes] = useState(null)
+  const [badgeRows, setBadgeRows] = useState([])
+  const [badgeGames, setBadgeGames] = useState({ games: [], milestones: 0, total: 0 })
   const [editingId, setEditingId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -193,7 +223,6 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [clothesLoading, setClothesLoading] = useState(true)
   const [clothesLoadError, setClothesLoadError] = useState('')
   // Wardrobe search / filters live in the URL (?q=&game=&status=&sort=&cat=) so refresh, back and shared links keep them.
-  const [params, setParams] = useSearchParams()
   const filters = { q: params.get('q') || '', game: params.get('game') || '', status: params.get('status') || '', sort: params.get('sort') || '', cat: params.get('cat') || '' }
   const [outfitPage, setOutfitPage] = useState(1)
   const setFilters = useCallback((patch) => {
@@ -299,24 +328,67 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     return { total: badges.length, active: active.length, hidden: hidden.length, gameBadges: gameBadges.length, timesEarned }
   }, [badges])
 
-  const activeBadgeCount = useMemo(() => badges.filter((b) => !b.isArchived).length, [badges])
-  const archivedBadgeCount = useMemo(() => badges.filter((b) => b.isArchived).length, [badges])
+  const activeBadgeCount = badgeRes ? badgeRes.counts.active : badges.filter((b) => !b.isArchived).length
+  const archivedBadgeCount = badgeRes ? badgeRes.counts.archived : badges.filter((b) => b.isArchived).length
 
   const badgesInView = useMemo(() => badges.filter((b) => !!b.isArchived === (archiveView === 'archived')), [badges, archiveView])
 
-  const filterCounts = useMemo(() => ({
+  // Chip and Active/Archived counts follow the current search, game and visibility (from the server).
+  const filterCounts = useMemo(() => (badgeRes ? {
+    All: badgeRes.counts.all, 'Game badges': badgeRes.counts.game, Milestones: badgeRes.counts.milestone, Hidden: badgeRes.counts.hidden,
+  } : {
     All: badgesInView.length,
     'Game badges': badgesInView.filter((b) => b.badgeType === 'game_completion').length,
     Milestones: badgesInView.filter((b) => b.badgeType === 'milestone').length,
     Hidden: badgesInView.filter((b) => !b.isActive).length,
-  }), [badgesInView])
+  }), [badgesInView, badgeRes])
+
+  const badgeReloadKey = badges.map((b) => `${b.id}${b.isActive}${b.isArchived}${b.updatedAt || ''}`).join('|')
+  useEffect(() => {
+    if (pageTab !== 'Badges') return undefined
+    let cancelled = false
+    authFetch('/api/admin/badges/games').then((d) => { if (!cancelled) setBadgeGames(d) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [pageTab, badgeReloadKey])
+  useEffect(() => {
+    if (pageTab !== 'Badges') return undefined
+    let cancelled = false
+    authFetch('/api/admin/badges', { query: { q: bFilters.q, game: bFilters.game, vis: bFilters.vis, sort: bFilters.sort, type: bFilters.type, archived: archiveView === 'archived' ? '1' : '', page: badgePage, limit: 24 } })
+      .then((d) => {
+        if (cancelled) return
+        setBadgeRes(d)
+        setBadgeRows((rows) => (d.page > 1 ? [...rows, ...d.items] : d.items))
+      })
+      .catch(() => { if (!cancelled) setBadgeRes(null) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageTab, bFilters.q, bFilters.game, bFilters.vis, bFilters.sort, bFilters.type, archiveView, badgePage, badgeReloadKey])
+
+  const badgeGameOptions = useMemo(() => [
+    { value: 'all', label: 'All games', count: badgeGames.total },
+    ...badgeGames.games.map((g) => ({ value: g.gameId, label: g.name, count: g.count })),
+    { value: 'milestone', label: 'Milestones (any game)', count: badgeGames.milestones },
+  ], [badgeGames])
 
   const visibleBadges = useMemo(() => {
-    if (statusFilter === 'All') return badgesInView
-    if (statusFilter === 'Game badges') return badgesInView.filter((b) => b.badgeType === 'game_completion')
-    if (statusFilter === 'Milestones') return badgesInView.filter((b) => b.badgeType === 'milestone')
-    return badgesInView.filter((b) => !b.isActive)
-  }, [badgesInView, statusFilter])
+    if (!badgeRes) {
+      if (statusFilter === 'All') return badgesInView
+      if (statusFilter === 'Game badges') return badgesInView.filter((b) => b.badgeType === 'game_completion')
+      if (statusFilter === 'Milestones') return badgesInView.filter((b) => b.badgeType === 'milestone')
+      return badgesInView.filter((b) => !b.isActive)
+    }
+    const byId = new Map(badges.map((x) => [x.id, x]))
+    return badgeRows.map((r) => (byId.has(r.id) ? { ...byId.get(r.id), howToEarn: r.howToEarn, gameName: r.gameName, earnedLive: r.earned } : null)).filter(Boolean)
+  }, [badges, badgeRes, badgeRows, badgesInView, statusFilter])
+
+  const badgePills = [
+    bFilters.game && { key: 'game', text: `Game: ${bFilters.game === 'milestone' ? 'Milestones' : (badgeGames.games.find((g) => g.gameId === bFilters.game)?.name || '…')}` },
+    bFilters.vis && { key: 'vis', text: `Visibility: ${bFilters.vis === 'active' ? 'Active' : 'Hidden'}` },
+    bFilters.q && { key: 'q', text: `Search: "${bFilters.q}"` },
+    bFilters.type && { key: 'type', text: `Type: ${statusFilter}` },
+  ].filter(Boolean)
+  const badgeSortLabel = (BADGE_TOOLBAR.sort.options.find(([v]) => v === (bFilters.sort || 'earned-desc')) || BADGE_TOOLBAR.sort.options[0])[1]
+  const clearBadgeFilters = () => setBadgeFilters({ q: '', game: '', vis: '', sort: '', type: '' })
 
   const openCreate = () => {
     setEditingId(null)
@@ -513,7 +585,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
     filters.q && { key: 'q', text: `Search: "${filters.q}"` },
     filters.cat && { key: 'cat', text: `Category: ${clothesFilter}` },
   ].filter(Boolean)
-  const sortLabel = (SORT_OPTIONS.find(([v]) => v === (filters.sort || 'game-asc')) || SORT_OPTIONS[0])[1]
+  const sortLabel = (OUTFIT_TOOLBAR.sort.options.find(([v]) => v === (filters.sort || 'game-asc')) || OUTFIT_TOOLBAR.sort.options[0])[1]
   const clearFilters = () => setFilters({ q: '', game: '', status: '', sort: '', cat: '' })
 
   // Only themes that actually have pieces get a filter chip.
@@ -739,6 +811,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           <button className="admin-btn" onClick={openCreate}>Add badge</button>
         </div>
 
+        <FilterToolbar config={BADGE_TOOLBAR} filters={{ ...bFilters, second: bFilters.vis }} setFilters={(p) => setBadgeFilters('second' in p ? { ...p, vis: p.second } : p)} gameOptions={badgeGameOptions} total={badgeRes?.total ?? badges.length} />
+
         <div className="admin-button-row" style={{ marginBottom: '12px' }}>
           <button
             type="button"
@@ -771,13 +845,21 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
 
-        <div className="games-list">
+        <div className="wt-meta">
+          {badgePills.map((p) => (
+            <span key={p.key} className="wt-pill">{p.text}<button type="button" onClick={() => setBadgeFilters({ [p.key]: '' })} aria-label={`Remove ${p.text}`}><X size={14} /></button></span>
+          ))}
+          {badgePills.length > 0 && <button type="button" className="wt-clearall" onClick={clearBadgeFilters}>Clear all</button>}
+          <span className="wt-showing">Showing {visibleBadges.length} of {badgeRes ? badgeRes.total : visibleBadges.length} badges</span>
+          <p className="wt-sorted">Sorted by {badgeSortLabel.toLowerCase()}</p>
+        </div>
+
+        <div className="games-list badge-cards">
           {visibleBadges.length === 0 && (
-            <div className="game-card">
-              <div>
-                <h4>No badges found</h4>
-                <p>{archiveView === 'archived' ? 'No archived badges.' : 'Try a different filter or add a new badge.'}</p>
-              </div>
+            <div className="wt-empty">
+              <h4>No badges match these filters</h4>
+              <p>{archiveView === 'archived' ? 'No archived badges.' : 'Try a different search, or clear the filters.'}</p>
+              <button type="button" onClick={clearBadgeFilters}>Clear filters</button>
             </div>
           )}
           {visibleBadges.map((badge) => (
@@ -793,8 +875,10 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                   {badge.isArchived && <span className="admin-pill gray"><ArchiveIcon size={11} /> Archived</span>}
                 </div>
                 <p>{badge.description}</p>
-                <div className="badge-earned-line">
-                  <UsersIcon size={13} /> Earned by {badge.earnedCount} patient{badge.earnedCount === 1 ? '' : 's'}
+                {badge.howToEarn && <div className="wardrobe-unlock-pill bc-how"><Lock size={14} aria-hidden="true" /> {badge.howToEarn}</div>}
+                <div className="badge-earned-line bc-meta">
+                  {badge.badgeType === 'game_completion' && badge.gameName ? <span className="bc-game"><Gamepad2 size={14} aria-hidden="true" /> {badge.gameName}</span> : <span className="bc-any">Any game</span>}
+                  <span><UsersIcon size={13} /> Earned {badge.earnedLive ?? badge.earnedCount}×</span>
                 </div>
               </div>
               <div className="admin-item-actions">
@@ -827,6 +911,9 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
             </div>
           ))}
         </div>
+        {badgeRes && badgePage < badgeRes.pages && (
+          <button type="button" className="wt-more" onClick={() => setBadgePage((p) => p + 1)}>Load more</button>
+        )}
       </div>
       </>
       )
@@ -872,7 +959,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
 
-        <WardrobeToolbar filters={filters} setFilters={setFilters} gameOptions={gameOptions} total={outfitRes?.total ?? clothes.length} />
+        <FilterToolbar config={OUTFIT_TOOLBAR} filters={{ ...filters, second: filters.status }} setFilters={(p) => setFilters('second' in p ? { ...p, status: p.second } : p)} gameOptions={gameOptions} total={outfitRes?.total ?? clothes.length} />
 
         <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
           <div className="admin-button-row">

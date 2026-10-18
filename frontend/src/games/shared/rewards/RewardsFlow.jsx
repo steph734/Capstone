@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowRight, Shirt, Star } from 'lucide-react'
 import BadgeMedal from '../../../components/BadgeMedal'
 import { markPaoSeen } from '../../../utils/paoApi'
@@ -9,7 +10,7 @@ import './rewards-flow.css'
 
 const CATEGORY_SLOT = { Hats: 'hats', Clothes: 'clothes', Pants: 'pants', Shoes: 'shoes', Hair: 'hair' }
 
-const poseFor = (step, wearing) => ({ badge: 'badge', xp: 'xp', level: 'levelUp', stats: 'stats', outfit: wearing ? 'wearing' : 'gift', allDone: 'allDone', replay: 'replay', keepGoing: 'keepGoing' }[step.kind])
+const poseFor = (step, wearing) => ({ badge: 'badge', xp: 'xp', level: 'levelUp', stats: 'stats', outfit: wearing ? 'wearing' : 'gift', allDone: 'allDone', replay: 'replay', keepGoing: 'keepGoing', error: 'keepGoing' }[step.kind])
 
 function useCountUp(target, run, ms = 900) {
   const [v, setV] = useState(0)
@@ -57,6 +58,7 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
   // One short line per step.
   useEffect(() => {
     if (!step || !sound) return undefined
+    if (step.kind === 'error') return undefined
     const line = step.kind === 'level' ? SPEECH.levelUp(xp.levelAfter) : step.kind === 'outfit' ? (wearing ? SPEECH.wearing : SPEECH.gift) : SPEECH[step.kind]
     if (line) speakPao(line, { rate: 0.85, pitch: 1.1 })
     return undefined
@@ -100,7 +102,7 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
   const profile = reward.profile
   const xpPct = (v) => Math.min(100, Math.round((v / (xp.cap || 100)) * 100))
 
-  return (
+  return createPortal(
     <div className="rw-overlay" role="dialog" aria-modal="true" aria-label="Pao's rewards">
       <div className="rw-card" onClick={(e) => { if (counted && !last && !e.target.closest('button') && step.kind !== 'outfit') next() }}>
         <div className="rw-head">
@@ -188,6 +190,12 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
             <div className="rw-starsrow" aria-label={`${stars} out of 3 stars`}>{[1, 2, 3].map((n) => <Star key={n} size={46} fill={n <= stars ? '#ffc83d' : 'none'} color={n <= stars ? '#f0a500' : '#d9cdea'} strokeWidth={2.2} aria-hidden="true" />)}</div>
           </>
         )}
+        {step.kind === 'error' && (
+          <>
+            <h2>We couldn&apos;t save your rewards</h2>
+            <p>{reward.message || 'Check the internet and try again.'}</p>
+          </>
+        )}
         {step.kind === 'keepGoing' && (
           <>
             <h2>Keep going!</h2>
@@ -206,6 +214,11 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
               <button type="button" className="rw-btn orange" onClick={() => close(actions?.playAgain)} autoFocus>Play again</button>
               <button type="button" className="rw-btn white" onClick={() => close(actions?.allGames)}>All games</button>
             </>
+          ) : step.kind === 'error' ? (
+            <>
+              <button type="button" className="rw-btn orange" onClick={() => close(reward.retry)} autoFocus>Try again</button>
+              <button type="button" className="rw-btn white" onClick={() => close(actions?.allGames)}>All games</button>
+            </>
           ) : step.kind === 'keepGoing' ? (
             <button type="button" className="rw-btn orange" onClick={() => close(actions?.allGames)} autoFocus>All games</button>
           ) : (
@@ -214,6 +227,7 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
         </div>
         {(step.kind === 'badge' || step.kind === 'xp') && <small className="rw-hint">Tap anywhere to continue</small>}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

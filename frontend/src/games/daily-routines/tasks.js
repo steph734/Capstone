@@ -3,9 +3,12 @@
 // step.why = the reason this step comes at its place ("Not yet! We need soap before we scrub.").
 const step = (id, text, why) => ({ id, text, why })
 
+// Daily Routines has ONE badge for the whole game (the first finished task earns it).
+export const BADGE = { code: 'routine_star', name: 'Routine Star' }
+
 export const TASKS = [
   {
-    id: 'morning', key: 'morning', name: 'My morning', badge: 'Early Bird', badgeCode: 'early_bird', finish: 'Ready for the day!', safety: false,
+    id: 'morning', key: 'morning', name: 'My morning', badge: BADGE.name, badgeCode: BADGE.code, finish: 'Ready for the day!', safety: false,
     steps: [
       step('wake', 'Wake up', 'We start the day by waking up.'),
       step('toilet', 'Use the toilet', 'First we use the toilet after we wake up.'),
@@ -16,7 +19,7 @@ export const TASKS = [
     ],
   },
   {
-    id: 'handwashing', key: 'handwashing', name: 'Washing hands', badge: 'Clean Hands', badgeCode: 'clean_hands', finish: 'Squeaky clean!', safety: false,
+    id: 'handwashing', key: 'handwashing', name: 'Washing hands', badge: BADGE.name, badgeCode: BADGE.code, finish: 'Squeaky clean!', safety: false,
     steps: [
       step('water', 'Turn on the water', 'First, we turn on the water.'),
       step('wet', 'Wet your hands', 'We wet our hands before the soap.'),
@@ -27,7 +30,7 @@ export const TASKS = [
     ],
   },
   {
-    id: 'egg', key: 'egg', name: 'Cooking an egg', note: 'with a grown-up', badge: 'Little Chef', badgeCode: 'little_chef', finish: 'Yummy egg!', safety: true,
+    id: 'egg', key: 'egg', name: 'Cooking an egg', note: 'with a grown-up', badge: BADGE.name, badgeCode: BADGE.code, finish: 'Yummy egg!', safety: true,
     steps: [
       step('help', 'Ask a grown-up to help', 'We always ask a grown-up first.'),
       step('pan', 'Put the pan on the stove', 'The pan goes on the stove before the egg.'),
@@ -38,7 +41,7 @@ export const TASKS = [
     ],
   },
   {
-    id: 'sandwich', key: 'sandwich', name: 'Making a sandwich', badge: 'Sandwich Maker', badgeCode: 'snack_maker', finish: 'Yummy sandwich!', safety: false,
+    id: 'sandwich', key: 'sandwich', name: 'Making a sandwich', badge: BADGE.name, badgeCode: BADGE.code, finish: 'Yummy sandwich!', safety: false,
     steps: [
       step('wash', 'Wash your hands', 'We wash our hands before we touch food.'),
       step('bread', 'Take two slices of bread', 'We take the bread before we spread.'),
@@ -49,7 +52,7 @@ export const TASKS = [
     ],
   },
   {
-    id: 'bedtime', key: 'bedtime', name: 'Bedtime', badge: 'Sweet Dreams', badgeCode: 'sweet_dreams', finish: 'Sweet dreams!', safety: false,
+    id: 'bedtime', key: 'bedtime', name: 'Bedtime', badge: BADGE.name, badgeCode: BADGE.code, finish: 'Sweet dreams!', safety: false,
     steps: [
       step('bath', 'Take a bath', 'We start with a bath.'),
       step('pajamas', 'Put on pajamas', 'We put on pajamas after the bath.'),
@@ -63,6 +66,14 @@ export const TASKS = [
 
 export const STEPS_PER_TASK = 6
 export const DEFAULT_SETTINGS = { placeExample: true, showAll: false, readAloud: true, hintDelay: 12, sound: true }
+
+const DONE = 'dailyRoutines:done:'
+export function loadDone(who) {
+  try { return new Set(JSON.parse(localStorage.getItem(DONE + who) || '[]')) } catch { return new Set() }
+}
+export function saveDone(who, set) {
+  try { localStorage.setItem(DONE + who, JSON.stringify([...set])) } catch { /* private mode */ }
+}
 
 const KEY = 'dailyRoutines:settings:'
 export function loadSettings(who) {

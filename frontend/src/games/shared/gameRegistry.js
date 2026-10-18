@@ -1,6 +1,9 @@
 /*
  * GAME REGISTRY — the one list of every game in Gamified Activities.
  *
+ * Games must end with finish() (useGameSession). Never award rewards inside a game: the server decides XP, badge,
+ * stats and outfit, and the shared RewardsFlow shows them.
+ *
  * To add a new game: add one entry here. The loading modal is automatic.
  *   slug       the game id used by the game cards (see GAMES in GamifiedFullPage.jsx)
  *   name, icon (a lucide icon), category, level

@@ -854,11 +854,18 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                     {themeById(item.theme) && <span className="admin-pill wardrobe-theme-pill">{themeById(item.theme).icon} {themeById(item.theme).label}</span>}
                   </div>
                   <p>{item.description}</p>
-                  {item.unlock && (
-                    <div className="wardrobe-unlock-pill">
-                      🔒 {describeUnlock(item.unlock.type, item.unlock, games, badges)}
-                    </div>
-                  )}
+                  {(() => {
+                    // Set on the item itself, or automatically from a badge whose "Unlocks item for Pao" is this item.
+                    const viaBadge = badges.find((b) => b.unlockItemCode === item.code && b.isActive !== false)
+                    const text = item.unlock
+                      ? describeUnlock(item.unlock.type, item.unlock, games, badges)
+                      : viaBadge
+                        ? (viaBadge.criteriaType === 'complete_specific_game'
+                          ? describeUnlock('complete_specific_game', { gameId: viaBadge.criteriaGameId }, games, badges)
+                          : `Earn the "${viaBadge.name}" badge`)
+                        : null
+                    return text ? <div className="wardrobe-unlock-pill">🔒 {text}</div> : null
+                  })()}
                 </div>
                 <div className="admin-item-actions wardrobe-card-actions">
                   <button className="admin-icon-btn admin-icon-edit" onClick={() => openEditClothing(item)} title="Edit" aria-label={`Edit ${item.name}`}>

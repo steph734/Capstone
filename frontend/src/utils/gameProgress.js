@@ -4,14 +4,15 @@
 // via the published games list, since nothing else maps a frontend game
 // screen to its Mongo document.
 let gameIdMapPromise = null
+const nameKey = (n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '')
 
 function loadGameIdMap() {
   if (!gameIdMapPromise) {
-    gameIdMapPromise = fetch('/api/games/list')
+    gameIdMapPromise = fetch('/api/games/list?scope=all')
       .then((r) => r.json())
       .then((body) => {
         const map = {}
-        ;(body.games || []).forEach((g) => { if (g.name) map[g.name.trim().toLowerCase()] = g.id })
+        ;(body.games || []).forEach((g) => { if (g.name) map[nameKey(g.name)] = g.id })
         return map
       })
       .catch(() => ({}))
@@ -40,7 +41,7 @@ export async function reportGameCompletion({ patientEmail, gameName, score = nul
 export async function resolveGameIdByName(gameName) {
   if (!gameName) return null
   const map = await loadGameIdMap()
-  return map[gameName.trim().toLowerCase()] || null
+  return map[nameKey(gameName)] || null
 }
 
 export async function fetchUnlockState(patientEmail) {

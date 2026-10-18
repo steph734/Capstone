@@ -12,32 +12,32 @@ const img = (key) => `/games/daily-routines/${key}.svg`
 
 // Each task: steps are [picture key, card text (Pao says "Next, <text>!")].
 const TASKS = [
-  { task_key: 'morning', name: 'Morning Routine', min_age: 8, safety: false, badge_code: 'early_bird', finish_text: 'Ready for school!', color: '#FFF4DE',
+  { task_key: 'morning', name: 'Morning Routine', min_age: 8, safety: false, finish_text: 'Ready for school!', color: '#FFF4DE',
     steps: [['morning-wake', 'wake up'], ['morning-bath', 'take a bath'], ['morning-dress', 'get dressed'], ['morning-breakfast', 'eat breakfast'], ['morning-teeth', 'brush our teeth'], ['morning-pack', 'pack our bag']],
     levels: [
       { level_name: 'Warm-up', prompt_level: 'full_model', count: 3 },
       { level_name: 'Getting ready', prompt_level: 'partial', count: 4 },
       { level_name: 'All of it', prompt_level: 'none', count: 6 },
     ] },
-  { task_key: 'handwashing', name: 'Wash Your Hands', min_age: 8, safety: false, badge_code: 'clean_hands', finish_text: 'Clean hands!', color: '#E0F2FE',
+  { task_key: 'handwashing', name: 'Wash Your Hands', min_age: 8, safety: false, finish_text: 'Clean hands!', color: '#E0F2FE',
     steps: [['hands-wet', 'wet our hands'], ['hands-soap', 'get soap'], ['hands-scrub', 'scrub'], ['hands-rinse', 'rinse'], ['hands-dry', 'dry our hands']],
     levels: [
       { level_name: 'Warm-up', prompt_level: 'full_model', count: 5 },
       { level_name: 'All', prompt_level: 'partial', count: 5 },
     ] },
-  { task_key: 'egg', name: 'Cook an Egg', min_age: 12, safety: true, badge_code: 'little_chef', finish_text: 'Breakfast is ready!', color: '#FEF9C3',
+  { task_key: 'egg', name: 'Cook an Egg', min_age: 12, safety: true, finish_text: 'Breakfast is ready!', color: '#FEF9C3',
     steps: [['egg-get', 'get an egg'], ['egg-crack', 'crack it in the bowl'], ['egg-cook', 'cook it in the pan'], ['egg-plate', 'put it on the plate']],
     levels: [
       { level_name: 'Warm-up', prompt_level: 'full_model', count: 4 },
       { level_name: 'All', prompt_level: 'partial', count: 4 },
     ] },
-  { task_key: 'sandwich', name: 'Make a Sandwich', min_age: 8, safety: false, badge_code: 'snack_maker', finish_text: 'Yummy sandwich!', color: '#FFEDD5',
+  { task_key: 'sandwich', name: 'Make a Sandwich', min_age: 8, safety: false, finish_text: 'Yummy sandwich!', color: '#FFEDD5',
     steps: [['sandwich-bread', 'get two slices of bread'], ['sandwich-spread', 'spread the peanut butter'], ['sandwich-filling', 'add the jam'], ['sandwich-close', 'close the sandwich']],
     levels: [
       { level_name: 'Warm-up', prompt_level: 'full_model', count: 4 },
       { level_name: 'All', prompt_level: 'partial', count: 4 },
     ] },
-  { task_key: 'bedtime', name: 'Bedtime', min_age: 8, safety: false, badge_code: 'sweet_dreams', finish_text: 'Sweet dreams!', color: '#E0E7FF',
+  { task_key: 'bedtime', name: 'Bedtime', min_age: 8, safety: false, finish_text: 'Sweet dreams!', color: '#E0E7FF',
     steps: [['bed-pyjamas', 'put on our pyjamas'], ['bed-teeth', 'brush our teeth'], ['bed-story', 'read a story'], ['bed-light', 'turn off the light']],
     levels: [
       { level_name: 'Warm-up', prompt_level: 'full_model', count: 4 },
@@ -45,12 +45,9 @@ const TASKS = [
     ] },
 ]
 
+// ONE badge for the whole game: finishing any task earns it (no per-task badges).
 const BADGES = [
-  { code: 'early_bird', name: 'Early Bird', emoji: '🌅', description: 'Finished the Morning Routine.', task_key: 'morning', color: 'yellow' },
-  { code: 'clean_hands', name: 'Clean Hands', emoji: '🧼', description: 'Finished Wash Your Hands.', task_key: 'handwashing', color: 'blue' },
-  { code: 'little_chef', name: 'Little Chef', emoji: '🍳', description: 'Finished Cook an Egg.', task_key: 'egg', color: 'orange' },
-  { code: 'snack_maker', name: 'Snack Maker', emoji: '🥪', description: 'Finished Make a Sandwich.', task_key: 'sandwich', color: 'orange' },
-  { code: 'sweet_dreams', name: 'Sweet Dreams', emoji: '🌙', description: 'Finished Bedtime.', task_key: 'bedtime', color: 'purple' },
+  { code: 'routine_star', name: 'Routine Star', emoji: null, description: 'Finished a Daily Routines task.', color: 'green' },
 ]
 
 // Each level's items are the first `count` steps of its task, in order.
@@ -106,7 +103,6 @@ async function main() {
             name: t.name,
             min_age: new Int32(t.min_age),
             safety: t.safety,
-            badge_code: t.badge_code,
             finish_text: t.finish_text,
             cover_image: img(t.steps[0][0]),
             color: t.color,
@@ -154,7 +150,7 @@ async function main() {
       icon_url: null,
       theme_code: null,
       art: { shape: 'circle', color: b.color, symbol: 'gem', banner: false },
-      criteria: { type: 'complete_specific_game', game_id: game._id, value: new Int32(1), task_key: b.task_key },
+      criteria: { type: 'complete_specific_game', game_id: game._id, value: new Int32(1) },
       unlock_item_type: null,
       unlock_item_code: null,
       is_active: true,

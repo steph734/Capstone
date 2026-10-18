@@ -11,14 +11,14 @@ export default function TaskPicker({ earned, selected, onSelect, onStart, onBack
       <p>Pick a task. Put the steps in the right order.</p>
       <div className="dr-tasks" role="radiogroup" aria-label="Tasks">
         {TASKS.map((t) => {
-          const got = earned.has(t.badgeCode)
+          const got = earned.has(t.id) // this task was finished before
           return (
             <button key={t.id} type="button" role="radio" aria-checked={selected === t.id} className={`dr-task${selected === t.id ? ' on' : ''}`} onClick={() => onSelect(t)}>
               {got && <span className="dr-got" aria-hidden="true"><Check size={20} strokeWidth={4} /></span>}
               <div className="dr-taskpic"><Picture name={`cover:${t.id}`} /></div>
               <strong>{t.name}</strong>
               <small>6 steps</small>
-              {got ? <span className="dr-badgepill earned"><Check size={13} strokeWidth={4} aria-hidden="true" /> Badge earned</span> : <span className="dr-badgepill">Badge: {t.badge}</span>}
+              {got ? <span className="dr-badgepill earned"><Check size={13} strokeWidth={4} aria-hidden="true" /> Task done</span> : <span className="dr-badgepill">Badge: {t.badge}</span>}
             </button>
           )
         })}

@@ -67,10 +67,8 @@ export default async function handler(req, res) {
 
     const profile = await getOrCreateProfile(patientId)
 
-    const requiredLevel = Number(game.unlock_level) || 1
-    if (profile.level < requiredLevel) {
-      return res.status(403).json({ error: `This game unlocks at level ${requiredLevel}.`, requiredLevel })
-    }
+    // Every game is open to every player (the games page no longer locks cards), so there is no level check here.
+    // A refusal used to fail silently and the player never got their rewards.
 
     // Any session this patient left open counts as abandoned the moment a
     // new one starts — including the streak reset that goes with it.

@@ -118,8 +118,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'That finished too quickly to record — please actually play the game.' })
     }
 
-    const game = await Game.findById(existing.game_id).lean()
-    if (!game) return res.status(404).json({ error: 'Game not found.' })
+    const gameDoc = await Game.findById(existing.game_id).lean()
+    if (!gameDoc) {
+      console.warn('[rewards] complete: unknown game for session', String(existing._id))
+      return res.status(404).json({ error: 'This game is not set up for rewards yet.' })
+    }
+    // No reward config on the game: default 50 XP, no badge, no stats of its own.
+    const game = { ...gameDoc, points_per_play: gameDoc.points_per_play ?? 50 }
 
     const patientId = existing.patient_id
 

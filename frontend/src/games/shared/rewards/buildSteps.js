@@ -2,6 +2,7 @@
 // Order: Badge (first time) -> XP -> Level up (only if the level changed) -> Stats -> Outfit -> All done.
 export function buildSteps(reward) {
   if (!reward) return []
+  if (reward.error) return [{ kind: 'error' }]
   if (reward.exit) return [{ kind: 'keepGoing' }]
   const badges = reward.badges || []
   const unlocks = reward.unlocks || []

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Lightbulb, Undo2 } from 'lucide-react'
 import { useGameSession } from '../../hooks/useGameSession'
-import { useOptionalPao } from '../../context/PaoContext'
-import { fetchUnlockState } from '../../utils/gameProgress'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import HUD from './HUD'
 import PaoGuide from './PaoGuide'
@@ -12,7 +10,7 @@ import StepCard from './StepCard'
 import TaskDone from './TaskDone'
 import TaskPicker from './TaskPicker'
 import Picture from './pictures/Picture'
-import { STEPS_PER_TASK, buildTray, saveSettings } from './tasks'
+import { STEPS_PER_TASK, buildTray, loadDone, saveDone, saveSettings } from './tasks'
 import { sounds } from './sounds'
 import './daily-routines.css'
 
@@ -149,7 +147,7 @@ function TaskPlay({ task, settings, setSettings, settingsKey, onPickAnother, onR
     })
     if (data) {
       setResult((r) => ({ ...r, reward: data.reward }))
-      if (data.reward?.badges?.length) onEarned(task.badgeCode)
+      onEarned(task.id) // remember this task as finished (the one badge itself comes from the server)
     }
   }, [gameSession, task, talk, onEarned])
 
@@ -273,22 +271,14 @@ function TaskPlay({ task, settings, setSettings, settingsKey, onPickAnother, onR
 }
 
 export default function DailyRoutines({ patientName: _patientName = 'friend', settings: initial, settingsKey, onExit }) {
-  const pao = useOptionalPao()
   const [settings, setSettings] = useState(initial)
   const sRef = useRef(settings)
   useEffect(() => { sRef.current = settings })
   const [selected, setSelected] = useState(null)
   const [run, setRun] = useState(null) // { task, n }
-  const [earned, setEarned] = useState(() => new Set())
+  const [earned, setEarned] = useState(() => loadDone(settingsKey))
   const [paused, setPaused] = useState(false)
   const { line, talk } = useTalk(sRef)
-
-  // Which task badges the player already has ("Badge earned" on the card).
-  useEffect(() => {
-    let alive = true
-    fetchUnlockState(pao?.ident?.patientEmail).then((s) => { if (alive) setEarned((e) => new Set([...e, ...s.earnedBadgeCodes])) })
-    return () => { alive = false }
-  }, [pao?.ident?.patientEmail])
 
   useEffect(() => {
     if (run) return
@@ -302,7 +292,7 @@ export default function DailyRoutines({ patientName: _patientName = 'friend', se
     setSettings(n)
     if (settingsKey) saveSettings(settingsKey, n)
   }
-  const addEarned = useCallback((code) => setEarned((e) => new Set(e).add(code)), [])
+  const addEarned = useCallback((id) => setEarned((e) => { const n = new Set(e).add(id); saveDone(settingsKey, n); return n }), [settingsKey])
 
   if (run) {
     return (

@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { X } from 'lucide-react'
+import { authFetch } from '../../utils/session'
+import WardrobeToolbar, { SORT_OPTIONS } from './WardrobeToolbar'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { PAO_ITEM_CATEGORIES } from '../../data/paoItems'
@@ -188,7 +192,23 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   const [themes, setThemes] = useState([])
   const [clothesLoading, setClothesLoading] = useState(true)
   const [clothesLoadError, setClothesLoadError] = useState('')
-  const [clothesFilter, setClothesFilter] = useState('All')
+  // Wardrobe search / filters live in the URL (?q=&game=&status=&sort=&cat=) so refresh, back and shared links keep them.
+  const [params, setParams] = useSearchParams()
+  const filters = { q: params.get('q') || '', game: params.get('game') || '', status: params.get('status') || '', sort: params.get('sort') || '', cat: params.get('cat') || '' }
+  const [outfitPage, setOutfitPage] = useState(1)
+  const setFilters = useCallback((patch) => {
+    setOutfitPage(1)
+    setParams((cur) => {
+      const next = new URLSearchParams(cur)
+      Object.entries(patch).forEach(([k, v]) => { if (v) next.set(k, v); else next.delete(k) })
+      return next
+    }, { replace: true })
+  }, [setParams])
+  const clothesFilter = filters.cat ? filters.cat.charAt(0).toUpperCase() + filters.cat.slice(1) : 'All'
+  const setClothesFilter = (v) => setFilters({ cat: v === 'All' ? '' : v.toLowerCase() })
+  const [outfitRes, setOutfitRes] = useState(null) // { items, total, counts, pages } from the server
+  const [outfitRows, setOutfitRows] = useState([])  // accumulated pages (Load more)
+  const [gameList, setGameList] = useState({ games: [], notLinked: 0, total: 0 })
   const [themeFilter, setThemeFilter] = useState('all') // 'all' | 'everyday' | theme id
   const [showThemeSets, setShowThemeSets] = useState(false)
   const [addingThemeId, setAddingThemeId] = useState(null)
@@ -438,17 +458,63 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
   /* ── Clothes (Pao wardrobe) ── */
   const CLOTHES_FILTERS = ['All', ...PAO_ITEM_CATEGORIES]
 
+  // Global counts (the stat cards at the top never change with the filters).
   const clothesFilterCounts = useMemo(() => ({
     All: clothes.length,
     ...Object.fromEntries(PAO_ITEM_CATEGORIES.map((cat) => [cat, clothes.filter((c) => c.category === cat).length])),
   }), [clothes])
 
-  const visibleClothes = useMemo(() => clothes.filter((c) => {
-    if (clothesFilter !== 'All' && c.category !== clothesFilter) return false
-    if (themeFilter === 'everyday') return !c.theme
-    if (themeFilter !== 'all') return c.theme === themeFilter
-    return true
-  }), [clothes, clothesFilter, themeFilter])
+  // Chip counts follow the current search + game + status (from the server).
+  const chipCounts = useMemo(() => (outfitRes ? {
+    All: outfitRes.counts.all,
+    ...Object.fromEntries(PAO_ITEM_CATEGORIES.map((cat) => [cat, outfitRes.counts[cat.toLowerCase()] ?? 0])),
+  } : clothesFilterCounts), [outfitRes, clothesFilterCounts])
+
+  const reloadKey = `${wardrobe.length}:${wardrobe.map((w) => w.updatedAt || w.name).join('|')}:${badges.length}`
+  useEffect(() => {
+    if (pageTab !== 'Clothes') return undefined
+    let cancelled = false
+    authFetch('/api/admin/outfits/games').then((d) => { if (!cancelled) setGameList(d) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [pageTab, reloadKey])
+  useEffect(() => {
+    if (pageTab !== 'Clothes') return undefined
+    let cancelled = false
+    authFetch('/api/admin/outfits', { query: { q: filters.q, game: filters.game, status: filters.status, sort: filters.sort, category: filters.cat, page: outfitPage, limit: 24 } })
+      .then((d) => {
+        if (cancelled) return
+        setOutfitRes(d)
+        setOutfitRows((rows) => (d.page > 1 ? [...rows, ...d.items] : d.items))
+      })
+      .catch(() => { if (!cancelled) setOutfitRes(null) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageTab, filters.q, filters.game, filters.status, filters.sort, filters.cat, outfitPage, reloadKey])
+
+  const gameOptions = useMemo(() => [
+    { value: 'all', label: 'All games', count: gameList.total },
+    ...gameList.games.map((g) => ({ value: g.gameId, label: g.name, count: g.count })),
+    { value: 'none', label: 'Not linked to a game', count: gameList.notLinked },
+  ], [gameList])
+
+  const visibleClothes = useMemo(() => {
+    const byId = new Map(clothes.map((c) => [c.id, c]))
+    const rows = outfitRes ? outfitRows.map((r) => (byId.has(r.id) ? { ...byId.get(r.id), linkedGameName: r.gameName } : null)).filter(Boolean) : clothes
+    return rows.filter((c) => {
+      if (themeFilter === 'everyday') return !c.theme
+      if (themeFilter !== 'all') return c.theme === themeFilter
+      return true
+    })
+  }, [clothes, outfitRes, outfitRows, themeFilter])
+
+  const activePills = [
+    filters.game && { key: 'game', text: `Game: ${filters.game === 'none' ? 'Not linked' : (gameList.games.find((g) => g.gameId === filters.game)?.name || '…')}` },
+    filters.status && { key: 'status', text: `Status: ${({ linked: 'Linked to a game', free: 'Free for everyone', custom: 'Custom design' })[filters.status] || filters.status}` },
+    filters.q && { key: 'q', text: `Search: "${filters.q}"` },
+    filters.cat && { key: 'cat', text: `Category: ${clothesFilter}` },
+  ].filter(Boolean)
+  const sortLabel = (SORT_OPTIONS.find(([v]) => v === (filters.sort || 'game-asc')) || SORT_OPTIONS[0])[1]
+  const clearFilters = () => setFilters({ q: '', game: '', status: '', sort: '', cat: '' })
 
   // Only themes that actually have pieces get a filter chip.
   const themeCounts = useMemo(() => {
@@ -806,6 +872,8 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           </div>
         </div>
 
+        <WardrobeToolbar filters={filters} setFilters={setFilters} gameOptions={gameOptions} total={outfitRes?.total ?? clothes.length} />
+
         <div className="admin-toolbar" style={{ marginBottom: '16px' }}>
           <div className="admin-button-row">
             {CLOTHES_FILTERS.map((filter) => (
@@ -815,7 +883,7 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
                 className={clothesFilter === filter ? 'admin-btn' : 'admin-btn-secondary'}
                 onClick={() => setClothesFilter(filter)}
               >
-                {filter} <span className="badge-filter-count">{clothesFilterCounts[filter]}</span>
+                {filter} <span className="badge-filter-count">{chipCounts[filter]}</span>
               </button>
             ))}
           </div>
@@ -832,12 +900,20 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
           )}
         </div>
 
+        <div className="wt-meta">
+          {activePills.map((p) => (
+            <span key={p.key} className="wt-pill">{p.text}<button type="button" onClick={() => setFilters({ [p.key]: '' })} aria-label={`Remove ${p.text}`}><X size={14} /></button></span>
+          ))}
+          {activePills.length > 0 && <button type="button" className="wt-clearall" onClick={clearFilters}>Clear all</button>}
+          <span className="wt-showing">Showing {visibleClothes.length} of {clothes.length} items</span>
+          <p className="wt-sorted">Sorted by {sortLabel.toLowerCase().replace('–', ' to ')}</p>
+        </div>
+
         {visibleClothes.length === 0 ? (
-          <div className="game-card">
-            <div>
-              <h4>No items found</h4>
-              <p>Try a different filter or design a new clothing item.</p>
-            </div>
+          <div className="wt-empty">
+            <h4>No outfits match these filters</h4>
+            <p>Try a different search, or clear the filters.</p>
+            <button type="button" onClick={clearFilters}>Clear filters</button>
           </div>
         ) : (
           <div className="wardrobe-grid">
@@ -878,6 +954,9 @@ export default function GamifiedBadgesPage({ user, onLogout }) {
               </article>
             ))}
           </div>
+        )}
+        {outfitRes && outfitPage < outfitRes.pages && (
+          <button type="button" className="wt-more" onClick={() => setOutfitPage((p) => p + 1)}>Load more</button>
         )}
       </div>
       </>

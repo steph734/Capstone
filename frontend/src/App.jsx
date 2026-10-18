@@ -1120,6 +1120,21 @@ function App() {
         />
 
         <Route
+          path="/therapist/reports/patient/:id"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <TherapistReportPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
           path="/admin/profile"
           element={
             isAuthenticated ? (

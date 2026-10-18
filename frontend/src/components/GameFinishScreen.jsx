@@ -2,7 +2,7 @@ import PandaMascot from '../pages/games/PandaMascot'
 import BadgeMedal from './BadgeMedal'
 
 // The finish screen used after a game: Pao on the left, a result card on the
-// right (stars, title, the badge just earned, XP, and Play again / All games).
+// right (stars, title, and Play again / All games). Badge, XP, level and outfit are shown by the shared rewards flow (games/shared/rewards), not here.
 // Stacks into one column on phones.
 export default function GameFinishScreen({
   title,
@@ -36,16 +36,6 @@ export default function GameFinishScreen({
           </div>
           <h1 className="mt-1 text-[36px] font-black leading-tight text-[#1e1b4b]">{title}</h1>
           {subtitle && <p className="text-[14px] font-semibold text-[#3a2e6b]/70">{subtitle}</p>}
-
-          {(badge || badgeFallback) && (
-            <div className="mt-2 flex flex-col items-center gap-2 rounded-3xl border-2 border-emerald-300/40 bg-emerald-50 px-8 py-4" style={{ animation: 'gfFadeUp .5s both' }}>
-              {badge
-                ? <BadgeMedal shape={badge.shape} colour={badge.colour} symbol={badge.symbol} size={90} />
-                : <span className="text-[64px]" aria-hidden="true">{badgeFallback.emoji}</span>}
-              <div className="text-[18px] font-black text-emerald-700">{badge ? badge.name : badgeFallback.name}</div>
-              <div className="text-[13px] font-extrabold text-amber-700">+{xp} XP</div>
-            </div>
-          )}
 
           {chips.length > 0 && (
             <div className="mt-2 flex flex-wrap justify-center gap-2">

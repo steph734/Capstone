@@ -34,13 +34,6 @@ export default function ResultScreen({ name, stars, puzzles, perfect, hints, sec
           <div><Lightbulb size={20} aria-hidden="true" /><small>Hints used</small><b>{hints}</b></div>
           <div><Clock size={20} aria-hidden="true" /><small>Time</small><b>{fmt(seconds)}</b></div>
         </div>
-        <div className="sb-rewards">
-          <div className="sb-reward"><Award size={26} aria-hidden="true" /><span>Sentence Star badge</span>{reward?.badges?.length > 0 && <em>NEW</em>}</div>
-          <div className="sb-reward col">
-            <span><Star size={22} fill="#ffd23f" color="#ffd23f" aria-hidden="true" /> +{reward?.xpEarned ?? 100} XP{profile ? ` · Level ${profile.level}` : ''}</span>
-            <div className="sb-bar"><i style={{ width: `${xpPct}%` }} /></div>
-          </div>
-        </div>
         <div className="sb-result-btns">
           <button type="button" className="sb-big" onClick={onBack}>Back to games</button>
           <button type="button" className="sb-big primary" onClick={onAgain}>Play again</button>

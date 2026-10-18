@@ -43,6 +43,7 @@ export function useGameSession({ gameName }) {
       sessionRef.current = null
       if (s && !finishedRef.current) {
         navigator.sendBeacon?.(`/api/sessions/${s.id}/abandon`, new Blob(['{}'], { type: 'application/json' }))
+        pao?.showReward?.({ exit: true, gameName }) // "Keep going": nothing was earned
       }
     }
   }, [gameName, identKey, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,7 +61,7 @@ export function useGameSession({ gameName }) {
         const data = await res.json().catch(() => ({}))
         if (!res.ok) return null // a 4xx won't succeed on retry (e.g. too short)
         pao?.applyServerProfile(data.profile)
-        pao?.showReward({ ...data.reward, profile: data.profile })
+        pao?.showReward({ ...data.reward, profile: data.profile, stars: result?.stars ?? 0, gameName })
         return data
       } catch {
         // Network blip: retry once.

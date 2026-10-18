@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import EmergencyReady from '../../components/emergency-ready/EmergencyReady.jsx'
+import EmergencyReady from '../../games/emergency-ready/EmergencyReady'
+import EmergencySettings from '../../games/emergency-ready/SettingsPanel'
+import { loadSettings, saveSettings } from '../../games/emergency-ready/emergencies'
 import { EmergencyStartModal } from '../../components/emergency-ready/EmergencyReadyModals'
 import { buildEmergencies } from '../../components/emergency-ready/emergencyReady'
-import { useGameSession } from '../../hooks/useGameSession'
 
 const PREVIEW = {
   name: 'Emergency Ready',
@@ -14,11 +15,12 @@ const PREVIEW = {
 // Emergency Ready: loads the game from the database, shows its start screen,
 // then plays the pick-an-emergency flow and reports each finished
 // emergency to Pao.
-export default function EmergencyReadyPage({ lang = 'en', onExit }) {
+export default function EmergencyReadyPage({ settingsKey = null, canEdit = false, onExit }) {
   const [game, setGame] = useState(null)
   const [error, setError] = useState('')
   const [started, setStarted] = useState(false)
-  const gameSession = useGameSession({ gameName: 'Emergency Ready' })
+  const [settings, setSettings] = useState(() => loadSettings(settingsKey || 'default'))
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -41,24 +43,19 @@ export default function EmergencyReadyPage({ lang = 'en', onExit }) {
   if (!started) {
     const shown = game || PREVIEW
     return (
-      <EmergencyStartModal
-        game={shown}
-        emergencies={buildEmergencies(shown)}
-        ready={!!game}
-        onStart={() => setStarted(true)}
-        onCancel={onExit}
-      />
+      <>
+        <EmergencyStartModal
+          game={shown}
+          emergencies={buildEmergencies(shown)}
+          ready={!!game}
+          onStart={() => setStarted(true)}
+          onCancel={onExit}
+          onSettings={canEdit ? () => setShowSettings(true) : null}
+        />
+        {showSettings && <EmergencySettings value={settings} onChange={(v) => { setSettings(v); saveSettings(settingsKey || 'default', v) }} onClose={() => setShowSettings(false)} />}
+      </>
     )
   }
 
-  if (!game) return null
-
-  return (
-    <EmergencyReady
-      game={game}
-      lang={lang}
-      onExit={onExit}
-      onComplete={(result) => { gameSession.finish(result) }}
-    />
-  )
+  return <EmergencyReady settings={settings} settingsKey={settingsKey || 'default'} onExit={onExit} />
 }

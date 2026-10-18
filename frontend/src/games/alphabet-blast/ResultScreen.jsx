@@ -19,13 +19,6 @@ export default function ResultScreen({ name, stars, letters, seconds, correct, t
           <div><Target size={22} aria-hidden="true" /><small>Correct taps</small><b>{correct} / {total}</b></div>
           <div><Flame size={22} aria-hidden="true" /><small>Best streak</small><b>{streak}</b></div>
         </div>
-        <div className="ab-rewards">
-          <div className="ab-reward"><Award size={28} aria-hidden="true" /><span>Alphabet Blast badge</span>{reward?.badges?.length > 0 && <em>NEW</em>}</div>
-          <div className="ab-reward col">
-            <span><Star size={24} fill="#ffd23f" color="#ffd23f" aria-hidden="true" /> +{reward?.xpEarned ?? 100} XP{profile ? ` · Level ${profile.level}` : ''}</span>
-            <div className="ab-bar"><i style={{ width: `${xpPct}%` }} /></div>
-          </div>
-        </div>
         <div className="ab-result-btns">
           <button type="button" className="ab-big" onClick={onBack}>Back to games</button>
           <button type="button" className="ab-big primary" onClick={onAgain}>Play again</button>

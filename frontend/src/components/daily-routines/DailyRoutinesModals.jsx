@@ -36,7 +36,7 @@ function Cover({ src, rotate = 0, offset = 0, size = 92 }) {
   )
 }
 
-export function DailyRoutinesStartModal({ game, ready = true, onStart, onCancel }) {
+export function DailyRoutinesStartModal({ game, ready = true, onStart, onCancel, onSettings = null }) {
   const ref = useRef(null)
   useDialogKeys(ref, onCancel)
   const tasks = game.type_settings?.step_by_step?.tasks || []
@@ -73,6 +73,11 @@ export function DailyRoutinesStartModal({ game, ready = true, onStart, onCancel 
         <button type="button" onClick={onStart} disabled={!ready} style={{ width: '100%', background: color, border: 'none', color: '#fff', borderRadius: 14, padding: 13, cursor: ready ? 'pointer' : 'wait', opacity: ready ? 1 : 0.6, fontSize: 15, fontWeight: 800, boxShadow: `0 6px 16px ${color}55`, marginBottom: 10 }}>
           Start Game 🎮
         </button>
+        {onSettings && (
+          <button type="button" onClick={onSettings} style={{ width: '100%', background: 'none', border: 'none', color: '#5b21b6', fontSize: 13, fontWeight: 800, cursor: 'pointer', marginBottom: 8, textDecoration: 'underline' }}>
+            Game settings
+          </button>
+        )}
         <button type="button" onClick={onCancel} style={{ width: '100%', background: 'rgba(124,79,224,.06)', border: '1px solid rgba(124,79,224,.15)', color: 'rgba(58,46,107,.6)', borderRadius: 12, padding: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           Cancel
         </button>

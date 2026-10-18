@@ -36,6 +36,12 @@ function themeIsActiveToday(theme) {
   return true
 }
 
+// Only the stats THIS game gives (not the +1 every stat gets on a level up), with the new total for the mini bar.
+const STAT_LABELS = { intelligence: 'Intelligence', focus: 'Focus', resistance: 'Resistance', creativity: 'Creativity', speed: 'Speed', memory: 'Memory' }
+function gameStatsList(applied, keys, totals) {
+  return (keys || []).map((k) => ({ key: k, label: STAT_LABELS[k] || k, gained: Number(applied?.[k]) || 0, total: Number(totals?.[k]) || 0, max: 100 })).filter((x) => x.gained > 0)
+}
+
 async function buildRewardNames(db, badgeCodes, unlocks) {
   const [badgeDocs, itemDocs, hairDocs] = await Promise.all([
     badgeCodes.length ? Badge.find({ code: { $in: badgeCodes } }).lean() : [],
@@ -90,6 +96,9 @@ export default async function handler(req, res) {
       return res.status(200).json({
         reward: {
           xpEarned: existing.reward?.xp_earned || 0,
+          firstTime: Boolean(existing.reward?.first_time),
+          xpBefore: existing.reward?.xp_before ?? null,
+          gameStats: gameStatsList(existing.reward?.stat_gains, existing.reward?.game_stat_keys, profile?.stats),
           levelBefore: existing.reward?.level_before,
           levelAfter: existing.reward?.level_after,
           leveledUp: (existing.reward?.level_after || 0) > (existing.reward?.level_before || 0),
@@ -138,6 +147,7 @@ export default async function handler(req, res) {
         const xpEarned = computeXpEarned(game, { isFirstFinish, finishesTodayIncludingThis: finishedTodayBefore + 1 })
 
         const levelBefore = profile.level
+        const xpBefore = profile.xp
         const { level, xp, levelsGained } = applyXp(profile.level, profile.xp, xpEarned)
         const gains = statGainsForGame(game)
         const { stats, gains: appliedGains } = applyStatGains(profile.stats, gains, levelsGained)
@@ -249,6 +259,9 @@ export default async function handler(req, res) {
         // ── Close out the session ───────────────────────────────────────
         const reward = {
           xp_earned: xpEarned,
+          xp_before: xpBefore,
+          first_time: isFirstFinish,
+          game_stat_keys: Object.keys(gains).filter((k) => gains[k] > 0),
           level_before: levelBefore,
           level_after: level,
           stat_gains: appliedGains,
@@ -295,6 +308,9 @@ export default async function handler(req, res) {
         response = {
           reward: {
             xpEarned,
+            firstTime: isFirstFinish,
+            xpBefore,
+            gameStats: gameStatsList(appliedGains, Object.keys(gains).filter((k) => gains[k] > 0), stats),
             levelBefore,
             levelAfter: level,
             leveledUp: level > levelBefore,
@@ -314,6 +330,9 @@ export default async function handler(req, res) {
         return res.status(200).json({
           reward: {
             xpEarned: saved.reward?.xp_earned || 0,
+            firstTime: Boolean(saved.reward?.first_time),
+            xpBefore: saved.reward?.xp_before ?? null,
+            gameStats: gameStatsList(saved.reward?.stat_gains, saved.reward?.game_stat_keys, profile?.stats),
             levelBefore: saved.reward?.level_before,
             levelAfter: saved.reward?.level_after,
             leveledUp: (saved.reward?.level_after || 0) > (saved.reward?.level_before || 0),

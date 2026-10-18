@@ -20,13 +20,6 @@ export default function ResultScreen({ name, stars, pairs, firstTry, hints, stre
           <div><Lightbulb size={20} aria-hidden="true" /><small>Hints used</small><b>{hints}</b></div>
           <div><Flame size={20} aria-hidden="true" /><small>Best streak</small><b>{streak}</b></div>
         </div>
-        <div className="rt-rewards">
-          <div className="rt-reward"><Award size={26} aria-hidden="true" /><span>Rhyme Master badge</span>{reward?.badges?.length > 0 && <em>NEW</em>}</div>
-          <div className="rt-reward col">
-            <span><Star size={22} fill="#ffd23f" color="#ffd23f" aria-hidden="true" /> +{reward?.xpEarned ?? 100} XP{profile ? ` · Level ${profile.level}` : ''}</span>
-            <div className="rt-bar"><i style={{ width: `${xpPct}%` }} /></div>
-          </div>
-        </div>
         <div className="rt-result-btns">
           <button type="button" className="rt-big" onClick={onBack}>Back to games</button>
           <button type="button" className="rt-big primary" onClick={onAgain}>Play again</button>

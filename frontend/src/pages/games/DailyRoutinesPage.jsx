@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import DailyRoutines from '../../components/daily-routines/DailyRoutines'
+import DailyRoutines from '../../games/daily-routines/DailyRoutines'
+import DailySettings from '../../games/daily-routines/SettingsPanel'
+import { loadSettings, saveSettings } from '../../games/daily-routines/tasks'
 import { DailyRoutinesStartModal } from '../../components/daily-routines/DailyRoutinesModals'
-import { useGameSession } from '../../hooks/useGameSession'
 
 // Shown straight away while the database record loads, so there is no blank wait.
 const PREVIEW = {
@@ -14,11 +15,12 @@ const PREVIEW = {
 
 // Daily Routines: loads the game from the database, shows its start screen,
 // lets the player pick a task, and reports each finished task to Pao.
-export default function DailyRoutinesPage({ lang = 'en', patientAge = null, onExit }) {
+export default function DailyRoutinesPage({ patientName = 'friend', settingsKey = null, canEdit = false, onExit }) {
   const [game, setGame] = useState(null)
   const [error, setError] = useState('')
   const [started, setStarted] = useState(false)
-  const gameSession = useGameSession({ gameName: 'Daily Routines' })
+  const [settings, setSettings] = useState(() => loadSettings(settingsKey || 'default'))
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -40,24 +42,18 @@ export default function DailyRoutinesPage({ lang = 'en', patientAge = null, onEx
 
   if (!started) {
     return (
-      <DailyRoutinesStartModal
-        game={game || PREVIEW}
-        ready={!!game}
-        onStart={() => setStarted(true)}
-        onCancel={onExit}
-      />
+      <>
+        <DailyRoutinesStartModal
+          game={game || PREVIEW}
+          ready={!!game}
+          onStart={() => setStarted(true)}
+          onCancel={onExit}
+          onSettings={canEdit ? () => setShowSettings(true) : null}
+        />
+        {showSettings && <DailySettings value={settings} onChange={(v) => { setSettings(v); saveSettings(settingsKey || 'default', v) }} onClose={() => setShowSettings(false)} />}
+      </>
     )
   }
 
-  if (!game) return null
-
-  return (
-    <DailyRoutines
-      game={game}
-      lang={lang}
-      patientAge={patientAge}
-      onExit={onExit}
-      onTaskComplete={(result) => { gameSession.finish(result) }}
-    />
-  )
+  return <DailyRoutines patientName={patientName} settings={settings} settingsKey={settingsKey || 'default'} onExit={onExit} />
 }

@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getPaoProfile, equipPao, equipPaoTheme, hasIdent } from '../utils/paoApi'
-import RewardSequence from '../components/RewardSequence'
+import RewardsFlow from '../games/shared/rewards/RewardsFlow'
 import AppErrorBoundary from '../components/AppErrorBoundary'
 
 // Pao's real profile (level, XP, stats, equipped outfit) from the server,
@@ -13,6 +13,8 @@ export function PaoProvider({ ident, children }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
   const [pendingReward, setPendingReward] = useState(null)
+  const actionsRef = useRef({}) // { playAgain, allGames }, registered by the games page
+  const setRewardActions = useCallback((a) => { actionsRef.current = a || {} }, [])
   const enabled = hasIdent(ident)
   const identKey = ident?.activitySessionId || ident?.patientEmail || ''
 
@@ -53,18 +55,20 @@ export function PaoProvider({ ident, children }) {
 
   const value = useMemo(() => ({
     profile, error, refresh, applyServerProfile, equip, equipTheme,
-    showReward: setPendingReward, ident,
-  }), [profile, error, refresh, applyServerProfile, equip, equipTheme, identKey]) // eslint-disable-line react-hooks/exhaustive-deps
+    showReward: setPendingReward, setRewardActions, ident,
+  }), [profile, error, refresh, applyServerProfile, equip, equipTheme, setRewardActions, identKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <PaoContext.Provider value={value}>
       {children}
       {pendingReward && (
         <AppErrorBoundary label="reward sequence" onReset={() => setPendingReward(null)}>
-          <RewardSequence
+          <RewardsFlow
             reward={pendingReward}
+            gameName={pendingReward.gameName}
             ident={ident}
             onEquip={equip}
+            actions={actionsRef.current}
             onDone={() => setPendingReward(null)}
           />
         </AppErrorBoundary>

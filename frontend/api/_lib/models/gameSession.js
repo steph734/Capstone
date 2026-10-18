@@ -19,6 +19,9 @@ const resultSchema = new mongoose.Schema(
 const rewardSchema = new mongoose.Schema(
   {
     xp_earned: { type: Number, default: 0 },
+    xp_before: { type: Number, default: null },
+    first_time: { type: Boolean, default: false },
+    game_stat_keys: { type: [String], default: [] },
     level_before: { type: Number, default: null },
     level_after: { type: Number, default: null },
     stat_gains: { type: mongoose.Schema.Types.Mixed, default: null },

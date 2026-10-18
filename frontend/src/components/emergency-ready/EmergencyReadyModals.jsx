@@ -23,7 +23,7 @@ function useDialogKeys(ref, onClose) {
   }, [ref, onClose])
 }
 
-export function EmergencyStartModal({ game, emergencies, ready = true, onStart, onCancel }) {
+export function EmergencyStartModal({ game, emergencies, ready = true, onStart, onCancel, onSettings = null }) {
   const ref = useRef(null)
   useDialogKeys(ref, onCancel)
   const gains = Object.entries(game.statGains || {}).filter(([, v]) => v > 0)
@@ -65,6 +65,9 @@ export function EmergencyStartModal({ game, emergencies, ready = true, onStart, 
         <button type="button" onClick={onStart} disabled={!ready} className="h-14 w-full rounded-2xl bg-[#F59E0B] text-[20px] font-extrabold text-[#2B2A4C] disabled:opacity-60" style={{ ...HEADING, boxShadow: '0 5px 0 #C97A00' }}>
           Start Game
         </button>
+        {onSettings && (
+          <button type="button" onClick={onSettings} className="mt-2 w-full text-[13px] font-extrabold text-[#5b21b6] underline">Game settings</button>
+        )}
         <button type="button" onClick={onCancel} className="mt-2.5 h-12 w-full rounded-2xl border-2 border-[#E4DFCE] bg-white text-[16px] font-bold text-[#5A5670]">
           Cancel
         </button>

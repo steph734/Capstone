@@ -1,3 +1,5 @@
+import { preloadRewardPoses } from '../rewards/paoRewardPoses'
+
 // The 6 loading poses live in public/games/loading/ and are loaded by URL (never imported).
 const base = import.meta.env.BASE_URL || '/'
 const pose = (name) => `${base}games/loading/pao-${name}.svg`
@@ -16,6 +18,7 @@ export const FALLBACK_PAO = `${base}pao.png`
 let preloaded = null
 // Called once when the Gamified Activities page opens, so the modal never waits for its own art.
 export function preloadLoadingPao() {
+  preloadRewardPoses() // the 9 reward poses are preloaded together with these
   if (!preloaded) {
     preloaded = Promise.all(Object.entries(loadingPoses).map(([name, src]) => new Promise((resolve) => {
       const img = new Image()

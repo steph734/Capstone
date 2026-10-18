@@ -27,7 +27,7 @@ import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLangu
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
 import { fetchGameBadge } from '../utils/gameProgress'
 import GameLauncher from '../games/shared/GameLauncher'
-import { GAME_COMPONENTS as GC } from '../games/shared/gameRegistry'
+import { GAME_COMPONENTS as GC, entryForCard, needsIntro } from '../games/shared/gameRegistry'
 import { preloadLoadingPao } from '../games/shared/loading/paoLoadingPoses'
 
 // Game screens are lazy: each game's JS is downloaded by the loading modal (see games/shared/gameRegistry.js).
@@ -190,8 +190,7 @@ function CategoryModal({ onSelect, onClose, lang }) {
 
 // ─── Game instructions modal — shown before a game launches ──────────────────
 
-// Games that open their own start screen (or picker) after the card is tapped.
-const SELF_START_GAMES = new Set(['money-match', 'daily-routines', 'feed-pao', 'picture-word', 'puzzle-pieces', 'echo', 'copy-colors', 'spot-difference', 'emergency-ready'])
+const FOCUS_AREA = { cognitive: 'Cognitive', speech: 'Speech & Language' }
 
 function GameInstructionsModal({ game, onStart, onClose, settingsKey = null }) {
   const [realBadge, setRealBadge] = useState(null)
@@ -199,6 +198,7 @@ function GameInstructionsModal({ game, onStart, onClose, settingsKey = null }) {
   const [rtSettings, setRtSettings] = useState(null)
   const [sbSettings, setSbSettings] = useState(null)
   const [shSettings, setShSettings] = useState(null)
+  const steps = entryForCard(game)?.steps || []
 
   useEffect(() => {
     let cancelled = false
@@ -207,71 +207,65 @@ function GameInstructionsModal({ game, onStart, onClose, settingsKey = null }) {
     return () => { cancelled = true }
   }, [game.title])
 
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', background:'rgba(60,50,90,0.45)', fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
-      <style>{`@keyframes gfModalIn{from{opacity:0;transform:scale(.88) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
-      <div style={{ background:'linear-gradient(145deg,#ffffff,#fdf3e3)', border:`1.5px solid ${game.color}40`, borderRadius:28, padding:'32px 28px', width:400, maxWidth:'92vw', animation:'gfModalIn .45s cubic-bezier(.34,1.56,.64,1)', boxShadow:'0 24px 64px rgba(80,60,20,.25)' }}>
-        <div style={{ fontSize:44, textAlign:'center', marginBottom:6 }}>{game.emoji}</div>
-        <h2 style={{ color:'#3a2e6b', fontSize:22, fontWeight:800, margin:'0 0 10px', textAlign:'center' }}>{game.title}</h2>
-        <p style={{ color:'rgba(58,46,107,.75)', fontSize:14, lineHeight:1.5, margin:'0 0 20px', textAlign:'center' }}>{game.instructions || game.desc}</p>
+  const settingsOpen = {
+    alphabet: () => setAbSettings(loadSettings(settingsKey)),
+    rhyme: () => setRtSettings(loadRhymeSettings(settingsKey)),
+    sentence: () => setSbSettings(loadSentenceSettings(settingsKey)),
+    'sound-hunt': () => setShSettings(loadSoundSettings(settingsKey)),
+  }[game.id]
 
-        <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-          <div style={{ flex:1, background:`${game.color}1a`, border:`1.5px solid ${game.color}55`, borderRadius:16, padding:'12px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-            {realBadge ? (
-              <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={44} />
-            ) : (
-              <span style={{ fontSize:26 }}>{game.badgeEmoji}</span>
-            )}
-            <span style={{ fontSize:11, color:'rgba(58,46,107,.55)', fontWeight:700 }}>Badge</span>
-            <span style={{ fontSize:12.5, color:'#3a2e6b', fontWeight:800, textAlign:'center' }}>{realBadge ? realBadge.name : game.badge}</span>
+  const font = "'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif"
+  const heading = "'Baloo 2', 'Segoe UI', system-ui, sans-serif"
+  const stat = (label, value, tint, extra) => (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, borderRadius:16, padding:12, background:tint, textAlign:'center', minWidth:0 }}>
+      {extra}
+      <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.04em', color:'#5A5670' }}>{label}</span>
+      <span style={{ fontSize:13, fontWeight:800, color:'#2B2A4C', fontFamily:heading, lineHeight:1.3 }}>{value}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(8px)', background:'rgba(60,50,90,0.45)', fontFamily:font }}>
+      <style>{`@keyframes gfModalIn{from{opacity:0;transform:scale(.92) translateY(14px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
+      <div role="dialog" aria-modal="true" aria-labelledby="gf-intro-title" style={{ background:'linear-gradient(145deg,#ffffff,#fdf3e3)', border:`1.5px solid ${game.color}40`, borderRadius:28, padding:28, width:400, maxWidth:'92vw', maxHeight:'95vh', overflowY:'auto', animation:'gfModalIn .35s ease', boxShadow:'0 24px 64px rgba(80,60,20,.25)', boxSizing:'border-box' }}>
+        <h2 id="gf-intro-title" style={{ margin:0, textAlign:'center', fontSize:24, fontWeight:800, color:'#3a2e6b', fontFamily:heading }}>{game.title}</h2>
+        <p style={{ margin:'8px 0 0', textAlign:'center', fontSize:14, lineHeight:1.6, color:'rgba(58,46,107,.75)' }}>{game.instructions || game.desc}</p>
+
+        {steps.length > 0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:8, marginTop:16 }}>
+            {steps.map((p) => <span key={p} style={{ borderRadius:999, background:'#ede9fe', padding:'4px 12px', fontSize:12, fontWeight:800, color:'#5b21b6' }}>{p}</span>)}
           </div>
-          <div style={{ flex:1, background:`${game.color}1a`, border:`1.5px solid ${game.color}55`, borderRadius:16, padding:'12px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-            <span style={{ fontSize:26 }}>⭐</span>
-            <span style={{ fontSize:11, color:'rgba(58,46,107,.55)', fontWeight:700 }}>Points</span>
-            <span style={{ fontSize:12.5, color:'#3a2e6b', fontWeight:800 }}>+{game.xp} XP</span>
-          </div>
+        )}
+
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginTop:16 }}>
+          {stat('Badge', realBadge ? realBadge.name : (game.badge || 'Game Star'), '#FFF0CC',
+            realBadge ? <BadgeMedal shape={realBadge.shape} colour={realBadge.colour} symbol={realBadge.symbol} size={34} /> : null)}
+          {stat('Points', `+${game.xp ?? 100} XP`, '#E3F4E8')}
+          {stat('Focus', FOCUS_AREA[game.category] || 'Learning', '#ede9fe')}
         </div>
 
         {game.benefits && (
-          <div style={{ background:'rgba(16,185,129,.08)', border:'1.5px solid rgba(16,185,129,.3)', borderRadius:16, padding:'14px 16px', marginBottom:22, display:'flex', gap:10, alignItems:'flex-start' }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>🌱</span>
-            <div>
-              <div style={{ fontSize:11, color:'#0d9488', fontWeight:800, letterSpacing:.4, textTransform:'uppercase', marginBottom:4 }}>Why this helps</div>
-              <p style={{ margin:0, fontSize:12.5, lineHeight:1.55, color:'rgba(58,46,107,.85)' }}>{game.benefits}</p>
-            </div>
+          <div style={{ marginTop:16, borderRadius:16, border:'2px solid #A9D8B6', background:'#E3F4E8', padding:16 }}>
+            <p style={{ margin:0, fontSize:12, fontWeight:800, letterSpacing:'.06em', color:'#2F8A4C' }}>WHY THIS HELPS</p>
+            <p style={{ margin:'4px 0 0', fontSize:14, lineHeight:1.6, color:'#2B2A4C' }}>{game.benefits}</p>
           </div>
         )}
 
-        <button onClick={() => onStart(game)} style={{ width:'100%', background:game.color, border:'none', color:'#fff', borderRadius:14, padding:'13px', cursor:'pointer', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:15, fontWeight:800, boxShadow:`0 6px 16px ${game.color}55`, marginBottom:10 }}>
-          Start Game 🎮
+        <button type="button" onClick={() => onStart(game)} style={{ marginTop:20, width:'100%', height:56, border:'none', borderRadius:16, background:'#F59E0B', color:'#2B2A4C', fontFamily:'inherit', fontSize:20, fontWeight:800, cursor:'pointer', boxShadow:'0 5px 0 #C97A00' }}>
+          Start Game
         </button>
-        {game.id === 'alphabet' && settingsKey && (
-          <button onClick={() => setAbSettings(loadSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
+        {settingsOpen && settingsKey && (
+          <button type="button" onClick={settingsOpen} style={{ display:'block', margin:'12px auto 0', background:'none', border:'none', color:'#5b21b6', fontFamily:'inherit', fontSize:14, fontWeight:800, cursor:'pointer', textDecoration:'underline' }}>
             Game settings
           </button>
         )}
-        {game.id === 'rhyme' && settingsKey && (
-          <button onClick={() => setRtSettings(loadRhymeSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
-            Game settings
-          </button>
-        )}
-        {game.id === 'sentence' && settingsKey && (
-          <button onClick={() => setSbSettings(loadSentenceSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
-            Game settings
-          </button>
-        )}
-        {game.id === 'sound-hunt' && settingsKey && (
-          <button onClick={() => setShSettings(loadSoundSettings(settingsKey))} style={{ width:'100%', background:'none', border:'none', color:'#5b21b6', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:8, textDecoration:'underline' }}>
-            Game settings
-          </button>
-        )}
+        <button type="button" onClick={onClose} style={{ marginTop:10, width:'100%', height:48, borderRadius:16, border:'2px solid #E4DFCE', background:'#fff', color:'#5A5670', fontFamily:'inherit', fontSize:16, fontWeight:700, cursor:'pointer' }}>
+          Cancel
+        </button>
         {shSettings && <SoundSettings value={shSettings} onChange={(v) => { setShSettings(v); saveSoundSettings(settingsKey, v) }} onClose={() => setShSettings(null)}/>}
         {sbSettings && <SentenceSettings value={sbSettings} onChange={(v) => { setSbSettings(v); saveSentenceSettings(settingsKey, v) }} onClose={() => setSbSettings(null)}/>}
         {rtSettings && <RhymeSettings value={rtSettings} onChange={(v) => { setRtSettings(v); saveRhymeSettings(settingsKey, v) }} onClose={() => setRtSettings(null)}/>}
         {abSettings && <AlphabetSettings value={abSettings} onChange={(v) => { setAbSettings(v); saveSettings(settingsKey, v) }} onClose={() => setAbSettings(null)}/>}
-        <button onClick={onClose} style={{ width:'100%', background:'rgba(124,79,224,.06)', border:'1px solid rgba(124,79,224,.15)', color:'rgba(58,46,107,.6)', borderRadius:12, padding:'10px', cursor:'pointer', fontFamily:"'Segoe UI',system-ui,sans-serif", fontSize:13, fontWeight:600 }}>
-          Cancel
-        </button>
       </div>
     </div>
   )
@@ -502,6 +496,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   const [selCategory,  setSelCategory]  = useState('fruits')
   const [previewGame,  setPreviewGame]  = useState(null)
   const [launching,    setLaunching]    = useState(null) // the card being loaded by the loading modal
+  const lastCardRef = useRef(null) // for the rewards flow's "Play again"
   const [puzzlePicker, setPuzzlePicker] = useState(false)
   const [puzzleConfig, setPuzzleConfig] = useState({ setId: 'animals', level: 'easy' })
   const [showStats,    setShowStats]    = useState(false)
@@ -686,7 +681,16 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   // Every card goes through the launcher: loading modal first, then openGame() mounts the game.
-  const startGame = (game) => { setPreviewGame(null); setLaunching(game) }
+  // Pao's loading modal always comes first; once it is done the game's intro shows (games with their own
+  // start screen skip it) and its Start button is what actually mounts the game.
+  const startGame = (game) => { lastCardRef.current = game; setPreviewGame(null); setLaunching(game) }
+  const afterLoading = (game) => {
+    setLaunching(null)
+    if (needsIntro(game)) setPreviewGame(game)
+    else openGame(game)
+  }
+  const startFromIntro = (game) => { setPreviewGame(null); openGame(game) }
+  const closeIntro = () => { setPreviewGame(null); if (previewGameId) navigate(backPath) }
   const openGame = (game) => {
     setLaunching(null)
     if (game.builder) { stopPaoVoice(); setBuilderTitle(game.title); setPhase('builder'); return }
@@ -709,7 +713,19 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   useEffect(() => { preloadLoadingPao() }, [])
-  const launcher = launching ? <GameLauncher card={launching} playerName={progress.patientName} onLaunch={openGame} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
+  // The shared rewards flow ends with "Play again" / "All games"; tell it what those do here.
+  useEffect(() => {
+    pao.setRewardActions?.({
+      allGames: () => backToGames(),
+      playAgain: () => {
+        const c = lastCardRef.current
+        if (!c) { backToGames(); return }
+        setPhase('games'); setGamesIn(true)
+        setTimeout(() => startGame(c), 0)
+      },
+    })
+  }) // eslint-disable-line react-hooks/exhaustive-deps
+  const launcher = launching ? <GameLauncher card={launching} playerName={progress.patientName} onLaunch={afterLoading} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
 
   // Owner "Preview" (see OwnerGamePreviewPage): launch one game straight
   // away. There's no player / activity session here, so the PaoProvider has no
@@ -771,7 +787,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'daily-routines') {
-    return <DailyRoutinesPage lang={lang} onExit={backToGames}/>
+    return <DailyRoutinesPage patientName={progress.patientName} settingsKey={patientEmail || String(patientId)} canEdit={Boolean(therapistEmail)} onExit={backToGames}/>
   }
 
   if (phase === 'feed-pao') {
@@ -779,7 +795,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'emergency-ready') {
-    return <EmergencyReadyPage lang={lang} onExit={backToGames}/>
+    return <EmergencyReadyPage settingsKey={patientEmail || String(patientId)} canEdit={Boolean(therapistEmail)} onExit={backToGames}/>
   }
 
   if (phase === 'sort-basket') {
@@ -1117,9 +1133,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 return (
                   <button key={game.id} className="gf-card" onClick={() => {
                     if (!unlocked) return
-                    // These games show their own start screen, so skip the generic preview (one modal only)
-                    if (SELF_START_GAMES.has(game.id)) { startGame(game); return }
-                    setPreviewGame(game)
+                    startGame(game) // loading modal first, then the game's intro
                   }} style={{
                     background: unlocked ? `${game.color}1f` : 'rgba(0,0,0,.03)',
                     border: `2px solid ${unlocked ? game.color+'60' : 'rgba(0,0,0,.08)'}`,
@@ -1170,7 +1184,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       )}
 
       {launcher}
-      {previewGame && <GameInstructionsModal game={previewGame} onStart={startGame} onClose={() => setPreviewGame(null)} settingsKey={therapistEmail ? (patientEmail || String(patientId)) : null}/>}
+      {previewGame && <GameInstructionsModal game={previewGame} onStart={startFromIntro} onClose={closeIntro} settingsKey={therapistEmail ? (patientEmail || String(patientId)) : null}/>}
       {puzzlePicker && (
         <PuzzlePickerModal
           lang={lang}

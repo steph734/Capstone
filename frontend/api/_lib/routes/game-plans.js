@@ -54,11 +54,11 @@ export async function therapistToday(req, res) {
     const key = manilaDayKey()
     const dayStartUtc = new Date(`${key}T00:00:00Z`)
     const appts = await db.collection('appointments').aggregate([
-      { $match: { employee_id: employee._id, $or: [{ session_date: { $gte: dayStartUtc, $lt: new Date(dayStartUtc.getTime() + 86400000) } }, { session_date: { $gte: manilaDayStart(key), $lt: manilaDayEnd(key) } }], is_archived: { $ne: true }, status: { $nin: ['Cancelled', 'Declined', 'Archived', 'No-show'] } } },
+      { $match: { employee_id: employee._id, $or: [{ session_date: { $gte: dayStartUtc, $lt: new Date(dayStartUtc.getTime() + 86400000) } }, { session_date: { $gte: manilaDayStart(key), $lt: manilaDayEnd(key) } }], is_archived: { $ne: true }, status: { $nin: ['Cancelled', 'Declined', 'Archived', 'No Show', 'No-show', 'Completed'] } } },
       { $lookup: { from: 'patients', localField: 'patient_id', foreignField: '_id', as: 'patient' } },
       { $unwind: '$patient' },
       { $lookup: { from: 'patient_assign', let: { p: '$patient_id' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$patient_id', '$$p'] }, { $eq: ['$employee_id', employee._id] }, { $eq: ['$status', 'active'] }] } } }, { $limit: 1 }], as: 'assign' } },
-      { $unwind: '$assign' },
+      { $unwind: { path: '$assign', preserveNullAndEmptyArrays: true } },
       { $sort: { start_time: 1 } },
     ]).toArray()
     const plans = appts.length ? await SessionGamePlan.find({ patient_id: { $in: appts.map((a) => a.patient_id) }, plan_date: manilaDayStart(key), status: { $ne: 'cancelled' } }) : []
@@ -71,7 +71,7 @@ export async function therapistToday(req, res) {
         return {
           id: String(a._id), patientId: String(a.patient_id), patientName: pretty(a.patient), condition: a.patient.primary_condition || a.condition || '',
           start: a.start_time, end: a.end_time, sessionType: a.session_type || a.session_mode || 'Session',
-          therapyTypes: a.assign.therapy_types || [], assignmentId: String(a.assign._id),
+          therapyTypes: a.assign?.therapy_types || [String(a.session_type || 'cognitive').toLowerCase()], assignmentId: a.assign ? String(a.assign._id) : null,
           plan: plan ? { id: String(plan._id), status: plan.status, gamesCount: plan.games.length } : null,
         }
       }),

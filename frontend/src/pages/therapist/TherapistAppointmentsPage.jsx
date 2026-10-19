@@ -6,6 +6,7 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { apiGet, apiPatch } from '../../utils/api'
 import RecommendSessionModal from '../../components/RecommendSessionModal'
+import { manilaDateKey } from '../../utils/manilaTime'
 import './TherapistAppointmentsPage.css'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -28,8 +29,8 @@ function fmtShort(iso) {
   return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 function groupLabel(iso) {
-  const today    = new Date().toISOString().slice(0,10)
-  const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10)
+  const today    = manilaDateKey()
+  const tomorrow = manilaDateKey(new Date(Date.now() + 86400000))
   if (iso === today)    return 'Today'
   if (iso === tomorrow) return 'Tomorrow'
   return new Date(iso+'T00:00').toLocaleDateString('en-US',{weekday:'long'})
@@ -110,7 +111,7 @@ function FullCalendar({ appointments, selectedDate, onSelectDate }) {
 
   const year  = calMonth.getFullYear()
   const month = calMonth.getMonth()
-  const today = new Date().toISOString().slice(0,10)
+  const today = manilaDateKey()
 
   const firstDay    = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
@@ -481,7 +482,7 @@ function FormModal({ initial, onClose, onSave, appointments = [] }) {
   const isEdit = !!initial?.id
 
   const [form, setForm] = useState(initial || {
-    patientName: '', date: new Date().toISOString().slice(0,10),
+    patientName: '', date: manilaDateKey(),
     time: '08:00', type: 'Follow-up', duration: '60 min', status: 'Pending', notes: '',
   })
 
@@ -765,7 +766,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     return () => { cancelled = true }
   }, [user?.email])
 
-  const today = new Date().toISOString().slice(0,10)
+  const today = manilaDateKey()
   const todayCount = appointments.filter(a => a.date === today && a.status !== 'Archived').length
   const schedCount = appointments.filter(a => a.status === 'Confirmed' || a.status === 'Pending').length
   const doneCount  = appointments.filter(a => a.status === 'Completed').length

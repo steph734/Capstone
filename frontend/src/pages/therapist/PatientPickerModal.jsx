@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { manilaDateKey } from '../../utils/manilaTime'
 import {
   UsersIcon, XIcon, SearchIcon, CalendarIcon, ChevronDownIcon, CakeIcon,
   StethoscopeIcon, DotIcon, ClockIcon, MicIcon, VolumeIcon, CheckIcon,
@@ -31,7 +32,7 @@ function formatDate(iso) {
 
 function isToday(iso) {
   if (!iso) return false
-  return iso === new Date().toISOString().slice(0, 10)
+  return iso === manilaDateKey()
 }
 
 export default function PatientPickerModal({ therapistEmail, initialTool = 'stt', onSelect, onPracticeMode, onClose }) {

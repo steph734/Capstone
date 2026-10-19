@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { manilaDateKey } from '../../utils/manilaTime'
 import { useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
@@ -58,7 +59,7 @@ const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 // ── Helpers ────────────────────────────────────────────
 function isoToday() {
-  return new Date().toISOString().slice(0, 10)
+  return manilaDateKey()
 }
 function fmt12(t) {
   if (!t) return '—'

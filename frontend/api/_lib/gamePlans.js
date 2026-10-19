@@ -35,8 +35,26 @@ export async function employeeFor(db, user) {
 }
 
 // The one active patient_assign row between this patient and therapist (source of truth for who they may assign).
-export const activeAssignment = (db, patientId, employeeId) =>
-  db.collection('patient_assign').findOne({ patient_id: patientId, employee_id: employeeId, status: 'active' })
+// A patient the therapist has a session with is theirs to assign games to: when no assignment row exists yet, one is created
+// (active, primary) from that session. A patient whose assignment was ended stays blocked.
+const TYPES = ['cognitive', 'speech', 'physical', 'occupational']
+export async function activeAssignment(db, patientId, employeeId) {
+  const found = await db.collection('patient_assign').findOne({ patient_id: patientId, employee_id: employeeId, status: 'active' })
+  if (found) return found
+  if (await db.collection('patient_assign').findOne({ patient_id: patientId, employee_id: employeeId })) return null
+  const appt = await db.collection('appointments').findOne({ patient_id: patientId, employee_id: employeeId, is_archived: { $ne: true }, status: { $nin: ['Cancelled', 'Declined'] } }, { sort: { session_date: 1 } })
+  if (!appt) return null
+  const emp = await db.collection('employees').findOne({ _id: employeeId }, { projection: { branch_id: 1 } })
+  if (!emp?.branch_id) return null
+  const s = String(appt.session_type || '').toLowerCase()
+  const now = new Date()
+  const doc = {
+    patient_id: patientId, employee_id: employeeId, branch_id: emp.branch_id, role: 'primary', status: 'active',
+    therapy_types: [TYPES.find((t) => s.includes(t.slice(0, 5))) || 'cognitive'], start_date: appt.session_date || now, assigned_by: null, created_at: now, updated_at: now,
+  }
+  const r = await db.collection('patient_assign').insertOne(doc)
+  return { ...doc, _id: r.insertedId }
+}
 
 // Move a plan through scheduled -> active -> ended as the clock passes; returns the fresh document.
 export async function refreshPlan(plan) {

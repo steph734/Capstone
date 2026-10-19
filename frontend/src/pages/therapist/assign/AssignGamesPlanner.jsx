@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Check, ChevronDown, Clock, GripVertical, Info, Pause, Play, Plus, Search, Send, Square, Timer, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Calendar, Check, ChevronDown, Clock, GripVertical, Hand, Info, Pause, Play, Plus, Search, Send, Square, Timer, WifiOff, X } from 'lucide-react'
+import PlaytimeMonitor from './PlaytimeMonitor'
+import useLiveMonitor, { chime, mmss, secondsLeft } from './useLiveMonitor'
 import { authFetch } from '../../../utils/session'
 import './assign-games.css'
 
@@ -55,6 +57,26 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
   const dragFrom = useRef(null)
 
   const sel = sessions?.find((s) => s.id === selId) || null
+
+  // Live monitor: polled every 5 s; the plan form only shows while there is no plan (or while editing one).
+  const live = useLiveMonitor(true)
+  const [editing, setEditing] = useState(false)
+  const [muted, setMuted] = useState(() => { try { return localStorage.getItem('assignGames:muted') === '1' } catch { return false } })
+  const [undo, setUndo] = useState(null)
+  const seenAlerts = useRef(null)
+  const lv = sel ? live.plans.get(sel.patientId) : null
+  const showMonitor = Boolean(lv) && !editing
+  const toast = (msg, action) => { if (action) { setUndo({ msg, action }); setTimeout(() => setUndo(null), 9000) } else onToast?.(msg) }
+  useEffect(() => { setEditing(false) }, [selId])
+  useEffect(() => {
+    // A soft chime for each NEW alert (never for the ones already there when the page opened).
+    const keys = [...live.plans.values()].flatMap((p) => p.alerts.map((a) => `${p.planId}:${a.key}`))
+    if (seenAlerts.current === null) { seenAlerts.current = new Set(keys); return }
+    const fresh = keys.filter((k) => !seenAlerts.current.has(k))
+    fresh.forEach((k) => seenAlerts.current.add(k))
+    if (fresh.length && !muted) chime()
+  }, [live.plans, muted])
+  const toggleMute = () => setMuted((m) => { const n = !m; try { localStorage.setItem('assignGames:muted', n ? '1' : '0') } catch { /* private mode */ } return n })
 
   const load = useCallback(async () => {
     try {
@@ -153,19 +175,28 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
         ? await authFetch(`/api/game-plans/${saved.id}`, { method: 'PUT', body: body() })
         : await authFetch('/api/game-plans', { method: 'POST', body: body() })
       setSaved(d.plan)
+      setEditing(false); await live.refresh()
       onToast?.(`${first} will see ${plan.length} game${plan.length === 1 ? '' : 's'} from ${fmt12(start)} to ${fmt12(end)}.`)
       await load()
       onAssigned?.()
     } catch (e) { onToast?.(e.message || 'Could not assign these games.') } finally { setBusy(false) }
   }
+  const extend = async (minutes) => {
+    try {
+      const d = await authFetch(`/api/game-plans/${saved?.id || lv.planId}/extend`, { method: 'POST', body: { minutes } })
+      setSaved(d.plan); await live.refresh()
+      toast?.(`Added ${minutes} minutes. ${first} sees the new end time within a few seconds.`)
+    } catch (e) { onToast?.(e.message) }
+  }
   const act = async (action) => {
     try {
+      if (!saved && lv) { const d = await authFetch(`/api/game-plans/${lv.planId}/${action}`, { method: 'POST' }); setSaved(d.plan); await load(); await live.refresh(); return }
       const d = action === 'cancel'
         ? (await authFetch(`/api/game-plans/${saved.id}`, { method: 'DELETE' }), { plan: null })
         : await authFetch(`/api/game-plans/${saved.id}/${action}`, { method: 'POST' })
       setSaved(d.plan)
       if (d.plan) { setStart(manilaHHMM(d.plan.playStart)); setEnd(manilaHHMM(d.plan.playEnd)) }
-      await load()
+      await load(); await live.refresh()
     } catch (e) { onToast?.(e.message) }
   }
 
@@ -189,20 +220,43 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
           const [bg, fg] = colorOf(s.patientName)
           const nowMin = (() => { const d = new Date(Date.now() + 8 * 3600000); return d.getUTCHours() * 60 + d.getUTCMinutes() })()
           const inSession = nowMin >= toMin(s.start) && nowMin < toMin(s.end)
-          const pill = s.plan && s.plan.status !== 'cancelled' ? ['Games set', 'set'] : inSession ? ['In session', 'live'] : ['To do', 'todo']
+          const sl = live.plans.get(s.patientId)
+          const left = sl ? secondsLeft(sl, live.offset) : 0
+          const pill = sl
+            ? (sl.status === 'ended' ? ['Ended', 'set'] : sl.status === 'paused' ? ['Paused', 'paused'] : sl.status === 'scheduled' ? ['Scheduled', 'sched'] : [`${mmss(left)} left`, 'live'])
+            : s.plan && s.plan.status !== 'cancelled' ? ['Games set', 'set'] : inSession ? ['In session', 'live'] : ['To do', 'todo']
+          const mini = sl ? (sl.status === 'ended' ? `Time's up · ${sl.summary.done} of ${sl.summary.total} done` : sl.status === 'scheduled' ? (sl.startManually ? 'Waiting to start' : `Starts ${fmt12(manilaHHMM(sl.playStart))}`) : sl.status === 'paused' ? 'Paused' : sl.nowPlaying ? `Playing · ${sl.nowPlaying.name}` : 'Open now') : null
+          const used = sl && sl.totalSeconds ? Math.min(100, Math.round(((sl.totalSeconds - left) / sl.totalSeconds) * 100)) : 0
           return (
             <button key={s.id} type="button" className={`ag-session${selId === s.id ? ' on' : ''}`} onClick={() => setSelId(s.id)}>
               <span className="ag-time">{s.start}</span>
               <span className="ag-avatar" style={{ background: bg, color: fg }}>{initials(s.patientName)}</span>
-              <span className="ag-sinfo"><b>{s.patientName}</b><small>{s.therapyTypes.map((t) => TYPE_LABEL[t] || cap(t)).join(', ') || s.sessionType}{s.plan ? ` · ${s.plan.gamesCount} games set` : ' · not set'}</small></span>
+              <span className="ag-sinfo"><b>{s.patientName}</b><small>{mini || `${s.therapyTypes.map((t) => TYPE_LABEL[t] || cap(t)).join(', ') || s.sessionType}${s.plan ? ` · ${s.plan.gamesCount} games set` : ' · not set'}`}</small>{sl && <span className="ag-mini"><i style={{ width: `${used}%` }} /></span>}</span>
               <span className={`ag-pill ${pill[1]}`}>{pill[0]}</span>
             </button>
           )
         })}
+        {sel && lv && (
+          <div className="ag-alerts">
+            <div className="ag-alerts-head">
+              <span><Bell size={18} aria-hidden="true" /> <b>Alerts</b>{lv.alerts.length > 0 && <em>{lv.alerts.length}</em>}<small>{first}</small></span>
+              <button type="button" onClick={toggleMute} aria-pressed={muted} aria-label={muted ? 'Turn alert sound on' : 'Mute alert sound'}>{muted ? <BellOff size={16} /> : <Bell size={16} />}</button>
+            </div>
+            {lv.alerts.length === 0 && <p className="ag-muted">All quiet. Alerts appear here.</p>}
+            {lv.alerts.map((a) => (
+              <div key={a.key} className={`ag-alert ${a.type}`}>
+                {a.type === 'idle' ? <Hand size={18} /> : a.type === 'offline' ? <WifiOff size={18} /> : a.type === 'timeup' ? <Clock size={18} /> : <AlertTriangle size={18} />}
+                <div><b>{a.message}</b><small>{a.detail || (a.type === 'idle' ? `${first} may need help or a break.` : '')}<span> {new Date(a.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}</span></small></div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {!sel ? <section className="ag-card ag-empty"><p className="ag-muted">Select a session to assign games.</p></section> : (
         <div className="ag-right">
+          {showMonitor && <PlaytimeMonitor lv={lv} first={first} offset={live.offset} today={day} onAct={act} onExtend={extend} onEdit={() => setEditing(true)} onToast={toast} />}
+          {!showMonitor && (<>
           {/* Play time */}
           <section className="ag-card">
             <div className="ag-time-grid">
@@ -303,8 +357,10 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
               )}
             </section>
           </div>
+          </>)}
         </div>
       )}
+      {undo && <div className="ag-undo" role="status"><span>{undo.msg}</span><button type="button" onClick={async () => { try { await undo.action.run(); } catch (e) { onToast?.(e.message) } setUndo(null) }}>{undo.action.label}</button></div>}
     </div>
   )
 }

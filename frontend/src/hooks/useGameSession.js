@@ -97,6 +97,7 @@ export function useGameSession({ gameName }) {
             const p = paoRef.current
             p?.applyServerProfile(data.profile) // the header (level, XP bar) updates without a reload
             p?.showReward({ ...data.reward, profile: data.profile, stars: result?.stars ?? 0, gameName })
+            window.dispatchEvent(new CustomEvent('tp:game-finished', { detail: { gameName } })) // the play-time monitor listens
             log('flow opened', gameName)
             return data
           }

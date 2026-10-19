@@ -1,11 +1,18 @@
 import { useState } from 'react'
-import { Check, Lock, Play, Star } from 'lucide-react'
+import { Check, Gamepad2, Lock, Play, Star } from 'lucide-react'
+import { findGame } from '../gameRegistry'
 import { clock, norm, time12 } from './usePlanState'
 import './plan.css'
 
 const DIFF = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
 const CAT = { cognitive: 'Cognitive', speech: 'Speech & Language' }
 const EASE_TO_HARD = 'sentence'
+
+// The game's picture: its icon on a tile in the game's own colour.
+function GamePic({ card, locked }) {
+  const Icon = findGame(card.id)?.icon || Gamepad2
+  return <span className={`pl-pic${locked ? ' locked' : ''}`} style={{ '--c': card.color }} aria-hidden="true"><Icon size={34} strokeWidth={2.2} /></span>
+}
 
 function TimerCard({ ps }) {
   const { state, remaining, total, plan } = ps
@@ -73,7 +80,7 @@ export default function PlanPanel({ ps, cards, onPlay, name }) {
               return (
                 <div key={g.gameId} className={`pl-today${isDone ? ' done' : ''}${isNext && open ? ' next' : ''}`} style={{ '--c': card.color }}>
                   <span className="pl-tag"><Star size={13} aria-hidden="true" /> Today</span>
-                  <strong>{card.title}</strong>
+                  <div className="pl-head"><GamePic card={card} /><strong>{card.title}</strong></div>
                   <div className="pl-tags">
                     <span className="c">{CAT[card.category] || card.category}</span>
                     <span className={`d ${card.difficulty}`}>{card.id === EASE_TO_HARD ? 'Easy to Hard' : DIFF[card.difficulty]}</span>
@@ -98,7 +105,7 @@ export default function PlanPanel({ ps, cards, onPlay, name }) {
         {others.map((card) => (
           <button key={card.id} type="button" className="pl-lock" onClick={() => tapLocked('Ask your therapist to add this game.')} aria-label={`${card.title}, locked`}>
             <Lock size={18} className="pl-ico" aria-hidden="true" />
-            <strong>{card.title}</strong>
+            <div className="pl-head"><GamePic card={card} locked /><strong>{card.title}</strong></div>
             <div className="pl-tags"><span className="c">{CAT[card.category] || card.category}</span><span className={`d ${card.difficulty}`}>{card.id === EASE_TO_HARD ? 'Easy to Hard' : DIFF[card.difficulty]}</span></div>
             <small>Not in today&apos;s plan</small>
           </button>

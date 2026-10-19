@@ -30,7 +30,8 @@ export default function usePlanState({ enabled, activitySessionId }) {
   useEffect(() => { setLoaded(false); load() }, [load])
   useEffect(() => {
     if (!enabled) return undefined
-    const t = setInterval(load, 60000) // resync with the server every minute
+    // Resync with the server every 5 s (paused while the tab is hidden) so Pause, +5 min and End now apply quickly.
+    const t = setInterval(() => { if (!document.hidden) load() }, 5000)
     return () => clearInterval(t)
   }, [enabled, load])
   useEffect(() => {

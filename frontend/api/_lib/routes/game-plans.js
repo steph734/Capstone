@@ -6,6 +6,8 @@ import { requireSession } from '../session.js'
 import { audit } from '../noteAccess.js'
 import { notify } from '../sessionRecommendations.js'
 import { SessionGamePlan } from '../models/sessionGamePlan.js'
+import { GamePlayEvent, ensureEventIndexes } from '../models/gamePlayEvent.js'
+import { computeLive, soapText } from '../gameLive.js'
 import {
   activeAssignment, checkGameAccess, employeeFor, manilaDayEnd, manilaDayKey, manilaDayStart,
   oid, refreshPlan, serializeGame, serializePlan, todaysPlan, validatePlanInput,
@@ -235,11 +237,24 @@ export async function plansAction(req, res) {
       plan.started_at = now; plan.play_start = now; plan.play_end = end; plan.status = 'active'
     } else if (action === 'pause') {
       if (plan.status !== 'active') return res.status(409).json({ error: 'Play time is not running.' })
-      plan.status = 'paused' // updated_at (set by the save) marks when the pause began
+      plan.status = 'paused'
+      plan.paused_at = now
     } else if (action === 'resume') {
       if (plan.status !== 'paused') return res.status(409).json({ error: 'Play time is not paused.' })
-      plan.play_end = new Date(plan.play_end.getTime() + Math.max(0, now - plan.updated_at))
+      plan.play_end = new Date(Math.min(plan.play_end.getTime() + Math.max(0, now - (plan.paused_at || plan.updated_at)), manilaDayEnd(manilaDayKey(plan.plan_date)).getTime() - 1))
+      plan.paused_at = null
       plan.status = 'active'
+    } else if (action === 'extend') {
+      if (!['active', 'paused', 'scheduled'].includes(plan.status)) return res.status(409).json({ error: 'Play time has already ended.' })
+      const minutes = Math.round(Number(req.body?.minutes))
+      if (!Number.isFinite(minutes) || minutes < 1 || minutes > 30) return res.status(400).json({ error: 'Add between 1 and 30 minutes.' })
+      if ((plan.extended_minutes || 0) + minutes > 30) return res.status(409).json({ error: 'You can add at most 30 minutes in total.' })
+      const dayEnd = manilaDayEnd(manilaDayKey(plan.plan_date)).getTime() - 1
+      plan.play_end = new Date(Math.min(plan.play_end.getTime() + minutes * 60000, dayEnd))
+      plan.extended_minutes = (plan.extended_minutes || 0) + minutes
+    } else if (action === 'soap-summary') {
+      const live = await liveFor(db, plan)
+      return res.status(200).json({ text: soapText(live), live })
     } else if (action === 'end') {
       if (plan.status === 'ended' || plan.status === 'cancelled') return res.status(409).json({ error: 'This plan has already ended.' })
       if (plan.play_end > now) plan.play_end = now
@@ -298,4 +313,74 @@ export async function patientGameAccess(req, res) {
     if (!r.ok) return res.status(403).json({ error: 'This game is locked right now.', code: r.code, reason: r.reason })
     return res.status(200).json({ ok: true })
   } catch (err) { return fail(res, err, 'patient/game-access') }
+}
+
+// ---- live monitor -------------------------------------------------------------------------------------------
+
+async function liveFor(db, plan) {
+  const ids = plan.games.map((g) => g.game_id)
+  const docs = ids.length ? await db.collection('games').find({ _id: { $in: ids } }).toArray() : []
+  const names = new Map(docs.map((d) => [String(d._id), { name: d.name, difficulty: ['easy', 'medium', 'hard'].includes(d.difficulty) ? d.difficulty : 'easy' }]))
+  const patient = await db.collection('patients').findOne({ _id: plan.patient_id }, { projection: { first_name: 1, last_name: 1, nickname: 1 } })
+  await refreshPlan(plan)
+  const live = await computeLive(plan, patient, names)
+  return { ...live, patient: { id: String(plan.patient_id), name: pretty(patient) } }
+}
+
+// GET /api/therapist/game-plans/live?date=today -> one entry per plan today for this therapist's assigned patients
+export async function therapistLive(req, res) {
+  if (!method(req, res, 'GET')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    const { db, employee } = ctx
+    const key = manilaDayKey()
+    const plans = await SessionGamePlan.find({ employee_id: employee._id, plan_date: manilaDayStart(key), status: { $ne: 'cancelled' } })
+    const assigned = plans.length ? new Set((await db.collection('patient_assign').find({ employee_id: employee._id, status: 'active', patient_id: { $in: plans.map((p) => p.patient_id) } }).project({ patient_id: 1 }).toArray()).map((a) => String(a.patient_id))) : new Set()
+    const out = []
+    for (const p of plans) if (assigned.has(String(p.patient_id))) out.push(await liveFor(db, p))
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(200).json({ today: key, now: new Date().toISOString(), plans: out })
+  } catch (err) { return fail(res, err, 'therapist/game-plans/live') }
+}
+
+// POST /api/game-plans/:id/events  (the patient's device; only for that patient's own plan)
+const TYPES = ['game_started', 'heartbeat', 'round_retry', 'hint_used', 'game_finished', 'game_exited']
+const int = (v, max = 100000) => (v == null || v === '' ? null : Number.isFinite(Number(v)) ? Math.min(max, Math.max(0, Math.round(Number(v)))) : null)
+export async function planEvents(req, res) {
+  if (!method(req, res, 'POST')) return
+  try {
+    const ctx = await playerCtx(req, res)
+    if (!ctx) return
+    const { db, patient } = ctx
+    const planId = oid(req.params.id)
+    const plan = planId && await SessionGamePlan.findOne({ _id: planId, patient_id: patient._id })
+    if (!plan) return res.status(404).json({ error: 'Plan not found.' })
+    const b = req.body || {}
+    if (!TYPES.includes(b.type)) return res.status(400).json({ error: 'Unknown event.' })
+    const gameId = oid(b.gameId)
+    if (!gameId || !plan.games.some((g) => String(g.game_id) === String(gameId))) return res.status(400).json({ error: 'That game is not in the plan.' })
+    await ensureEventIndexes()
+    if (b.type === 'heartbeat') {
+      const recent = await GamePlayEvent.countDocuments({ plan_id: plan._id, type: 'heartbeat', at: { $gte: new Date(Date.now() - 60000) } })
+      if (recent >= 6) return res.status(429).json({ error: 'Too many updates.' })
+    }
+    const acc = b.accuracy == null || b.accuracy === '' ? null : Math.min(100, Math.max(0, Number(b.accuracy)))
+    const last = new Date(b.lastInputAt)
+    await GamePlayEvent.create({
+      plan_id: plan._id, patient_id: patient._id, game_id: gameId, game_session_id: oid(b.gameSessionId), type: b.type,
+      round: int(b.round, 1000), total_rounds: int(b.totalRounds, 1000), score: int(b.score), accuracy: Number.isFinite(acc) ? acc : null, hints: int(b.hints, 1000),
+      last_input_at: Number.isNaN(last.getTime()) ? null : last, at: new Date(),
+    })
+    const set = {}
+    if (b.type === 'game_started') set['games.$[g].status'] = 'in_progress'
+    if (b.type === 'game_finished') { set['games.$[g].status'] = 'done'; set['games.$[g].completed_at'] = new Date() }
+    if (Object.keys(set).length) {
+      const filter = b.type === 'game_started' ? { _id: plan._id } : { _id: plan._id }
+      await SessionGamePlan.updateOne(filter, { $set: set }, { arrayFilters: [{ 'g.game_id': gameId, ...(b.type === 'game_started' ? { 'g.status': { $ne: 'done' } } : {}) }], timestamps: false })
+    } else if (b.type === 'game_exited') {
+      await SessionGamePlan.updateOne({ _id: plan._id }, { $set: { 'games.$[g].status': 'pending' } }, { arrayFilters: [{ 'g.game_id': gameId, 'g.status': 'in_progress' }], timestamps: false })
+    }
+    return res.status(200).json({ ok: true })
+  } catch (err) { return fail(res, err, 'game-plans events') }
 }

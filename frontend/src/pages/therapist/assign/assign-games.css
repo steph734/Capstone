@@ -104,3 +104,72 @@
   .ag-card { padding: 16px; border-radius: 18px; }
   .ag-legend em { margin-left: 0; width: 100%; }
 }
+
+/* ── Live play-time monitor ── */
+.ag-pill.paused { background: #fdebc8; color: #a15c00; }
+.ag-pill.sched { background: #e8edf0; color: #51606a; }
+.ag-mini { display: block; height: 5px; border-radius: 3px; background: #e5efe9; margin-top: 6px; overflow: hidden; }
+.ag-mini i { display: block; height: 100%; background: #2c8a64; border-radius: 3px; transition: width .9s linear; }
+.ag-alerts { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e8efec; display: grid; gap: 8px; }
+.ag-alerts-head { display: flex; align-items: center; justify-content: space-between; }
+.ag-alerts-head span { display: inline-flex; align-items: center; gap: 8px; color: #1f3d33; }
+.ag-alerts-head em { font-style: normal; min-width: 20px; height: 20px; border-radius: 10px; background: #e5484d; color: #fff; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+.ag-alerts-head small { color: #6b7c75; font-size: 12px; }
+.ag-alerts-head button { min-height: 0; width: 34px; height: 34px; border: 0; border-radius: 10px; background: #eef4f1; color: #2c4a3e; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.ag-alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1px solid; }
+.ag-alert b { display: block; font-size: 14px; }
+.ag-alert small { display: block; font-size: 12px; opacity: .85; line-height: 1.35; }
+.ag-alert.idle { background: #fff4ea; border-color: #f8d9b8; color: #9a4a00; }
+.ag-alert.stuck, .ag-alert.ending { background: #fffbe6; border-color: #f2e6a6; color: #8a6d00; }
+.ag-alert.timeup { background: #fdecec; border-color: #f6c4c4; color: #b3262f; }
+.ag-alert.offline { background: #eef0f2; border-color: #d9dde1; color: #4b5560; }
+.ag-undo { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 14px; background: #1f3d33; color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.ag-undo button { min-height: 0; border: 0; background: none; color: #9be3c5; font: inherit; font-weight: 800; cursor: pointer; text-decoration: underline; }
+
+.pm-wrap { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.pm-top { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; align-items: center; }
+.pm-ring { width: 100%; max-width: 240px; }
+.pm-big { font-size: 40px; font-weight: 800; fill: #1f3d33; }
+.pm-small { font-size: 12px; fill: #6b7c75; font-weight: 700; }
+.pm-info h3 { margin: 8px 0 4px; font-size: 24px; color: #1f2d27; }
+.pm-info p { margin: 0 0 14px; color: #51606a; font-size: 14px; line-height: 1.5; }
+.pm-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 14px; background: #e8edf0; color: #51606a; font-weight: 800; font-size: 13px; }
+.pm-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pm-chip.active { background: #dcf6e6; color: #15803d; }
+.pm-chip.active.playing { background: #dbe8ff; color: #2f5fd0; }
+.pm-chip.paused { background: #fdebc8; color: #a15c00; }
+.pm-chip.ended { background: #fdecec; color: #b3262f; }
+.pm-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.pm-btns button, .pm-modal button { min-height: 0; display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 16px; border: 1.5px solid #dfe7e3; border-radius: 12px; background: #fff; color: #1f3d33; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
+.pm-btns button:disabled { opacity: .5; cursor: default; }
+.pm-btns .pm-primary { background: #2c5a47; border-color: #2c5a47; color: #fff; }
+.pm-danger { color: #b3262f !important; border-color: #f2c4c4 !important; background: #fff5f5 !important; }
+.pm-now { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 12px 16px; border-radius: 14px; background: #eaf1ff; border: 1px solid #cfdcf8; color: #1f3d8a; font-size: 14px; }
+.pm-lower { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
+.pm-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pm-games li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #e5ece8; border-radius: 14px; }
+.pm-games li.in_progress { background: #eef3ff; border-color: #c9d8fb; }
+.pm-gico { width: 38px; height: 38px; border-radius: 12px; background: #eef2f0; color: #51606a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pm-games li.done .pm-gico { background: #dcf6e6; color: #15803d; }
+.pm-games li.in_progress .pm-gico { background: #dbe8ff; color: #2f5fd0; }
+.pm-gtext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pm-gtext b { font-size: 15px; color: #1f2d27; }
+.pm-gtext small { font-size: 12.5px; color: #6b7c75; }
+.pm-spill { font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 12px; background: #e8edf0; color: #51606a; }
+.pm-spill.done { background: #dcf6e6; color: #15803d; }
+.pm-spill.in_progress { background: #dbe8ff; color: #2f5fd0; }
+.pm-time { min-width: 44px; text-align: right; font-weight: 800; color: #1f3d33; font-variant-numeric: tabular-nums; }
+.pm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.pm-stats div { padding: 12px 6px; border-radius: 14px; background: #eef7f2; text-align: center; display: flex; flex-direction: column; }
+.pm-stats b { font-size: 20px; color: #1f3d33; }
+.pm-stats small { font-size: 11.5px; color: #6b7c75; font-weight: 700; }
+.pm-modal { position: fixed; inset: 0; z-index: 70; background: rgba(20, 40, 33, .5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pm-modal > div { width: min(420px, 100%); background: #fff; border-radius: 20px; padding: 22px; }
+.pm-modal h3 { margin: 0 0 8px; }
+.pm-modal p { margin: 0 0 16px; color: #51606a; line-height: 1.5; }
+.pm-modal > div > div { display: flex; gap: 10px; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .pm-top { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .pm-btns { justify-content: center; }
+  .pm-lower { grid-template-columns: 1fr; }
+}

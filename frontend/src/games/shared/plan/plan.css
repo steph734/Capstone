@@ -46,3 +46,8 @@
   .pl-timer { width: 100%; box-sizing: border-box; }
   .pl-bubble { font-size: 15px; padding: 12px 16px; }
 }
+
+.pl-head { display: flex; align-items: center; gap: 12px; min-width: 0; padding-right: 44px; }
+.pl-pic { width: 58px; height: 58px; flex-shrink: 0; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--c, #6366f1) 18%, #fff); color: var(--c, #6366f1); border: 2px solid color-mix(in srgb, var(--c, #6366f1) 40%, #fff); }
+.pl-pic.locked { filter: grayscale(.85); opacity: .75; }
+.pl-today .pl-head { padding-right: 0; }

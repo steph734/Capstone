@@ -100,6 +100,7 @@ export async function serializePlan(db, plan) {
     playEnd: plan.play_end.toISOString(),
     startManually: plan.start_manually,
     startedAt: plan.started_at ? plan.started_at.toISOString() : null,
+    extendedMinutes: plan.extended_minutes || 0,
     warnBeforeMinutes: plan.warn_before_minutes,
     allowFinishCurrent: plan.allow_finish_current,
     now: new Date().toISOString(),

@@ -30,6 +30,7 @@ import GameLauncher from '../games/shared/GameLauncher'
 import usePlanState from '../games/shared/plan/usePlanState'
 import PlanPanel from '../games/shared/plan/PlanPanel'
 import PlanOverlays from '../games/shared/plan/PlanOverlays'
+import usePlayEvents from '../games/shared/plan/usePlayEvents'
 import { authFetch } from '../utils/session'
 import { GAME_COMPONENTS as GC, entryForCard, needsIntro } from '../games/shared/gameRegistry'
 import { preloadLoadingPao } from '../games/shared/loading/paoLoadingPoses'
@@ -752,6 +753,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   const GAME_PHASES = ['echo','picture-word','puzzle-pieces','money-match','daily-routines','feed-pao','emergency-ready','sort-basket','copy-colors','spot-difference','builder','story-select','alphabet','rhyme-time','sentence-builder','sound-hunt']
   useEffect(() => { plan.setGameOpen(GAME_PHASES.includes(phase)) }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Live updates for the therapist's play-time monitor.
+  usePlayEvents({ plan, open: GAME_PHASES.includes(phase), getCard: () => lastCardRef.current, activitySessionId })
   const backToGames = () => {
     // Owner preview: leaving a game goes straight back to the library.
     if (previewGameId) { stopPaoVoice(); navigate(backPath); return }

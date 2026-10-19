@@ -30,6 +30,8 @@ const sessionGamePlanSchema = new mongoose.Schema(
     play_end: { type: Date, required: true },
     start_manually: { type: Boolean, default: false },
     started_at: { type: Date, default: null },
+    paused_at: { type: Date, default: null },
+    extended_minutes: { type: Number, default: 0, min: 0, max: 30 },
     warn_before_minutes: { type: Number, default: 5, min: 0, max: 30 },
     allow_finish_current: { type: Boolean, default: true },
     status: { type: String, enum: ['scheduled', 'active', 'paused', 'ended', 'cancelled'], default: 'scheduled' },

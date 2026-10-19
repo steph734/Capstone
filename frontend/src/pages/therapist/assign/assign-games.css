@@ -163,11 +163,18 @@
 .pm-stats div { padding: 12px 6px; border-radius: 14px; background: #eef7f2; text-align: center; display: flex; flex-direction: column; }
 .pm-stats b { font-size: 20px; color: #1f3d33; }
 .pm-stats small { font-size: 11.5px; color: #6b7c75; font-weight: 700; }
-.pm-modal { position: fixed; inset: 0; z-index: 70; background: rgba(20, 40, 33, .5); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.pm-modal > div { width: min(420px, 100%); background: #fff; border-radius: 20px; padding: 22px; }
-.pm-modal h3 { margin: 0 0 8px; }
-.pm-modal p { margin: 0 0 16px; color: #51606a; line-height: 1.5; }
-.pm-modal > div > div { display: flex; gap: 10px; justify-content: flex-end; }
+.pm-modal { position: fixed; inset: 0; z-index: 70; background: rgba(20, 40, 33, .55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pm-box { width: min(400px, 100%); background: #fff; border-radius: 26px; padding: 28px 24px 22px; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
+.pm-ico { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; }
+.pm-box.go .pm-ico { background: #dcf6e6; color: #15803d; } .pm-box.warn .pm-ico { background: #fdebc8; color: #a15c00; } .pm-box.danger .pm-ico { background: #fde1e1; color: #b91c1c; }
+.pm-box h3 { margin: 0 0 8px; font-size: 21px; color: #1f3d33; }
+.pm-chip { display: inline-flex; align-items: center; gap: 6px; background: #eef3f0; color: #44574f; border-radius: 10px; padding: 4px 12px; font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+.pm-box p { margin: 0 0 20px; color: #51606a; line-height: 1.5; font-size: 14.5px; }
+.pm-actions { display: flex; gap: 10px; }
+.pm-actions button { flex: 1; justify-content: center; height: 48px; font-size: 15px; border-radius: 14px; }
+.pm-box .pm-confirm { color: #fff; border-color: transparent; }
+.pm-box.go .pm-confirm { background: #2c7a5a; } .pm-box.warn .pm-confirm { background: #d97706; } .pm-box.danger .pm-confirm { background: #dc2626; }
+@media (max-width: 480px) { .pm-actions { flex-direction: column-reverse; } }
 @media (max-width: 900px) {
   .pm-top { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .pm-btns { justify-content: center; }

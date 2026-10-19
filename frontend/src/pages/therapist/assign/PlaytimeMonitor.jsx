@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Clock, FileText, GripVertical, Pause, Play, Plus, RotateCcw, Square } from 'lucide-react'
 import { mmss, secondsLeft } from './useLiveMonitor'
 import { addResultsToSoap } from './addToSoap'
@@ -6,6 +6,29 @@ import { addResultsToSoap } from './addToSoap'
 const pad = (n) => String(n).padStart(2, '0')
 const fmt12 = (iso) => { const d = new Date(new Date(iso).getTime() + 8 * 3600000); const h = d.getUTCHours(); return `${h % 12 || 12}:${pad(d.getUTCMinutes())} ${h >= 12 ? 'PM' : 'AM'}` }
 const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1)
+
+// Shared confirmation dialog: icon, title, message, and two stacked-on-mobile buttons. Esc and a tap outside cancel.
+function ConfirmModal({ tone, icon: Icon, title, detail, text, cancelLabel, confirmLabel, onCancel, onConfirm }) {
+  useEffect(() => {
+    const on = (e) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', on)
+    return () => document.removeEventListener('keydown', on)
+  }, [onCancel])
+  return (
+    <div className="pm-modal" role="alertdialog" aria-modal="true" aria-labelledby="pm-ct" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className={`pm-box ${tone}`}>
+        <span className="pm-ico"><Icon size={26} aria-hidden="true" /></span>
+        <h3 id="pm-ct">{title}</h3>
+        {detail && <span className="pm-chip"><Clock size={14} aria-hidden="true" /> {detail}</span>}
+        <p>{text}</p>
+        <div className="pm-actions">
+          <button type="button" onClick={onCancel}>{cancelLabel}</button>
+          <button type="button" className="pm-confirm" onClick={onConfirm} autoFocus>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export const STATUS_TEXT = (lv, playing) => (lv.status === 'scheduled' ? 'Not started' : lv.status === 'paused' ? 'Paused' : lv.status === 'ended' ? "Time's up" : playing ? 'Playing' : 'Open')
 
@@ -108,22 +131,23 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
       </div>
 
       {confirm && (
-        <div className="pm-modal" role="alertdialog" aria-modal="true" aria-label={confirm === 'start' ? 'Start play time' : 'Restart play time'}>
-          <div>
-            <h3>{confirm === 'start' ? 'Start now?' : 'Restart play time?'}</h3>
-            <p>{confirm === 'start' ? `Planned start is ${fmt12(lv.playStart)}. ${first}'s games open right away.` : `The timer and today's game progress start over for ${first}.`}</p>
-            <div><button type="button" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="pm-primary" onClick={() => { const a = confirm; setConfirm(null); onAct(a) }}>{confirm === 'start' ? 'Start now' : 'Restart'}</button></div>
-          </div>
-        </div>
+        <ConfirmModal
+          tone={confirm === 'start' ? 'go' : 'warn'}
+          icon={confirm === 'start' ? Play : RotateCcw}
+          title={confirm === 'start' ? 'Start play time now?' : 'Restart play time?'}
+          detail={confirm === 'start' ? `Planned start was ${fmt12(lv.playStart)}.` : null}
+          text={confirm === 'start' ? `${first}'s games open right away and the timer begins.` : `The timer and today's game progress start over for ${first}.`}
+          cancelLabel="Cancel" confirmLabel={confirm === 'start' ? 'Start now' : 'Restart'}
+          onCancel={() => setConfirm(null)} onConfirm={() => { const act = confirm; setConfirm(null); onAct(act) }}
+        />
       )}
       {confirmEnd && (
-        <div className="pm-modal" role="alertdialog" aria-modal="true" aria-label="End play time">
-          <div>
-            <h3>End play time now?</h3>
-            <p>{first}&apos;s games lock right away. A game in progress is closed unless you allowed finishing it.</p>
-            <div><button type="button" onClick={() => setConfirmEnd(false)}>Keep playing</button><button type="button" className="pm-danger" onClick={() => { setConfirmEnd(false); onAct('end') }}>End now</button></div>
-          </div>
-        </div>
+        <ConfirmModal
+          tone="danger" icon={Square} title="End play time now?"
+          text={`${first}'s games lock right away. A game in progress is closed unless you allowed finishing it.`}
+          cancelLabel="Keep playing" confirmLabel="End now"
+          onCancel={() => setConfirmEnd(false)} onConfirm={() => { setConfirmEnd(false); onAct('end') }}
+        />
       )}
     </div>
   )

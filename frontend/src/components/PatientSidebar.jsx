@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { ShieldCheck } from 'lucide-react'
 import useUnreadCount from '../stream/useUnreadCount'
 import useEmailUnreadCount from '../lib/useEmailUnreadCount'
 import './PatientSidebar.css'
@@ -122,10 +123,13 @@ const DEFAULT_MENU_ITEMS = [
 const SPEECH_ITEM = { id: 'speech-features', label: 'Speech to Text / TTS', icon: <SpeechToTextIcon />, path: '/patient/speech-features' }
 const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities', icon: <GamepadIcon />, path: '/patient/gamified-activities' }
 
+// Terms & Policies sits last, right above Settings and Help & Support.
+const TERMS_ITEM = { id: 'terms-policies', label: 'Terms & Policies', icon: <ShieldCheck size={24} />, path: '/patient/terms-policies' }
+
 function getPatientMenuItems(betaTier) {
-  if (betaTier === 'gold') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM]
-  if (betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM]
-  return DEFAULT_MENU_ITEMS
+  if (betaTier === 'gold') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM, TERMS_ITEM]
+  if (betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, TERMS_ITEM]
+  return [...DEFAULT_MENU_ITEMS, TERMS_ITEM]
 }
 
 const DEFAULT_BOTTOM_MENU_ITEMS = [

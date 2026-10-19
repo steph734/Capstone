@@ -25,6 +25,7 @@ import AppointmentsPage from './pages/AppointmentsPage'
 import NotesPage from './pages/NotesPage'
 import MessagesPage from './pages/MessagesPage'
 import SubscriptionPage from './pages/SubscriptionPage'
+import TermsPolicies from './pages/patient/TermsPolicies'
 import SettingsPage from './pages/SettingsPage'
 import HelpPage from './pages/HelpPage'
 import UpdatePaymentPage from './pages/UpdatePaymentPage'
@@ -1431,7 +1432,22 @@ function App() {
           } 
         />
 
-        <Route 
+        <Route
+          path="/patient/terms-policies"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Patient' ? (
+                <TermsPolicies user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
           path="/settings" 
           element={
             isAuthenticated ? (

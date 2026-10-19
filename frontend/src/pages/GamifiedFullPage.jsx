@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Suspense, useEffect, useState, useRef, useMemo } from 'react'
+import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
 import PaoBuddy from '../components/pao/PaoBuddy'
@@ -27,6 +27,10 @@ import { getPaoLanguage, setPaoLanguage, PAO_LANGUAGES } from '../utils/paoLangu
 import { FULL_PAGE_LINES, CLICK_REACT_LINES, pickLine } from '../utils/paoLines'
 import { fetchGameBadge } from '../utils/gameProgress'
 import GameLauncher from '../games/shared/GameLauncher'
+import usePlanState from '../games/shared/plan/usePlanState'
+import PlanPanel from '../games/shared/plan/PlanPanel'
+import PlanOverlays from '../games/shared/plan/PlanOverlays'
+import { authFetch } from '../utils/session'
 import { GAME_COMPONENTS as GC, entryForCard, needsIntro } from '../games/shared/gameRegistry'
 import { preloadLoadingPao } from '../games/shared/loading/paoLoadingPoses'
 
@@ -428,18 +432,23 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
     ident = { patientEmail: rest.patientEmail }
   }
   const navigate = useNavigate()
+  // Today's play plan locks everything except the games the therapist assigned, and only inside the play window.
+  // Owner previews and practice mode (no tracked patient) are never locked.
+  const enforcePlan = !rest.previewGameId && (requirePlayer ? Boolean(activity.isActive && !activity.isPractice) : Boolean(rest.patientEmail))
+  const plan = usePlanState({ enabled: enforcePlan, activitySessionId: requirePlayer ? activity.session?.id : null })
   return (
     <PaoProvider ident={ident}>
       <AppErrorBoundary label="games" onReset={() => navigate(rest.backPath || '/dashboard')}>
         <Suspense fallback={null}>
-          <GamifiedFullPageInner requirePlayer={requirePlayer} {...rest} />
+          <GamifiedFullPageInner requirePlayer={requirePlayer} plan={plan} activitySessionId={requirePlayer ? activity.session?.id : null} {...rest} />
+          <PlanOverlays ps={plan} />
         </Suspense>
       </AppErrorBoundary>
     </PaoProvider>
   )
 }
 
-function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null }) {
+function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null, plan, activitySessionId = null }) {
   const navigate = useNavigate()
   const pao = usePao()
 
@@ -725,7 +734,11 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       },
     })
   }) // eslint-disable-line react-hooks/exhaustive-deps
-  const launcher = launching ? <GameLauncher card={launching} playerName={progress.patientName} onLaunch={afterLoading} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
+  const checkAccess = useCallback(
+    plan.enabled ? (card) => authFetch('/api/patient/game-access', { query: { name: card.title, ...(activitySessionId ? { activitySessionId } : {}) } }) : undefined,
+    [plan.enabled, activitySessionId]
+  )
+  const launcher = launching ? <GameLauncher card={launching} check={checkAccess} playerName={progress.patientName} onLaunch={afterLoading} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
 
   // Owner "Preview" (see OwnerGamePreviewPage): launch one game straight
   // away. There's no player / activity session here, so the PaoProvider has no
@@ -737,12 +750,15 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     else navigate(backPath)
   }, [previewGameId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const GAME_PHASES = ['echo','picture-word','puzzle-pieces','money-match','daily-routines','feed-pao','emergency-ready','sort-basket','copy-colors','spot-difference','builder','story-select','alphabet','rhyme-time','sentence-builder','sound-hunt']
+  useEffect(() => { plan.setGameOpen(GAME_PHASES.includes(phase)) }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
   const backToGames = () => {
     // Owner preview: leaving a game goes straight back to the library.
     if (previewGameId) { stopPaoVoice(); navigate(backPath); return }
     setPhase('games'); setGamesIn(true); setDisplayText('')
     setTimeout(() => speakScript(pickLine(FULL_PAGE_LINES.gamesScript, lang)), 400)
   }
+  useEffect(() => { plan.registerBack(backToGames) })
 
   if (phase === 'profile') {
     return <GamifiedProfileView progress={progress} pao={pao.profile} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
@@ -1121,6 +1137,13 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
               })}
             </div>
 
+            {plan.enabled ? (plan.state === 'loading' ? null : (
+              <PlanPanel ps={plan} name={progress.patientName} onPlay={startGame} cards={allGames.filter(g =>
+                (gameCatFilter === 'all' || g.category === gameCatFilter) &&
+                (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter) &&
+                isGamePublished(g.title)
+              )}/>
+            )) : (
             <div className="gf-games-grid">
               {allGames.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&
@@ -1179,6 +1202,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 )
               })}
             </div>
+            )}
           </div>
         </div>
       )}

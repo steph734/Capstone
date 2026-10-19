@@ -145,6 +145,7 @@ import paoWardrobe from './_lib/routes/pao-wardrobe.js'
 import paoEquip from './_lib/routes/pao-equip.js'
 import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
 import paoSeen from './_lib/routes/pao-seen.js'
+import * as gamePlans from './_lib/routes/game-plans.js'
 import gameSessionsStart from './_lib/routes/game-sessions-start.js'
 import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
 import gameSessionsComplete from './_lib/routes/game-sessions-complete.js'
@@ -285,6 +286,13 @@ app.all('/api/pao-hair/create', paoHairCreate)
 app.all('/api/pao-hair/:id', paoHairItem)
 app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
+app.all('/api/therapist/today', gamePlans.therapistToday)
+app.all('/api/therapist/games', gamePlans.therapistGames)
+app.all('/api/game-plans', gamePlans.plansCollection)
+app.all('/api/game-plans/:id/:action', gamePlans.plansAction)
+app.all('/api/game-plans/:id', gamePlans.plansItem)
+app.all('/api/patient/game-plan/today', gamePlans.patientToday)
+app.all('/api/patient/game-access', gamePlans.patientGameAccess)
 app.all('/api/games/list', gamesList)
 app.all('/api/games/by-name', gamesByName) // must come before /api/games/:gameId, or "by-name" is read as an id
 app.all('/api/games', gamesAdminList)

@@ -20,6 +20,7 @@ import { buildUnlockContext } from '../unlockContext.js'
 import { serializePaoProfile } from '../serializePaoProfile.js'
 import { serializeBadge } from '../serializeBadge.js'
 import { serializePaoItem } from '../serializePaoItem.js'
+import { markPlanGame } from '../gamePlans.js'
 import { serializePaoHair } from '../serializePaoHair.js'
 import {
   computeXpEarned, applyXp, statGainsForGame, applyStatGains, isPerfectResult, manilaDayRange,
@@ -353,6 +354,7 @@ export default async function handler(req, res) {
       await session.endSession()
     }
 
+    await markPlanGame(patientId, game._id, 'done')
     return res.status(200).json(response)
   } catch (err) {
     console.error('game-sessions/complete error:', err)

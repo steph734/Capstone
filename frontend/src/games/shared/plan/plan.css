@@ -1,0 +1,48 @@
+/* Patient games page when today's play plan applies. */
+.pl-wrap { display: flex; flex-direction: column; gap: 12px; font-family: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif; }
+.pl-top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.pl-bubble { flex: 1 1 280px; background: rgba(255, 255, 255, .95); border-radius: 18px; padding: 14px 20px; font-size: 17px; font-weight: 700; color: #1d3557; }
+.pl-timer { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 18px; padding: 10px 18px 10px 12px; box-shadow: 0 4px 14px rgba(20, 60, 100, .18); }
+.pl-timer b { display: block; font-size: 18px; color: #1d3557; }
+.pl-timer small { display: block; font-size: 12.5px; font-weight: 700; color: #51647a; }
+.pl-timer.over, .pl-timer.paused { opacity: .92; }
+.pl-progress { display: flex; align-items: center; gap: 8px; color: #fff; font-weight: 800; font-size: 14px; text-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.pl-progress i { width: 34px; height: 12px; border-radius: 8px; background: rgba(255, 255, 255, .55); }
+.pl-progress i.done { background: #22c55e; } .pl-progress i.now { background: #fbbf24; }
+.pl-h { margin: 6px 0 0; font-size: 19px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.pl-row, .pl-locked { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pl-today { position: relative; background: #fff; border: 3px solid var(--c, #6ee7b7); border-radius: 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 130px; box-sizing: border-box; }
+.pl-today.done { border-color: #5eead4; } .pl-today.next { box-shadow: 0 0 0 4px rgba(34, 197, 94, .25); }
+.pl-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; background: #fff0c9; color: #92400e; font-size: 12px; font-weight: 800; border-radius: 9px; padding: 3px 9px; }
+.pl-today strong, .pl-lock strong { font-size: 20px; color: #1d3557; line-height: 1.2; overflow-wrap: anywhere; }
+.pl-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.pl-tags span { font-size: 12px; font-weight: 800; border-radius: 9px; padding: 3px 10px; }
+.pl-tags .c { background: #ede9fe; color: #5b21b6; } .pl-tags .m { background: #eef2f7; color: #475569; }
+.pl-tags .d.easy { background: #dcfce7; color: #166534; } .pl-tags .d.medium { background: #fef0d4; color: #92400e; } .pl-tags .d.hard { background: #fee2e2; color: #991b1b; }
+.pl-act { margin-top: auto; align-self: flex-end; }
+.pl-act button { display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 10px 20px; border-radius: 12px; border: 0; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+.pl-act .play { background: #16a34a; color: #fff; box-shadow: 0 4px 0 #0f7a36; } .pl-act .ghost { background: #dcfce7; color: #166534; }
+.pl-done { display: inline-flex; align-items: center; gap: 6px; background: #d1fae5; color: #047857; font-weight: 800; border-radius: 12px; padding: 9px 18px; }
+.pl-wait { background: #eef2ff; color: #4338ca; font-weight: 800; border-radius: 12px; padding: 9px 18px; font-size: 15px; }
+.pl-lock { position: relative; text-align: left; font: inherit; background: rgba(255, 255, 255, .55); border: 2px dashed rgba(255, 255, 255, .95); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-height: 120px; min-width: 0; }
+.pl-lock strong { color: #4b5563; }
+.pl-lock small { color: #4b5563; font-weight: 700; font-size: 13px; margin-top: auto; }
+.pl-ico { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; padding: 9px; box-sizing: border-box; border-radius: 12px; background: #fff; color: #4b5563; }
+.pl-msg { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: #1d3557; color: #fff; padding: 12px 20px; border-radius: 14px; font-weight: 800; z-index: 10050; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
+
+/* Toast + time's-up card (rendered above every game). */
+.pl-toast { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10060; display: flex; align-items: center; gap: 10px; background: #fff; color: #1d3557; border-radius: 16px; padding: 10px 18px 10px 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); font-weight: 800; font-size: 16px; max-width: 92vw; }
+.pl-toast img { width: 44px; height: 54px; object-fit: contain; }
+.pl-over { position: fixed; inset: 0; z-index: 10070; background: rgba(20, 40, 80, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pl-over > div { background: #fffdf8; border-radius: 28px; width: min(92vw, 420px); padding: 24px; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.pl-over img { width: 150px; height: 190px; object-fit: contain; }
+.pl-over h2 { margin: 6px 0 4px; font-size: 26px; color: #1d3557; }
+.pl-over p { margin: 0 0 16px; color: #51647a; font-size: 16px; font-weight: 700; }
+.pl-over button { min-height: 52px; padding: 0 28px; border-radius: 16px; border: 0; background: #16a34a; color: #fff; font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; box-shadow: 0 5px 0 #0f7a36; }
+
+@media (max-width: 900px) { .pl-row, .pl-locked { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .pl-row, .pl-locked { grid-template-columns: minmax(0, 1fr); }
+  .pl-timer { width: 100%; box-sizing: border-box; }
+  .pl-bubble { font-size: 15px; padding: 12px 16px; }
+}

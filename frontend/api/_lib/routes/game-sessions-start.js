@@ -13,6 +13,8 @@ import { Employee } from '../models/employee.js'
 import { ActivitySession } from '../models/activitySession.js'
 import { resolvePatientId } from '../resolvePatient.js'
 import { serializePaoProfile } from '../serializePaoProfile.js'
+import { checkGameAccess, markPlanGame } from '../gamePlans.js'
+import { getDb } from '../mongo.js'
 
 async function getOrCreateProfile(patientId) {
   let profile = await PaoProfile.findOne({ patient_id: patientId })
@@ -65,6 +67,10 @@ export default async function handler(req, res) {
     const game = await Game.findById(gameId).lean()
     if (!game) return res.status(404).json({ error: 'Game not found.' })
 
+    // Gamified Activities are locked to today's game plan and its play-time window.
+    const access = await checkGameAccess(await getDb(), patientId, game._id)
+    if (!access.ok) return res.status(403).json({ error: 'This game is locked right now.', code: access.code, reason: access.reason })
+
     const profile = await getOrCreateProfile(patientId)
 
     // Every game is open to every player (the games page no longer locks cards), so there is no level check here.
@@ -107,6 +113,7 @@ export default async function handler(req, res) {
       await activitySession.save()
     }
 
+    await markPlanGame(patientId, game._id, 'in_progress')
     return res.status(201).json({ sessionId: String(session._id), profile: serializePaoProfile(profile) })
   } catch (err) {
     console.error('game-sessions/start error:', err)

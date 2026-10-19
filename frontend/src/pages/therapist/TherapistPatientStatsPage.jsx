@@ -333,7 +333,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
               <div className="text-center" style={{ ...CARD, padding: 48 }}>
                 <p style={{ fontSize: 16, fontWeight: 700, color: GREEN_900 }}>No games played yet.</p>
                 <p className="mt-1" style={{ fontSize: 13, color: MUTED }}>Stats will appear after the first session.</p>
-                <PrimaryButton onClick={() => navigate('/therapist/assign-exercises')} style={{ marginTop: 16 }}>Assign a game</PrimaryButton>
+                <PrimaryButton onClick={() => navigate('/therapist/assign-games')} style={{ marginTop: 16 }}>Assign a game</PrimaryButton>
               </div>
             ) : (
               <>
@@ -538,7 +538,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <PrimaryButton onClick={() => navigate(`/therapist/assign-exercises?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Assign exercises</PrimaryButton>
+                      <PrimaryButton onClick={() => navigate(`/therapist/assign-games?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Assign exercises</PrimaryButton>
                       <SecondaryButton onClick={() => navigate(`/therapist/notes-progress?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Add a note</SecondaryButton>
                     </div>
                   </div>

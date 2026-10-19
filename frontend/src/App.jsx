@@ -791,7 +791,7 @@ function App() {
         />
 
         <Route
-          path="/therapist/assign-exercises"
+          path="/therapist/assign-games"
           element={
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
@@ -804,6 +804,8 @@ function App() {
             )
           }
         />
+
+        <Route path="/therapist/assign-exercises" element={<Navigate to="/therapist/assign-games" replace />} />
 
         <Route
           path="/therapist/speech-to-text"

@@ -2,8 +2,7 @@
 // The "Who is playing today?" patient list. There's no dedicated
 // patient-therapist assignment collection in this app — exactly like the
 // Speech-to-Text "Who is this session for?" picker (patients-therapist-list.js),
-// "this therapist's patients" is derived from who they actually have
-// appointments with, via the `appointments` collection.
+// "this therapist's patients" is the `patient_assign` collection (status 'active').
 import { getMongo, getDb } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { PaoProfile } from '../models/paoProfile.js'
@@ -43,18 +42,14 @@ export default async function handler(req, res) {
     const db = await getDb()
     const todayIso = new Date().toISOString().slice(0, 10)
 
-    const appts = await db.collection('appointments').aggregate([
-      { $match: { employee_id: employee._id } },
-      { $lookup: { from: 'patients', localField: 'patient_id', foreignField: '_id', as: 'patient' } },
-      { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
-    ]).toArray()
+    // Only patients with an ACTIVE patient_assign row for this therapist can be picked.
+    const assigns = await db.collection('patient_assign').find({ employee_id: employee._id, status: 'active' }).toArray()
+    const assignedIds = assigns.map((x) => x.patient_id)
+    const patientDocs = assignedIds.length ? await db.collection('patients').find({ _id: { $in: assignedIds } }).toArray() : []
+    const appts = assignedIds.length ? await db.collection('appointments').find({ employee_id: employee._id, patient_id: { $in: assignedIds } }).toArray() : []
 
-    const byPatient = new Map()
-    for (const a of appts) {
-      const key = String(a.patient_id)
-      if (!byPatient.has(key)) byPatient.set(key, { patient: a.patient, appts: [] })
-      byPatient.get(key).appts.push(a)
-    }
+    const byPatient = new Map(patientDocs.map((p) => [String(p._id), { patient: p, appts: [] }]))
+    for (const a of appts) byPatient.get(String(a.patient_id))?.appts.push(a)
 
     let patients = Array.from(byPatient.values())
 

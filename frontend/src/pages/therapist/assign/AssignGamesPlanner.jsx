@@ -87,12 +87,25 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
   useEffect(() => {
     if (!sel) return undefined
     let alive = true
-    const query = { patientId: sel.patientId, difficulty: diff, sort, ...(q ? { q } : {}), ...(type ? { type } : {}) }
-    const t = setTimeout(() => {
-      authFetch('/api/therapist/games', { query }).then((d) => { if (alive) { setCatalog(d.games); setDefaultTypes(d.defaultTypes) } }).catch((e) => onToast?.(e.message))
-    }, 200)
-    return () => { alive = false; clearTimeout(t) }
-  }, [selId, diff, type, sort, q]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Fetched once per patient and type; difficulty, search and sort are applied instantly in the browser (no waiting).
+    authFetch('/api/therapist/games', { query: { patientId: sel.patientId, ...(type ? { type } : {}) } })
+      .then((d) => { if (alive) { setCatalog(d.games); setDefaultTypes(d.defaultTypes) } }).catch((e) => onToast?.(e.message))
+    return () => { alive = false }
+  }, [selId, type]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shownGames = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const rank = { easy: 0, medium: 1, hard: 2 }
+    const cmp = {
+      shortest: (a, b) => a.minutes - b.minutes || a.name.localeCompare(b.name),
+      longest: (a, b) => b.minutes - a.minutes || a.name.localeCompare(b.name),
+      name: (a, b) => a.name.localeCompare(b.name),
+      difficulty: (a, b) => rank[a.difficulty] - rank[b.difficulty] || a.name.localeCompare(b.name),
+    }[sort]
+    return catalog
+      .filter((g) => (diff === 'all' || g.difficulty === diff) && (!needle || `${g.name} ${g.description}`.toLowerCase().includes(needle)))
+      .sort(cmp)
+  }, [catalog, diff, q, sort])
 
   // Live status of a saved plan.
   useEffect(() => {
@@ -235,8 +248,8 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
                 <label className="ag-select">Sort: <select value={sort} onChange={(e) => setSort(e.target.value)}>{SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select><ChevronDown size={14} /></label>
               </div>
               <div className="ag-games">
-                {catalog.length === 0 && <p className="ag-muted">No games match.</p>}
-                {catalog.map((g) => {
+                {shownGames.length === 0 && <p className="ag-muted">No games match.</p>}
+                {shownGames.map((g) => {
                   const added = plan.some((p) => p.gameId === g.id)
                   const fits = added || g.minutes <= free
                   return (

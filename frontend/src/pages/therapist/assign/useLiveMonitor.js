@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authFetch } from '../../../utils/session'
 
-// Polls the live play-time endpoint every 5 s (paused while the tab is hidden) and keeps a clock offset to the server.
+// Polls the live play-time endpoint every 3 s (paused while the tab is hidden) and keeps a clock offset to the server.
 // Returns { plans: Map(patientId -> live), offset, refresh, tick } where tick changes every second (for local countdowns).
 export default function useLiveMonitor(enabled = true) {
   const [plans, setPlans] = useState(() => new Map())
@@ -14,7 +14,8 @@ export default function useLiveMonitor(enabled = true) {
       const d = await authFetch('/api/therapist/game-plans/live')
       if (!alive.current) return
       offset.current = new Date(d.now).getTime() - Date.now()
-      setPlans(new Map(d.plans.map((p) => [p.patientId, p])))
+      const at = performance.now()
+      setPlans(new Map(d.plans.map((p) => [p.patientId, { ...p, _at: at }])))
     } catch { /* keep the last good data */ }
   }, [])
 
@@ -22,7 +23,7 @@ export default function useLiveMonitor(enabled = true) {
     alive.current = true
     if (!enabled) return undefined
     refresh()
-    const t = setInterval(() => { if (!document.hidden) refresh() }, 5000)
+    const t = setInterval(() => { if (!document.hidden) refresh() }, 3000)
     const vis = () => { if (!document.hidden) refresh() }
     document.addEventListener('visibilitychange', vis)
     return () => { alive.current = false; clearInterval(t); document.removeEventListener('visibilitychange', vis) }
@@ -40,7 +41,8 @@ export default function useLiveMonitor(enabled = true) {
 export function secondsLeft(lv, offset) {
   if (!lv) return 0
   if (lv.status === 'ended') return 0
-  if (lv.status === 'active') return Math.max(0, Math.round((new Date(lv.playEnd).getTime() - (Date.now() + offset)) / 1000))
+  // Counts down from the server's remainingSeconds using performance.now(), so this device's clock does not matter.
+  if (lv.status === 'active') return Math.max(0, Math.round(lv.remainingSeconds - (performance.now() - (lv._at || performance.now())) / 1000))
   return lv.remainingSeconds
 }
 

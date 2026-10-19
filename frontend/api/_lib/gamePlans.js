@@ -56,17 +56,32 @@ export async function activeAssignment(db, patientId, employeeId) {
   return { ...doc, _id: r.insertedId }
 }
 
+// The planned play length in seconds (older plans only had a fixed window).
+export const durationOf = (plan) => Number.isFinite(plan.duration_seconds) ? plan.duration_seconds : Math.max(0, Math.round((plan.play_end - plan.play_start) / 1000))
+
+// Seconds of play time left. Server clock only: changing the patient's device clock cannot change it.
+export function planRemaining(plan, nowMs = Date.now()) {
+  if (!plan || plan.status === 'ended' || plan.status === 'cancelled') return 0
+  const running = plan.run_started_at ? Math.max(0, (nowMs - plan.run_started_at.getTime()) / 1000) : 0
+  return Math.max(0, Math.round(durationOf(plan) + (plan.extended_seconds || 0) - (plan.used_seconds || 0) - running))
+}
+export const remainingSeconds = (plan) => planRemaining(plan)
+
 // Move a plan through scheduled -> active -> ended as the clock passes; returns the fresh document.
+// A plan that is not "start manually" opens by itself at play_start; a running plan ends when its remaining time hits 0.
 export async function refreshPlan(plan) {
   if (!plan) return plan
-  const now = Date.now()
-  let status = plan.status
-  if (status === 'scheduled' && !plan.start_manually && now >= plan.play_start.getTime()) status = 'active'
-  if (status === 'active' && now > plan.play_end.getTime()) status = 'ended'
-  if (status !== plan.status) {
-    plan.status = status
-    await SessionGamePlan.updateOne({ _id: plan._id, status: { $ne: status } }, { $set: { status } }, { timestamps: false })
+  const now = new Date()
+  const set = {}
+  if (plan.status === 'scheduled' && !plan.start_manually && now >= plan.play_start) {
+    Object.assign(set, { status: 'active', started_at: plan.play_start, run_started_at: plan.play_start, duration_seconds: durationOf(plan) })
+    Object.assign(plan, set)
   }
+  if (plan.status === 'active' && planRemaining(plan, now.getTime()) <= 0) {
+    Object.assign(set, { status: 'ended', used_seconds: durationOf(plan) + (plan.extended_seconds || 0), run_started_at: null, play_end: now })
+    Object.assign(plan, set)
+  }
+  if (Object.keys(set).length) await SessionGamePlan.updateOne({ _id: plan._id }, { $set: set }, { timestamps: false })
   return plan
 }
 
@@ -74,13 +89,6 @@ export async function refreshPlan(plan) {
 export async function todaysPlan(patientId, key = manilaDayKey()) {
   const plan = await SessionGamePlan.findOne({ patient_id: patientId, plan_date: manilaDayStart(key), status: { $ne: 'cancelled' } })
   return refreshPlan(plan)
-}
-
-export function remainingSeconds(plan) {
-  if (!plan) return 0
-  if (plan.status === 'ended') return 0
-  const from = plan.status === 'paused' || plan.status === 'scheduled' ? Math.max(plan.play_start.getTime(), Date.now()) : Date.now()
-  return Math.max(0, Math.round((plan.play_end.getTime() - from) / 1000))
 }
 
 // Plan + its game documents, in the shape both pages use.
@@ -100,11 +108,13 @@ export async function serializePlan(db, plan) {
     playEnd: plan.play_end.toISOString(),
     startManually: plan.start_manually,
     startedAt: plan.started_at ? plan.started_at.toISOString() : null,
-    extendedMinutes: plan.extended_minutes || 0,
+    durationSeconds: durationOf(plan), extendedSeconds: plan.extended_seconds || 0, usedSeconds: plan.used_seconds || 0,
+    runStartedAt: plan.run_started_at ? plan.run_started_at.toISOString() : null, pausedAt: plan.paused_at ? plan.paused_at.toISOString() : null,
+    pauseCount: plan.pause_count || 0, totalPausedSeconds: plan.total_paused_seconds || 0, startedEarly: Boolean(plan.started_early),
     warnBeforeMinutes: plan.warn_before_minutes,
     allowFinishCurrent: plan.allow_finish_current,
     now: new Date().toISOString(),
-    remainingSeconds: remainingSeconds(plan),
+    remainingSeconds: planRemaining(plan),
     games: sorted.map((g) => {
       const d = byId.get(String(g.game_id))
       return {
@@ -125,13 +135,13 @@ export async function checkGameAccess(db, patientId, gameId) {
   const entry = plan.games.find((g) => String(g.game_id) === String(gameId))
   if (!entry) return { ok: false, code: 'GAME_LOCKED', reason: 'not_assigned' }
   const now = Date.now()
-  if (plan.status === 'paused') return { ok: false, code: 'GAME_LOCKED', reason: 'paused' }
-  if (plan.status === 'scheduled' || now < plan.play_start.getTime()) return { ok: false, code: 'GAME_LOCKED', reason: 'not_started' }
-  if (plan.status === 'active' && now <= plan.play_end.getTime()) return { ok: true, plan }
+  if (plan.status === 'paused') return { ok: false, code: 'GAME_PAUSED', reason: 'paused' }
+  if (plan.status === 'scheduled') return { ok: false, code: 'GAME_LOCKED', reason: 'not_started' }
+  if (plan.status === 'active' && planRemaining(plan, now) > 0) return { ok: true, plan }
   // After the window: only a game that was already being played may be picked up again.
   if (plan.allow_finish_current) {
     const open = await db.collection('game_sessions').findOne({
-      patient_id: patientId, game_id: oid(gameId), status: 'in_progress', started_at: { $lte: plan.play_end },
+      patient_id: patientId, game_id: oid(gameId), status: 'in_progress', started_at: { $lte: plan.play_end || new Date() },
     }, { projection: { _id: 1 } })
     if (open) return { ok: true, plan }
   }

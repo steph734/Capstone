@@ -51,3 +51,15 @@
 .pl-pic { width: 58px; height: 58px; flex-shrink: 0; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--c, #6366f1) 18%, #fff); color: var(--c, #6366f1); border: 2px solid color-mix(in srgb, var(--c, #6366f1) 40%, #fff); }
 .pl-pic.locked { filter: grayscale(.85); opacity: .75; }
 .pl-today .pl-head { padding-right: 0; }
+
+/* Pause overlay: above every game and every other overlay; the game underneath is frozen and cannot be touched. */
+.pl-pause { position: fixed; inset: 0; z-index: 10090; background: rgba(20, 40, 80, .6); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; touch-action: none; animation: pl-pause-in .3s ease both; }
+.pl-pause.out { animation: pl-pause-out .3s ease both; pointer-events: none; }
+.pl-pause > div { background: #fffdf8; border-radius: 28px; width: min(92vw, 400px); padding: 24px; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.pl-pause img { width: 130px; height: 165px; object-fit: contain; }
+.pl-pause h2 { margin: 6px 0 4px; font-size: 26px; color: #1d3557; }
+.pl-pause p { margin: 0; color: #51647a; font-size: 18px; font-weight: 700; }
+@keyframes pl-pause-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes pl-pause-out { from { opacity: 1 } to { opacity: 0 } }
+.tp-paused *:not(.pl-pause):not(.pl-pause *) { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .pl-pause, .pl-pause.out { animation: none; } }

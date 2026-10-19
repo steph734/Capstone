@@ -7,8 +7,8 @@ import useGameAssets, { isGameLoaded } from './loading/useGameAssets'
 
 const LOCK_TEXT = {
   not_assigned: 'This game is not in today\'s plan. Ask your therapist to add it.',
-  not_started: 'Play time has not started yet.',
-  paused: 'Play time is paused. Your therapist will start it again.',
+  not_started: 'Your therapist will start play time soon.',
+  paused: 'Your therapist paused play time. Wait a moment!',
   time_over: 'Play time is over. Great playing today!',
   no_plan: 'No games today yet. Your therapist will pick them during your session.',
 }
@@ -30,7 +30,7 @@ export default function GameLauncher({ card, playerName, speak = true, check, on
     setAccess('checking')
     check(card).then(() => { if (alive) setAccess('ok') }).catch((e) => {
       if (!alive) return
-      if (e?.data?.code === 'GAME_LOCKED') { setReason(e.data.reason); setAccess('locked') } else setAccess('ok') // a network blip must not lock the child out; the server still guards the session start
+      if (e?.data?.code === 'GAME_LOCKED' || e?.data?.code === 'GAME_PAUSED') { setReason(e.data.reason); setAccess('locked') } else setAccess('ok') // a network blip must not lock the child out; the server still guards the session start
     })
     return () => { alive = false }
   }, [card, check])

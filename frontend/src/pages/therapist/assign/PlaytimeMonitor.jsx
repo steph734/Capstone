@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Clock, FileText, GripVertical, Pause, Play, Plus, Square } from 'lucide-react'
+import { Check, Clock, FileText, GripVertical, Pause, Play, Plus, RotateCcw, Square } from 'lucide-react'
 import { mmss, secondsLeft } from './useLiveMonitor'
 import { addResultsToSoap } from './addToSoap'
 
@@ -9,12 +9,12 @@ const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').sli
 
 export const STATUS_TEXT = (lv, playing) => (lv.status === 'scheduled' ? 'Not started' : lv.status === 'paused' ? 'Paused' : lv.status === 'ended' ? "Time's up" : playing ? 'Playing' : 'Open')
 
-function Ring({ left, total, color }) {
+function Ring({ left, total, color, paused }) {
   const r = 88
   const c = 2 * Math.PI * r
   const frac = total > 0 ? Math.max(0, Math.min(1, left / total)) : 0
   return (
-    <svg viewBox="0 0 200 200" className="pm-ring" role="img" aria-label={`${mmss(left)} left`}>
+    <svg viewBox="0 0 200 200" className={`pm-ring${paused ? ' paused' : ''}`} role="img" aria-label={`${mmss(left)} left`}>
       <circle cx="100" cy="100" r={r} fill="none" stroke="#e5efe9" strokeWidth="16" />
       <circle cx="100" cy="100" r={r} fill="none" stroke={color} strokeWidth="16" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} transform="rotate(-90 100 100)" style={{ transition: 'stroke-dashoffset .9s linear, stroke .4s' }} />
       <text x="100" y="104" textAnchor="middle" className="pm-big">{mmss(left)}</text>
@@ -27,13 +27,23 @@ function Ring({ left, total, color }) {
 export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExtend, onEdit, onToast }) {
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [soapBusy, setSoapBusy] = useState(false)
+  const [confirm, setConfirm] = useState(null) // 'start' | 'restart'
   const left = secondsLeft(lv, offset)
-  const color = lv.status === 'ended' || left === 0 ? '#dc2626' : left <= 300 && lv.status === 'active' ? '#f59e0b' : '#2c8a64'
+  const paused = lv.status === 'paused'
+  const pausedFor = paused && lv.pausedAt ? Math.max(0, Math.round((Date.now() + offset - new Date(lv.pausedAt).getTime()) / 1000)) : 0
+  const early = lv.status === 'scheduled' && Date.now() + offset < new Date(lv.playStart).getTime()
+  const color = paused ? '#9aa9a2' : lv.status === 'ended' || left === 0 ? '#dc2626' : left <= 300 && lv.status === 'active' ? '#f59e0b' : '#2c8a64'
   const np = lv.nowPlaying
   const nowMs = Date.now() + offset
   const inGame = np ? np.secondsInGame + Math.max(0, Math.round((nowMs - new Date(lv.now).getTime()) / 1000)) + 0 : 0
   const lastTapMin = np ? Math.max(0, Math.floor((nowMs - new Date(np.lastInputAt).getTime()) / 60000)) : 0
   const running = lv.status === 'active' || lv.status === 'paused' || lv.status === 'scheduled'
+  const maxed = (lv.extendedSeconds || 0) >= 1800
+  const toggle = () => { if (lv.status === 'active') onAct('pause'); else if (lv.status === 'paused') onAct('resume') }
+  const onKey = (e) => { if (e.code === 'Space' && e.target === e.currentTarget) { e.preventDefault(); toggle() } }
+  const infoLine = lv.status === 'scheduled'
+    ? `Planned ${fmt12(lv.playStart)} – ${fmt12(lv.playEnd)} · warning ${lv.warnBeforeMinutes || 5} min before end · finish current game: ${lv.allowFinishCurrent ? 'on' : 'off'}`
+    : `Started ${fmt12(lv.startedAt || lv.playStart)}${lv.startedEarly ? ' (early)' : ''} · ${lv.status === 'ended' ? 'ended' : 'ends about'} ${fmt12(lv.playEnd)}${lv.pauseCount ? ` · paused ${lv.pauseCount} time${lv.pauseCount === 1 ? '' : 's'} (${mmss(lv.totalPausedSeconds)})` : ''}`
 
   const soap = async () => {
     setSoapBusy(true)
@@ -45,21 +55,20 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
 
   return (
     <div className="pm-wrap">
-      <section className="ag-card pm-top">
-        <Ring left={left} total={lv.totalSeconds} color={color} />
+      <section className={`ag-card pm-top${paused ? ' is-paused' : ''}`} tabIndex={0} onKeyDown={onKey} aria-label="Play time controls. Press Space to pause or resume.">
+        <Ring left={left} total={lv.totalSeconds} color={color} paused={paused} />
         <div className="pm-info">
           <span className={`pm-chip ${lv.status}${np ? ' playing' : ''}`}><i />{STATUS_TEXT(lv, np)}</span>
           <h3>Play time for {lv.patient.name}</h3>
-          <p>
-            {lv.startManually && lv.status === 'scheduled' ? 'Starts when you press Start play time' : `Started ${fmt12(lv.playStart)}`} · ends <b>{fmt12(lv.playEnd)}</b>
-            {lv.warnAt ? ` · warning at ${fmt12(lv.warnAt)}` : ''} · finish current game: {lv.allowFinishCurrent ? 'on' : 'off'}
-          </p>
+          <p>{infoLine}</p>
+          {paused && <p className="pm-pausedfor"><Pause size={14} aria-hidden="true" /> Paused for {mmss(pausedFor)}</p>}
           <div className="pm-btns">
-            {lv.status === 'scheduled' && lv.startManually && <button type="button" className="pm-primary" onClick={() => onAct('start')}><Play size={16} /> Start play time</button>}
+            {lv.status === 'scheduled' && <button type="button" className="pm-primary pm-bigstart" onClick={() => (early ? setConfirm('start') : onAct('start'))}><Play size={18} /> Start play time</button>}
             {lv.status === 'active' && <button type="button" onClick={() => onAct('pause')}><Pause size={16} /> Pause</button>}
             {lv.status === 'paused' && <button type="button" className="pm-primary" onClick={() => onAct('resume')}><Play size={16} /> Resume</button>}
-            {running && <button type="button" onClick={() => onExtend(5)} disabled={lv.extendedMinutes >= 30} title={lv.extendedMinutes >= 30 ? 'You can add at most 30 minutes in total' : ''}><Plus size={16} /> +5 min</button>}
-            <button type="button" onClick={onEdit}><GripVertical size={16} /> Edit plan</button>
+            {lv.status === 'ended' && <button type="button" className="pm-primary" onClick={() => setConfirm('restart')}><RotateCcw size={16} /> Restart play time</button>}
+            {running && <button type="button" onClick={() => onExtend(5)} disabled={maxed} title={maxed ? 'You can add at most 30 minutes in total' : ''}><Plus size={16} /> +5 min</button>}
+            {lv.status !== 'ended' && <button type="button" onClick={onEdit}><GripVertical size={16} /> Edit plan</button>}
             {running && <button type="button" className="pm-danger" onClick={() => setConfirmEnd(true)}><Square size={16} /> End now</button>}
           </div>
           {np && (
@@ -91,12 +100,22 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
             <div><b>{lv.summary.minutesPlayed}m</b><small>Played</small></div>
             <div><b>{lv.summary.accuracy != null ? `${lv.summary.accuracy}%` : '—'}</b><small>Accuracy</small></div>
             <div><b>{lv.summary.hints}</b><small>Hints</small></div>
+            {lv.pauseCount > 0 && <div><b>{mmss(lv.totalPausedSeconds)}</b><small>Paused</small></div>}
           </div>
           <button type="button" className="ag-assign" onClick={soap} disabled={soapBusy || lv.summary.minutesPlayed === 0 && lv.summary.done === 0}><FileText size={18} /> {soapBusy ? 'Adding…' : 'Add results to SOAP notes'}</button>
           <p className="ag-note">Adds the game results to the Objective section of today&apos;s note for {first}.</p>
         </section>
       </div>
 
+      {confirm && (
+        <div className="pm-modal" role="alertdialog" aria-modal="true" aria-label={confirm === 'start' ? 'Start play time' : 'Restart play time'}>
+          <div>
+            <h3>{confirm === 'start' ? 'Start now?' : 'Restart play time?'}</h3>
+            <p>{confirm === 'start' ? `Planned start is ${fmt12(lv.playStart)}. ${first}'s games open right away.` : `The timer and today's game progress start over for ${first}.`}</p>
+            <div><button type="button" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="pm-primary" onClick={() => { const a = confirm; setConfirm(null); onAct(a) }}>{confirm === 'start' ? 'Start now' : 'Restart'}</button></div>
+          </div>
+        </div>
+      )}
       {confirmEnd && (
         <div className="pm-modal" role="alertdialog" aria-modal="true" aria-label="End play time">
           <div>

@@ -173,3 +173,11 @@
   .pm-btns { justify-content: center; }
   .pm-lower { grid-template-columns: 1fr; }
 }
+
+/* Pause / resume / early start */
+.pm-top.is-paused .pm-chip { background: #fef3c7; color: #92400e; }
+.pm-top.is-paused .pm-chip i { background: #f59e0b; }
+.pm-ring.paused { opacity: .55; filter: grayscale(.6); }
+.pm-pausedfor { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; font-weight: 800; color: #92400e; font-variant-numeric: tabular-nums; }
+.pm-bigstart { min-height: 52px; padding: 0 26px; font-size: 17px; }
+.pm-top:focus-visible { outline: 3px solid #2c8a64; outline-offset: 2px; }

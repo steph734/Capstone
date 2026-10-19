@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authFetch } from '../../../utils/session'
+import { setPaused } from './usePause'
 
 // Today's game plan for the player, with a clock corrected to the server's and a countdown that ticks every second.
 //   state: 'off' (not enforced) | 'loading' | 'none' | 'before' | 'open' | 'paused' | 'over'
@@ -9,6 +10,8 @@ export default function usePlanState({ enabled, activitySessionId }) {
   const [loaded, setLoaded] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const offset = useRef(0)
+  const anchor = useRef({ remaining: 0, at: 0 }) // server remainingSeconds + the performance.now() it arrived at
+  const gameOpenRef = useRef(false)
   const [tick, setTick] = useState(0)
   const [warned, setWarned] = useState(false)
   const [warnNow, setWarnNow] = useState(false)
@@ -20,7 +23,7 @@ export default function usePlanState({ enabled, activitySessionId }) {
     if (!enabled) return
     try {
       const d = await authFetch('/api/patient/game-plan/today', { query: activitySessionId ? { activitySessionId } : undefined })
-      if (d.plan) offset.current = new Date(d.plan.now).getTime() - Date.now()
+      if (d.plan) { offset.current = new Date(d.plan.now).getTime() - Date.now(); anchor.current = { remaining: d.plan.remainingSeconds, at: performance.now() } }
       setPlan(d.plan); setPlayerName(d.playerName || '')
     } catch {
       setPlan(null)
@@ -30,35 +33,37 @@ export default function usePlanState({ enabled, activitySessionId }) {
   useEffect(() => { setLoaded(false); load() }, [load])
   useEffect(() => {
     if (!enabled) return undefined
-    // Resync with the server every 5 s (paused while the tab is hidden) so Pause, +5 min and End now apply quickly.
-    const t = setInterval(() => { if (!document.hidden) load() }, 5000)
-    return () => clearInterval(t)
+    // Resync often so Pause, Resume, +5 min and End now apply quickly: every 3 s while a game is open, 10 s otherwise.
+    // (Plain polling; a socket would push faster but the serverless host cannot hold one open.)
+    let t
+    const arm = () => { t = setTimeout(async () => { if (!document.hidden) await load(); arm() }, gameOpenRef.current ? 3000 : 10000) }
+    arm()
+    const vis = () => { if (!document.hidden) load() }
+    document.addEventListener('visibilitychange', vis)
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', vis) }
   }, [enabled, load])
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1000)
     return () => clearInterval(t)
   }, [])
 
-  const nowMs = Date.now() + offset.current
   void tick
-  const start = plan ? new Date(plan.playStart).getTime() : 0
-  const end = plan ? new Date(plan.playEnd).getTime() : 0
+  const running = plan && plan.status === 'active' ? Math.max(0, Math.round(anchor.current.remaining - (performance.now() - anchor.current.at) / 1000)) : 0
 
   let state = 'off'
   if (enabled) {
     if (!loaded) state = 'loading'
     else if (!plan || plan.status === 'cancelled') state = 'none'
-    else if (plan.status === 'ended' || nowMs > end) state = 'over'
+    else if (plan.status === 'ended' || (plan.status === 'active' && running <= 0)) state = 'over'
     else if (plan.status === 'paused') state = 'paused'
-    else if (plan.status === 'scheduled' || nowMs < start) state = 'before'
+    else if (plan.status === 'scheduled') state = 'before'
     else state = 'open'
   }
 
-  const remaining = !plan ? 0
-    : state === 'paused' ? plan.remainingSeconds
-      : state === 'open' ? Math.max(0, Math.round((end - nowMs) / 1000))
-        : state === 'before' ? Math.round((end - start) / 1000) : 0
-  const total = plan ? Math.max(1, Math.round((end - start) / 1000)) : 1
+  // The countdown runs on the server's remaining seconds, measured with performance.now(): the device clock cannot change it.
+  const remaining = !plan ? 0 : state === 'paused' ? plan.remainingSeconds : state === 'open' ? running : state === 'before' ? plan.remainingSeconds : 0
+  const total = plan ? Math.max(1, plan.durationSeconds + plan.extendedSeconds) : 1
+  useEffect(() => { setPaused(enabled && state === 'paused'); return () => setPaused(false) }, [enabled, state])
 
   // One "5 minutes left" warning per plan.
   useEffect(() => {
@@ -68,7 +73,8 @@ export default function usePlanState({ enabled, activitySessionId }) {
   useEffect(() => { setWarned(false); setOverDismissed(false) }, [plan?.id])
 
   return {
-    enabled, state, plan, playerName, remaining, total, warnNow, gameOpen, setGameOpen, reload: load,
+    enabled, state, plan, playerName, remaining, total, warnNow, gameOpen, paused: state === 'paused',
+    setGameOpen: (v) => { gameOpenRef.current = v; setGameOpen(v) }, reload: load,
     overDismissed, dismissOver: () => setOverDismissed(true),
     registerBack: (fn) => { backRef.current = fn }, goBack: () => backRef.current?.(),
   }

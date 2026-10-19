@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Gamepad2, Lock, Play, Star } from 'lucide-react'
 import { findGame } from '../gameRegistry'
-import { clock, norm, time12 } from './usePlanState'
+import { clock, norm } from './usePlanState'
 import './plan.css'
 
 const DIFF = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
@@ -20,8 +20,8 @@ function TimerCard({ ps }) {
   const pct = state === 'open' || state === 'paused' ? Math.max(0, Math.min(1, remaining / total)) : state === 'before' ? 1 : 0
   const R = 26
   const C = 2 * Math.PI * R
-  const title = state === 'open' ? `${min} min left` : state === 'paused' ? 'Paused by your therapist' : state === 'before' ? (plan.startManually ? 'Waiting to start' : `Starts at ${time12(plan.playStart)}`) : 'Play time is over'
-  const sub = state === 'open' ? `Play time ends at ${time12(plan.playEnd)}` : state === 'paused' ? `${clock(remaining)} left when it starts again` : state === 'before' ? (plan.startManually ? 'Your therapist will start play time' : `Play time ends at ${time12(plan.playEnd)}`) : 'Great playing today'
+  const title = state === 'open' ? `${min} min left` : state === 'paused' ? 'Paused by your therapist' : state === 'before' ? 'Play time has not started' : 'Play time is over'
+  const sub = state === 'open' ? `${clock(remaining)} left` : state === 'paused' ? `${clock(remaining)} left when it starts again` : state === 'before' ? 'Your therapist will start play time soon' : 'Great playing today'
   return (
     <div className={`pl-timer ${state}`} role="timer" aria-label={`${title}. ${sub}`}>
       <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
@@ -48,9 +48,9 @@ export default function PlanPanel({ ps, cards, onPlay, name }) {
   const open = state === 'open'
 
   const line = state === 'none' ? 'No games today yet. Your therapist will pick them during your session.'
-    : state === 'before' ? `Hi ${first}! Your therapist picked ${total} game${total === 1 ? '' : 's'} for today. They open soon.`
+    : state === 'before' ? `Hi ${first}! Your therapist will start play time soon.`
       : state === 'over' ? `Time's up! Great playing today, ${first}.`
-        : state === 'paused' ? 'Play time is paused. Your therapist will start it again.'
+        : state === 'paused' ? 'Play time is paused. Wait a moment!'
           : `Hi ${first}! Your therapist picked ${total} game${total === 1 ? '' : 's'} for today. Let's play!`
 
   const tapLocked = (why) => { setMsg(why); setTimeout(() => setMsg(''), 2600) }

@@ -30,8 +30,16 @@ const sessionGamePlanSchema = new mongoose.Schema(
     play_end: { type: Date, required: true },
     start_manually: { type: Boolean, default: false },
     started_at: { type: Date, default: null },
+    // Timer model: duration_seconds is the planned play length. Time already played is used_seconds plus the current run.
+    // remaining = duration_seconds + extended_seconds - used_seconds - (run_started_at ? now - run_started_at : 0)
+    duration_seconds: { type: Number, default: null },
+    used_seconds: { type: Number, default: 0, min: 0 },
+    run_started_at: { type: Date, default: null },
     paused_at: { type: Date, default: null },
-    extended_minutes: { type: Number, default: 0, min: 0, max: 30 },
+    pause_count: { type: Number, default: 0, min: 0 },
+    total_paused_seconds: { type: Number, default: 0, min: 0 },
+    started_early: { type: Boolean, default: false },
+    extended_seconds: { type: Number, default: 0, min: 0, max: 1800 },
     warn_before_minutes: { type: Number, default: 5, min: 0, max: 30 },
     allow_finish_current: { type: Boolean, default: true },
     status: { type: String, enum: ['scheduled', 'active', 'paused', 'ended', 'cancelled'], default: 'scheduled' },

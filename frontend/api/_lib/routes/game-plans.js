@@ -9,8 +9,8 @@ import { SessionGamePlan } from '../models/sessionGamePlan.js'
 import { GamePlayEvent, ensureEventIndexes } from '../models/gamePlayEvent.js'
 import { computeLive, soapText } from '../gameLive.js'
 import {
-  activeAssignment, checkGameAccess, employeeFor, manilaDayEnd, manilaDayKey, manilaDayStart,
-  oid, refreshPlan, serializeGame, serializePlan, todaysPlan, validatePlanInput,
+  activeAssignment, checkGameAccess, durationOf, employeeFor, planRemaining, manilaDayEnd, manilaDayKey, manilaDayStart,
+  manilaInstant, oid, refreshPlan, serializeGame, serializePlan, todaysPlan, validatePlanInput,
 } from '../gamePlans.js'
 
 const method = (req, res, ...allowed) => {
@@ -165,7 +165,8 @@ export async function plansCollection(req, res) {
       patient_id: patientId, employee_id: employee._id, branch_id: assignment.branch_id || employee.branch_id || null, assignment_id: assignment._id,
       appointment_id: appointment ? appointment._id : null, plan_date: manilaDayStart(key), games: v.games,
       play_start: v.playStart, play_end: v.playEnd, start_manually: v.startManually,
-      started_at: !v.startManually && v.playStart <= now ? now : null,
+      duration_seconds: Math.round((v.playEnd - v.playStart) / 1000), used_seconds: 0, extended_seconds: 0, pause_count: 0, total_paused_seconds: 0, started_early: false,
+      started_at: !v.startManually && v.playStart <= now ? v.playStart : null, run_started_at: !v.startManually && v.playStart <= now ? v.playStart : null,
       warn_before_minutes: v.warnBeforeMinutes, allow_finish_current: v.allowFinishCurrent,
       status: !v.startManually && v.playStart <= now ? 'active' : 'scheduled',
     })
@@ -206,9 +207,7 @@ export async function plansItem(req, res) {
     // Keep progress for games that stay in the plan.
     const prior = new Map(plan.games.map((g) => [String(g.game_id), g]))
     plan.games = v.games.map((g) => { const p = prior.get(String(g.game_id)); return p ? { ...g, status: p.status, completed_at: p.completed_at } : g })
-    plan.play_start = v.playStart
-    plan.play_end = v.playEnd
-    plan.start_manually = v.startManually
+    if (plan.status === 'scheduled') { plan.play_start = v.playStart; plan.play_end = v.playEnd; plan.duration_seconds = Math.round((v.playEnd - v.playStart) / 1000); plan.start_manually = v.startManually }
     plan.warn_before_minutes = v.warnBeforeMinutes
     plan.allow_finish_current = v.allowFinishCurrent
     await plan.save()
@@ -218,7 +217,9 @@ export async function plansItem(req, res) {
   } catch (err) { return fail(res, err, 'game-plans item') }
 }
 
-// POST /api/game-plans/:id/(start|pause|resume|end)
+// POST /api/game-plans/:id/(start|pause|resume|extend|end|restart|soap-summary)
+// Play time is a stopwatch the therapist controls: start any time today, pause and resume freely. Every response carries the
+// plan, the server `now` and remainingSeconds, and each control is audit-logged.
 export async function plansAction(req, res) {
   if (!method(req, res, 'POST')) return
   try {
@@ -227,44 +228,58 @@ export async function plansAction(req, res) {
     const { db, user, ip } = ctx
     const plan = await ownedPlan(ctx, req.params.id)
     if (!plan) return res.status(404).json({ error: 'Plan not found.' })
+    // Every control needs an active patient_assign (created on demand from a booked session; an ended assignment blocks).
+    if (!(await activeAssignment(db, plan.patient_id, ctx.employee._id))) return res.status(403).json({ error: 'This patient is not assigned to you.' })
     await refreshPlan(plan)
     const action = req.params.action
     const now = new Date()
-    if (action === 'start') {
-      if (plan.status !== 'scheduled') return res.status(409).json({ error: 'Play time was already started.' })
-      const length = plan.play_end - plan.play_start
-      const end = new Date(Math.min(now.getTime() + length, manilaDayEnd(manilaDayKey(plan.plan_date)).getTime() - 1))
-      plan.started_at = now; plan.play_start = now; plan.play_end = end; plan.status = 'active'
-    } else if (action === 'pause') {
-      if (plan.status !== 'active') return res.status(409).json({ error: 'Play time is not running.' })
-      plan.status = 'paused'
-      plan.paused_at = now
-    } else if (action === 'resume') {
-      if (plan.status !== 'paused') return res.status(409).json({ error: 'Play time is not paused.' })
-      plan.play_end = new Date(Math.min(plan.play_end.getTime() + Math.max(0, now - (plan.paused_at || plan.updated_at)), manilaDayEnd(manilaDayKey(plan.plan_date)).getTime() - 1))
-      plan.paused_at = null
-      plan.status = 'active'
-    } else if (action === 'extend') {
-      if (!['active', 'paused', 'scheduled'].includes(plan.status)) return res.status(409).json({ error: 'Play time has already ended.' })
-      const minutes = Math.round(Number(req.body?.minutes))
-      if (!Number.isFinite(minutes) || minutes < 1 || minutes > 30) return res.status(400).json({ error: 'Add between 1 and 30 minutes.' })
-      if ((plan.extended_minutes || 0) + minutes > 30) return res.status(409).json({ error: 'You can add at most 30 minutes in total.' })
-      const dayEnd = manilaDayEnd(manilaDayKey(plan.plan_date)).getTime() - 1
-      plan.play_end = new Date(Math.min(plan.play_end.getTime() + minutes * 60000, dayEnd))
-      plan.extended_minutes = (plan.extended_minutes || 0) + minutes
-    } else if (action === 'soap-summary') {
+    const nowMs = now.getTime()
+    const settle = () => { if (plan.run_started_at) plan.used_seconds = (plan.used_seconds || 0) + Math.max(0, Math.round((nowMs - plan.run_started_at.getTime()) / 1000)); plan.run_started_at = null }
+    const expectedEnd = () => new Date(nowMs + planRemaining(plan, nowMs) * 1000)
+    const conflict = (m) => res.status(409).json({ error: m })
+
+    if (action === 'soap-summary') {
       const live = await liveFor(db, plan)
       return res.status(200).json({ text: soapText(live), live })
+    }
+    if (action === 'start') {
+      if (plan.status !== 'scheduled') return conflict('Play time was already started.')
+      const appt = plan.appointment_id ? await db.collection('appointments').findOne({ _id: plan.appointment_id }, { projection: { end_time: 1 } }) : null
+      const apptEnd = appt ? manilaInstant(manilaDayKey(plan.plan_date), appt.end_time) : null
+      plan.started_early = now < plan.play_start || Boolean(apptEnd && now > apptEnd)
+      plan.duration_seconds = durationOf(plan)
+      plan.started_at = now; plan.run_started_at = now; plan.paused_at = null; plan.status = 'active'
+      plan.play_end = expectedEnd()
+    } else if (action === 'pause') {
+      if (plan.status !== 'active') return conflict('Play time is not running.')
+      settle()
+      plan.paused_at = now; plan.pause_count = (plan.pause_count || 0) + 1; plan.status = 'paused'
+    } else if (action === 'resume') {
+      if (plan.status !== 'paused') return conflict('Play time is not paused.')
+      plan.total_paused_seconds = (plan.total_paused_seconds || 0) + Math.max(0, Math.round((nowMs - (plan.paused_at || now).getTime()) / 1000))
+      plan.paused_at = null; plan.run_started_at = now; plan.status = 'active'
+      plan.play_end = expectedEnd()
+    } else if (action === 'extend') {
+      if (!['active', 'paused', 'scheduled'].includes(plan.status)) return conflict('Play time has already ended.')
+      const minutes = Math.round(Number(req.body?.minutes))
+      if (!Number.isFinite(minutes) || minutes < 1 || minutes > 30) return res.status(400).json({ error: 'Add between 1 and 30 minutes.' })
+      if ((plan.extended_seconds || 0) + minutes * 60 > 1800) return conflict('You can add at most 30 minutes in total.')
+      plan.extended_seconds = (plan.extended_seconds || 0) + minutes * 60
+      if (plan.status === 'active') plan.play_end = expectedEnd()
     } else if (action === 'end') {
-      if (plan.status === 'ended' || plan.status === 'cancelled') return res.status(409).json({ error: 'This plan has already ended.' })
-      if (plan.play_end > now) plan.play_end = now
-      plan.status = 'ended'
+      if (plan.status === 'ended' || plan.status === 'cancelled') return conflict('This plan has already ended.')
+      if (plan.status === 'paused') plan.total_paused_seconds = (plan.total_paused_seconds || 0) + Math.max(0, Math.round((nowMs - (plan.paused_at || now).getTime()) / 1000))
+      settle(); plan.paused_at = null; plan.status = 'ended'; plan.play_end = now
+    } else if (action === 'restart') {
+      if (plan.status !== 'ended') return conflict('Only a finished play time can be restarted.')
+      Object.assign(plan, { status: 'scheduled', used_seconds: 0, extended_seconds: 0, run_started_at: null, paused_at: null, pause_count: 0, total_paused_seconds: 0, started_early: false, started_at: null, start_manually: true })
+      plan.games = plan.games.map((g) => ({ ...(g.toObject ? g.toObject() : g), status: 'pending', completed_at: null }))
     } else {
       return res.status(404).json({ error: 'Unknown action.' })
     }
     await plan.save()
-    await audit(db, { user, role: user.role, action: `game_plan_${action}`, patientId: plan.patient_id, ip, meta: { plan_id: String(plan._id) } })
-    return res.status(200).json({ plan: await serializePlan(db, plan) })
+    await audit(db, { user, role: user.role, action: `game_plan_${action}`, patientId: plan.patient_id, ip, meta: { plan_id: String(plan._id), started_early: plan.started_early || undefined } })
+    return res.status(200).json({ plan: await serializePlan(db, plan), now: new Date().toISOString(), remainingSeconds: planRemaining(plan) })
   } catch (err) { return fail(res, err, 'game-plans action') }
 }
 
@@ -361,6 +376,7 @@ export async function planEvents(req, res) {
     const gameId = oid(b.gameId)
     if (!gameId || !plan.games.some((g) => String(g.game_id) === String(gameId))) return res.status(400).json({ error: 'That game is not in the plan.' })
     await ensureEventIndexes()
+    if (plan.status === 'paused' && b.type === 'heartbeat') return res.status(200).json({ ok: true, ignored: true }) // nothing counts while paused
     if (b.type === 'heartbeat') {
       const recent = await GamePlayEvent.countDocuments({ plan_id: plan._id, type: 'heartbeat', at: { $gte: new Date(Date.now() - 60000) } })
       if (recent >= 6) return res.status(429).json({ error: 'Too many updates.' })

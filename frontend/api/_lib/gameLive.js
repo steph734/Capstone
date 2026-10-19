@@ -1,6 +1,6 @@
 // Live play-time monitor: turns a plan + its game_play_events into what the therapist sees.
 import { GamePlayEvent } from './models/gamePlayEvent.js'
-import { remainingSeconds } from './gamePlans.js'
+import { durationOf, planRemaining } from './gamePlans.js'
 
 const IDLE_MS = 2 * 60 * 1000
 const OFFLINE_MS = 60 * 1000
@@ -38,7 +38,8 @@ export async function computeLive(plan, patient, names, now = new Date()) {
   const events = await GamePlayEvent.find({ plan_id: plan._id }).sort({ at: 1 }).lean()
   const ps = plays(events)
   const nowMs = now.getTime()
-  const seconds = (p) => Math.max(0, Math.round(((p.open ? nowMs : (p.endedAt || p.lastAt).getTime()) - p.startedAt.getTime()) / 1000))
+  const frozen = plan.status === 'paused' && plan.paused_at ? new Date(plan.paused_at).getTime() : nowMs
+  const seconds = (p) => Math.max(0, Math.round(((p.open ? Math.min(nowMs, frozen) : (p.endedAt || p.lastAt).getTime()) - p.startedAt.getTime()) / 1000))
 
   const games = [...plan.games].sort((a, b) => a.order - b.order).map((g) => {
     const id = String(g.game_id)
@@ -53,6 +54,7 @@ export async function computeLive(plan, patient, names, now = new Date()) {
     }
   })
 
+  const paused = plan.status === 'paused'
   const open = [...ps].reverse().find((p) => p.open)
   const nowPlaying = open ? {
     gameId: open.gameId, name: (names.get(open.gameId) || {}).name || 'Game', startedAt: open.startedAt.toISOString(), secondsInGame: seconds(open),
@@ -61,14 +63,14 @@ export async function computeLive(plan, patient, names, now = new Date()) {
 
   const first = String(patient?.nickname || patient?.first_name || 'The patient')
   const alerts = []
-  if (open) {
+  if (open && !paused) { // no idle / offline alerts while play time is paused
     const lastInput = (open.lastInputAt || open.startedAt).getTime()
     if (nowMs - lastInput > IDLE_MS) alerts.push({ type: 'idle', key: `idle:${open.startedAt.getTime()}`, message: 'No taps for 2 minutes', at: new Date(lastInput + IDLE_MS).toISOString() })
     if (nowMs - open.lastAt.getTime() > OFFLINE_MS) alerts.push({ type: 'offline', key: `offline:${open.startedAt.getTime()}`, message: `${first}'s device is offline`, at: new Date(open.lastAt.getTime() + OFFLINE_MS).toISOString() })
   }
   for (const p of ps) for (const [r, n] of p.retries) if (n >= 3) alerts.push({ type: 'stuck', key: `stuck:${p.gameId}:${p.startedAt.getTime()}:${r}`, message: `Round ${r} tried ${n} times`, detail: `${(names.get(p.gameId) || {}).name || 'Game'} · consider a hint or an easier game.`, at: p.lastRetryAt.get(r).toISOString() })
-  const remaining = remainingSeconds(plan)
-  const ended = plan.status === 'ended' || (plan.status === 'active' && nowMs > plan.play_end.getTime())
+  const remaining = planRemaining(plan)
+  const ended = plan.status === 'ended'
   if (plan.status === 'active' && !ended && remaining > 0 && remaining * 1000 <= WARN_MS) alerts.push({ type: 'ending', key: 'ending', message: '5 minutes left', at: new Date(plan.play_end.getTime() - WARN_MS).toISOString() })
   if (ended) alerts.push({ type: 'timeup', key: 'timeup', message: "Time's up", at: plan.play_end.toISOString() })
   alerts.sort((a, b) => (a.at < b.at ? 1 : -1))
@@ -83,9 +85,11 @@ export async function computeLive(plan, patient, names, now = new Date()) {
   return {
     planId: String(plan._id), patientId: String(plan.patient_id), status: ended ? 'ended' : plan.status,
     playStart: plan.play_start.toISOString(), playEnd: plan.play_end.toISOString(), pausedAt: pausedAt ? new Date(pausedAt).toISOString() : null,
-    now: now.toISOString(), remainingSeconds: ended ? 0 : remaining, totalSeconds: Math.round((plan.play_end - plan.play_start) / 1000),
+    now: now.toISOString(), remainingSeconds: ended ? 0 : remaining, totalSeconds: durationOf(plan) + (plan.extended_seconds || 0), durationSeconds: durationOf(plan), extendedSeconds: plan.extended_seconds || 0, usedSeconds: plan.used_seconds || 0,
+    pauseCount: plan.pause_count || 0, totalPausedSeconds: (plan.total_paused_seconds || 0) + (paused && plan.paused_at ? Math.round((nowMs - new Date(plan.paused_at).getTime()) / 1000) : 0), startedEarly: Boolean(plan.started_early),
+    startedAt: plan.started_at ? plan.started_at.toISOString() : null,
     warnAt: plan.warn_before_minutes ? new Date(plan.play_end.getTime() - plan.warn_before_minutes * 60000).toISOString() : null,
-    allowFinishCurrent: plan.allow_finish_current, startManually: plan.start_manually, extendedMinutes: plan.extended_minutes || 0,
+    allowFinishCurrent: plan.allow_finish_current, startManually: plan.start_manually, warnBeforeMinutes: plan.warn_before_minutes,
     nowPlaying, games, summary, alerts,
   }
 }
@@ -95,6 +99,6 @@ export function soapText(live) {
     const detail = [g.score != null ? `${g.score}` : null, g.accuracy != null ? `${g.accuracy}%` : null, `${g.hints || 0} hint${g.hints === 1 ? '' : 's'}`].filter(Boolean).join(', ')
     return `${g.name} (${detail})`
   })
-  const planned = Math.round((new Date(live.playEnd) - new Date(live.playStart)) / 60000)
+  const planned = Math.round(live.totalSeconds / 60)
   return `Games: ${parts.length ? parts.join('; ') : 'none played yet'}. Played ${live.summary.minutesPlayed} min of ${planned}.`
 }

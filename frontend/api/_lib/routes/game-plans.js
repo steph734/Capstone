@@ -54,7 +54,7 @@ export async function therapistToday(req, res) {
     const key = manilaDayKey()
     const dayStartUtc = new Date(`${key}T00:00:00Z`)
     const appts = await db.collection('appointments').aggregate([
-      { $match: { employee_id: employee._id, session_date: { $gte: dayStartUtc, $lt: new Date(dayStartUtc.getTime() + 86400000) }, is_archived: { $ne: true }, status: { $nin: ['Cancelled', 'Declined', 'Archived', 'No-show'] } } },
+      { $match: { employee_id: employee._id, $or: [{ session_date: { $gte: dayStartUtc, $lt: new Date(dayStartUtc.getTime() + 86400000) } }, { session_date: { $gte: manilaDayStart(key), $lt: manilaDayEnd(key) } }], is_archived: { $ne: true }, status: { $nin: ['Cancelled', 'Declined', 'Archived', 'No-show'] } } },
       { $lookup: { from: 'patients', localField: 'patient_id', foreignField: '_id', as: 'patient' } },
       { $unwind: '$patient' },
       { $lookup: { from: 'patient_assign', let: { p: '$patient_id' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$patient_id', '$$p'] }, { $eq: ['$employee_id', employee._id] }, { $eq: ['$status', 'active'] }] } } }, { $limit: 1 }], as: 'assign' } },

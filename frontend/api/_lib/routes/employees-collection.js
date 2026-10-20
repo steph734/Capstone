@@ -178,7 +178,8 @@ async function handleCreate(req, res) {
   try {
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'staff_documents' })
     const documents = {}
-    for (const key of DOC_KEYS) {
+    // The four documents upload in parallel (one after another was slow enough to hit the serverless time limit).
+    await Promise.all(DOC_KEYS.map(async (key) => {
       const file = files[key][0]
       const fileId = new mongoose.Types.ObjectId()
       await new Promise((resolve, reject) => {
@@ -188,7 +189,7 @@ async function handleCreate(req, res) {
         uploadStream.end(file.buffer)
       })
       documents[key] = fileId.toString()
-    }
+    }))
     employee.documents = documents
 
     const photoFile = files.photo?.[0]
@@ -219,7 +220,11 @@ async function handleCreate(req, res) {
   user.is_verified = true
 
   try {
-    await sendApplicationReceivedEmail({ email, name: fullName })
+    // The confirmation email must never keep the owner waiting: give it 6 seconds, then carry on.
+    await Promise.race([
+      sendApplicationReceivedEmail({ email, name: fullName }),
+      new Promise((resolve) => setTimeout(resolve, 6000)),
+    ])
   } catch (err) {
     console.error('send application received email error:', err)
   }

@@ -110,19 +110,23 @@ function useContainerWidth(fallback) {
   return [ref, width]
 }
 
-function ProgressChart({ points, trend }) {
+// Line chart used for accuracy (0-100%) and, with `unit=""`, for counts such as hints per game.
+function ProgressChart({ points, color = '#7C5CE0', height = 200, unit = '%', valueLabel = 'Accuracy' }) {
   const [hover, setHover] = useState(null)
   const [asTable, setAsTable] = useState(false)
   const [boxRef, boxWidth] = useContainerWidth(760)
-  const w = Math.min(760, boxWidth), h = 200, padL = 36, padR = 10, padT = 10, padB = 26
+  const w = Math.min(760, boxWidth), h = height, padL = 36, padR = 10, padT = 10, padB = 26
   const innerW = w - padL - padR, innerH = h - padT - padB
+  const top = unit === '%' ? 100 : Math.max(4, Math.ceil(Math.max(1, ...points.map((p) => p.value)) / 4) * 4)
+  const xText = (p) => p.label ?? fmtDate(p.date)
+  const fmtTick = (v) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`
 
   if (points.length === 0) {
     return <p className="py-10 text-center text-[13px]" style={{ color: MUTED }}>Not enough data yet.</p>
   }
 
   const stepX = points.length > 1 ? innerW / (points.length - 1) : 0
-  const yFor = (v) => padT + innerH - (Math.min(100, Math.max(0, v)) / 100) * innerH
+  const yFor = (v) => padT + innerH - (Math.min(top, Math.max(0, v)) / top) * innerH
   const xy = points.map((p, i) => [padL + i * stepX, yFor(p.value)])
   const smoothed = xy.map((_, i) => {
     const win = xy.slice(Math.max(0, i - 1), i + 2)
@@ -141,8 +145,8 @@ function ProgressChart({ points, trend }) {
         <button type="button" onClick={() => setAsTable(false)} className="mb-2 text-[12.5px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>← Back to chart</button>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
-            <thead><tr style={{ color: MUTED, textAlign: 'left' }}><th className="pb-1 pr-4">Date</th><th className="pb-1">Accuracy</th></tr></thead>
-            <tbody>{points.map((p, i) => <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}><td className="py-1 pr-4" style={{ color: GREEN_900 }}>{fmtDate(p.date)}</td><td className="py-1" style={{ color: GREEN_900 }}>{p.value}%</td></tr>)}</tbody>
+            <thead><tr style={{ color: MUTED, textAlign: 'left' }}><th className="pb-1 pr-4">Date</th><th className="pb-1">{valueLabel}</th></tr></thead>
+            <tbody>{points.map((p, i) => <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}><td className="py-1 pr-4" style={{ color: GREEN_900 }}>{xText(p)}</td><td className="py-1" style={{ color: GREEN_900 }}>{p.value}{unit}</td></tr>)}</tbody>
           </table>
         </div>
       </div>
@@ -153,52 +157,38 @@ function ProgressChart({ points, trend }) {
     <div ref={boxRef}>
       <div className="relative" style={{ height: h }}>
         <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" role="img"
-          aria-label={`Accuracy per session: ${points.map((p) => `${p.date} ${p.value}%`).join(', ')}`}>
-          {[0, 25, 50, 75, 100].map((t) => {
+          aria-label={`${valueLabel}: ${points.map((p) => `${xText(p)} ${p.value}${unit}`).join(', ')}`}>
+          {[0, 0.25, 0.5, 0.75, 1].map((r) => {
+            const t = top * r
             const y = yFor(t)
             return (
-              <g key={t}>
+              <g key={r}>
                 <line x1={padL} x2={w - padR} y1={y} y2={y} stroke="#EEF2F0" strokeWidth="1" />
-                <text x={padL - 8} y={y + 3} fontSize="10" textAnchor="end" fill={MUTED}>{t}%</text>
+                <text x={padL - 8} y={y + 3} fontSize="10" textAnchor="end" fill={MUTED}>{fmtTick(t)}</text>
               </g>
             )
           })}
-          <path d={area} fill="#7C5CE0" opacity="0.12" />
+          <path d={area} fill={color} opacity="0.12" />
           <path d={dashLine} fill="none" stroke="#1FA58A" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.8" />
-          <path d={line} fill="none" stroke="#7C5CE0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           {xy.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={hover === i ? 6 : 4} fill="#7C5CE0" stroke="#fff" strokeWidth="1.5"
+            <circle key={i} cx={x} cy={y} r={hover === i ? 6 : 4} fill={color} stroke="#fff" strokeWidth="1.5"
               onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
               tabIndex={0} style={{ cursor: 'pointer', outline: 'none' }} />
           ))}
           {points.map((p, i) => (i % labelEvery === 0 || i === points.length - 1) && (
-            <text key={i} x={xy[i][0]} y={h - 6} fontSize="10" textAnchor="middle" fill={MUTED}>{fmtDate(p.date)}</text>
+            <text key={i} x={xy[i][0]} y={h - 6} fontSize="10" textAnchor="middle" fill={MUTED}>{xText(p)}</text>
           ))}
         </svg>
         {hover !== null && (
           <div className="pointer-events-none absolute rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-white shadow"
             style={{ background: GREEN_900, left: `${(xy[hover][0] / w) * 100}%`, top: `${(xy[hover][1] / h) * 100}%`, transform: 'translate(-50%,-130%)', whiteSpace: 'nowrap' }}>
-            {fmtDate(points[hover].date)} · {points[hover].value}%
+            {xText(points[hover])} · {points[hover].value}{unit}
           </div>
         )}
       </div>
       <button type="button" onClick={() => setAsTable(true)} className="mt-1 text-[12px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>View as table</button>
     </div>
-  )
-}
-
-function SmallLine({ points, color = '#1FA58A', valueKey = 'value', height = 110 }) {
-  const w = 260, h = height, pad = 10
-  if (points.length === 0) return <p className="py-6 text-center text-[12.5px]" style={{ color: MUTED }}>Not enough data yet</p>
-  const max = Math.max(1, ...points.map((p) => p[valueKey]))
-  const stepX = points.length > 1 ? (w - pad * 2) / (points.length - 1) : 0
-  const xy = points.map((p, i) => [pad + i * stepX, h - pad - (p[valueKey] / max) * (h - pad * 2)])
-  const line = xy.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label={`Trend: ${points.map((p) => `${p.date || p.label} ${p[valueKey]}`).join(', ')}`}>
-      <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {xy.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="3" fill={color} />)}
-    </svg>
   )
 }
 
@@ -381,7 +371,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                       color: data.trend === 'improving' ? '#16a34a' : MUTED,
                     }}>{TREND_LABEL[data.trend]}</span>
                   </div>
-                  <ProgressChart points={data.series} trend={data.trend} />
+                  <ProgressChart points={data.series} />
                 </div>
 
                 {/* Character stats | Session analytics | Time by therapy type */}
@@ -430,7 +420,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                     ) : (
                       <div>
                         <p className="mb-1 text-[12px] font-bold" style={{ color: MUTED }}>Accuracy over time (%)</p>
-                        <SmallLine points={data.analytics[tab.toLowerCase()]?.accuracy || []} color={TYPE_COLOR[tab] || '#1FA58A'} height={140} />
+                        <ProgressChart points={data.analytics[tab.toLowerCase()]?.accuracy || []} color={TYPE_COLOR[tab] || '#7C5CE0'} height={190} />
                       </div>
                     )}
                     <p className="mb-1 mt-3 text-[12px] font-bold" style={{ color: MUTED }}>Last 3 sessions</p>
@@ -527,7 +517,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                   <div style={CARD}>
                     <CardTitle>Independence</CardTitle>
                     <p className="mb-2 -mt-2" style={{ fontSize: 12.5, fontWeight: 400, color: MUTED }}>Hints used per game — fewer means {data.profile.name.split(' ')[0]} needs less help</p>
-                    <SmallLine points={data.hintsWeekly} color="#EC4899" valueKey="value" />
+                    <ProgressChart points={data.hintsWeekly} color="#EC4899" height={190} unit="" valueLabel="Hints per game" />
                   </div>
                   <div className="flex flex-col justify-between" style={{ ...CARD, background: 'linear-gradient(135deg,#E3F0FD,#E3F6EA)' }}>
                     <div className="flex items-start gap-3">

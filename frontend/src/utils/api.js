@@ -59,14 +59,18 @@ export async function apiDelete(path, body) {
 // Like apiPost, but for multipart/form-data bodies (file uploads) — the
 // browser sets the multipart boundary itself, so no Content-Type header here.
 export async function apiPostForm(path, formData) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: formData,
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
-  return data
+  // Uploads can be slow; give up after 60 s with a clear message instead of an endless "Saving…".
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 60000)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: authHeaders(), body: formData, signal: ctl.signal })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || (res.status === 504 || res.status === 502 ? 'The server took too long. Please try again.' : `POST ${path} failed: ${res.status}`))
+    return data
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('This is taking too long. Check your connection and try again.')
+    throw e
+  } finally { clearTimeout(timer) }
 }
 
 // Quick connectivity check — hits GET /api/health on the backend.

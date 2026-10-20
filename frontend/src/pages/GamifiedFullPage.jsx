@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
-import PaoBuddy from '../components/pao/PaoBuddy'
+import PaoPoseImage from '../components/pao/PaoPoseImage'
 import { getWardrobe } from '../utils/paoApi'
 import { resolveItemKey } from '../components/pao/paoLayers'
 import { takeHandoffPose } from '../components/pao/usePaoReaction'
@@ -78,6 +78,14 @@ function introMoodFor(stageIdx, talking, explainPhase) {
   const isLast = stageIdx === INTRO_STAGES.length - 1
   if (isLast) return 'explain-letsgo-b'
   return plan.secondIsExplain ? `${plan.second}-b` : plan.second
+}
+
+// New-design Pao pose for the intro: greets first, points while explaining, celebrates at the end.
+function introPoseFor(stageIdx, talking, explainPhase) {
+  const isLast = stageIdx === INTRO_STAGES.length - 1
+  if (talking) return explainPhase === 0 ? 'listen' : 'point-talk'
+  if (isLast) return 'celebrate'
+  return stageIdx === 0 ? 'hello' : 'point'
 }
 
 // ─── Game list ────────────────────────────────────────────────────────────────
@@ -666,11 +674,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     }
   }
 
-  // ── Intro is skipped — once a language is chosen, go straight to the games ───
+  // ── Intro enter — waits for a language to be chosen first ────────────────────
   useEffect(() => {
     if (!gateOpen || introStartedRef.current) return
     introStartedRef.current = true
-    goToGames()
+    setShowUI(true)
+    speakStage(0)
   }, [gateOpen]) // eslint-disable-line
 
   // ── Pao click → gentle reaction + friendly line ──────────────────────────────
@@ -963,12 +972,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
           {/* Pao mascot */}
           <div className="pao-mascot-intro" style={{ flexShrink:0 }}>
-            <PaoBuddy
-              mood={introMoodFor(introStage, talking, explainPhase)}
-              size={250}
-              lang={lang}
-              onTap={handlePandaClick}
-            />
+            <PaoPoseImage pose={introPoseFor(introStage, talking, explainPhase)} size={250} onTap={handlePandaClick}/>
           </div>
 
           {/* Speech bubble */}
@@ -1018,7 +1022,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoBuddy mood={talking ? 'talk' : 'idle'} size={150} lang={lang} outfit={headerOutfit} layeredPose={headerPose} onTap={handlePandaClick}/>
+              <PaoPoseImage pose={talking ? 'listen' : 'hello'} size={150} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

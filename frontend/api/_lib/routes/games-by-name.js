@@ -28,6 +28,7 @@ export default async function handler(req, res) {
         description: g.description || '',
         gameType: g.game_type || null,
         therapyType: g.therapy_type || null,
+        difficulty: g.difficulty || null,
         pointsPerPlay: Number(g.points_per_play) || 100,
         statGains: g.stat_gains || {},
         badge: badge ? { code: badge.code, name: badge.name, emoji: badge.emoji || null } : null,

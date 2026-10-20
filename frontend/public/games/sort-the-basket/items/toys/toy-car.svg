@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><ellipse cx="100" cy="186" rx="60" ry="9" fill="rgba(0,0,0,.12)"/><path d="M28 132v-26l22-6 22-34h56l26 34 20 6v26z" fill="#F57C2B" stroke="#B5501A" stroke-width="5" stroke-linejoin="round"/><path d="M80 74h20v26H64zM110 74h16l18 26h-34z" fill="#CDEBFA"/><circle cx="64" cy="138" r="18" fill="#2A2433"/><circle cx="140" cy="138" r="18" fill="#2A2433"/><circle cx="64" cy="138" r="7" fill="#BBBBBB"/><circle cx="140" cy="138" r="7" fill="#BBBBBB"/></svg>

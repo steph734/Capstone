@@ -1398,6 +1398,24 @@ function EditStaffModal({ staffMember, onClose, onSave }) {
 // StaffSetup.jsx), not by the owner — this list is only used here to render
 // a staff member's already-uploaded documents in the read-only ViewModal tab.
 const WIZARD_STEPS = ['Personal Information', 'Professional Information', 'Upload Documents', 'Review & Add']
+// The host rejects (or stalls on) uploads over ~4.5 MB in total, so photos are shrunk in the browser before sending.
+const MAX_UPLOAD_BYTES = 4.2 * 1024 * 1024
+async function shrinkImage(file, maxSide = 1600, quality = 0.8) {
+  if (!file || !/^image\/(jpe?g|png)$/.test(file.type) || file.size < 300 * 1024) return file
+  try {
+    const bmp = await createImageBitmap(file)
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale)
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob || blob.size >= file.size) return file
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch { return file }
+}
+
 const DOC_FIELDS = [
   { key: 'ptr', icon: <DocLicenseIcon />, tint: '#e6f5f2', color: '#159a72', label: 'Professional License (PTR)' },
   { key: 'prc', icon: <DocMedalIcon />, tint: '#fdf2f8', color: '#db2777', label: 'PRC License' },
@@ -1675,8 +1693,15 @@ function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
         status: form.status,
       }
       Object.entries(fields).forEach(([key, val]) => formData.append(key, val ?? ''))
-      DOC_FIELDS.forEach((d) => formData.append(d.key, files[d.key]))
-      if (photo) formData.append('photo', photo)
+      const docs = await Promise.all(DOC_FIELDS.map((d) => shrinkImage(files[d.key])))
+      const profile = photo ? await shrinkImage(photo, 800) : null
+      const total = [...docs, profile].reduce((n, x) => n + (x ? x.size : 0), 0)
+      if (total > MAX_UPLOAD_BYTES) {
+        const mb = (total / 1048576).toFixed(1)
+        throw new Error(`The files add up to ${mb} MB, but only about 4 MB can be uploaded at once. Use smaller PDFs or photos and try again.`)
+      }
+      DOC_FIELDS.forEach((d, i) => formData.append(d.key, docs[i]))
+      if (profile) formData.append('photo', profile)
 
       const data = await apiPostForm('/api/employees', formData)
 

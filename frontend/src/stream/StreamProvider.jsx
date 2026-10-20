@@ -51,6 +51,8 @@ export default function StreamProvider({ user, children }) {
     }
 
     let cancelled = false
+    let chat = null
+    let video = null
     setError('')
 
     fetchStreamSession(email)
@@ -59,15 +61,18 @@ export default function StreamProvider({ user, children }) {
         const apiKey = data.apiKey || apiKeyFallback
         if (!apiKey) throw new Error('Messaging isn’t configured yet (missing Stream API key).')
 
-        const chat = StreamChat.getInstance(apiKey)
-        await chat.connectUser({ id: data.userId, name: data.name, image: data.image || undefined }, data.token)
-        if (cancelled) { chat.disconnectUser().catch(() => {}); return }
+        const userInfo = { id: data.userId, name: data.name, image: data.image || undefined }
 
-        const video = new StreamVideoClient({
-          apiKey,
-          user: { id: data.userId, name: data.name, image: data.image || undefined },
-          token: data.token,
-        })
+        // The chat client is a per-key singleton: if it's still connected (or
+        // mid-teardown) from a previous run, wait for it to fully disconnect
+        // before reconnecting, otherwise its socket is reused while CLOSING.
+        chat = StreamChat.getInstance(apiKey)
+        if (chat.userID) await chat.disconnectUser().catch(() => {})
+        if (cancelled) return
+        await chat.connectUser(userInfo, data.token)
+        if (cancelled) return
+
+        video = new StreamVideoClient({ apiKey, user: userInfo, token: data.token })
 
         clientsRef.current = { chat, video }
         setChatClient(chat)
@@ -78,16 +83,19 @@ export default function StreamProvider({ user, children }) {
         if (!cancelled) setError(err.message || 'Could not connect to messaging.')
       })
 
+    // Always tear down what *this* run created, so a re-run/remount never
+    // leaves an orphaned client reconnecting in the background.
     return () => {
       cancelled = true
+      const c = chat
+      const v = video
+      chat = null
+      video = null
+      if (clientsRef.current.chat === c) clientsRef.current = { chat: null, video: null }
+      c?.disconnectUser().catch(() => {})
+      v?.disconnectUser().catch(() => {})
     }
   }, [email])
-
-  // Disconnect on unmount (e.g. logout navigating away entirely).
-  useEffect(() => () => {
-    clientsRef.current.chat?.disconnectUser().catch(() => {})
-    clientsRef.current.video?.disconnectUser().catch(() => {})
-  }, [])
 
   // Mirror every new message into `conversations` (last_message_preview/by/at)
   // — best-effort, fire-and-forget, never blocks the chat UI.

@@ -666,12 +666,11 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     }
   }
 
-  // ── Intro enter — waits for a language to be chosen first ────────────────────
+  // ── Intro is skipped — once a language is chosen, go straight to the games ───
   useEffect(() => {
     if (!gateOpen || introStartedRef.current) return
     introStartedRef.current = true
-    setShowUI(true)
-    speakStage(0)
+    goToGames()
   }, [gateOpen]) // eslint-disable-line
 
   // ── Pao click → gentle reaction + friendly line ──────────────────────────────

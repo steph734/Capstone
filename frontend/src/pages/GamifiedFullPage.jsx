@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
-import PaoPoseImage from '../components/pao/PaoPoseImage'
+import PaoSprite from '../components/pao/PaoSprite'
 import { getWardrobe } from '../utils/paoApi'
 import { resolveItemKey } from '../components/pao/paoLayers'
 import { takeHandoffPose } from '../components/pao/usePaoReaction'
@@ -80,16 +80,17 @@ function introMoodFor(stageIdx, talking, explainPhase) {
   return plan.secondIsExplain ? `${plan.second}-b` : plan.second
 }
 
-// New-design Pao poses for each intro step: [while explaining (1st half), while explaining (2nd half), resting].
+// Pao_v3 pose per intro step: [while speaking, after speaking].
 const INTRO_PAO_POSES = [
-  ['wave-happy', 'idle-happy', 'wave-happy'],   // Meet Pao!
-  ['listen',     'point-talk', 'point'],        // How to Play
-  ['proud',      'surprised',  'proud'],        // Level Up & Stats
-  ['surprised',  'celebrate',  'celebrate'],    // Badges & Customize
+  ['pao-wave-happy', 'pao-idle-happy'], // Meet Pao!
+  ['pao-point-talk', 'pao-point'],      // How to Play
+  ['pao-proud',      'pao-idle-happy'], // Level Up & Stats
+  ['pao-surprised',  'pao-celebrate'],  // Badges & Customize
 ]
-function introPoseFor(stageIdx, talking, explainPhase) {
+function introPoseFor(stageIdx, talking, leaving) {
+  if (leaving) return 'pao-ready'
   const plan = INTRO_PAO_POSES[stageIdx] || INTRO_PAO_POSES[0]
-  return talking ? plan[explainPhase === 0 ? 0 : 1] : plan[2]
+  return plan[talking ? 0 : 1]
 }
 
 // ─── Game list ────────────────────────────────────────────────────────────────
@@ -510,6 +511,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }, [phase])
   const [introStage,   setIntroStage]   = useState(0)
   const [showUI,       setShowUI]       = useState(false)
+  const [leavingIntro, setLeavingIntro] = useState(false) // Pao cheers (pao-ready) for 600 ms before leaving
   const [talking,      setTalking]      = useState(false)
   const [displayText,  setDisplayText]  = useState('')
   const [explainPhase, setExplainPhase] = useState(0) // 0 = first explaining pose, 1 = second
@@ -659,11 +661,13 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   // ── Skip / Next buttons ───────────────────────────────────────────────────────
-  const handleSkip = () => {
+  const leaveIntro = () => {
     stopPaoVoice()
     setTalking(false)
-    goToCustomize()
+    setLeavingIntro(true)
+    setTimeout(goToCustomize, 600)
   }
+  const handleSkip = () => { if (!leavingIntro) leaveIntro() }
 
   const handleNextStage = () => {
     stopPaoVoice()
@@ -673,8 +677,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
       stageRef.current = next
       setIntroStage(next)
       speakStage(next)
-    } else {
-      goToCustomize()
+    } else if (!leavingIntro) {
+      leaveIntro()
     }
   }
 
@@ -976,7 +980,9 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
           {/* Pao mascot */}
           <div className="pao-mascot-intro" style={{ flexShrink:0 }}>
-            <PaoPoseImage pose={introPoseFor(introStage, talking, explainPhase)} size={250} onTap={handlePandaClick}/>
+            <button type="button" onClick={handlePandaClick} aria-label="Tap Pao" style={{ background:'none', border:'none', padding:0, cursor:'pointer' }}>
+              <PaoSprite pose={introPoseFor(introStage, talking, leavingIntro)} size={220}/>
+            </button>
           </div>
 
           {/* Speech bubble */}
@@ -1026,7 +1032,9 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoPoseImage pose={talking ? 'point-talk' : 'idle-happy'} size={150} onTap={handlePandaClick}/>
+              <button type="button" onClick={handlePandaClick} aria-label="Tap Pao" style={{ background:'none', border:'none', padding:0, cursor:'pointer' }}>
+                <PaoSprite pose={talking ? 'pao-point-talk' : 'pao-idle-happy'} size={120}/>
+              </button>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

@@ -5,6 +5,7 @@ import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { SORT_BASKET_LINES, pickLine, pickRandomLine } from '../../utils/paoLines'
 import { fetchGameBadge } from '../../utils/gameProgress'
+import { PAO_BASE } from '../../components/pao/PaoSprite'
 import { useGameSession } from '../../hooks/useGameSession'
 
 // Sort the Basket: zones, levels and items all come from the `games` document
@@ -12,7 +13,7 @@ import { useGameSession } from '../../hooks/useGameSession'
 // slip or on request, level 3 has no hints (the level's `prompt_level`).
 const GAME_NAME = 'Sort the Basket'
 const ASSETS = '/games/sort-the-basket'
-const PAO = (pose) => `/games/pao/pao-${pose}.svg`
+const PAO = (pose) => `${PAO_BASE}/pao-${pose}.svg`
 const BASKET = (zoneKey) => `${ASSETS}/baskets/basket-${zoneKey}.svg`
 
 // What each basket holds, spoken by "Read baskets" and shown as the legend.
@@ -261,7 +262,7 @@ function SortTheBasketPlay({ game, onExit, patientId = 'alvrin', exerciseId = 's
       timerRef.current = setTimeout(advance, 2000)
     } else {
       wrongTotalRef.current += 1
-      say(pickRandomLine(SORT_BASKET_LINES.wrongTry, lang), 'try-again')
+      say(pickRandomLine(SORT_BASKET_LINES.wrongTry, lang), nextAttempts >= 2 ? 'encourage' : 'try-again')
       timerRef.current = setTimeout(() => {
         setFlash(null); setLocked(false)
         // Level 2 (and any wrong-twice slip on level 1) shows the answer; level 3 never does.

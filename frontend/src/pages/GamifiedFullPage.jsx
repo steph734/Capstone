@@ -85,7 +85,7 @@ function introPoseFor(stageIdx, talking, explainPhase) {
   const isLast = stageIdx === INTRO_STAGES.length - 1
   if (talking) return explainPhase === 0 ? 'listen' : 'point-talk'
   if (isLast) return 'celebrate'
-  return stageIdx === 0 ? 'hello' : 'point'
+  return stageIdx === 0 ? 'wave-happy' : 'point'
 }
 
 // ─── Game list ────────────────────────────────────────────────────────────────
@@ -1022,7 +1022,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoPoseImage pose={talking ? 'listen' : 'hello'} size={150} onTap={handlePandaClick}/>
+              <PaoPoseImage pose={talking ? 'listen' : 'wave-happy'} size={150} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

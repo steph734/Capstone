@@ -1,8 +1,8 @@
 import { preloadRewardPoses } from '../rewards/paoRewardPoses'
 
-// The 6 loading poses live in public/games/loading/ and are loaded by URL (never imported).
+// The 6 loading poses live in public/games/pao/ and are loaded by URL (never imported).
 const base = import.meta.env.BASE_URL || '/'
-const pose = (name) => `${base}games/loading/pao-${name}.svg`
+const pose = (name) => `${base}games/pao/pao-${name}.svg`
 
 export const loadingPoses = {
   hello: pose('hello'),

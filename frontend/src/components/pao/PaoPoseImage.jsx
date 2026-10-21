@@ -1,10 +1,10 @@
-// Pao in the new flat-vector design (public/games/sort-the-basket/pao/pao-<pose>.svg).
+// Pao in the new flat-vector design (public/games/pao/pao-<pose>.svg).
 // Poses: hello, listen, point, point-talk, thinking, idea, reading, correct,
 // proud, try-again, surprised, celebrate, sleepy, idle.
 export default function PaoPoseImage({ pose = 'idle', size = 220, onTap, className = '' }) {
   const img = (
     <img
-      src={`/games/sort-the-basket/pao/pao-${pose}.svg`}
+      src={`/games/pao/pao-${pose}.svg`}
       alt="Pao the panda"
       width={size}
       height={size}

@@ -12,7 +12,7 @@ import { useGameSession } from '../../hooks/useGameSession'
 // slip or on request, level 3 has no hints (the level's `prompt_level`).
 const GAME_NAME = 'Sort the Basket'
 const ASSETS = '/games/sort-the-basket'
-const PAO = (pose) => `${ASSETS}/pao/pao-${pose}.svg`
+const PAO = (pose) => `/games/pao/pao-${pose}.svg`
 const BASKET = (zoneKey) => `${ASSETS}/baskets/basket-${zoneKey}.svg`
 
 // What each basket holds, spoken by "Read baskets" and shown as the legend.
@@ -147,7 +147,7 @@ function SortTheBasketPlay({ game, onExit, patientId = 'alvrin', exerciseId = 's
   const [glowZone, setGlowZone] = useState(null)
   const [locked,   setLocked]   = useState(false)
   const [flash,    setFlash]    = useState(null) // { zone, type: 'correct' | 'wrong' }
-  const [pose,     setPose]     = useState('hello')
+  const [pose,     setPose]     = useState('wave-happy')
   const [line,     setLine]     = useState('')
   const [readAloud, setReadAloud] = useState(game.support?.read_aloud !== false)
   const [paused,   setPaused]   = useState(false)

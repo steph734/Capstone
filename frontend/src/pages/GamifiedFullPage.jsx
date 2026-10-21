@@ -80,12 +80,16 @@ function introMoodFor(stageIdx, talking, explainPhase) {
   return plan.secondIsExplain ? `${plan.second}-b` : plan.second
 }
 
-// New-design Pao pose for the intro: greets first, points while explaining, celebrates at the end.
+// New-design Pao poses for each intro step: [while explaining (1st half), while explaining (2nd half), resting].
+const INTRO_PAO_POSES = [
+  ['wave-happy', 'idle-happy', 'wave-happy'],   // Meet Pao!
+  ['listen',     'point-talk', 'point'],        // How to Play
+  ['proud',      'surprised',  'proud'],        // Level Up & Stats
+  ['surprised',  'celebrate',  'celebrate'],    // Badges & Customize
+]
 function introPoseFor(stageIdx, talking, explainPhase) {
-  const isLast = stageIdx === INTRO_STAGES.length - 1
-  if (talking) return explainPhase === 0 ? 'listen' : 'point-talk'
-  if (isLast) return 'celebrate'
-  return stageIdx === 0 ? 'wave-happy' : 'point'
+  const plan = INTRO_PAO_POSES[stageIdx] || INTRO_PAO_POSES[0]
+  return talking ? plan[explainPhase === 0 ? 0 : 1] : plan[2]
 }
 
 // ─── Game list ────────────────────────────────────────────────────────────────
@@ -1022,7 +1026,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
           {/* Pao + speech bubble row */}
           <div className="gf-hero" style={{ display:'flex', alignItems:'flex-end', gap:16, padding:'14px 24px 0', flexShrink:0 }}>
             <div className="gf-mascot" style={{ flexShrink:0 }}>
-              <PaoPoseImage pose={talking ? 'listen' : 'wave-happy'} size={150} onTap={handlePandaClick}/>
+              <PaoPoseImage pose={talking ? 'point-talk' : 'idle-happy'} size={150} onTap={handlePandaClick}/>
             </div>
             <div className="gf-hero-text" style={{ flex:1, alignSelf:'center', display:'flex', flexDirection:'column', gap:6 }}>
               {/* Patient name */}

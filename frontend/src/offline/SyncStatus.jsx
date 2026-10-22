@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { getSyncState, subscribeSync, syncNow, resolveKeepMine, resolveUseTheirs, dismissRejected } from './syncService'
 import { db, SYNCED_COLLECTIONS } from './db'
 import { openRecord, watch } from './repo'
@@ -11,6 +12,49 @@ const notifyInline = () => inlineListeners.forEach((fn) => fn())
 const subscribeInline = (fn) => { inlineListeners.add(fn); return () => inlineListeners.delete(fn) }
 const hasInlinePill = () => inlineCount > 0
 
+// Finds the page header of whatever page is open and puts a small slot in it, left of the
+// profile badge, so the pill looks the same on every patient and owner page without editing
+// each page. Pages change when the user navigates, so a MutationObserver looks again.
+// Returns the slot element, or null when the page has no recognisable header.
+const HEADER_RULES = [
+  { selector: '.admin-header-right', place: 'start' }, // owner header
+  { selector: '.dashboard-top-header .header-right', place: 'start' }, // patient dashboard header
+  { selector: '.user-badge, .user-badge2, .user-badge3', place: 'before' }, // profile badge on subscription / payment pages
+  { selector: '.page-header', place: 'end' }, // help, settings, profile
+]
+function useHeaderSlot(enabled) {
+  const [slot, setSlot] = useState(null)
+  useEffect(() => {
+    if (!enabled) return undefined
+    const el = document.createElement('span')
+    el.setAttribute('data-sync-slot', '')
+    el.style.cssText = 'display:inline-flex;align-items:center;margin-right:12px;vertical-align:middle'
+    let frame = 0
+    const place = () => {
+      frame = 0
+      for (const { selector, place: where } of HEADER_RULES) {
+        const target = document.querySelector(selector)
+        if (!target) continue
+        const parent = where === 'before' ? target.parentElement : target
+        if (el.parentElement === parent && (where !== 'before' || el.nextElementSibling === target)) { setSlot(el); return }
+        if (where === 'start') target.prepend(el)
+        else if (where === 'end') target.append(el)
+        else target.parentElement.insertBefore(el, target)
+        setSlot(el)
+        return
+      }
+      el.remove()
+      setSlot(null)
+    }
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(place) }
+    place()
+    const observer = new MutationObserver(schedule)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => { observer.disconnect(); if (frame) cancelAnimationFrame(frame); el.remove(); setSlot(null) }
+  }, [enabled])
+  return slot
+}
+
 // Small status pill for the page header: Online / Offline / "N changes pending" / Sync error.
 // When something needs the therapist's attention (a SOAP conflict, a refused change)
 // the pill shows "Review" and opens the dialog below.
@@ -19,6 +63,7 @@ export default function SyncStatus({ floating = false }) {
   const [open, setOpen] = useState(false)
   const attention = s.conflicts + s.rejected
   const inlineExists = useSyncExternalStore(subscribeInline, hasInlinePill)
+  const headerSlot = useHeaderSlot(floating && !inlineExists)
   useEffect(() => {
     if (floating) return undefined
     inlineCount += 1; notifyInline()
@@ -66,15 +111,19 @@ export default function SyncStatus({ floating = false }) {
   )
   if (!floating) return body
   if (inlineExists) return null // a header pill is already showing
-  // Patients and owners have no shared header, so the pill floats in the bottom-left corner.
+
+  const savedNote = cachedAt && !s.online && (
+    <span style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '4px 10px', fontSize: 12, color: '#4b5563', boxShadow: '0 1px 4px rgba(0,0,0,.12)', marginLeft: 8 }}>
+      Showing data saved {new Date(cachedAt).toLocaleString()}
+    </span>
+  )
+  // Normal case: inside the page's own header, next to the profile badge.
+  if (headerSlot) return createPortal(<>{body}{savedNote}</>, headerSlot)
+  // Page without a header (games, chat ...): top-right corner of the screen.
   return (
-    <div style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>
+    <div style={{ position: 'fixed', right: 16, top: 12, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>
       {body}
-      {cachedAt && !s.online && (
-        <span style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '4px 10px', fontSize: 12, color: '#4b5563', boxShadow: '0 1px 4px rgba(0,0,0,.12)' }}>
-          Showing data saved {new Date(cachedAt).toLocaleString()}
-        </span>
-      )}
+      {savedNote}
     </div>
   )
 }

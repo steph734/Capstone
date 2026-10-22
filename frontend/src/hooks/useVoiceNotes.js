@@ -73,6 +73,15 @@ export default function useVoiceNotes({ enabled, getText, setText, onSaveDraft, 
     return 'removed last phrase'
   }, [])
 
+  const stopMeter = useCallback(() => {
+    const m = meterRef.current
+    meterRef.current = null
+    if (!m) return
+    clearInterval(m.timer)
+    m.stream.getTracks().forEach((t) => t.stop())
+    try { m.ctx.close?.() } catch { /* ignore */ }
+  }, [])
+
   const stop = useCallback(() => {
     const was = listeningRef.current
     listeningRef.current = false
@@ -117,15 +126,6 @@ export default function useVoiceNotes({ enabled, getText, setText, onSaveDraft, 
       }, 80)
       meterRef.current = m
     } catch { /* no processed stream: the confidence check still applies */ }
-  }, [])
-
-  const stopMeter = useCallback(() => {
-    const m = meterRef.current
-    meterRef.current = null
-    if (!m) return
-    clearInterval(m.timer)
-    m.stream.getTracks().forEach((t) => t.stop())
-    try { m.ctx.close?.() } catch { /* ignore */ }
   }, [])
 
   // True when this phrase looks like speech rather than background noise.

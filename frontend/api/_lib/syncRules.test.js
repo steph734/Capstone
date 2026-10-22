@@ -86,3 +86,32 @@ describe('input checks', () => {
     expect((await applyEntry(ctx, { collection: 'nope', op: 'create', docId: 'x', doc: {} })).status).toBe('rejected')
   })
 })
+
+describe('role limits (patient and owner)', () => {
+  const gameDoc = (id) => ({ collection: 'gameSessions', op: 'create', docId: id, doc: { _id: id, game_id: String(new ObjectId()), started_at: new Date().toISOString(), result: {} } })
+  it('a patient can only push game sessions, never notes or appointments', async () => {
+    const pctx = { ...ctx, role: 'Patient', patientId: new ObjectId() }
+    const id = String(new ObjectId())
+    expect(await applyEntry(pctx, note())).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+    expect(await applyEntry(pctx, { collection: 'appointments', op: 'create', docId: id, doc: { _id: id } })).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+    expect(await applyEntry(pctx, { collection: 'leaveDecisions', op: 'create', docId: id, doc: { _id: id, action: 'approve' } })).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+  })
+  it('an owner can only push leave decisions', async () => {
+    const octx = { ...ctx, role: 'Owner' }
+    expect(await applyEntry(octx, note())).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+    expect(await applyEntry(octx, gameDoc(String(new ObjectId())))).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+  })
+  it('an invalid leave decision is refused before anything runs', async () => {
+    const octx = { ...ctx, role: 'Owner' }
+    expect(await applyEntry(octx, { collection: 'leaveDecisions', op: 'create', docId: 'x', doc: { _id: 'not-an-id', action: 'approve' } })).toMatchObject({ status: 'rejected', code: 'BAD_DATA' })
+    const id = String(new ObjectId())
+    expect(await applyEntry(octx, { collection: 'leaveDecisions', op: 'create', docId: id, doc: { _id: id, action: 'delete-everything' } })).toMatchObject({ status: 'rejected', code: 'BAD_DATA' })
+  })
+  it('a patient cannot replay a play record that belongs to another patient', async () => {
+    const id = new ObjectId()
+    store.game_sessions = [{ _id: id, patient_id: new ObjectId(), status: 'in_progress' }]
+    const pctx = { ...ctx, role: 'Patient', patientId: new ObjectId() }
+    const r = await applyEntry(pctx, { collection: 'gameSessions', op: 'create', docId: String(id), doc: { _id: String(id), game_id: String(new ObjectId()), result: {} } })
+    expect(r).toMatchObject({ status: 'rejected', code: 'NOT_ALLOWED' })
+  })
+})

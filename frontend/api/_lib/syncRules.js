@@ -16,6 +16,7 @@ import { ObjectId } from 'mongodb'
 import { SOAP_FIELDS, encryptField, decryptField, validateSoap, cleanText } from './soapCrypto.js'
 import { isAssigned, audit } from './noteAccess.js'
 import completeGameSession from './routes/game-sessions-complete.js'
+import ownerLeaveRequests from './routes/owner-leave-requests.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -40,27 +41,42 @@ const unescapeHtml = (s) => String(s ?? '').replace(/&lt;/g, '<').replace(/&gt;/
 // A finished offline play is "replayed": the server creates the session with
 // its ORIGINAL start time, then runs the normal /complete logic, so XP, badges
 // and outfits are awarded exactly once (that route is already idempotent).
+// Two kinds of player:
+//   Therapist: plays inside a "Who is playing today?" activity session, which names the patient.
+//   Patient:   plays on their own account; the patient is the one linked to the SIGNED-IN email
+//              (never an id sent by the device).
 async function pushGameSession(ctx, doc) {
-  const { db, employee } = ctx
+  const { db, employee, role } = ctx
+  const isPatient = role === 'Patient'
   const _id = oid(doc._id)
   const gameId = oid(doc.game_id)
   const activityId = oid(doc.activity_session_id)
-  if (!_id || !gameId || !activityId) return rejected('BAD_DATA', 'This game record is missing its game or player.')
+  if (!_id || !gameId || (!isPatient && !activityId)) return rejected('BAD_DATA', 'This game record is missing its game or player.')
 
-  const existing = await db.collection('game_sessions').findOne({ _id }, { projection: { status: 1 } })
-  if (existing && existing.status !== 'in_progress') return ok() // append-only: already saved, nothing to change
+  const existing = await db.collection('game_sessions').findOne({ _id }, { projection: { status: 1, patient_id: 1, employee_id: 1 } })
+  if (existing) {
+    const mine = isPatient ? String(existing.patient_id) === String(ctx.patientId) : String(existing.employee_id) === String(employee._id)
+    if (!mine) return rejected('NOT_ALLOWED', 'That play record belongs to someone else.')
+    if (existing.status !== 'in_progress') return ok() // append-only: already saved, nothing to change
+  }
 
   if (!existing) {
-    const activity = await db.collection('activity_sessions').findOne({ _id: activityId })
-    if (!activity || String(activity.therapist_id) !== String(employee._id) || !activity.patient_id || activity.mode !== 'patient') {
-      return rejected('NOT_ALLOWED', 'That play session does not belong to you.')
+    let patientId
+    if (isPatient) {
+      patientId = ctx.patientId
+    } else {
+      const activity = await db.collection('activity_sessions').findOne({ _id: activityId })
+      if (!activity || String(activity.therapist_id) !== String(employee._id) || !activity.patient_id || activity.mode !== 'patient') {
+        return rejected('NOT_ALLOWED', 'That play session does not belong to you.')
+      }
+      patientId = activity.patient_id
     }
     if (!(await db.collection('games').findOne({ _id: gameId }, { projection: { _id: 1 } }))) return rejected('BAD_DATA', 'That game no longer exists.')
     const now = new Date()
     // Never trust the device clock for the future: a start time after "now" is clamped.
     const startedAt = new Date(Math.min(new Date(doc.started_at).getTime() || now.getTime(), now.getTime()))
     await db.collection('game_sessions').insertOne({
-      _id, patient_id: activity.patient_id, game_id: gameId, employee_id: employee._id, activity_session_id: activityId,
+      _id, patient_id: patientId, game_id: gameId, employee_id: isPatient ? null : employee._id, activity_session_id: isPatient ? null : activityId,
       language: ['en', 'tl', 'ceb'].includes(doc.language) ? doc.language : 'en',
       status: 'in_progress', started_at: startedAt, completed_at: null, offline: true,
       result: {}, reward: {}, created_at: now, updated_at: now,
@@ -74,6 +90,22 @@ async function pushGameSession(ctx, doc) {
   if (out.status === 200) return ok()
   if (out.status >= 500) return { status: 'error', message: out.body?.error || 'The server could not finish this game.' }
   return rejected('COMPLETE_FAILED', out.body?.error || 'The server did not accept this game result.')
+}
+
+// ───────────────────────────── owner: leave request decisions ─────────────────────────────
+// An owner approved or declined a therapist's leave request while offline. The existing
+// route is run as-is (in-process), so the audit entry, the therapist notification and the
+// email all behave exactly like an online decision. A request someone already decided
+// comes back as 409 and is reported as "rejected" with that message.
+async function pushLeaveDecision(ctx, doc) {
+  const id = String(doc._id || '')
+  if (!/^[a-f0-9]{24}$/i.test(id) || !['approve', 'reject'].includes(doc.action)) return rejected('BAD_DATA', 'This leave decision is not valid.')
+  const out = { status: 200, body: null }
+  const fakeRes = { status(c) { out.status = c; return this }, json(b) { out.body = b; return this }, setHeader() {} }
+  await ownerLeaveRequests({ method: 'PATCH', query: { id }, body: { action: doc.action, note: doc.note || '' }, headers: ctx.headers || {}, socket: ctx.socket }, fakeRes)
+  if (out.status === 200) return ok()
+  if (out.status >= 500 || out.status === 401) return { status: 'error', message: out.body?.error || 'The server could not save this decision.' }
+  return rejected('NOT_ACCEPTED', out.body?.error || 'The server did not accept this decision.')
 }
 
 // ───────────────────────────── speech recordings ─────────────────────────────
@@ -235,10 +267,18 @@ const HANDLERS = {
   speechRecordings: (ctx, e) => pushSpeechRecording(ctx, e.doc),
   soapNotes: (ctx, e) => pushSoapNote(ctx, e.doc),
   appointments: (ctx, e) => pushAppointment(ctx, e.doc, e.op),
+  leaveDecisions: (ctx, e) => pushLeaveDecision(ctx, e.doc),
+}
+// What each signed-in role may push. A device cannot widen this: the role comes from the server session.
+const ALLOWED = {
+  Therapist: ['gameSessions', 'speechRecordings', 'soapNotes', 'appointments'],
+  Patient: ['gameSessions'],
+  Owner: ['leaveDecisions'],
 }
 export async function applyEntry(ctx, entry) {
   const handler = HANDLERS[entry?.collection]
   if (!handler || !entry.doc || typeof entry.doc !== 'object') return rejected('BAD_DATA', 'Unknown or empty change.')
+  if (!(ALLOWED[ctx.role || 'Therapist'] || []).includes(entry.collection)) return rejected('NOT_ALLOWED', 'Your account cannot sync this kind of change.')
   try {
     return await handler(ctx, entry)
   } catch (err) {

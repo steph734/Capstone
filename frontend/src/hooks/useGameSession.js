@@ -81,14 +81,15 @@ export function useGameSession({ gameName }) {
     log('finish called', gameName, result)
     // No connection: keep the finished play on this device and queue it. When the sync engine
     // reaches the server it replays the game with its original start time, and rewards are
-    // awarded once. Only therapist-run activity sessions can do this (the server needs one).
+    // awarded once. A therapist-run play needs its activity session; a patient playing on their
+    // own account needs only their signed-in email (the server finds the patient from the login).
     const queueOffline = async () => {
-      if (!ident?.activitySessionId) return null
+      if (!ident?.activitySessionId && !ident?.patientEmail) return null
       try {
         const gameId = await resolveGameIdByName(gameName)
         if (!gameId) return null
         await saveLocal('gameSessions', {
-          game_id: gameId, activity_session_id: ident.activitySessionId, language: ident.language || 'en',
+          game_id: gameId, activity_session_id: ident.activitySessionId || null, language: ident.language || 'en',
           started_at: playStartedAt.current.toISOString(), completed_at: new Date().toISOString(), result,
         }, 'create')
         finishedRef.current = true // the unmount "abandon" must not cancel it

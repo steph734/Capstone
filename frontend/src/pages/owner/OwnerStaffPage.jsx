@@ -6,6 +6,7 @@ import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { authFetch, getSessionToken } from '../../utils/session'
+import { saveLocal } from '../../offline/repo'
 import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
 import { generateUniqueId } from '../../utils/idGenerator'
 import ScanIdModal from '../../components/ScanIdModal'
@@ -2300,6 +2301,18 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     } catch (err) {
       setLeaveError(err.message || 'Could not save your decision.')
       if (err.status === 409) setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
+      if (!err.status) {
+        // No connection (fetch itself failed): keep the decision on this device and queue it.
+        // The therapist is told (and emailed) when it reaches the server.
+        if (action === 'reject' && !leaveNote.trim()) { setLeaveError('Please give the therapist a short reason for declining.'); return }
+        try {
+          await saveLocal('leaveDecisions', { _id: req.id, action, note: leaveNote.trim() }, 'create')
+          setLeaveRequests((prev) => prev.filter((r) => r.id !== req.id))
+          logStaff(action === 'approve' ? '✅' : '❌', (action === 'approve' ? 'Approved ' : 'Rejected ') + req.leaveType.toLowerCase() + ' for ' + req.name + ' (saved offline, will sync)', req.employeeId)
+          setLeaveError('')
+          setLeaveConfirm(null)
+        } catch { /* local database unavailable: the error below stays */ }
+      }
     } finally {
       setLeaveBusy(false)
     }

@@ -9,7 +9,7 @@ Inspect data in DevTools → **Application → IndexedDB → therapypro-offline*
 ```
 npx vitest run src/offline api/_lib/syncRules.test.js
 ```
-Expect **22 passed**. They cover: unique ids, one outbox entry per record, encrypted note text, logout wipe, push only cleared after "ok", backoff when unreachable, expired login keeps data, SOAP conflict (both choices), refused change, pull never overwrites unsent edits, and the server rules (idempotent create, 409 conflict, signed-meanwhile, assignment check, appointment overlap).
+Expect **34 passed** (therapist, patient and owner). They cover: unique ids, one outbox entry per record, encrypted note text, logout wipe, push only cleared after "ok", backoff when unreachable, expired login keeps data, SOAP conflict (both choices), refused change, pull never overwrites unsent edits, and the server rules (idempotent create, 409 conflict, signed-meanwhile, assignment check, appointment overlap).
 
 ## 1. App loads offline
 - [ ] Open Notes, Appointments and one game once while online.
@@ -74,6 +74,39 @@ Expect **22 passed**. They cover: unique ids, one outbox entry per record, encry
 ## 11. Server errors back off, never drop
 - [ ] DevTools → Network → right-click `sync/push` → **Block request URL**, save a draft, wait.
 - [ ] `outbox` entry stays, `tries` goes up 1, 2, 3… and `nextTryAt` moves out (2s, 4s, 8s … max 5 min). Unblock: it sends and clears.
+
+## 12. PATIENT / GUARDIAN side: play a game offline
+Log in as a **Patient** (an account linked to a patient record). A pill appears bottom-left.
+- [ ] Online: open Gamified Activities once.
+- [ ] Go **Offline**, play a game to the end.
+- [ ] Finish card: **"Saved on this device"**. Pill: **Offline · 1 pending**.
+- [ ] Go **Online**: pill syncs and returns to **Online**. In MongoDB `game_sessions` there is **one** completed session for that patient (`offline: true`) and XP/badge were awarded **once**.
+- [ ] Repeat the sync (click the pill): still one session.
+
+## 13. PATIENT side: saved pages offline (read-only)
+- [ ] Online: open **Notes**, **Progress** and the games list once each.
+- [ ] Go **Offline**, reload and open the same pages: the last data shows. Pill: "Offline" + **"Showing data saved <date/time>"**.
+- [ ] A page you never opened online shows its normal "could not load" message (nothing saved).
+- [ ] IndexedDB `readCache`: rows exist but contain only `key`, `sealed`, `savedAt` (no readable text).
+- [ ] Booking and payment pages stay online-only (they are never cached).
+- [ ] Speech to Text / Text to Speech: patient recordings and messages are stored on the device only (the server accepts them from staff accounts only), so there is nothing to sync. Browser speech recognition itself needs the internet.
+
+## 14. OWNER side: saved dashboards offline
+Log in as an **Owner**.
+- [ ] Online: open Dashboard, Patients, Appointments, Staff and the Gamified overview once.
+- [ ] Go **Offline**, reload each: last data shows with "Showing data saved …".
+- [ ] A 401/500 from the server is **not** hidden by saved data (security errors always show).
+
+## 15. OWNER side: approve / decline a leave request offline
+- [ ] Online: open **Staff → Leave requests**. Go **Offline**.
+- [ ] Approve one request (and decline another with a reason). They disappear from the list; pill: **2 pending**.
+- [ ] Go **Online**: both sync. MongoDB `leave_request` shows `approved` / `rejected` with `reviewed_by`; the therapist gets the notification and email; `audit_logs` has the entries.
+- [ ] Conflict case: while the owner is offline, a second owner decides the same request. When the first owner reconnects: pill **Review 1**: "This request was already decided…" (nothing is overwritten). **OK, remove it** clears it.
+
+## 16. Role limits (server enforced)
+- [ ] Logged in as Patient, run in the console:
+  `await (await fetch('/api/sync/push',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+sessionStorage.getItem('sessionToken')},body:JSON.stringify({entries:[{collection:'soapNotes',op:'create',docId:'x',doc:{_id:'x'}}]})})).json()`
+  Result must be `status: 'rejected', code: 'NOT_ALLOWED'`. The same for an Owner pushing game sessions.
 
 ---
 ### API checks (browser console while logged in as Therapist)

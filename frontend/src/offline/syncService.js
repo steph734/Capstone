@@ -193,7 +193,9 @@ export function syncNow({ force = false } = {}) {
       setState({ online: true, syncing: true })
       const pushed = await pushAll(force)
       if (pushed !== 'blocked') {
-        const pulled = await pull()
+        // Only therapists download records. Patients and owners push their own changes; what they
+        // read comes from the read-only cache (readCache.js).
+        const pulled = currentRole === 'Therapist' ? await pull() : true
         if (pulled && pushed !== 'failed') setState({ error: '', lastSyncAt: new Date().toISOString() })
       }
     } catch (err) {
@@ -238,15 +240,18 @@ export async function dismissRejected(collection, id) {
 
 // ───────────────────────────── start / stop ─────────────────────────────
 let started = false
+let currentRole = 'Therapist'
 let timer = null
 let debounce = null
 let subs = []
 const onOnline = () => { setState({ online: true }); syncNow({ force: true }) }
 const onOffline = () => setState({ online: false })
 
-export function startSync() {
+// role: 'Therapist' | 'Patient' | 'Owner'. The server also checks it, so a wrong value cannot widen access.
+export function startSync(role = 'Therapist') {
   if (started) return
   started = true
+  currentRole = role
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
   timer = setInterval(() => { if (navigator.onLine) syncNow() }, SYNC_EVERY_MS)

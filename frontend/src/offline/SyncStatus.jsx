@@ -6,10 +6,20 @@ import { openRecord, watch } from './repo'
 // Small status pill for the page header: Online / Offline / "N changes pending" / Sync error.
 // When something needs the therapist's attention (a SOAP conflict, a refused change)
 // the pill shows "Review" and opens the dialog below.
-export default function SyncStatus() {
+export default function SyncStatus({ floating = false }) {
   const s = useSyncExternalStore(subscribeSync, getSyncState)
   const [open, setOpen] = useState(false)
   const attention = s.conflicts + s.rejected
+
+  // Set when a page was answered from the saved (offline) copy instead of the server.
+  const [cachedAt, setCachedAt] = useState(null)
+  useEffect(() => {
+    const onCache = (e) => setCachedAt(e.detail?.savedAt || new Date().toISOString())
+    const onOnline = () => setCachedAt(null) // the next load is live again
+    window.addEventListener('tp:offline-cache', onCache)
+    window.addEventListener('online', onOnline)
+    return () => { window.removeEventListener('tp:offline-cache', onCache); window.removeEventListener('online', onOnline) }
+  }, [])
 
   let label = 'Online'
   let tone = 'ok'
@@ -24,7 +34,7 @@ export default function SyncStatus() {
     ok: ['#e3f4e8', '#1f7a45'], off: ['#eceff1', '#4b5563'], warn: ['#fff4d6', '#92400e'], bad: ['#fde8e8', '#b91c1c'], busy: ['#ede9fe', '#5b21b6'],
   }[tone]
 
-  return (
+  const body = (
     <>
       <button
         type="button"
@@ -38,12 +48,23 @@ export default function SyncStatus() {
         {attention > 0 && <span style={{ background: '#b91c1c', color: '#fff', borderRadius: 999, padding: '1px 8px', marginLeft: 4 }}>Review {attention}</span>}
       </button>
       {open && attention > 0 && <ReviewDialog onClose={() => setOpen(false)} />}
-      {open && attention === 0 && null}
     </>
+  )
+  if (!floating) return body
+  // Patients and owners have no shared header, so the pill floats in the bottom-left corner.
+  return (
+    <div style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>
+      {body}
+      {cachedAt && !s.online && (
+        <span style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '4px 10px', fontSize: 12, color: '#4b5563', boxShadow: '0 1px 4px rgba(0,0,0,.12)' }}>
+          Showing data saved {new Date(cachedAt).toLocaleString()}
+        </span>
+      )}
+    </div>
   )
 }
 
-const LABELS = { soapNotes: 'Session note', appointments: 'Appointment', gameSessions: 'Game session', speechRecordings: 'Recording' }
+const LABELS = { soapNotes: 'Session note', appointments: 'Appointment', gameSessions: 'Game session', speechRecordings: 'Recording', leaveDecisions: 'Leave decision' }
 const SOAP = [['subjective', 'Subjective'], ['objective', 'Objective'], ['assessment', 'Assessment'], ['plan', 'Plan']]
 
 // Everything the server refused or that changed on another device.

@@ -21,8 +21,16 @@ db.version(1).stores({
   meta: 'key', // small settings such as { key: 'lastSyncTime', value: '2026-10-22T...' }
 })
 
-// Tables that hold synced records (everything except outbox and meta).
-export const SYNCED_COLLECTIONS = ['patients', 'appointments', 'soapNotes', 'gameSessions', 'speechRecordings']
+// Version 2 adds two tables for the patient and owner sides:
+//   leaveDecisions: an owner's approve/decline of a therapist leave request, made offline
+//   readCache:      the last good answer of read-only pages (dashboards, notes list ...), kept encrypted
+db.version(2).stores({
+  leaveDecisions: '_id, syncStatus',
+  readCache: 'key',
+})
+
+// Tables that hold synced records (everything except outbox, meta and readCache).
+export const SYNCED_COLLECTIONS = ['patients', 'appointments', 'soapNotes', 'gameSessions', 'speechRecordings', 'leaveDecisions']
 
 // Wipes every table. Called on logout so nothing clinical stays on a shared device.
 // Other modules (e.g. the encryption key cache) register here to forget what they hold in memory.

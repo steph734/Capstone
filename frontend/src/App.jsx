@@ -4,6 +4,8 @@ import { MessagesProvider } from './context/MessagesContext'
 import StreamProvider from './stream/StreamProvider'
 import { clearAll as clearOfflineData } from './offline/db'
 import { startSync, stopSync } from './offline/syncService'
+import { installReadCache, uninstallReadCache } from './offline/readCache'
+import SyncStatus from './offline/SyncStatus'
 import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
@@ -184,13 +186,21 @@ function App() {
     applyAccessibilityPrefs(loadAccessibilityPrefs())
   }, [])
 
-  // Offline sync runs for signed-in therapists only (the engine in src/offline/).
-  // It stops on logout (handleLogout), which also erases the local copy.
-  const isTherapist = isAuthenticated && currentUser?.role === 'Therapist'
+  // Offline sync (the engine in src/offline/) runs for signed-in therapists, patients/guardians and owners.
+  // What each role can do offline is decided on the SERVER (see api/_lib/syncRules.js).
+  // Patients and owners also get the read-only cache, so pages they already opened still show
+  // their last data with no connection. Everything stops on logout (handleLogout), which also
+  // erases the local copy.
+  const syncRole = isAuthenticated && ['Therapist', 'Patient', 'Owner'].includes(currentUser?.role) ? currentUser.role : null
   useEffect(() => {
-    if (isTherapist) startSync()
-    else stopSync()
-  }, [isTherapist])
+    if (syncRole) {
+      startSync(syncRole)
+      if (syncRole !== 'Therapist') installReadCache(syncRole, currentUser?.email || null)
+    } else {
+      stopSync()
+      uninstallReadCache()
+    }
+  }, [syncRole]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loginToast) return
@@ -375,6 +385,7 @@ function App() {
     if (token) fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}' }).catch(() => {})
     setSessionToken('')
     stopSync() // stop sending/receiving before the local copy is erased
+    uninstallReadCache()
     clearOfflineData().catch(() => {}) // erase the on-device copy of clinical data
     setIsAuthenticated(false)
     setCurrentUser(null)
@@ -1524,6 +1535,8 @@ function App() {
         />
       </Routes>
       {isAuthenticated && ['Owner', 'Therapist', 'Patient'].includes(currentUser?.role) && <PaoBot user={currentUser} />}
+      {/* Therapists have the sync pill in their page header; patients and owners get a floating one. */}
+      {isAuthenticated && ['Owner', 'Patient'].includes(currentUser?.role) && <SyncStatus floating />}
     </Router>
     </AnalyticsProvider>
     </ProgressProvider>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
 import StreamProvider from './stream/StreamProvider'
+import { clearAll as clearOfflineData } from './offline/db'
 import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
@@ -364,6 +365,7 @@ function App() {
     const token = getSessionToken()
     if (token) fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}' }).catch(() => {})
     setSessionToken('')
+    clearOfflineData().catch(() => {}) // erase the on-device copy of clinical data
     setIsAuthenticated(false)
     setCurrentUser(null)
     localStorage.removeItem('isAuthenticated')

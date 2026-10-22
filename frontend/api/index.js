@@ -38,6 +38,8 @@ import appointmentsTherapistSlots from './_lib/routes/appointments-therapist-slo
 import appointmentsTherapistList from './_lib/routes/appointments-therapist-list.js'
 import patientsTherapistList from './_lib/routes/patients-therapist-list.js'
 import streamToken from './_lib/routes/stream-token.js'
+import syncPush from './_lib/routes/sync-push.js'
+import syncPull from './_lib/routes/sync-pull.js'
 import streamContact from './_lib/routes/stream-contact.js'
 import streamContacts from './_lib/routes/stream-contacts.js'
 import streamMessageLog from './_lib/routes/stream-message-log.js'
@@ -189,6 +191,8 @@ app.all('/api/appointments/therapists', appointmentsTherapists)
 app.all('/api/appointments/therapist-slots', appointmentsTherapistSlots)
 app.all('/api/appointments/therapist-list', appointmentsTherapistList)
 app.all('/api/patients/therapist-list', patientsTherapistList)
+app.all('/api/sync/push', syncPush) // offline sync: see _lib/syncRules.js
+app.all('/api/sync/pull', syncPull)
 app.all('/api/stream/token', streamToken)
 app.all('/api/stream/contact', streamContact)
 app.all('/api/stream/contacts', streamContacts)

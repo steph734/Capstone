@@ -26,6 +26,7 @@
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
     "cors": "^2.8.6",
+    "dexie": "^4.4.6",
     "express": "^5.2.1",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",

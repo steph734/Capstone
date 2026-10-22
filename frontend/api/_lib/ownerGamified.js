@@ -152,7 +152,7 @@ export async function buildOverview(db, { branchId = '', therapistId = '', days 
     db.collection('pao_profiles').find({ patient_id: { $in: ids } }).toArray(),
     db.collection('patient_badges').find({ patient_id: { $in: ids } }).toArray(),
     db.collection('games').find({}, { projection: { name: 1, therapy_type: 1 } }).toArray(),
-    db.collection('badges').find({ is_active: true, status: 'active' }).project({ code: 1 }).toArray(),
+    db.collection('badges').find({ is_active: true, status: { $in: ['active', null] } }).project({ code: 1 }).toArray(),
     db.collection('game_sessions').find({ patient_id: { $in: ids }, status: 'completed', completed_at: { $gte: from, $lt: toExclusive } }).sort({ completed_at: 1 }).toArray(),
     db.collection('game_sessions').find({ patient_id: { $in: ids }, status: 'completed', completed_at: { $gte: prevFrom, $lt: prevTo } }).toArray(),
     db.collection('game_sessions').aggregate([

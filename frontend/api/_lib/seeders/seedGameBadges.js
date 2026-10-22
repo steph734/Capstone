@@ -6,12 +6,14 @@
 //     automatically. An item already taken by another badge, or a badge that already unlocks something, is left alone.
 //   node api/_lib/seeders/seedGameBadges.js          create what is missing
 //   node api/_lib/seeders/seedGameBadges.js --dry    only print what would be created
+//   add --keep-old-daily to leave the old per-task Daily Routines badges as they are (use it while one of them is still the game's only badge)
 import { Int32 } from 'mongodb'
 import { getMongo, getDb } from '../mongo.js'
 
 process.loadEnvFile?.()
 
 const DRY = process.argv.includes('--dry')
+const KEEP_OLD_DAILY = process.argv.includes('--keep-old-daily')
 
 // One badge per game, keyed by the game's name in the `games` collection.
 // art: { shape, color, symbol } uses the same values as the badge builder (see src/data/badgeSymbols.js).
@@ -121,7 +123,7 @@ async function main() {
   }
 
   // Retire the old per-task Daily Routines badges so only Routine Star is awarded. Patients who already earned them keep them.
-  const old = await db.collection('badges').find({ code: { $in: OLD_DAILY_BADGES }, is_archived: { $ne: true } }).project({ code: 1, name: 1 }).toArray()
+  const old = KEEP_OLD_DAILY ? [] : await db.collection('badges').find({ code: { $in: OLD_DAILY_BADGES }, is_archived: { $ne: true } }).project({ code: 1, name: 1 }).toArray()
   for (const o of old) console.log(`${DRY ? '~ would retire' : '~ retired'} old Daily Routines badge "${o.name}"`)
   if (old.length && !DRY) {
     await db.collection('badges').updateMany({ _id: { $in: old.map((o) => o._id) } }, { $set: { is_active: false, status: 'archived', is_archived: true, archived_at: now, updated_at: now } })

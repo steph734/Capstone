@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (resolved.error) return res.status(resolved.error.status).json({ error: resolved.error.message })
     const patientId = resolved.patientId
 
-    const badges = await Badge.find({ is_active: true, status: 'active' }).sort({ sort_order: 1, name: 1 }).lean()
+    const badges = await Badge.find({ is_active: true, status: { $in: ['active', null] } }).sort({ sort_order: 1, name: 1 }).lean()
     const earned = patientId
       ? await PatientBadge.find({ patient_id: patientId }).lean()
       : []

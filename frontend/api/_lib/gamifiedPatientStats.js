@@ -77,7 +77,7 @@ export async function buildPatientStats(db, pid, days) {
     const [patient, profile, allBadges, earnedBadges, games, curSessions, prevSessions, recentLookback, assignments] = await Promise.all([
       db.collection('patients').findOne({ _id: pid }, { projection: { first_name: 1, last_name: 1, birthdate: 1 } }),
       db.collection('pao_profiles').findOne({ patient_id: pid }),
-      db.collection('badges').find({ is_active: true, status: 'active' }).sort({ sort_order: 1, name: 1 }).toArray(),
+      db.collection('badges').find({ is_active: true, status: { $in: ['active', null] } }).sort({ sort_order: 1, name: 1 }).toArray(),
       db.collection('patient_badges').find({ patient_id: pid }).toArray(),
       db.collection('games').find({}, { projection: { name: 1, therapy_type: 1 } }).toArray(),
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed', completed_at: { $gte: from, $lt: toExclusive } }).sort({ completed_at: 1 }).toArray(),

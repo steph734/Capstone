@@ -195,7 +195,7 @@ export default async function handler(req, res) {
         // ── Badges ──────────────────────────────────────────────────────
         const ctx = await buildUnlockContext(patientId, session) // must see this transaction's own writes above
         const alreadyEarned = new Set((await PatientBadge.find({ patient_id: patientId }).select('badge_code').session(session).lean()).map((b) => b.badge_code))
-        const activeBadges = await Badge.find({ is_active: true, status: 'active' }).session(session).lean()
+        const activeBadges = await Badge.find({ is_active: true, status: { $in: ['active', null] } }).session(session).lean()
 
         const newlyEarnedBadges = []
         for (const b of activeBadges) {

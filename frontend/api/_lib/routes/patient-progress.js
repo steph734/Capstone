@@ -58,7 +58,7 @@ export default async function handler(req, res) {
       db.collection('patients').findOne({ _id: patientId }, { projection: { first_name: 1, last_name: 1 } }),
       db.collection('pao_profiles').findOne({ patient_id: patientId }),
       db.collection('patient_badges').find({ patient_id: patientId }).toArray(),
-      db.collection('badges').find({ is_active: true, status: 'active' }).sort({ sort_order: 1, name: 1 }).toArray(),
+      db.collection('badges').find({ is_active: true, status: { $in: ['active', null] } }).sort({ sort_order: 1, name: 1 }).toArray(),
       db.collection('game_sessions').find({ patient_id: patientId, status: 'completed', completed_at: { $gte: rangeStart } }).toArray(),
       db.collection('game_sessions').find({ patient_id: patientId, status: 'completed', completed_at: { $gte: prevStart, $lt: rangeStart } }).toArray(),
       db.collection('game_sessions').find({ patient_id: patientId, status: 'completed', completed_at: { $gte: weekChartStart } }).toArray(),

@@ -14,6 +14,11 @@ import {
   Calendar, ChartColumn, CircleCheck, ClipboardList, Download, Eye, FileText, KeyRound, Lock, MessageSquare, PenLine, Stethoscope, Sun, TriangleAlert, User,
 } from 'lucide-react'
 import { unescapeHtml } from '../../utils/session'
+import { saveLocal, getDoc, listDocs } from '../../offline/repo'
+import OfflineDrafts from '../../offline/OfflineDrafts'
+
+// authFetch errors carry an HTTP status; a failed fetch (no connection) does not.
+const isNetworkError = (err) => !err?.status
 import './TherapistNotesProgressPage.css'
 import './notes/voice.css'
 
@@ -812,6 +817,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const [shareTarget, setShareTarget] = useState(null)
   const [locked,      setLocked]      = useState(null)        // { reason } while the page is locked
   const [reloadKey,   setReloadKey]   = useState(0)
+  const versionRef = useRef({}) // latest server version of each draft saved on this page
 
   // Everything on this page comes from the secured API with the session
   // token. Note text lives only in React state — never in browser storage —
@@ -859,8 +865,21 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         }
         setNotes(grouped)
       })
-      .catch((e) => {
+      .catch(async (e) => {
         if (cancelled) return
+        // No connection: fall back to the patients saved on this device by the last sync.
+        if (isNetworkError(e)) {
+          const saved = await listDocs('patients').catch(() => [])
+          if (cancelled) return
+          if (saved.length) {
+            setLoadError('')
+            setPatients(saved.map((p) => ({ id: p._id, name: [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Patient', diagnosis: 'Saved on this device' })))
+            setNotes({})
+            return
+          }
+          setLoadError('No internet connection, and no patients are saved on this device yet. Open this page once while online first.')
+          return
+        }
         if (e.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity.')
         else if (e.code === 'NO_SESSION') setLoadError('Please sign in again with your clinic account to open session notes.')
         else setLoadError(e.message || 'Could not load notes.')
@@ -920,30 +939,71 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       subjective: form.subjective, objective: form.objective, assessment: form.assessment, plan: form.plan,
       sign: form.sign, signatureImage: form.signatureData, password: form.password,
     }
+    // An existing draft (opened for editing, or created while dictating) is updated or signed in place.
+    const existingId = editing?.id || form.noteId
+    // The server version this text was edited from. Sent with every save so a change made on
+    // another device is detected instead of silently overwritten.
+    const baseVersion = existingId ? (versionRef.current[existingId] ?? editing?.version) : undefined
+
+    // Saves the draft on THIS device (encrypted) and queues it for the sync engine.
+    // baseVersion = the server version this text was edited from (0 = brand-new note).
+    const saveDraftLocally = async (local) => {
+      const rec = await saveLocal('soapNotes', {
+        _id: existingId || undefined,
+        patient_id: selectedId, session_date: manilaDateKey(), diagnosis: selectedPatient?.diagnosis,
+        subjective: form.subjective, objective: form.objective, assessment: form.assessment, plan: form.plan,
+        baseVersion: local ? local.baseVersion : (existingId ? (baseVersion ?? 1) : 0),
+      }, existingId ? 'update' : 'create')
+      return rec._id
+    }
+
     try {
-      // An existing draft (opened for editing, or created while dictating) is updated or signed in place.
-      const existingId = editing?.id || form.noteId
+      if (!form.sign) {
+        // A draft that only exists on this device (not on the server yet) is always saved locally.
+        const local = existingId ? await getDoc('soapNotes', existingId).catch(() => null) : null
+        if (local && local.syncStatus !== 'synced') return await saveDraftLocally(local)
+      }
       if (existingId) {
         if (form.sign) await signDraft(existingId, payload)
-        else await updateDraft(existingId, payload)
+        else {
+          const saved = await updateDraft(existingId, { ...payload, baseVersion })
+          if (saved?.version) versionRef.current[existingId] = saved.version
+        }
         return existingId
       }
       const created = await createNote(payload)
+      versionRef.current[created.id] = created.version || 1
       return created.id
     } catch (err) {
       if (err.code === 'SESSION_LOCKED') lockPage('This page locked after 15 minutes of inactivity. Your text is still here.')
+      // No connection: keep the draft on this device. Signing needs the password and the server, so it cannot go offline.
+      if (!form.sign && isNetworkError(err)) return saveDraftLocally(null)
+      if (form.sign && isNetworkError(err)) throw new Error('Signing needs an internet connection. Your draft is safe: save it, then sign once you are back online.')
       throw err
     }
   }
 
   // Dictation needs a saved note to attach its voice log to, so the first flush creates a draft.
   const ensureDraft = async (soapNow) => {
-    const created = await createNote({
-      patientId: selectedId, sessionDate: manilaDateKey(), diagnosis: selectedPatient?.diagnosis,
-      subjective: soapNow.subjective, objective: soapNow.objective, assessment: soapNow.assessment, plan: soapNow.plan, sign: false,
-    })
-    return created.id
+    try {
+      const created = await createNote({
+        patientId: selectedId, sessionDate: manilaDateKey(), diagnosis: selectedPatient?.diagnosis,
+        subjective: soapNow.subjective, objective: soapNow.objective, assessment: soapNow.assessment, plan: soapNow.plan, sign: false,
+      })
+      return created.id
+    } catch (err) {
+      if (!isNetworkError(err)) throw err
+      // Offline: create the draft on this device; it is sent when the connection returns.
+      const rec = await saveLocal('soapNotes', {
+        patient_id: selectedId, session_date: manilaDateKey(), diagnosis: selectedPatient?.diagnosis,
+        subjective: soapNow.subjective, objective: soapNow.objective, assessment: soapNow.assessment, plan: soapNow.plan, baseVersion: 0,
+      }, 'create')
+      return rec._id
+    }
   }
+
+  // Reopens a draft that is saved on this device. Its version is the server version it was based on.
+  const openLocalDraft = (d) => { setEditing({ id: d._id, version: d.baseVersion, subjective: d.subjective, objective: d.objective, assessment: d.assessment, plan: d.plan }); setView('edit') }
 
   const doShare = async (sections, summary, domain) => {
     await shareNote(shareTarget.id, sections, summary, domain)
@@ -980,6 +1040,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
           // Stays mounted (just hidden) while a note is open so the filter,
           // search and "See more" count survive coming back.
           <div style={view === 'overview' ? undefined : { display: 'none' }}>
+            <OfflineDrafts patientId={selectedId} onOpen={openLocalDraft} />
             <NotesShell
               patients={patients}
               notes={notes}

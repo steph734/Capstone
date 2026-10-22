@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     await getMongo()
     // Same auth as the notes routes. An expired token answers 401 and the device
     // keeps everything locally until the user signs in again.
-    const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist'], touch: false })
     if (!ctx) return
     const employee = await employeeFor(ctx.db, ctx.user)
     if (!employee) return res.status(403).json({ error: 'Your account is not linked to a staff record.' })

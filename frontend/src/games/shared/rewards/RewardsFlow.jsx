@@ -10,7 +10,7 @@ import './rewards-flow.css'
 
 const CATEGORY_SLOT = { Hats: 'hats', Clothes: 'clothes', Pants: 'pants', Shoes: 'shoes', Hair: 'hair' }
 
-const poseFor = (step, wearing) => ({ badge: 'badge', xp: 'xp', level: 'levelUp', stats: 'stats', outfit: wearing ? 'wearing' : 'gift', allDone: 'allDone', replay: 'replay', keepGoing: 'keepGoing', error: 'keepGoing' }[step.kind])
+const poseFor = (step, wearing) => ({ badge: 'badge', xp: 'xp', level: 'levelUp', stats: 'stats', outfit: wearing ? 'wearing' : 'gift', allDone: 'allDone', replay: 'replay', keepGoing: 'keepGoing', error: 'keepGoing', queued: 'allDone' }[step.kind])
 
 function useCountUp(target, run, ms = 900) {
   const [v, setV] = useState(0)
@@ -196,6 +196,13 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
             <p>{reward.message || 'Check the internet and try again.'}</p>
           </>
         )}
+        {step.kind === 'queued' && (
+          <>
+            <h2>Saved on this device</h2>
+            <p>Pao&apos;s rewards will arrive when you are back online.</p>
+            <div className="rw-starsrow" aria-label={`${stars} out of 3 stars`}>{[1, 2, 3].map((n) => <Star key={n} size={46} fill={n <= stars ? '#ffc83d' : 'none'} color={n <= stars ? '#f0a500' : '#d9cdea'} strokeWidth={2.2} aria-hidden="true" />)}</div>
+          </>
+        )}
         {step.kind === 'keepGoing' && (
           <>
             <h2>Keep going!</h2>
@@ -209,7 +216,7 @@ export default function RewardsFlow({ reward, ident, onEquip, onDone, actions, g
               <button type="button" className="rw-btn green" onClick={() => putOn(step.unlock)}>Put it on Pao</button>
               <button type="button" className="rw-btn white" onClick={next}>Maybe later</button>
             </>
-          ) : (step.kind === 'allDone' || step.kind === 'replay') ? (
+          ) : (step.kind === 'allDone' || step.kind === 'replay' || step.kind === 'queued') ? (
             <>
               <button type="button" className="rw-btn orange" onClick={() => close(actions?.playAgain)} autoFocus>Play again</button>
               <button type="button" className="rw-btn white" onClick={() => close(actions?.allGames)}>All games</button>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../../components/PatientSidebar'
 import BetaTag from '../../components/BetaTag'
+import SyncStatus from '../../offline/SyncStatus'
 import '../PageWithSidebar.css'
 import '../admin/AdminPages.css'
 
@@ -35,9 +36,12 @@ export default function TherapistPageShell({ user, onLogout, title, subtitle, ic
             </h1>
             <p>{subtitle}</p>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <SyncStatus />
           <div className="admin-header-badge">
             <img src={user?.avatar || '/therapy-pro-logo.png'} alt={user?.name || 'Therapist'} />
             <span>{user?.name || 'Therapist'}</span>
+          </div>
           </div>
         </div>
 

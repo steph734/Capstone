@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useOptionalPao } from '../context/PaoContext'
 import { resolveGameIdByName } from '../utils/gameProgress'
 import { identBody, hasIdent } from '../utils/paoApi'
+import { saveLocal } from '../offline/repo'
 
 // Games must end with finish(). Never award rewards inside a game: the server decides XP, badge, stats and outfit,
 // and the shared RewardsFlow shows them. (See games/shared/gameRegistry.js.)
@@ -27,6 +28,7 @@ export function useGameSession({ gameName }) {
   const finishedRef = useRef(false)
   const inflight = useRef(false)
   const aliveRef = useRef(true)
+  const playStartedAt = useRef(new Date()) // when this play began, sent with an offline-saved result
   const paoRef = useRef(pao)
   useEffect(() => { paoRef.current = pao })
 
@@ -77,12 +79,35 @@ export function useGameSession({ gameName }) {
     if (!enabled || finishedRef.current || inflight.current) return null
     inflight.current = true
     log('finish called', gameName, result)
-    const fail = (message) => {
+    // No connection: keep the finished play on this device and queue it. When the sync engine
+    // reaches the server it replays the game with its original start time, and rewards are
+    // awarded once. Only therapist-run activity sessions can do this (the server needs one).
+    const queueOffline = async () => {
+      if (!ident?.activitySessionId) return null
+      try {
+        const gameId = await resolveGameIdByName(gameName)
+        if (!gameId) return null
+        await saveLocal('gameSessions', {
+          game_id: gameId, activity_session_id: ident.activitySessionId, language: ident.language || 'en',
+          started_at: playStartedAt.current.toISOString(), completed_at: new Date().toISOString(), result,
+        }, 'create')
+        finishedRef.current = true // the unmount "abandon" must not cancel it
+        paoRef.current?.showReward?.({ queued: true, gameName, stars: result?.stars ?? 0 })
+        window.dispatchEvent(new CustomEvent('tp:game-finished', { detail: { gameName } }))
+        log('saved offline', gameName)
+        return { queued: true }
+      } catch (e) { log('offline save failed', e); return null }
+    }
+    const isOfflineMessage = (m) => m === 'No internet connection.'
+
+    const fail = async (message) => {
+      if (isOfflineMessage(message)) { const queued = await queueOffline(); if (queued) return queued }
       log('finish failed', message)
       paoRef.current?.showReward?.({ error: true, message, gameName, stars: result?.stars ?? 0, retry: () => finish(result) })
       return null
     }
     try {
+      if (!navigator.onLine) { const queued = await queueOffline(); if (queued) return queued }
       const s = sessionRef.current || (await startRef.current) || (await startSession())
       if (!s) return fail(lastError.current)
       const payload = JSON.stringify({ result })

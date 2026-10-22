@@ -4,6 +4,7 @@ export function buildSteps(reward) {
   if (!reward) return []
   if (reward.error) return [{ kind: 'error' }]
   if (reward.exit) return [{ kind: 'keepGoing' }]
+  if (reward.queued) return [{ kind: 'queued' }] // finished offline: saved on this device, rewards come after sync
   const badges = reward.badges || []
   const unlocks = reward.unlocks || []
   const stats = (reward.gameStats || []).filter((s) => s.gained > 0)

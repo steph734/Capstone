@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
   try {
     await getMongo()
-    const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist'], touch: false })
     if (!ctx) return
     const employee = await employeeFor(ctx.db, ctx.user)
     if (!employee) return res.status(403).json({ error: 'Your account is not linked to a staff record.' })

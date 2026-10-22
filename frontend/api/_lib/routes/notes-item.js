@@ -135,6 +135,8 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       const denied = needAuthor(); if (denied) return
       if (note.status !== 'draft' || note.voided) return fail(res, 409, 'Signed notes are read-only. Add an addendum instead.')
+      // Never overwrite silently: if the client edited from an older version, another device changed this note since.
+      if (body.baseVersion != null && Number(body.baseVersion) < (note.version || 1)) return fail(res, 409, 'This note was changed on another device. Close it and reopen it to see the latest version.', { code: 'VERSION_CONFLICT', version: note.version || 1 })
       const { errors, value } = validateSoap(body, { complete: false })
       if (Object.keys(errors).length) return fail(res, 400, 'Please fix the highlighted sections.', { fields: errors })
       const enc = Object.fromEntries(SOAP_FIELDS.map((f) => [f, value[f] ? encryptField(value[f], id, f) : null]))

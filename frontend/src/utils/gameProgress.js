@@ -6,6 +6,11 @@
 let gameIdMapPromise = null
 const nameKey = (n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '')
 
+// The name -> id map is also kept in localStorage, so a therapist who goes offline
+// can still finish a game and queue it for sync (the server needs the real game id).
+const ID_CACHE_KEY = 'tp_game_ids'
+const readCachedIds = () => { try { return JSON.parse(localStorage.getItem(ID_CACHE_KEY) || '{}') } catch { return {} } }
+
 function loadGameIdMap() {
   if (!gameIdMapPromise) {
     gameIdMapPromise = fetch('/api/games/list?scope=all')
@@ -13,9 +18,13 @@ function loadGameIdMap() {
       .then((body) => {
         const map = {}
         ;(body.games || []).forEach((g) => { if (g.name) map[nameKey(g.name)] = g.id })
+        try { if (Object.keys(map).length) localStorage.setItem(ID_CACHE_KEY, JSON.stringify(map)) } catch { /* storage full or blocked */ }
         return map
       })
-      .catch(() => ({}))
+      .catch(() => {
+        gameIdMapPromise = null // do not remember the failure: try again once back online
+        return readCachedIds()
+      })
   }
   return gameIdMapPromise
 }

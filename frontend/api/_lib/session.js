@@ -64,8 +64,10 @@ export async function revokeSession(sessionId) {
 
 // Resolves the caller from the Authorization header, or sends the 401/403 and
 // returns null. `idle: false` skips the idle check (used by re-authentication,
-// which is how a locked session is unlocked).
-export async function requireSession(req, res, { roles, idle = true } = {}) {
+// which is how a locked session is unlocked). `touch: false` still enforces the
+// idle lock but does not count the request as user activity (used by background
+// sync, so it can never keep an idle session alive).
+export async function requireSession(req, res, { roles, idle = true, touch = true } = {}) {
   try {
     const header = String(req.headers?.authorization || '')
     const payload = header.startsWith('Bearer ') ? verifyToken(header.slice(7)) : null
@@ -92,7 +94,7 @@ export async function requireSession(req, res, { roles, idle = true } = {}) {
       res.status(403).json({ error: 'You do not have access to this.', code: 'FORBIDDEN' })
       return null
     }
-    if (idle) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date() } })
+    if (idle && touch) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date() } })
     return { db, user, session, ip: getClientIp(req) }
   } catch (err) {
     console.error('requireSession error:', err.message)

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
 import { saveAudioBlob, getAudioBlob, deleteAudioBlob, newAudioKey } from '../utils/recordingsDb'
+import { saveLocal } from '../offline/repo'
 import { pickRecorderMime, extensionForMime, blobToWavBlob, canDecodeAudio } from '../utils/audioUtils'
 import { speakPao, stopPaoVoice } from '../utils/paoVoice'
 import PandaMascot from './games/PandaMascot'
@@ -1462,14 +1463,30 @@ export default function SpeechFeaturesUI({ user, patient = null, initialTab, onC
         }
       } catch (err) {
         // The server could not be reached: keep the recording in the Recordings list (audio is already in
-        // this browser's storage) instead of losing it.
+        // this browser's storage) instead of losing it. When it was a real connection failure, also queue the
+        // transcript for sync (the audio file itself stays on this device).
+        let localId = `local-${Date.now()}`
+        let queued = false
+        if (err instanceof TypeError) {
+          try {
+            const rec = await saveLocal('speechRecordings', {
+              patient_id: patient?.id || null, patient_name: patient?.name || null,
+              title: defaultSessionTitle(new Date()), transcript: finalTranscript, segments: [...segmentsRef.current],
+              word_count: words, duration_seconds: durationSec, language: null,
+            }, 'create')
+            localId = rec._id
+            queued = true
+          } catch { /* local database unavailable: the on-screen copy below still works */ }
+        }
         setRecordings(prev => [{
-          id: `local-${Date.now()}`, title: defaultSessionTitle(new Date()), transcript: finalTranscript,
+          id: localId, title: defaultSessionTitle(new Date()), transcript: finalTranscript,
           segments: [...segmentsRef.current], audioUrl, audioKey, durationSec, wordCount: words,
           summaryStatus: 'none', summary: null, patientId: patient?.id || null, patientName: patient?.name || null,
           isArchived: false, createdAt: new Date().toISOString(),
         }, ...prev])
-        setSttError(`Saved on this device only (${err.message || 'could not reach the server'}).`)
+        setSttError(queued
+          ? 'No connection: the transcript is saved on this device and will sync when you are back online. The audio file stays on this device.'
+          : `Saved on this device only (${err.message || 'could not reach the server'}).`)
       }
     }
 

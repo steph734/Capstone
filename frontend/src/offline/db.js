@@ -25,8 +25,13 @@ db.version(1).stores({
 export const SYNCED_COLLECTIONS = ['patients', 'appointments', 'soapNotes', 'gameSessions', 'speechRecordings']
 
 // Wipes every table. Called on logout so nothing clinical stays on a shared device.
+// Other modules (e.g. the encryption key cache) register here to forget what they hold in memory.
+const clearHooks = []
+export const onClear = (fn) => clearHooks.push(fn)
+
 export async function clearAll() {
   await Promise.all(db.tables.map((t) => t.clear()))
+  clearHooks.forEach((fn) => { try { fn() } catch { /* nothing to forget */ } })
 }
 
 export async function getMeta(key, fallback = null) {

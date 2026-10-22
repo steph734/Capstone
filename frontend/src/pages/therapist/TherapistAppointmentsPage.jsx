@@ -7,6 +7,7 @@ import { logActivity } from '../../utils/auditLog'
 import { apiGet, apiPatch } from '../../utils/api'
 import RecommendSessionModal from '../../components/RecommendSessionModal'
 import { manilaDateKey } from '../../utils/manilaTime'
+import { saveLocal } from '../../offline/repo'
 import './TherapistAppointmentsPage.css'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -858,6 +859,19 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       logAppt('✅', `Marked ${patient(appt).name}'s session as completed`, appt)
       if (body.canRecommend) setPromptRec({ ...appt, status: 'Completed' })
     } catch (err) {
+      if (err instanceof TypeError) {
+        // No connection (fetch itself failed): keep the change on this device and queue it for sync.
+        try {
+          await saveLocal('appointments', { _id: appt.id, status: 'Completed', completion_remarks: remarks || '' }, 'update')
+          setAppointments(p => p.map(a => (a.id === appt.id
+            ? { ...a, status: 'Completed', completedAt: new Date().toISOString(), completionRemarks: remarks || null }
+            : a)))
+          setCompleteTarget(null)
+          showToast('Saved offline. It will sync when you are back online.')
+          logAppt('✅', `Marked ${patient(appt).name}'s session as completed (offline)`, appt)
+          return
+        } catch { /* fall through to the normal error message */ }
+      }
       setCompleteError(err.message || 'Could not mark the session as completed.')
     } finally {
       setCompleteBusy(false)

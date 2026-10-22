@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocat
 import { MessagesProvider } from './context/MessagesContext'
 import StreamProvider from './stream/StreamProvider'
 import { clearAll as clearOfflineData } from './offline/db'
+import { startSync, stopSync } from './offline/syncService'
 import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
@@ -182,6 +183,14 @@ function App() {
   useEffect(() => {
     applyAccessibilityPrefs(loadAccessibilityPrefs())
   }, [])
+
+  // Offline sync runs for signed-in therapists only (the engine in src/offline/).
+  // It stops on logout (handleLogout), which also erases the local copy.
+  const isTherapist = isAuthenticated && currentUser?.role === 'Therapist'
+  useEffect(() => {
+    if (isTherapist) startSync()
+    else stopSync()
+  }, [isTherapist])
 
   useEffect(() => {
     if (!loginToast) return
@@ -365,6 +374,7 @@ function App() {
     const token = getSessionToken()
     if (token) fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}' }).catch(() => {})
     setSessionToken('')
+    stopSync() // stop sending/receiving before the local copy is erased
     clearOfflineData().catch(() => {}) // erase the on-device copy of clinical data
     setIsAuthenticated(false)
     setCurrentUser(null)

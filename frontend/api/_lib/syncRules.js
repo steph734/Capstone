@@ -14,7 +14,8 @@
 // Timestamps are ALWAYS set here (updated_at = server clock), never taken from the device.
 import { ObjectId } from 'mongodb'
 import { SOAP_FIELDS, encryptField, decryptField, validateSoap, cleanText } from './soapCrypto.js'
-import { isAssigned, audit } from './noteAccess.js'
+import { isAssigned, audit, sealSignature } from './noteAccess.js'
+import { boundedOfflineDate } from './manilaDate.js'
 import completeGameSession from './routes/game-sessions-complete.js'
 import ownerLeaveRequests from './routes/owner-leave-requests.js'
 
@@ -156,7 +157,6 @@ async function pushSoapNote(ctx, doc) {
   const _id = oid(doc._id)
   const patientId = oid(doc.patient_id)
   if (!_id || !patientId) return rejected('BAD_DATA', 'This note is missing its patient.')
-  if (!DATE_RE.test(String(doc.session_date || ''))) return rejected('BAD_DATA', 'Invalid session date.')
   if (!(await isAssigned(db, employee._id, patientId))) {
     await audit(db, { user, action: 'denied', patientId, ip, meta: { attempted: 'sync' } })
     return rejected('NOT_ALLOWED', 'You are not assigned to this patient.')
@@ -174,11 +174,14 @@ async function pushSoapNote(ctx, doc) {
     const patient = await db.collection('patients').findOne({ _id: patientId }, { projection: { first_name: 1, last_name: 1 } })
     if (!patient) return rejected('BAD_DATA', 'Patient not found.')
     const encrypted = enc()
+    // The date is decided here, not by the device: the server's today, or (for a note written offline) the
+    // device's date only when it is real, not in the future and at most 7 days old.
+    const { date: noteDate, fromDevice } = boundedOfflineDate(doc.session_date)
     await db.collection('therapy_notes').insertOne({
       _id, NoteID: id, appointment_id: null, employee_id: employee._id,
       employee_name: [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' '),
       patient_id: patientId, patient_name: [patient.first_name, patient.last_name].filter(Boolean).join(' ') || null,
-      diagnosis: cleanText(doc.diagnosis).slice(0, 150) || null, title: null, session_date: doc.session_date, timezone: 'Asia/Manila',
+      diagnosis: cleanText(doc.diagnosis).slice(0, 150) || null, title: null, session_date: noteDate, date_source: fromDevice ? 'device_offline' : 'server', timezone: 'Asia/Manila',
       ...encrypted, status: 'draft', signature_image: null, signed_at: null, signed_by: null, content_hash: null,
       shared_with_guardian: false, shared_summary: null, shared_at: null, addendum_to: null, voided: false,
       version: 1, enc: 1, is_archived: false, archived_at: null, created_at: now, updated_at: now,

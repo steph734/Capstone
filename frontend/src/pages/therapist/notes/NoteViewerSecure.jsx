@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { openNote, noteHistory, addAddendum, voidNote, logExport } from './notesApi'
 import { exportNotePdf, printNote } from './notePdf'
 import { unescapeHtml } from '../../../utils/session'
+import SignaturePad from './SignaturePad'
 
 // Read-only view of ONE note. It is fetched on open (so the server can check
 // access, decrypt, verify the SHA-256 and write the "view" audit entry), never
@@ -16,7 +17,7 @@ const SECTIONS = [
 const box = (bg, fg, border) => ({ background: bg, color: fg, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '0 0 12px' })
 const fieldErr = { color: '#b91c1c', fontSize: 12, display: 'block', marginTop: 4 }
 const when = (d) => (d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
-const ACTION_LABEL = { create: 'Created', view: 'Viewed', edit: 'Edited draft', sign: 'Signed', addendum: 'Addendum added', share: 'Shared with guardian', unshare: 'Unshared', export: 'Exported (PDF)', print: 'Printed', void: 'Voided', denied: 'Access denied' }
+const ACTION_LABEL = { create: 'Created', view: 'Viewed', edit: 'Edited draft', sign: 'Signed', addendum: 'Addendum added', share: 'Shared with guardian', unshare: 'Unshared', export: 'Exported (PDF)', print: 'Printed', void: 'Voided', denied: 'Access denied', sign_failed: 'Sign failed (wrong password)', sign_locked: 'Signing locked', voice_log_exported: 'Voice log downloaded' }
 
 export default function NoteViewerSecure({ noteId, patient, therapistName, onBack, onEditDraft, onChanged, onSessionError }) {
   const [note, setNote] = useState(null)
@@ -26,6 +27,7 @@ export default function NoteViewerSecure({ noteId, patient, therapistName, onBac
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ reason: '', text: '', password: '' })
   const [errors, setErrors] = useState({})
+  const [sig, setSig] = useState(null) // drawn signature for the addendum
 
   const handleErr = useCallback((err) => {
     if (err.code === 'SESSION_LOCKED' || err.code === 'NO_SESSION') { onSessionError?.(err); return true }
@@ -40,7 +42,7 @@ export default function NoteViewerSecure({ noteId, patient, therapistName, onBac
 
   const loadHistory = () => noteHistory(noteId).then(setHistory).catch((err) => { if (!handleErr(err)) setError(err.message) })
   const toggle = (name) => {
-    setErrors({}); setForm({ reason: '', text: '', password: '' })
+    setErrors({}); setForm({ reason: '', text: '', password: '' }); setSig(null)
     setPanel((p) => (p === name ? null : name))
     if (name === 'history' && panel !== 'history') loadHistory()
   }
@@ -48,15 +50,16 @@ export default function NoteViewerSecure({ noteId, patient, therapistName, onBac
   const submit = async (kind) => {
     setBusy(true); setErrors({})
     try {
-      if (kind === 'addendum') await addAddendum(noteId, { reason: form.reason, text: form.text, password: form.password })
+      if (kind === 'addendum' && !sig) { setErrors({ signature: 'Draw and confirm your signature.' }); return }
+      if (kind === 'addendum') await addAddendum(noteId, { reason: form.reason, text: form.text, password: form.password, signatureImage: sig })
       else await voidNote(noteId, form.reason)
-      setPanel(null); setForm({ reason: '', text: '', password: '' })
+      setPanel(null); setForm({ reason: '', text: '', password: '' }); setSig(null)
       load(); onChanged?.()
       if (history) loadHistory()
     } catch (err) {
       if (handleErr(err)) return
       setErrors({ ...(err.fields || {}), _: err.message })
-    } finally { setBusy(false) }
+    } finally { setBusy(false); setForm((f) => ({ ...f, password: '' })) } // the password never stays in state after an attempt
   }
 
   const doExport = async (kind) => {
@@ -123,7 +126,7 @@ export default function NoteViewerSecure({ noteId, patient, therapistName, onBac
 
         <div className="tnp-sig-section">
           <div className="tnp-sig-row">
-            <span className="tnp-sig-cheer">{signed ? `✍️ Signed ${when(note.signedAt)}${note.signedByName ? ` by ${note.signedByName}` : ''}` : 'Not signed yet'}</span>
+            <span className="tnp-sig-cheer">{signed ? `✍️ Signed${note.signedByName ? ` by ${note.signedByName}` : ''} on ${when(note.signedAt)}` : 'Not signed yet'}</span>
             <div className="tnp-sig-right">
               {note.signatureImage ? <img src={note.signatureImage} alt="Therapist signature" className="tnp-sig-img" /> : <div className="tnp-sig-placeholder-line" />}
               <span className="tnp-sig-text">Therapist Signature</span>
@@ -152,8 +155,11 @@ export default function NoteViewerSecure({ noteId, patient, therapistName, onBac
             <label className="tnp-field-label" htmlFor="ad-text" style={{ display: 'block', marginTop: 8 }}>Addendum</label>
             <textarea id="ad-text" className="tnp-textarea" rows={4} value={form.text} maxLength={5000} onChange={(e) => setForm({ ...form, text: e.target.value })} />
             {errors.text && <span style={fieldErr}>{errors.text}</span>}
+            <label className="tnp-field-label" style={{ display: 'block', marginTop: 8 }}>Draw your signature</label>
+            <SignaturePad onSign={(d) => { setSig(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSig(null)} />
+            {errors.signature && <span style={fieldErr}>{errors.signature}</span>}
             <label className="tnp-field-label" htmlFor="ad-pw" style={{ display: 'block', marginTop: 8 }}>Re-enter your password to sign</label>
-            <input id="ad-pw" type="password" autoComplete="current-password" className="tnp-textarea" style={{ minHeight: 40 }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <input id="ad-pw" type="password" name="addendum-signing-password" autoComplete="new-password" className="tnp-textarea" style={{ minHeight: 40 }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             {(errors.password || errors._) && <span style={fieldErr}>{errors.password || errors._}</span>}
             <div style={{ marginTop: 10 }}><button className="tnp-primary-btn" disabled={busy} onClick={() => submit('addendum')}>{busy ? 'Saving…' : 'Sign addendum'}</button></div>
           </div>

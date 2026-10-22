@@ -16,6 +16,7 @@ import {
 import { unescapeHtml } from '../../utils/session'
 import { saveLocal, getDoc, listDocs } from '../../offline/repo'
 import OfflineDrafts from '../../offline/OfflineDrafts'
+import SignaturePad from './notes/SignaturePad'
 
 // authFetch errors carry an HTTP status; a failed fetch (no connection) does not.
 const isNetworkError = (err) => !err?.status
@@ -107,109 +108,13 @@ function fromApiNote(n) {
   }
 }
 
-// ── Signature Pad ─────────────────────────────────────────────────────────────
-function SignaturePad({ onSign, onClear }) {
-  const canvasRef  = useRef(null)
-  const drawing    = useRef(false)
-  const lastPos    = useRef({ x: 0, y: 0 })
-  const [isEmpty,   setIsEmpty]   = useState(true)
-  const [confirmed, setConfirmed] = useState(false)
-
-  const getPos = (e) => {
-    const canvas = canvasRef.current
-    const rect   = canvas.getBoundingClientRect()
-    const src    = e.touches ? e.touches[0] : e
-    return {
-      x: (src.clientX - rect.left) * (canvas.width  / rect.width),
-      y: (src.clientY - rect.top)  * (canvas.height / rect.height),
-    }
-  }
-
-  const startDraw = (e) => {
-    e.preventDefault()
-    if (confirmed) return
-    drawing.current  = true
-    lastPos.current  = getPos(e)
-  }
-
-  const draw = (e) => {
-    e.preventDefault()
-    if (!drawing.current || confirmed) return
-    const canvas = canvasRef.current
-    const ctx    = canvas.getContext('2d')
-    const pos    = getPos(e)
-    ctx.beginPath()
-    ctx.moveTo(lastPos.current.x, lastPos.current.y)
-    ctx.lineTo(pos.x, pos.y)
-    ctx.strokeStyle = '#1a1a2e'
-    ctx.lineWidth   = 2.5
-    ctx.lineCap     = 'round'
-    ctx.lineJoin    = 'round'
-    ctx.stroke()
-    lastPos.current = pos
-    setIsEmpty(false)
-  }
-
-  const endDraw = () => { drawing.current = false }
-
-  const clearPad = () => {
-    const canvas = canvasRef.current
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
-    setIsEmpty(true)
-    setConfirmed(false)
-    onClear()
-  }
-
-  const confirmSig = () => {
-    if (isEmpty) return
-    setConfirmed(true)
-    onSign(canvasRef.current.toDataURL())
-  }
-
-  return (
-    <div className="tnp-sigpad-wrap">
-      <canvas
-        ref={canvasRef}
-        width={600}
-        height={110}
-        className={`tnp-canvas${confirmed ? ' tnp-canvas-confirmed' : ''}`}
-        onMouseDown={startDraw}
-        onMouseMove={draw}
-        onMouseUp={endDraw}
-        onMouseLeave={endDraw}
-        onTouchStart={startDraw}
-        onTouchMove={draw}
-        onTouchEnd={endDraw}
-      />
-      {!confirmed ? (
-        <div className="tnp-sig-btns">
-          <button className="tnp-ghost-btn" onClick={clearPad} type="button">Clear</button>
-          <button
-            className={`tnp-confirm-btn${isEmpty ? ' tnp-btn-dim' : ''}`}
-            onClick={confirmSig}
-            disabled={isEmpty}
-            type="button"
-          >
-            ✅ Confirm Signature
-          </button>
-        </div>
-      ) : (
-        <div className="tnp-sig-confirmed-row">
-          <span className="tnp-sig-confirmed-label">✅ Signature confirmed</span>
-          <button className="tnp-ghost-btn" onClick={clearPad} type="button">Re-sign</button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Note Form ─────────────────────────────────────────────────────────────────
 // Four SOAP sections (10–5000 characters each to sign). Signing needs a drawn
 // signature AND the password typed again; "Save draft" needs neither. The
 // server re-validates everything and encrypts the text before it is stored.
 const SOAP_SECTIONS = [
   { key: 'subjective', label: 'Subjective', Icon: MessageSquare, hint: 'What the patient or guardian reported or felt...', cls: 'tnp-s' },
-  { key: 'objective', label: 'Objective', Icon: Eye, hint: 'Measured outcomes, ROM, accuracy...', cls: 'tnp-o' },
+  { key: 'objective', label: 'Objective', Icon: Eye, hint: 'Accuracy, prompts needed, words produced…', cls: 'tnp-o' },
   { key: 'assessment', label: 'Assessment', Icon: ChartColumn, hint: 'Clinical interpretation of findings...', cls: 'tnp-a' },
   { key: 'plan', label: 'Plan', Icon: Sun, hint: 'Next steps and home program...', cls: 'tnp-p' },
 ]
@@ -217,12 +122,23 @@ const fieldErrStyle = { color: '#b91c1c', fontSize: 12, display: 'block', margin
 const VOICE_FLUSH_MS = 30000
 
 function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked }) {
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  // The note's date is set by the server. Show the server's date (or, when editing, the note's own date), never the browser clock.
+  const [serverDate, setServerDate] = useState('')
+  useEffect(() => {
+    let alive = true
+    fetch('/api/server-time').then((r) => r.json()).then((d) => { if (alive && d?.date) setServerDate(d.date) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const shownIso = initial?.date || serverDate
+  const today = shownIso
+    ? new Date(`${String(shownIso).slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Set by the server when saved'
   const [soap, setSoap] = useState(() => Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, unescapeHtml(initial?.[key] || '')])))
   // Latest text, updated synchronously so back-to-back dictated phrases never overwrite each other.
   const soapRef = useRef(soap)
   const [sigData, setSigData] = useState(null)
-  const [password, setPassword] = useState('')
+  const pwRef = useRef(null) // the password lives only in the input element, never in React state
+  const clearPassword = () => { if (pwRef.current) pwRef.current.value = '' }
   const [busy, setBusy] = useState('')
   const [done, setDone] = useState(null) // 'signed' | 'draft'
   const [errors, setErrors] = useState({})
@@ -310,6 +226,7 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
 
   const submit = async (sign) => {
     const e = {}
+    const password = pwRef.current?.value || '' // read once, used for this request only
     if (sign) {
       for (const { key } of SOAP_SECTIONS) {
         const len = soap[key].trim().length
@@ -328,13 +245,11 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
       if (id) { noteIdRef.current = id; setNoteId(id) }
       if (sign) voice.stop()
       else await flushVoice()
-      setPassword('')
       setDone(sign ? 'signed' : 'draft')
     } catch (err) {
       setErrors(err.fields || {})
       setFormError(err.message || 'Could not save this note.')
-      setPassword('')
-    } finally { setBusy('') }
+    } finally { clearPassword(); setBusy('') } // cleared after every attempt, success or not
   }
   saveDraftRef.current = () => { if (!busy) submit(false) }
 
@@ -396,9 +311,9 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
               <SignaturePad onSign={(d) => { setSigData(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSigData(null)} />
               {errors.signature && <span role="alert" style={fieldErrStyle}>{errors.signature}</span>}
               <label className="tnp-field-label" htmlFor="sign-pw" style={{ display: 'block', marginTop: 12 }}><KeyRound size={14} aria-hidden="true" /> Your account password</label>
-              <input id="sign-pw" type="password" autoComplete="current-password" className="vn-password" value={password}
+              <input id="sign-pw" ref={pwRef} type="password" name="note-signing-password" autoComplete="new-password" defaultValue="" className="vn-password"
                 placeholder="Enter the password you use to sign in" aria-describedby="sign-pw-hint" aria-invalid={!!errors.password}
-                onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: '' })) }} />
+                onChange={() => setErrors((x) => ({ ...x, password: '' }))} />
               <p id="sign-pw-hint" className="vn-pw-hint">Use the password of the account you are signed in with (not a note password). It is checked by the server and never stored with the note.</p>
               {errors.password && <span role="alert" style={fieldErrStyle}>{errors.password}</span>}
             </div>

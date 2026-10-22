@@ -157,20 +157,15 @@ export async function addEntries(db, user, noteId, entries, ip) {
   return docs.length
 }
 
-// Read/export access: the note's therapist, the owner of that branch, or a Super Admin.
-async function assertCanRead(db, user, note) {
-  if (user.role === 'Super Admin') return
+// Read/export access: ONLY the therapist who wrote the note. Owners and Super Admins cannot read
+// or download a voice log (it is part of the clinical record), and every refusal is logged.
+async function assertCanRead(db, user, note, ip = null) {
   if (user.role === 'Therapist') {
     const employee = await employeeFor(db, user)
     if (employee && String(note.employee_id) === String(employee._id)) return
   }
-  if (user.role === 'Owner') {
-    const author = await db.collection('employees').findOne({ _id: note.employee_id }, { projection: { branch_id: 1 } })
-    const branch = author?.branch_id ? await db.collection('branchs').findOne({ _id: author.branch_id }, { projection: { owner_id: 1 } }) : null
-    // A branch with no owner assigned yet is open to Owner accounts (older data).
-    if (!branch?.owner_id || String(branch.owner_id) === String(user._id)) return
-  }
-  throw httpError(403, 'You do not have access to this voice log.')
+  await audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: note._id, ip, meta: { attempted: 'voice log' } }).catch(() => {})
+  throw httpError(403, 'Only the therapist who wrote this note can open its voice log.')
 }
 
 const toEntry = (d) => {
@@ -183,9 +178,9 @@ const toEntry = (d) => {
   }
 }
 
-export async function listEntries(db, user, noteId, { type = 'all' } = {}) {
+export async function listEntries(db, user, noteId, { type = 'all', ip = null } = {}) {
   const note = await loadNote(db, noteId)
-  await assertCanRead(db, user, note)
+  await assertCanRead(db, user, note, ip)
   const q = { note_id: note._id }
   if (type === 'command' || type === 'dictation') q.type = type
   const rows = await db.collection('voice_logs').find(q).sort({ spoken_at: 1, _id: 1 }).toArray()
@@ -257,7 +252,7 @@ export async function exportEntries(db, user, noteId, { format, commands, dictat
   if (!MIME[format]) throw httpError(400, 'format must be pdf, csv or txt.')
   if (!commands && !dictation) throw httpError(400, 'Include commands, dictated text, or both.')
   const note = await loadNote(db, noteId)
-  await assertCanRead(db, user, note)
+  await assertCanRead(db, user, note, ip)
   const all = (await db.collection('voice_logs').find({ note_id: note._id }).sort({ spoken_at: 1, _id: 1 }).toArray()).map(toEntry)
   const rows = all.filter((e) => (e.type === 'command' ? commands : dictation))
 

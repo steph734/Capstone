@@ -7,9 +7,11 @@
 import { ObjectId } from 'mongodb'
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
-import { checkPasswordReentry } from '../passwordCheck.js'
+import { checkSigningPassword } from '../passwordCheck.js'
+import { manilaToday } from '../manilaDate.js'
+import { tooManyRequests } from '../rateLimit.js'
 import { SOAP_FIELDS, encryptField, contentHash, validateSoap, cleanText } from '../soapCrypto.js'
-import { employeeFor, isAssigned, audit } from '../noteAccess.js'
+import { employeeFor, isAssigned, audit, sealSignature } from '../noteAccess.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export const SIGNATURE_RE = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
   }
   try {
     await getMongo()
-    const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist'], auditDenied: true })
     if (!ctx) return
     const { db, user, ip } = ctx
     const body = req.body || {}
@@ -34,16 +36,19 @@ export default async function handler(req, res) {
       await audit(db, { user, action: 'denied', patientId, ip, meta: { attempted: 'create' } })
       return res.status(403).json({ error: 'You are not assigned to this patient.' })
     }
-    if (!DATE_RE.test(String(body.sessionDate || ''))) return res.status(400).json({ error: 'Invalid session date.' })
+    // The note date is the server's "today" (Philippine time). A date sent by the browser is ignored.
+    const sessionDate = manilaToday()
     const sign = body.sign === true
 
     const { errors, value } = validateSoap(body, { complete: sign })
     if (Object.keys(errors).length) return res.status(400).json({ error: 'Please fix the highlighted sections.', fields: errors })
     if (sign) {
+      if (await tooManyRequests(res, `sign:${user._id}`, { max: 20, windowMs: 15 * 60 * 1000 })) return
       if (!SIGNATURE_RE.test(String(body.signatureImage || '')) || body.signatureImage.length > 600000) {
         return res.status(400).json({ error: 'Draw your signature to sign this note.', fields: { signature: 'A signature is required.' } })
       }
-      const check = await checkPasswordReentry(db, user, body.password)
+      // Wrong passwords are logged, and 5 of them lock signing for 15 minutes (see passwordCheck.js).
+      const check = await checkSigningPassword(db, user, body.password, { ip, patientId })
       if (!check.ok) return res.status(check.locked ? 423 : 401).json({ error: check.error, locked: !!check.locked, fields: { password: check.error } })
     }
 
@@ -64,11 +69,11 @@ export default async function handler(req, res) {
       patient_name: [patient.first_name, patient.last_name].filter(Boolean).join(' ') || null,
       diagnosis: cleanText(body.diagnosis).slice(0, 150) || null,
       title: null,
-      session_date: body.sessionDate,
+      session_date: sessionDate,
       timezone: 'Asia/Manila',
       ...encrypted,
       status: sign ? 'signed' : 'draft',
-      signature_image: sign ? body.signatureImage : null,
+      signature_image: sign ? sealSignature(body.signatureImage, id) : null, // stored encrypted
       signed_at: sign ? now : null,
       signed_by: sign ? employee._id : null,
       content_hash: hash,

@@ -9,6 +9,7 @@
 import crypto from 'node:crypto'
 import { ObjectId } from 'mongodb'
 import { getDb } from './mongo.js'
+import { audit } from './noteAccess.js'
 
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000
 export const IDLE_LOCK_MS = 15 * 60 * 1000
@@ -67,7 +68,7 @@ export async function revokeSession(sessionId) {
 // which is how a locked session is unlocked). `touch: false` still enforces the
 // idle lock but does not count the request as user activity (used by background
 // sync, so it can never keep an idle session alive).
-export async function requireSession(req, res, { roles, idle = true, touch = true } = {}) {
+export async function requireSession(req, res, { roles, idle = true, touch = true, auditDenied = false } = {}) {
   try {
     const header = String(req.headers?.authorization || '')
     const payload = header.startsWith('Bearer ') ? verifyToken(header.slice(7)) : null
@@ -91,6 +92,8 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
       return null
     }
     if (roles && !roles.includes(user.role)) {
+      // Optional: record the refusal (used by the session-note routes: every 403 is logged).
+      if (auditDenied) await audit(db, { user, action: 'denied', ip: getClientIp(req), meta: { attempted: `${req.method} ${String(req.originalUrl || req.url || '').split('?')[0]}` } }).catch(() => {})
       res.status(403).json({ error: 'You do not have access to this.', code: 'FORBIDDEN' })
       return null
     }

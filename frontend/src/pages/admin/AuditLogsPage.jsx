@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import { getAuditLogs } from '../../utils/auditLog'
+import { authFetch } from '../../utils/session'
 import './AuditLogsPage.css'
 
 // Backend-recorded security events (account lockouts, etc.) use a plain
@@ -10,7 +11,22 @@ import './AuditLogsPage.css'
 const SERVER_ACTION_META = {
   account_locked: { icon: '🔒', label: 'Account Locked' },
   login_failed_after_lockout: { icon: '🚨', label: 'Repeated Failed Login' },
+  // Session-note (SOAP) events
+  create: { icon: '📝', label: 'Note Created' },
+  view: { icon: '👁️', label: 'Note Viewed' },
+  edit: { icon: '✏️', label: 'Draft Saved' },
+  sign: { icon: '✅', label: 'Note Signed' },
+  sign_failed: { icon: '⚠️', label: 'Sign Failed' },
+  sign_locked: { icon: '🔒', label: 'Signing Locked' },
+  addendum: { icon: '➕', label: 'Addendum Added' },
+  share: { icon: '📤', label: 'Note Shared' },
+  unshare: { icon: '🚫', label: 'Note Unshared' },
+  void: { icon: '🗑️', label: 'Note Voided' },
+  voice_log_exported: { icon: '⬇️', label: 'Voice Log Downloaded' },
+  denied: { icon: '⛔', label: 'Access Denied' },
 }
+// Events that mean something was refused or went wrong; everything else is a normal success.
+const FAILED_ACTIONS = new Set(['account_locked', 'login_failed_after_lockout', 'sign_failed', 'sign_locked', 'denied'])
 
 function mapServerLog(log) {
   const created = new Date(log.created_at)
@@ -26,7 +42,7 @@ function mapServerLog(log) {
     action: meta.label,
     description: log.description,
     entity: `IP ${log.ip_address}`,
-    status: 'Failed',
+    status: FAILED_ACTIONS.has(log.action) ? 'Failed' : 'Success',
   }
 }
 
@@ -53,8 +69,7 @@ export default function AuditLogsPage({ user, onLogout }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/audit-logs')
-      .then((res) => (res.ok ? res.json() : null))
+    authFetch('/api/audit-logs')
       .then((data) => {
         if (cancelled || !data?.logs?.length) return
         setLogs((existing) => {

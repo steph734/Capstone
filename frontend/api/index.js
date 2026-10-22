@@ -12,6 +12,8 @@
 // same `(req, res) => {}` handler shape as before, then `app.all(...)` it
 // below. No new file under /api, so no extra function.
 import express from 'express'
+import { securityHeaders, sameSiteOnly, sanitizeBody } from './_lib/hardening.js'
+import serverTime from './_lib/routes/server-time.js'
 
 import createPaymentIntent from './_lib/routes/create-payment-intent.js'
 import createSetupIntent from './_lib/routes/create-setup-intent.js'
@@ -164,7 +166,11 @@ const app = express()
 // Default express.json() limit (100kb) is too small for a booking that
 // includes a compressed profile photo (a base64 data URL, ~30-160KB) — see
 // the photo upload box on step 1 of the booking form.
+app.use(securityHeaders) // Helmet: nosniff, no framing, HSTS ...
+app.use(sameSiteOnly) // changes must come from our own site (or ALLOWED_ORIGINS)
 app.use(express.json({ limit: '3mb' }))
+app.use(sanitizeBody) // drop $operators from request bodies
+app.all('/api/server-time', serverTime) // the server's date for the note form
 
 app.all('/api/create-payment-intent', createPaymentIntent)
 app.all('/api/create-setup-intent', createSetupIntent)

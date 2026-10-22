@@ -19,9 +19,10 @@
 import { ObjectId } from 'mongodb'
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
-import { checkPasswordReentry } from '../passwordCheck.js'
+import { checkSigningPassword } from '../passwordCheck.js'
+import { tooManyRequests } from '../rateLimit.js'
 import { SOAP_FIELDS, encryptField, decryptField, contentHash, addendumHash, validateSoap, validateReason, cleanText } from '../soapCrypto.js'
-import { employeeFor, isAssigned, guardianPatientIds, audit, decryptSoap, integrityOf, decryptAddendum, SECTION_LABEL } from '../noteAccess.js'
+import { employeeFor, isAssigned, guardianPatientIds, audit, decryptSoap, integrityOf, decryptAddendum, sealSignature, readSignature, SECTION_LABEL } from '../noteAccess.js'
 import { sendNoteSharedEmail } from '../noteEmailShared.js'
 import { SIGNATURE_RE } from './notes-create.js'
 
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
-    const ctx = await requireSession(req, res, { roles: ['Therapist', 'Owner', 'Patient'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist', 'Owner', 'Patient'], auditDenied: true })
     if (!ctx) return
     const { db, user, ip } = ctx
     const _id = new ObjectId(id)
@@ -56,12 +57,23 @@ export default async function handler(req, res) {
       }
     } else if (role === 'Owner') {
       // Owners can read, with a reason, and see the history; nothing else.
-      if (!(req.method === 'GET' && (action === '' || action === 'history'))) return fail(res, 403, 'Owners can only view notes.')
+      if (!(req.method === 'GET' && (action === '' || action === 'history'))) {
+        await audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: _id, ip, meta: { attempted: `${req.method} ${action || 'note'}` } })
+        return fail(res, 403, 'Owners can only view notes.')
+      }
     } else if (role === 'Patient') {
-      if (!(req.method === 'GET' && action === '')) return fail(res, 403, 'You can only read notes shared with you.')
+      if (!(req.method === 'GET' && action === '')) {
+        await audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: _id, ip, meta: { attempted: `${req.method} ${action || 'note'}` } })
+        return fail(res, 403, 'You can only read notes shared with you.')
+      }
     }
     const isAuthor = employee && String(note.employee_id) === String(employee._id)
-    const needAuthor = () => (isAuthor ? null : fail(res, 403, 'Only the therapist who wrote this note can do that.'))
+    // Only the author may edit, sign, add an addendum or void. Anyone else is refused AND the attempt is logged.
+    const needAuthor = () => {
+      if (isAuthor) return null
+      audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: _id, ip, meta: { attempted: `${req.method} ${action || 'edit'}` } }).catch(() => {})
+      return fail(res, 403, 'Only the therapist who wrote this note can do that.')
+    }
 
     // ── Open ─────────────────────────────────────────────────────────────
     if (req.method === 'GET' && action === '') {
@@ -94,7 +106,7 @@ export default async function handler(req, res) {
           date: note.session_date, status: note.status, version: note.version || 1,
           ...fields, integrity,
           signedAt: note.signed_at, signedByName: note.signed_at ? note.employee_name : null,
-          signatureImage: role === 'Therapist' ? note.signature_image : null,
+          signatureImage: role === 'Therapist' ? readSignature(note) : null,
           voided: !!note.voided, voidReason: note.voided ? decryptField(note.void_reason, id, 'void_reason') : null, voidedAt: note.voided_at || null,
           share: share ? { sections: share.sections, summary: share.summary || '', domain: share.domain || null, sharedAt: share.shared_at } : null,
           addenda: addenda.map(decryptAddendum),
@@ -146,17 +158,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, version: (note.version || 1) + 1 })
     }
 
+    if (action === 'sign' || action === 'addendum') {
+      if (await tooManyRequests(res, `sign:${user._id}`, { max: 20, windowMs: 15 * 60 * 1000 })) return
+    }
+
     if (action === 'sign') {
       const denied = needAuthor(); if (denied) return
       if (note.status !== 'draft' || note.voided) return fail(res, 409, 'This note is already signed or voided.')
       const { errors, value } = validateSoap(body, { complete: true })
       if (Object.keys(errors).length) return fail(res, 400, 'Please fix the highlighted sections.', { fields: errors })
       if (!SIGNATURE_RE.test(String(body.signatureImage || '')) || body.signatureImage.length > 600000) return fail(res, 400, 'Draw your signature to sign this note.', { fields: { signature: 'A signature is required.' } })
-      const check = await checkPasswordReentry(db, user, body.password)
+      // Wrong passwords are logged, and 5 of them lock signing for 15 minutes (see passwordCheck.js).
+      const check = await checkSigningPassword(db, user, body.password, { ip, patientId, noteId: _id })
       if (!check.ok) return fail(res, check.locked ? 423 : 401, check.error, { locked: !!check.locked, fields: { password: check.error } })
       const enc = Object.fromEntries(SOAP_FIELDS.map((f) => [f, encryptField(value[f], id, f)]))
       const hash = contentHash(value)
-      await db.collection('therapy_notes').updateOne({ _id }, { $set: { ...enc, status: 'signed', signature_image: body.signatureImage, signed_at: now, signed_by: employee._id, content_hash: hash, version: (note.version || 1) + 1, updated_at: now } })
+      await db.collection('therapy_notes').updateOne({ _id }, { $set: { ...enc, status: 'signed', signature_image: sealSignature(body.signatureImage, id), signed_at: now, signed_by: employee._id, content_hash: hash, version: (note.version || 1) + 1, updated_at: now } })
       await saveVersion('sign', enc, hash)
       await audit(db, { user, action: 'sign', patientId, noteId: _id, ip })
       return res.status(200).json({ ok: true, signedAt: now })
@@ -169,7 +186,9 @@ export default async function handler(req, res) {
       if (reason.error) return fail(res, 400, reason.error, { fields: { reason: reason.error } })
       const textLen = String(body.text || '').trim().length
       if (textLen < 10 || textLen > 5000) return fail(res, 400, 'The addendum needs between 10 and 5000 characters.', { fields: { text: 'Write between 10 and 5000 characters.' } })
-      const check = await checkPasswordReentry(db, user, body.password)
+      // An addendum is signed like the note itself: a drawn signature AND the password.
+      if (!SIGNATURE_RE.test(String(body.signatureImage || '')) || body.signatureImage.length > 600000) return fail(res, 400, 'Draw your signature to sign this addendum.', { fields: { signature: 'A signature is required.' } })
+      const check = await checkSigningPassword(db, user, body.password, { ip, patientId, noteId: _id })
       if (!check.ok) return fail(res, check.locked ? 423 : 401, check.error, { locked: !!check.locked, fields: { password: check.error } })
       const text = cleanText(body.text)
       const aId = new ObjectId()
@@ -181,7 +200,7 @@ export default async function handler(req, res) {
         session_date: note.session_date, timezone: 'Asia/Manila',
         subjective: null, objective: null, assessment: null, plan: null,
         addendum_to: _id, addendum_reason: encryptField(reason.value, aid, 'addendum_reason'), addendum_text: encryptField(text, aid, 'addendum_text'),
-        status: 'signed', signature_image: null, signed_at: now, signed_by: employee._id, content_hash: hash,
+        status: 'signed', signature_image: sealSignature(body.signatureImage, aid), signed_at: now, signed_by: employee._id, content_hash: hash,
         shared_with_guardian: false, shared_summary: null, shared_at: null, voided: false, version: 1, enc: 1,
         is_archived: false, archived_at: null, created_at: now, updated_at: now,
       })

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   }
   try {
     await getMongo()
-    const ctx = await requireSession(req, res, { roles: ['Owner'] })
+    const ctx = await requireSession(req, res, { roles: ['Owner'], auditDenied: true })
     if (!ctx) return
     const { db } = ctx
     const notes = await db.collection('therapy_notes').find({ addendum_to: null, is_archived: { $ne: true } },

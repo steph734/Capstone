@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     if (isAccess) {
       if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return res.status(405).json({ error: 'Method not allowed' }) }
-      const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+      const ctx = await requireSession(req, res, { roles: ['Therapist'], auditDenied: true })
       if (!ctx) return
       const allowed = await hasVoicePlan(ctx.db, ctx.user)
       res.setHeader('Cache-Control', 'no-store')
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
 
     // ── Add entries ──
     if (!isExport && req.method === 'POST') {
-      const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+      const ctx = await requireSession(req, res, { roles: ['Therapist'], auditDenied: true })
       if (!ctx) return
       const { db, user, ip } = ctx
       if (!rateLimit(res, `vl-post:${user._id}`, 60)) return
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
 
     // ── Read / export (therapist, branch owner, super admin; never guardians) ──
     if (req.method !== 'GET') { res.setHeader('Allow', isExport ? 'GET' : 'GET, POST'); return res.status(405).json({ error: 'Method not allowed' }) }
-    const ctx = await requireSession(req, res, { roles: ['Therapist', 'Owner', 'Super Admin', 'Patient'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist', 'Owner', 'Super Admin', 'Patient'], auditDenied: true })
     if (!ctx) return
     const { db, user, ip } = ctx
     if (user.role === 'Patient') return res.status(403).json({ error: 'You do not have access to this voice log.' })
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       return res.send(body)
     }
 
-    const entries = await listEntries(db, user, noteId, { type: String(req.query.type || 'all') })
+    const entries = await listEntries(db, user, noteId, { type: String(req.query.type || 'all'), ip })
     res.setHeader('Cache-Control', 'no-store')
     return res.json({ entries })
   } catch (err) {

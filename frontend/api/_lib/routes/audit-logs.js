@@ -1,6 +1,7 @@
 import { getMongo } from '../mongo.js'
 import { AuditLog } from '../models/auditLog.js'
 import '../models/user.js' // registers the 'User' schema so populate() below works
+import { requireSession } from '../session.js'
 
 // GET /api/audit-logs — most recent security/audit events, for the
 // Super Admin audit log page.
@@ -12,6 +13,9 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
+    // Audit logs describe who touched clinical records: only a signed-in Super Admin may read them.
+    const ctx = await requireSession(req, res, { roles: ['Super Admin'] })
+    if (!ctx) return
     const logs = await AuditLog.find({})
       .sort({ created_at: -1 })
       .limit(200)

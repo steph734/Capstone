@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
   try {
     await getMongo()
-    const ctx = await requireSession(req, res, { roles: ['Therapist'] })
+    const ctx = await requireSession(req, res, { roles: ['Therapist'], auditDenied: true })
     if (!ctx) return
     const { db, user } = ctx
     const employee = await employeeFor(db, user)

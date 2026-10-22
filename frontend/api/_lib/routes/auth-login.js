@@ -4,6 +4,7 @@ import { User } from '../models/user.js'
 import { AuditLog } from '../models/auditLog.js'
 import { EmailOtp } from '../models/emailOtp.js'
 import { createSession } from '../session.js'
+import { tooManyRequests } from '../rateLimit.js'
 import { OTP_TTL_MS, OTP_RESEND_COOLDOWN_MS, generateCode, hashCode, sendOtpEmail } from '../otp.js'
 
 const MAX_FAILED_ATTEMPTS = 5
@@ -55,6 +56,10 @@ export default async function handler(req, res) {
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Email and password are required.' })
     }
+
+    // Slow down password guessing: per network address and per account (the account lock still applies too).
+    if (await tooManyRequests(res, `login-ip:${getClientIp(req)}`, { max: 40, windowMs: 10 * 60 * 1000 })) return
+    if (await tooManyRequests(res, `login-user:${identifier}`, { max: 15, windowMs: 10 * 60 * 1000 })) return
 
     const user = await User.findOne({ $or: [{ email: identifier }, { username: identifier }] })
     if (!user) {

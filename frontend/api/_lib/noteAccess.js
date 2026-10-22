@@ -1,7 +1,7 @@
 // Authorization + audit helpers for the SOAP-note routes. Every decision here
 // is made from the verified session, never from a query-string patient or
 // email the browser supplies.
-import { SOAP_FIELDS, decryptField, contentHash, addendumHash } from './soapCrypto.js'
+import { SOAP_FIELDS, decryptField, encryptField, isEncrypted, contentHash, addendumHash } from './soapCrypto.js'
 
 // Employee (therapist) record for a signed-in user, matched on login email.
 export async function employeeFor(db, user) {
@@ -24,21 +24,58 @@ export async function guardianPatientIds(db, email) {
 // there is deliberately no update or delete path anywhere. (For defence in
 // depth, give the application's database user insert/find only on this
 // collection.)
+// Plain-English wording for the Super Admin "Audit Logs" page (collection `auditlogs`:
+// user, action, IP address, description, time). The description never contains note text
+// or patient names, only the kind of action and the note id.
+const AUDIT_WORDS = {
+  create: 'created a session note', view: 'viewed a session note', edit: 'saved a draft of a session note',
+  sign: 'signed a session note', sign_failed: 'entered a wrong password while signing a note',
+  sign_locked: 'was locked out of signing for 15 minutes after 5 wrong passwords', addendum: 'added an addendum to a signed note',
+  share: 'shared a note with the guardian', unshare: 'stopped sharing a note', void: 'voided a note',
+  export: 'exported a note as PDF', print: 'printed a note', voice_log_exported: 'downloaded a voice log',
+  soap_voice_used: 'used voice dictation in a note', denied: 'was denied access to session notes',
+}
+
 export async function audit(db, { user, role, action, patientId = null, noteId = null, ip = null, meta = null }) {
+  const now = new Date()
   try {
+    // Detailed trail: who, what, which patient and note, with optional details.
     await db.collection('audit_logs').insertOne({
       user_id: user?._id || null, role: role || user?.role || null, action,
-      patient_id: patientId, note_id: noteId, ip, created_at: new Date(),
+      patient_id: patientId, note_id: noteId, ip, created_at: now,
       ...(meta ? { meta } : {}),
     })
   } catch (err) {
     console.error('audit_logs insert failed:', err.message)
     throw Object.assign(new Error('Could not record this action in the audit log, so it was not completed.'), { status: 500 })
   }
+  // Readable copy for the Audit Logs page. Best effort: the detailed row above already exists.
+  if (user?._id) {
+    try {
+      const words = AUDIT_WORDS[action] || action
+      const attempted = action === 'denied' && meta?.attempted ? ` (tried: ${meta.attempted})` : ''
+      await db.collection('auditlogs').insertOne({
+        user_id: user._id, action, ip_address: String(ip || 'unknown'),
+        description: `${role || user.role || 'User'} ${words}${noteId ? ` [note ${String(noteId)}]` : ''}${attempted}`,
+        created_at: now,
+      })
+    } catch (err) {
+      console.error('auditlogs mirror failed:', err.message)
+    }
+  }
 }
 
 export async function viewedRecently(db, userId, noteId, ms = 10 * 60 * 1000) {
   return Boolean(await db.collection('audit_logs').findOne({ user_id: userId, note_id: noteId, action: 'view', created_at: { $gte: new Date(Date.now() - ms) } }, { projection: { _id: 1 } }))
+}
+
+// The drawn signature is stored encrypted (same AES-256-GCM, bound to the note id).
+// Older notes hold it as a plain data URL until the migration script runs, so both are read.
+export const sealSignature = (dataUrl, noteId) => (dataUrl ? encryptField(dataUrl, String(noteId), 'signature_image') : null)
+export function readSignature(n) {
+  if (!n?.signature_image) return null
+  if (!isEncrypted(n.signature_image)) return n.signature_image
+  try { return decryptField(n.signature_image, String(n._id), 'signature_image') } catch { return null }
 }
 
 // Decrypts the four SOAP fields of a stored note.

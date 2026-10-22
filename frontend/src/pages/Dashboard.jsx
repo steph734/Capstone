@@ -4,6 +4,7 @@ import Calendar from 'react-calendar'
 import PatientSidebar from '../components/PatientSidebar'
 import 'react-calendar/dist/Calendar.css'
 import './Dashboard.css'
+import SyncStatus from '../offline/SyncStatus'
 
 // SVG Icons
 function MenuIcon() {
@@ -338,6 +339,7 @@ export default function Dashboard({ onLogout, user, betaTier }) {
           </div>
 
           <div className="header-right">
+            <SyncStatus />
             <button
               className="header-notification-btn"
               aria-label="Notifications"

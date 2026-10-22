@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PatientSidebar from '../../components/PatientSidebar'
 import BetaTag from '../../components/BetaTag'
 import NotificationBell from '../../components/NotificationBell'
+import SyncStatus from '../../offline/SyncStatus'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import '../PageWithSidebar.css'
 import '../admin/AdminPages.css'
@@ -40,6 +41,7 @@ export default function OwnerPageShell({ user, onLogout, title, subtitle, icon, 
             <p>{subtitle}</p>
           </div>
           <div className="admin-header-right">
+            <SyncStatus />
             {headerActions}
             <NotificationBell email={user?.email} />
             <div className="admin-header-badge">

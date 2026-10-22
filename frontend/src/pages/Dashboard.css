@@ -78,6 +78,9 @@
 
 .header-right {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px; /* room for the sync status pill next to the bell */
 }
 
 .header-notification-btn {

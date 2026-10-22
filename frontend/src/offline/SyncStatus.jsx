@@ -3,6 +3,14 @@ import { getSyncState, subscribeSync, syncNow, resolveKeepMine, resolveUseTheirs
 import { db, SYNCED_COLLECTIONS } from './db'
 import { openRecord, watch } from './repo'
 
+// How many header-placed pills are on screen. The floating pill (used on pages without a
+// header slot) hides itself while a header one exists, so there is never a double pill.
+let inlineCount = 0
+const inlineListeners = new Set()
+const notifyInline = () => inlineListeners.forEach((fn) => fn())
+const subscribeInline = (fn) => { inlineListeners.add(fn); return () => inlineListeners.delete(fn) }
+const hasInlinePill = () => inlineCount > 0
+
 // Small status pill for the page header: Online / Offline / "N changes pending" / Sync error.
 // When something needs the therapist's attention (a SOAP conflict, a refused change)
 // the pill shows "Review" and opens the dialog below.
@@ -10,6 +18,12 @@ export default function SyncStatus({ floating = false }) {
   const s = useSyncExternalStore(subscribeSync, getSyncState)
   const [open, setOpen] = useState(false)
   const attention = s.conflicts + s.rejected
+  const inlineExists = useSyncExternalStore(subscribeInline, hasInlinePill)
+  useEffect(() => {
+    if (floating) return undefined
+    inlineCount += 1; notifyInline()
+    return () => { inlineCount -= 1; notifyInline() }
+  }, [floating])
 
   // Set when a page was answered from the saved (offline) copy instead of the server.
   const [cachedAt, setCachedAt] = useState(null)
@@ -51,6 +65,7 @@ export default function SyncStatus({ floating = false }) {
     </>
   )
   if (!floating) return body
+  if (inlineExists) return null // a header pill is already showing
   // Patients and owners have no shared header, so the pill floats in the bottom-left corner.
   return (
     <div style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>

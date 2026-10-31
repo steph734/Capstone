@@ -126,10 +126,11 @@ const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities',
 // Terms & Policies sits last, right above Settings and Help & Support.
 const TERMS_ITEM = { id: 'terms-policies', label: 'Terms & Policies', icon: <ShieldCheck size={24} />, path: '/patient/terms-policies' }
 
+// Games are part of every patient's account (what they can play today is set by the therapist's game plan),
+// so Gamified Activities is always shown. Speech to Text / TTS still needs the Silver plan or higher.
 function getPatientMenuItems(betaTier) {
-  if (betaTier === 'gold') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM, TERMS_ITEM]
-  if (betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, TERMS_ITEM]
-  return [...DEFAULT_MENU_ITEMS, TERMS_ITEM]
+  if (betaTier === 'gold' || betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM, TERMS_ITEM]
+  return [...DEFAULT_MENU_ITEMS, GAMIFIED_ITEM, TERMS_ITEM]
 }
 
 const DEFAULT_BOTTOM_MENU_ITEMS = [

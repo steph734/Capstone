@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
@@ -30,6 +30,9 @@ import GameLauncher from '../games/shared/GameLauncher'
 import usePlanState from '../games/shared/plan/usePlanState'
 import PlanPanel from '../games/shared/plan/PlanPanel'
 import PlanOverlays from '../games/shared/plan/PlanOverlays'
+import useHomePractice from '../games/shared/home/useHomePractice'
+import PatientHub from '../games/shared/home/PatientHub'
+import HomeOverlays from '../games/shared/home/HomeOverlays'
 import usePlayEvents from '../games/shared/plan/usePlayEvents'
 import { authFetch } from '../utils/session'
 import { GAME_COMPONENTS as GC, entryForCard, needsIntro } from '../games/shared/gameRegistry'
@@ -450,19 +453,22 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
   // Owner previews and practice mode (no tracked patient) are never locked.
   const enforcePlan = !rest.previewGameId && (requirePlayer ? Boolean(activity.isActive && !activity.isPractice) : Boolean(rest.patientEmail))
   const plan = usePlanState({ enabled: enforcePlan, activitySessionId: requirePlayer ? activity.session?.id : null })
+  // Home practice is for the patient's own account only (not previews, not therapist-hosted play).
+  const home = useHomePractice(!rest.previewGameId && !requirePlayer && Boolean(rest.patientEmail))
   return (
     <PaoProvider ident={ident}>
       <AppErrorBoundary label="games" onReset={() => navigate(rest.backPath || '/dashboard')}>
         <Suspense fallback={null}>
-          <GamifiedFullPageInner requirePlayer={requirePlayer} plan={plan} activitySessionId={requirePlayer ? activity.session?.id : null} {...rest} />
+          <GamifiedFullPageInner requirePlayer={requirePlayer} plan={plan} home={home} activitySessionId={requirePlayer ? activity.session?.id : null} {...rest} />
           <PlanOverlays ps={plan} />
+          <HomeOverlays hp={home} gameOpen={plan.gameOpen} />
         </Suspense>
       </AppErrorBoundary>
     </PaoProvider>
   )
 }
 
-function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null, plan, activitySessionId = null }) {
+function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null, plan, home, activitySessionId = null }) {
   const navigate = useNavigate()
   const pao = usePao()
 
@@ -778,6 +784,16 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     setTimeout(() => speakScript(pickLine(FULL_PAGE_LINES.gamesScript, lang)), 400)
   }
   useEffect(() => { plan.registerBack(backToGames) })
+  // The dashboard's home practice "Play" button sends the game name here.
+  const location = useLocation()
+  const autoPlay = useRef(location.state?.play || null)
+  useEffect(() => {
+    if (!autoPlay.current || phase !== 'games' || (home.enabled && !home.loaded)) return
+    const want = String(autoPlay.current).toLowerCase().replace(/[^a-z0-9]/g, '')
+    autoPlay.current = null
+    const c = allGames.find((g) => String(g.title).toLowerCase().replace(/[^a-z0-9]/g, '') === want)
+    if (c) startGame(c)
+  }, [phase, home.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (phase === 'profile') {
     return <GamifiedProfileView progress={progress} pao={pao.profile} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
@@ -1155,13 +1171,16 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
               })}
             </div>
 
-            {plan.enabled ? (plan.state === 'loading' ? null : (
-              <PlanPanel ps={plan} name={progress.patientName} onPlay={startGame} cards={allGames.filter(g =>
+            {plan.enabled ? (plan.state === 'loading' || (home.enabled && !home.loaded) ? null : (() => {
+              const shownCards = allGames.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&
                 (gameDiffFilter === 'all' || g.difficulty === gameDiffFilter) &&
                 isGamePublished(g.title)
-              )}/>
-            )) : (
+              )
+              return home.enabled
+                ? <PatientHub ps={plan} hp={home} cards={shownCards} allCards={allGames.filter(g => isGamePublished(g.title))} onPlay={startGame} name={progress.patientName}/>
+                : <PlanPanel ps={plan} name={progress.patientName} onPlay={startGame} cards={shownCards}/>
+            })()) : (
             <div className="gf-games-grid">
               {allGames.filter(g =>
                 (gameCatFilter === 'all' || g.category === gameCatFilter) &&

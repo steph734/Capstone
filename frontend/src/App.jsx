@@ -88,6 +88,7 @@ import TherapistAppointmentsPage from './pages/therapist/TherapistAppointmentsPa
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage'
 import TherapistNotesProgressPage from './pages/therapist/TherapistNotesProgressPage'
 import TherapistAssignExercisesPage from './pages/therapist/TherapistAssignExercisesPage'
+import SendGamesHomePage from './pages/therapist/assign/SendGamesHomePage'
 import TherapistSubscriptionPage from './pages/therapist/TherapistSubscriptionPage'
 import TherapistProfilePage from './pages/therapist/TherapistProfilePage'
 import TherapistReportPage from './pages/therapist/TherapistReportPage'
@@ -819,6 +820,21 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Therapist' ? (
                 <TherapistAssignExercisesPage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/therapist/assign-games/:sessionId/home"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Therapist' ? (
+                <SendGamesHomePage user={currentUser} onLogout={handleLogout} betaTier={ownerBetaTier} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

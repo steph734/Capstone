@@ -103,6 +103,8 @@ export default async function handler(req, res) {
       employee_id: employeeId,
       activity_session_id: activitySessionId,
       language: effectiveLanguage,
+      context: access.home ? 'home' : 'session',
+      home_plan_id: access.home ? access.homePlan._id : null,
       status: 'in_progress',
       started_at: new Date(),
     })
@@ -113,7 +115,7 @@ export default async function handler(req, res) {
       await activitySession.save()
     }
 
-    await markPlanGame(patientId, game._id, 'in_progress')
+    if (!access.home) await markPlanGame(patientId, game._id, 'in_progress') // a home play never touches today's therapy-session plan
     return res.status(201).json({ sessionId: String(session._id), profile: serializePaoProfile(profile) })
   } catch (err) {
     console.error('game-sessions/start error:', err)

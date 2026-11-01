@@ -548,7 +548,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                         {sessionsPage.map((s, i) => (
                           <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}>
                             <td className="py-2.5 text-[13px]" style={{ color: MUTED }}>{fmtDate(s.date)}</td>
-                            <td className="py-2.5 text-[13px] font-bold" style={{ color: GREEN_900 }}>{s.game}</td>
+                            <td className="py-2.5 text-[13px] font-bold" style={{ color: GREEN_900 }}>{s.game}{s.atHome && <span className="ml-2 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>At home</span>}</td>
                             <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.accuracy !== null ? `${s.accuracy}%` : '—'}</td>
                             <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.hints}</td>
                             <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.minutes}</td>

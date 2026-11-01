@@ -5,6 +5,8 @@ import PatientSidebar from '../components/PatientSidebar'
 import 'react-calendar/dist/Calendar.css'
 import './Dashboard.css'
 import SyncStatus from '../offline/SyncStatus'
+import useHomePractice from '../games/shared/home/useHomePractice'
+import HomeCard from '../games/shared/home/HomeCard'
 
 // SVG Icons
 function MenuIcon() {
@@ -172,6 +174,7 @@ const CLINIC = {
 
 export default function Dashboard({ onLogout, user, betaTier }) {
   const navigate = useNavigate()
+  const homePractice = useHomePractice(user?.role === 'Patient')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentUser] = useState(user || {
     name: 'Alvrin',
@@ -408,6 +411,15 @@ export default function Dashboard({ onLogout, user, betaTier }) {
                     <span className="hero-stat-value">{gameStats.streakDays} days</span>
                   </div>
                 </div>
+                {homePractice.plan && (
+                  <div className="hero-stat">
+                    <MiniRing value={homePractice.data.week.goal ? (homePractice.data.week.played / homePractice.data.week.goal) * 100 : 0} color="#2563eb" />
+                    <div className="hero-stat-text">
+                      <span className="hero-stat-label">Home practice</span>
+                      <span className="hero-stat-value">{homePractice.data.week.played} of {homePractice.data.week.goal} plays</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -438,6 +450,9 @@ export default function Dashboard({ onLogout, user, betaTier }) {
               </button>
             </div>
           </div>
+
+          {/* Home practice from the therapist */}
+          <HomeCard hp={homePractice} onPlay={(g) => navigate('/patient/gamified-activities', { state: { play: g.name } })} />
 
           {/* Upcoming Appointment */}
           <div className="appointment-card">

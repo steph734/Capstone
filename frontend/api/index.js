@@ -150,6 +150,7 @@ import paoEquip from './_lib/routes/pao-equip.js'
 import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
 import paoSeen from './_lib/routes/pao-seen.js'
 import * as gamePlans from './_lib/routes/game-plans.js'
+import * as homePractice from './_lib/routes/home-practice.js'
 import gameSessionsStart from './_lib/routes/game-sessions-start.js'
 import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
 import gameSessionsComplete from './_lib/routes/game-sessions-complete.js'
@@ -296,6 +297,10 @@ app.all('/api/pao-hair/create', paoHairCreate)
 app.all('/api/pao-hair/:id', paoHairItem)
 app.all('/api/pao-themes/list', paoThemesList)
 app.all('/api/pao-themes/:code', paoThemesItem)
+app.all('/api/home-practice-plans', homePractice.homePlansCollection)
+app.all('/api/home-practice-plans/:id', homePractice.homePlansItem)
+app.all('/api/patients/:id/home-practice', homePractice.patientHomePractice)
+app.all('/api/home-practice/me', homePractice.homePracticeMe)
 app.all('/api/therapist/today', gamePlans.therapistToday)
 app.all('/api/therapist/games', gamePlans.therapistGames)
 app.all('/api/game-plans', gamePlans.plansCollection)

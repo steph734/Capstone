@@ -11,6 +11,11 @@ const LOCK_TEXT = {
   paused: 'Your therapist paused play time. Wait a moment!',
   time_over: 'Play time is over. Great playing today!',
   no_plan: 'No games today yet. Your therapist will pick them during your session.',
+  home_day: 'Home practice is closed today. Check your practice days.',
+  home_hours: 'Home practice is open at a different time of day. Come back during your home play hours.',
+  home_limit: 'You used all your home play time today. Great job! Come back on your next practice day.',
+  home_not_started: 'Home practice has not opened yet.',
+  expired: 'Home practice has ended.',
 }
 
 // Every game goes through here: access check -> loading modal -> game.

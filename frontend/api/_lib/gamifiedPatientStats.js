@@ -74,7 +74,7 @@ export async function buildPatientStats(db, pid, days) {
     const prevFrom = manilaMidnightUtc(days * 2 - 1)
     const prevTo = from
 
-    const [patient, profile, allBadges, earnedBadges, games, curSessions, prevSessions, recentLookback, assignments] = await Promise.all([
+    const [patient, profile, allBadges, earnedBadges, games, curRaw, prevRaw, recentRaw, assignments, hiddenPlans] = await Promise.all([
       db.collection('patients').findOne({ _id: pid }, { projection: { first_name: 1, last_name: 1, birthdate: 1 } }),
       db.collection('pao_profiles').findOne({ patient_id: pid }),
       db.collection('badges').find({ is_active: true, status: { $in: ['active', null] } }).sort({ sort_order: 1, name: 1 }).toArray(),
@@ -84,8 +84,15 @@ export async function buildPatientStats(db, pid, days) {
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed', completed_at: { $gte: prevFrom, $lt: prevTo } }).toArray(),
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed' }).sort({ completed_at: -1 }).limit(200).toArray(),
       db.collection('exercise_assignments').find({ patient_id: pid, is_archived: { $ne: true } }, { projection: { due_date: 1, status: 1 } }).toArray(),
+      db.collection('home_practice_plans').find({ patient_id: pid, save_to_progress: false }, { projection: { _id: 1 } }).toArray(),
     ])
     if (!patient) return null
+    // Home plays count in progress (tagged "At home") unless the therapist turned "Save home scores" off for that plan.
+    const hideIds = new Set(hiddenPlans.map((p) => String(p._id)))
+    const keep = (x) => !(x.context === 'home' && hideIds.has(String(x.home_plan_id)))
+    const curSessions = curRaw.filter(keep)
+    const prevSessions = prevRaw.filter(keep)
+    const recentLookback = recentRaw.filter(keep)
 
     const gameById = new Map(games.map((g) => [String(g._id), g]))
     const name = [patient.first_name, patient.last_name].filter(Boolean).join(' ') || 'Unknown'
@@ -251,6 +258,7 @@ export async function buildPatientStats(db, pid, days) {
       therapyType: (() => { const t = gameById.get(String(s.game_id))?.therapy_type; return t ? t.charAt(0).toUpperCase() + t.slice(1) : null })(),
       xp: s.reward?.xp_earned || 0,
       minutes: Math.round((s.result?.duration_seconds || 0) / 60),
+      atHome: s.context === 'home',
     }))
 
     // ── Recent games (5 most recent, with a star rating derived from accuracy) ──

@@ -21,6 +21,7 @@ import { serializePaoProfile } from '../serializePaoProfile.js'
 import { serializeBadge } from '../serializeBadge.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 import { markPlanGame } from '../gamePlans.js'
+import { maybeLevelUp, playPercent } from '../homePractice.js'
 import { serializePaoHair } from '../serializePaoHair.js'
 import {
   computeXpEarned, applyXp, statGainsForGame, applyStatGains, isPerfectResult, manilaDayRange,
@@ -354,7 +355,11 @@ export default async function handler(req, res) {
       await session.endSession()
     }
 
-    await markPlanGame(patientId, game._id, 'done')
+    if (existing.context === 'home') {
+      // Home practice: auto level-up when the score is 80% or more (only if the therapist turned it on).
+      const pct = playPercent(result)
+      if (existing.home_plan_id && pct != null && pct >= 80) await maybeLevelUp(await getDb(), existing.home_plan_id, game._id)
+    } else await markPlanGame(patientId, game._id, 'done')
     return res.status(200).json(response)
   } catch (err) {
     console.error('game-sessions/complete error:', err)

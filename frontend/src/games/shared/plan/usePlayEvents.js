@@ -32,7 +32,8 @@ export default function usePlayEvents({ plan, open, getCard, activitySessionId }
   // A game opens / closes.
   useEffect(() => {
     const p = ctx.current.plan
-    if (!open || !p?.plan || p.state === 'off') return undefined
+    // Only the therapy-session plan reports to the monitor; a play at home (session plan over or none) does not.
+    if (!open || !p?.plan || (p.state !== 'open' && p.state !== 'paused')) return undefined
     const card = ctx.current.getCard?.()
     const entry = card && p.plan.games.find((g) => norm(g.name) === norm(card.title))
     if (!entry) return undefined

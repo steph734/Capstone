@@ -40,6 +40,9 @@ const gameSessionSchema = new mongoose.Schema(
     game_id: { type: mongoose.Schema.Types.ObjectId, required: true },
     employee_id: { type: mongoose.Schema.Types.ObjectId, default: null },
     activity_session_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+    // 'home' = played at home under a home practice plan; anything else (or missing) is a therapy-session play.
+    context: { type: String, enum: ['session', 'home'], default: 'session' },
+    home_plan_id: { type: mongoose.Schema.Types.ObjectId, default: null },
     language: { type: String, enum: ['en', 'tl', 'ceb'], default: 'en' },
 
     status: { type: String, required: true, enum: ['in_progress', 'completed', 'abandoned'], default: 'in_progress' },

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import useHomePractice from '../games/shared/home/useHomePractice'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import useUnreadCount from '../stream/useUnreadCount'
@@ -160,7 +161,9 @@ export default function PatientSidebar({
   betaTier,
   profilePath,
 }) {
-  const resolvedMenuItems = menuItems ?? getPatientMenuItems(betaTier)
+  // Home practice games open right now show as a count on Gamified Activities (patients only).
+  const homePractice = useHomePractice(user?.role === 'Patient')
+  const resolvedMenuItems = (menuItems ?? getPatientMenuItems(betaTier)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
   const unreadCount = useUnreadCount()
   const emailUnreadCount = useEmailUnreadCount(user?.email)
   const navigate = useNavigate()

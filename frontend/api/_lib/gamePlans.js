@@ -2,6 +2,7 @@
 // patient's Gamified Activities. Everything here works in Asia/Manila days (no DST, UTC+8).
 import { ObjectId } from 'mongodb'
 import { SessionGamePlan } from './models/sessionGamePlan.js'
+import { checkHomeAccess } from './homePractice.js'
 
 const MANILA_OFFSET_MS = 8 * 3600 * 1000
 export const DAY_MS = 86400000
@@ -129,7 +130,7 @@ export async function serializePlan(db, plan) {
 // Server-side gate: may this patient start this game right now?
 //   { ok: true, plan } or { ok: false, code: 'GAME_LOCKED', reason }
 // reason: no_plan | not_assigned | not_started | paused | time_over
-export async function checkGameAccess(db, patientId, gameId) {
+async function checkSessionAccess(db, patientId, gameId) {
   const plan = await todaysPlan(patientId)
   if (!plan) return { ok: false, code: 'GAME_LOCKED', reason: 'no_plan' }
   const entry = plan.games.find((g) => String(g.game_id) === String(gameId))
@@ -146,6 +147,18 @@ export async function checkGameAccess(db, patientId, gameId) {
     if (open) return { ok: true, plan }
   }
   return { ok: false, code: 'GAME_LOCKED', reason: 'time_over' }
+}
+
+// A game opens during the therapy session window, or at home inside the home practice window.
+//   { ok: true, plan } (session) | { ok: true, home: true, homePlan } | { ok: false, code, reason }
+export async function checkGameAccess(db, patientId, gameId) {
+  const s = await checkSessionAccess(db, patientId, gameId)
+  if (s.ok || s.code === 'GAME_PAUSED') return s
+  const h = await checkHomeAccess(db, patientId, gameId)
+  if (h.ok) return { ok: true, home: true, homePlan: h.plan }
+  // The game is in the home plan but home play is closed right now: say why (day, hours, daily limit...).
+  if (h.inPlan && ['no_plan', 'not_assigned', 'time_over'].includes(s.reason)) return { ok: false, code: 'GAME_LOCKED', reason: h.reason }
+  return s
 }
 
 // Called by the game-session routes so the therapist's live status follows the child's play.

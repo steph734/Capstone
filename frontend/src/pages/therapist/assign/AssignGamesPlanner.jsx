@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bell, BellOff, Calendar, Check, ChevronDown, Clock, GripVertical, Hand, Info, Pause, Play, Plus, Search, Send, Square, Timer, WifiOff, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { House } from 'lucide-react'
 import PlaytimeMonitor from './PlaytimeMonitor'
+import HomeSettingsForm from './HomeSettingsForm'
+import { defaultHome, homeBody, homeFromPlan, homeSummary } from './homeSettings'
 import useLiveMonitor, { chime, mmss, secondsLeft } from './useLiveMonitor'
 import { authFetch } from '../../../utils/session'
 import './assign-games.css'
+import './home-practice.css'
 
 const pad = (n) => String(n).padStart(2, '0')
 const toMin = (hhmm) => { const [h, m] = String(hhmm || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
@@ -58,6 +63,13 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
 
   const sel = sessions?.find((s) => s.id === selId) || null
 
+  // Home practice: where the patient may play after the session.
+  const navigate = useNavigate()
+  const [homeOn, setHomeOn] = useState(true)
+  const [home, setHome] = useState(null)
+  const [homePlan, setHomePlan] = useState(null) // the patient's saved home plan, if any
+  const [nextSession, setNextSession] = useState(null)
+
   // Live monitor: polled every 5 s; the plan form only shows while there is no plan (or while editing one).
   const live = useLiveMonitor(true)
   const [editing, setEditing] = useState(false)
@@ -95,13 +107,23 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
     const len = Math.max(15, toMin(sel.end) - toMin(sel.start) - 20)
     setStart(toHHMM(s)); setEnd(toHHMM(Math.min(toMin(sel.end), s + len)))
     let alive = true
-    authFetch('/api/game-plans', { query: { patientId: sel.patientId } }).then((d) => {
-      if (!alive || !d.plan) return
+    setHomePlan(null); setNextSession(null); setHome(defaultHome(day, null)); setHomeOn(true)
+    Promise.all([
+      authFetch('/api/game-plans', { query: { patientId: sel.patientId } }).catch(() => ({ plan: null })),
+      authFetch(`/api/patients/${sel.patientId}/home-practice`, { query: { appointmentId: sel.id } }).catch(() => null),
+    ]).then(([d, hp]) => {
+      if (!alive) return
+      const next = hp?.nextSession || null
+      const existing = hp?.plan || null
+      setNextSession(next); setHomePlan(existing)
+      setHome(existing ? homeFromPlan(existing) : defaultHome(day, next))
+      const homeIds = new Set((existing?.games || []).map((g) => g.id))
+      if (!d.plan) return
       setSaved(d.plan)
-      setPlan(d.plan.games.map((g) => ({ gameId: g.gameId, name: g.name, difficulty: g.difficulty, minutes: g.minutes })))
+      setPlan(d.plan.games.map((g) => ({ gameId: g.gameId, name: g.name, difficulty: g.difficulty, minutes: g.minutes, atHome: existing ? homeIds.has(g.gameId) : true })))
       setStart(manilaHHMM(d.plan.playStart)); setEnd(manilaHHMM(d.plan.playEnd))
       setManual(d.plan.startManually); setWarn(d.plan.warnBeforeMinutes > 0); setFinish(d.plan.allowFinishCurrent)
-    }).catch(() => {})
+    })
     return () => { alive = false }
   }, [selId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -149,7 +171,9 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
   const typeValue = type || (defaultTypes.length === 1 ? defaultTypes[0] : defaultTypes.length ? 'mine' : 'all')
 
   const quick = (m) => { setCustom(false); setEnd(toHHMM(Math.min(toMin(sel.end), toMin(start) + m))) }
-  const add = (g) => setPlan((p) => [...p, { gameId: g.id, name: g.name, difficulty: g.difficulty, minutes: g.minutes }])
+  const add = (g) => setPlan((p) => [...p, { gameId: g.id, name: g.name, difficulty: g.difficulty, minutes: g.minutes, atHome: true }])
+  const setAtHome = (id, v) => setPlan((p) => p.map((g) => (g.gameId === id ? { ...g, atHome: v } : g)))
+  const homeGames = plan.filter((g) => g.atHome !== false)
   const remove = (id) => setPlan((p) => p.filter((g) => g.gameId !== id))
   const setMin = (id, v) => setPlan((p) => p.map((g) => (g.gameId === id ? { ...g, minutes: Math.min(60, Math.max(1, Math.round(Number(v)) || 1)) } : g)))
   const drop = (to) => {
@@ -175,8 +199,19 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
         ? await authFetch(`/api/game-plans/${saved.id}`, { method: 'PUT', body: body() })
         : await authFetch('/api/game-plans', { method: 'POST', body: body() })
       setSaved(d.plan)
+      // Home practice: create or replace the home plan (or switch it off when "Therapy session only" is chosen).
+      let homeNote = ''
+      if (homeOn && homeGames.length) {
+        const hb = homeBody(home, { patientId: sel.patientId, day, sessionEnd: sel.end, sessionPlanId: d.plan?.id, appointmentId: sel.id, games: homeGames.map((g) => ({ gameId: g.gameId, source: 'session' })) })
+        const r = await authFetch('/api/home-practice-plans', { method: 'POST', body: hb })
+        setHomePlan(r.plan)
+        homeNote = ` and can practice at home until ${homeSummary(home).split('until ')[1]}`
+      } else if (!homeOn && homePlan) {
+        await authFetch(`/api/home-practice-plans/${homePlan.id}`, { method: 'PATCH', body: { status: 'cancelled' } })
+        setHomePlan(null)
+      }
       setEditing(false); await live.refresh()
-      onToast?.(`${first} will see ${plan.length} game${plan.length === 1 ? '' : 's'} from ${fmt12(start)} to ${fmt12(end)}.`)
+      onToast?.(`${first} will see ${plan.length} game${plan.length === 1 ? '' : 's'} from ${fmt12(start)} to ${fmt12(end)}${homeNote}.`)
       await load()
       onAssigned?.()
     } catch (e) { onToast?.(e.message || 'Could not assign these games.') } finally { setBusy(false) }
@@ -255,6 +290,15 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
 
       {!sel ? <section className="ag-card ag-empty"><p className="ag-muted">Select a session to assign games.</p></section> : (
         <div className="ag-right">
+          {(sel.plan || lv || sel.completed || sel.home || homePlan) && (
+            <div className="hp-session-block">
+              <div>
+                <b><House size={16} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />{homePlan || sel.home ? `${first} has home practice` : sel.completed ? `${first}'s session is complete` : `Send games home after the session`}</b>
+                <small>{homePlan ? `${homePlan.games.length} game${homePlan.games.length === 1 ? '' : 's'} · ${homeSummary(homeFromPlan(homePlan))}` : 'Pick which games to keep practicing at home, based on how the session went.'}</small>
+              </div>
+              <button type="button" className="hp-btn" onClick={() => navigate(`/therapist/assign-games/${sel.id}/home`)}><House size={16} aria-hidden="true" /> {homePlan || sel.home ? 'Manage home practice' : 'Send games home'}</button>
+            </div>
+          )}
           {showMonitor && <PlaytimeMonitor lv={lv} first={first} offset={live.offset} today={day} onAct={act} onExtend={extend} onEdit={() => setEditing(true)} onToast={toast} />}
           {!showMonitor && (<>
           {/* Play time */}
@@ -284,6 +328,23 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
               <i className="w" style={{ flex: Math.max(warmup, 1) }} /><i className="g" style={{ flex: Math.max(Math.min(used, windowMin), 0.0001) }} /><i className="f" style={{ flex: Math.max(free, 0.0001) }} />
             </div>
             <div className="ag-legend"><span><b className="d w" /> Warm-up / wrap-up {warmup} min</span><span><b className="d g" /> Games planned {used} min</span><span><b className="d f" /> Free {Math.max(free, 0)} min of {windowMin}</span><em>Session {fmt12(sel.start)} – {fmt12(sel.end)}</em></div>
+          </section>
+
+          {/* Where can the patient play these games? */}
+          <section className="hp-card">
+            <div className="hp-head">
+              <span className="ag-icon"><House size={20} aria-hidden="true" /></span>
+              <div><h3>Where can {first} play these games? <span className="hp-new">NEW</span></h3><p>After the session, keep the same games unlocked so {first} can keep practicing at home.</p></div>
+            </div>
+            <div className="hp-opts" role="radiogroup" aria-label="Where can the patient play these games">
+              <button type="button" role="radio" aria-checked={!homeOn} className={`hp-opt${!homeOn ? ' on' : ''}`} onClick={() => setHomeOn(false)}>
+                <span className="dot" /><span><b>Therapy session only</b><small>Games lock again at {fmt12(end)} when play time ends.</small></span>
+              </button>
+              <button type="button" role="radio" aria-checked={homeOn} className={`hp-opt${homeOn ? ' on' : ''}`} onClick={() => setHomeOn(true)}>
+                <span className="dot" /><span><b>Session + home practice</b><small>Same games stay unlocked at home after the session, so {first} can practice and you can track progress.</small></span>
+              </button>
+            </div>
+            {homeOn && home && <HomeSettingsForm value={home} onChange={setHome} first={first} sessionEnd={sel.end} nextSession={nextSession} />}
           </section>
 
           <div className="ag-lower">
@@ -332,6 +393,13 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
                     <GripVertical size={16} className="grip" aria-hidden="true" />
                     <span className="n">{i + 1}</span><b>{g.name}</b>
                     <span className={`d ${g.difficulty}`}>{cap(g.difficulty)}</span>
+                    {homeOn && (
+                      <span className="hp-chips" style={{ flexBasis: '100%', paddingLeft: 56 }}>
+                        <span className="hp-chip s">In session</span>
+                        {g.atHome !== false && <span className="hp-chip h">At home</span>}
+                        <label className="hp-also"><input type="checkbox" checked={g.atHome !== false} onChange={(e) => setAtHome(g.gameId, e.target.checked)} /> Also at home</label>
+                      </span>
+                    )}
                     <label className="ag-min"><input type="number" min="1" max="60" value={g.minutes} onChange={(e) => setMin(g.gameId, e.target.value)} aria-label={`Minutes for ${g.name}`} /> min</label>
                     <button type="button" onClick={() => remove(g.gameId)} aria-label={`Remove ${g.name}`}><X size={16} /></button>
                   </li>
@@ -339,9 +407,10 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
               </ol>
               <div className={`ag-total${free < 0 ? ' over' : ''}`}><b>{plan.length} game{plan.length === 1 ? '' : 's'}</b><span>{used} of {windowMin} min · <em>{free < 0 ? `${-free} min over` : `${free} min free`}</em></span></div>
               <button type="button" className="ag-assign" disabled={!plan.length || free < 0 || windowMin <= 0 || busy} onClick={assign}>
-                <Send size={18} /> {busy ? 'Saving…' : saved && active ? `Update plan for ${first}` : `Assign & unlock for ${first}`}
+                <Send size={18} /> {busy ? 'Saving…' : saved && active ? `Update plan for ${first}` : homeOn ? 'Assign for session + home' : `Assign & unlock for ${first}`}
               </button>
               <p className="ag-note"><Info size={14} /> {first} sees only these {plan.length} game{plan.length === 1 ? '' : 's'} from {fmt12(start)} to {fmt12(end)}.</p>
+              {homeOn && home && <p className="hp-summary"><House size={14} aria-hidden="true" /> {homeGames.length ? `At home (${homeGames.length} game${homeGames.length === 1 ? '' : 's'}): ${homeSummary(home)}` : 'No game is set for home yet. Tick "Also at home" on a game.'}</p>}
 
               {saved && saved.status !== 'cancelled' && (
                 <div className={`ag-live ${saved.status}`}>

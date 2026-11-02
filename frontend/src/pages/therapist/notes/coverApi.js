@@ -1,7 +1,11 @@
 import { authFetch } from '../../../utils/session'
 
 // Sharing a SOAP note with a covering therapist (collection note_cover_shares; guardian sharing is separate).
-export const listAvailable = (date, time) => authFetch('/api/therapists/available', { query: { ...(date ? { date } : {}), ...(time ? { time } : {}) } }).then((b) => b.therapists)
+// Colleague availability is remembered per date and time, so reopening the modal or switching tabs shows the list at once.
+const availCache = new Map()
+const availKey = (d, t) => `${d || ''}|${t || ''}`
+export const cachedAvailable = (d, t) => availCache.get(availKey(d, t)) || null
+export const listAvailable = (date, time) => authFetch('/api/therapists/available', { query: { ...(date ? { date } : {}), ...(time ? { time } : {}) } }).then((b) => { availCache.set(availKey(date, time), b.therapists); return b.therapists })
 export const createCoverShare = (body) => authFetch('/api/note-shares', { method: 'POST', body }).then((b) => b.share)
 export const changeCoverShare = (id, body) => authFetch(`/api/note-shares/${id}`, { method: 'PATCH', body }).then((b) => b.share)
 export const stopCoverShare = (id) => authFetch(`/api/note-shares/${id}`, { method: 'PATCH', body: { status: 'revoked' } })

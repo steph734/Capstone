@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { changeCoverShare, createCoverShare, firstName, listAvailable, time12 } from './coverApi'
+import { cachedAvailable, changeCoverShare, createCoverShare, firstName, listAvailable, time12 } from './coverApi'
 import './cover.css'
 
 // Tab switcher shared by both halves of the modal.
@@ -18,7 +18,7 @@ const AVAIL = { free: ['Free at', 'free'], busy: ['Busy at', 'busy'], unavailabl
 // "Another therapist" tab. `patient` = { id, name }, `session` = { id, date, start, end, noteId, noteStatus },
 // `existing` = an active share when the owner is changing the therapist.
 export default function ShareTherapistModal({ patient, session, existing, tabs, onDone, onClose }) {
-  const [list, setList] = useState(null)
+  const [list, setList] = useState(() => cachedAvailable(session?.date, session?.start))
   const [q, setQ] = useState('')
   const [pick, setPick] = useState(null)
   const [access, setAccess] = useState(existing?.access || (session?.noteStatus === 'signed' ? 'view' : 'write_sign'))

@@ -7,7 +7,7 @@ import NoteViewerSecure from './notes/NoteViewerSecure'
 import ShareDialog from './notes/ShareDialog'
 import ShareTherapistModal, { ShareTabs } from './notes/ShareTherapistTab'
 import { OwnerShareCard, CoverDetail, CoverFormBanner, CoverSidePanel, IncomingBanner, AbsentBanner, ContextModal } from './notes/CoverPanels'
-import { sharedByMe, sharedWithMe as fetchSharedWithMe, stopCoverShare, fmtDay as coverDay } from './notes/coverApi'
+import { sharedByMe, sharedWithMe as fetchSharedWithMe, stopCoverShare, listAvailable, fmtDay as coverDay } from './notes/coverApi'
 import { authFetch } from '../../utils/session'
 import LockScreen, { useIdleLock } from './notes/IdleLock'
 import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote } from './notes/notesApi'
@@ -784,6 +784,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const [cover,       setCover]       = useState({ out: [], inn: [], absent: false, need: 0 })
   const [therapistShare, setTherapistShare] = useState(null) // { patient, session, existing }
   const [flash,       setFlash]       = useState('')
+  const [todayData,   setTodayData]   = useState(null) // today's sessions, loaded ahead so the share modal opens at once
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState('')
@@ -1006,7 +1007,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   // Opens the share modal for a patient: finds today's session and the state of today's note.
   const openTherapistShare = async (patient, existing = null) => {
     try {
-      const d = await authFetch('/api/therapist/today')
+      const d = todayData || await authFetch('/api/therapist/today')
       const sess = d.sessions.find((x) => x.patientId === patient.id)
       const todayNote = (notes[patient.id] || []).find((n) => n.rawDate === d.today && !n.voided)
       if (!sess && !existing) { showFlash('There is no session today for this patient, so there is no note to share yet.'); return }
@@ -1033,6 +1034,12 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     meName: user?.name || 'You', onShare: (p) => openTherapistShare(p), onChange: (p, sh) => openTherapistShare(p, sh), onStop: stopShare,
     onChanged: () => { loadCover(); reload() }, onFlash: showFlash,
   }
+  // Load today's sessions once (and when the list reloads), and warm the colleague list for the selected patient.
+  useEffect(() => { if (!locked) authFetch('/api/therapist/today').then(setTodayData).catch(() => {}) }, [reloadKey, locked])
+  useEffect(() => {
+    const sess = todayData?.sessions.find((x) => x.patientId === selectedId)
+    if (sess) listAvailable(todayData.today, sess.start).catch(() => {})
+  }, [todayData, selectedId])
   const incomingPending = cover.inn.find((sh) => sh.status === 'pending')
   const doShare = async (sections, summary, domain) => {
     await shareNote(shareTarget.id, sections, summary, domain)

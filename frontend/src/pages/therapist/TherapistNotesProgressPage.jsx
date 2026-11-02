@@ -5,8 +5,8 @@ import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { manilaDateKey } from '../../utils/manilaTime'
 import NoteViewerSecure from './notes/NoteViewerSecure'
 import ShareDialog from './notes/ShareDialog'
-import ShareTherapistModal, { ShareTabs } from './notes/ShareTherapistTab'
-import { OwnerShareCard, CoverDetail, CoverFormBanner, CoverSidePanel, IncomingBanner, AbsentBanner, ContextModal } from './notes/CoverPanels'
+import ShareHub from './notes/ShareHub'
+import { OwnerShareCard, CoverDetail, CoverFormBanner, CoverSidePanel, IncomingBanner, AbsentBanner, ContextModal, StopShareModal } from './notes/CoverPanels'
 import { sharedByMe, sharedWithMe as fetchSharedWithMe, stopCoverShare, listAvailable, fmtDay as coverDay } from './notes/coverApi'
 import { authFetch } from '../../utils/session'
 import LockScreen, { useIdleLock } from './notes/IdleLock'
@@ -548,7 +548,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
   ) : (
     <>
       {selectedPatient.out && (
-        <OwnerShareCard share={selectedPatient.out} onView={(id) => onViewNote({ id })} onChange={(sh) => coverUi.onChange(selectedPatient, sh)} onStop={coverUi.onStop} onReload={coverUi.onChanged} />
+        <OwnerShareCard share={selectedPatient.out} onView={(id) => onViewNote({ id })} onChange={(sh) => coverUi.onChange(selectedPatient, sh)} onStop={coverUi.onStop} onReload={coverUi.onRefresh} />
       )}
       {notesBlock}
     </>
@@ -782,8 +782,10 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const isMobile = useIsMobile()
   const [basePatients, setPatients]  = useState([])
   const [cover,       setCover]       = useState({ out: [], inn: [], absent: false, need: 0 })
-  const [therapistShare, setTherapistShare] = useState(null) // { patient, session, existing }
+  const [hub, setHub] = useState(null) // the open share modal: { patient, note, tab, existing }
   const [flash,       setFlash]       = useState('')
+  const [stopTarget,  setStopTarget]  = useState(null) // the share waiting for "Stop sharing?" confirmation
+  const [stopping,    setStopping]    = useState(false)
   const [todayData,   setTodayData]   = useState(null) // today's sessions, loaded ahead so the share modal opens at once
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
@@ -791,7 +793,6 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const [view,        setView]        = useState('overview')  // 'overview' | 'new' | 'edit' | 'viewer'
   const [viewingId,   setViewingId]   = useState(null)
   const [editing,     setEditing]     = useState(null)        // a draft opened for editing
-  const [shareTarget, setShareTarget] = useState(null)
   const [locked,      setLocked]      = useState(null)        // { reason } while the page is locked
   const [reloadKey,   setReloadKey]   = useState(0)
   const versionRef = useRef({}) // latest server version of each draft saved on this page
@@ -1004,46 +1005,44 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   // Reopens a draft that is saved on this device. Its version is the server version it was based on.
   const openLocalDraft = (d) => { setEditing({ id: d._id, version: d.baseVersion, subjective: d.subjective, objective: d.objective, assessment: d.assessment, plan: d.plan }); setView('edit') }
 
-  // Opens the share modal for a patient: finds today's session and the state of today's note.
-  const openTherapistShare = async (patient, existing = null) => {
-    try {
-      const d = todayData || await authFetch('/api/therapist/today')
-      const sess = d.sessions.find((x) => x.patientId === patient.id)
-      const todayNote = (notes[patient.id] || []).find((n) => n.rawDate === d.today && !n.voided)
-      if (!sess && !existing) { showFlash('There is no session today for this patient, so there is no note to share yet.'); return }
-      const base = sess ? { id: sess.id, date: d.today, start: sess.start } : { id: existing.appointmentId, date: existing.sessionDate, start: existing.sessionStart }
-      setShareTarget(null)
-      setTherapistShare({ patient, existing, session: { ...base, dateLabel: coverDay(base.date), noteId: existing?.noteId || todayNote?.id || null, noteStatus: todayNote ? todayNote.status : 'none' } })
-    } catch (err) { if (!handleSessionErrorOnce(err)) showFlash(err.message || 'Could not open sharing.') }
-  }
+  // Opens the share modal at once: everything it needs (today's sessions, the colleague list) is loaded ahead.
+  const latestSigned = (p) => (notes[p.id] || []).find((x) => x.signed && !x.voided) || null
+  const openHub = (patient, note, tab, existing = null) => setHub({ patient, note, tab, existing })
+  // Today's session for the patient, and the state of today's note, for the "Another therapist" tab.
+  const hubSession = (() => {
+    if (!hub) return null
+    const sess = todayData?.sessions.find((x) => x.patientId === hub.patient.id)
+    const ex = hub.existing
+    if (!sess && !ex) return null
+    const base = sess ? { id: sess.id, date: todayData.today, start: sess.start } : { id: ex.appointmentId, date: ex.sessionDate, start: ex.sessionStart }
+    const todayNote = todayData ? (notes[hub.patient.id] || []).find((n) => n.rawDate === todayData.today && !n.voided) : null
+    return { ...base, dateLabel: coverDay(base.date), noteId: ex?.noteId || todayNote?.id || null, noteStatus: todayNote ? todayNote.status : 'none' }
+  })()
   const afterTherapistShare = (share, chosen) => {
     const first = chosen.name.split(' ')[0]
-    setTherapistShare(null)
-    showFlash(`${share.access === 'view' ? "The note" : "Today's note"} for ${therapistShare.patient.name} was shared with ${chosen.name}. ${first} can ${share.access === 'view' ? 'view' : 'write and sign'} it.`)
+    showFlash(`${share.access === 'view' ? 'The note' : "Today's note"} for ${hub.patient.name} was shared with ${chosen.name}. ${first} can ${share.access === 'view' ? 'view' : 'write and sign'} it.`)
+    setHub(null)
     loadCover(); reload()
   }
-  const stopShare = async (sh) => {
-    if (!window.confirm(`Stop sharing with ${sh.cover.name}? They lose access right away.`)) return
-    try { await stopCoverShare(sh.id); showFlash('Sharing stopped.'); loadCover(); reload() } catch (err) { if (!handleSessionErrorOnce(err)) showFlash(err.message) }
-  }
-  const guardianTab = (patient) => {
-    const n = (notes[patient.id] || []).find((x) => x.signed && !x.voided)
-    if (n) { setTherapistShare(null); setShareTarget(n) } else showFlash('Open a signed note and tap Share… on it to share with the guardian.')
+  const stopShare = (sh) => setStopTarget(sh)
+  const confirmStop = async () => {
+    setStopping(true)
+    try { await stopCoverShare(stopTarget.id); showFlash('Sharing stopped.'); setStopTarget(null); loadCover(); reload() } catch (err) { setStopTarget(null); if (!handleSessionErrorOnce(err)) showFlash(err.message) } finally { setStopping(false) }
   }
   const coverUi = {
-    meName: user?.name || 'You', onShare: (p) => openTherapistShare(p), onChange: (p, sh) => openTherapistShare(p, sh), onStop: stopShare,
-    onChanged: () => { loadCover(); reload() }, onFlash: showFlash,
+    meName: user?.name || 'You', onShare: (p) => openHub(p, latestSigned(p), 'therapist'), onChange: (p, sh) => openHub(p, null, 'therapist', sh), onStop: stopShare,
+    onChanged: () => { loadCover(); reload() }, onRefresh: loadCover, onFlash: showFlash,
   }
   // Load today's sessions once (and when the list reloads), and warm the colleague list for the selected patient.
-  useEffect(() => { if (!locked) authFetch('/api/therapist/today').then(setTodayData).catch(() => {}) }, [reloadKey, locked])
+  useEffect(() => { if (!locked && !todayData) authFetch('/api/therapist/today').then(setTodayData).catch(() => {}) }, [locked]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const sess = todayData?.sessions.find((x) => x.patientId === selectedId)
     if (sess) listAvailable(todayData.today, sess.start).catch(() => {})
   }, [todayData, selectedId])
   const incomingPending = cover.inn.find((sh) => sh.status === 'pending')
   const doShare = async (sections, summary, domain) => {
-    await shareNote(shareTarget.id, sections, summary, domain)
-    setShareTarget(null)
+    await shareNote(hub.note.id, sections, summary, domain)
+    setHub(null)
     reload()
   }
   const doUnshare = async (note) => {
@@ -1072,7 +1071,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       <div className="tnp-page">
         {flash && <div className="cv-toast" role="status"><Share2 size={18} aria-hidden="true" /> {flash}</div>}
         {incomingPending && <IncomingBanner share={incomingPending} onOpen={() => selectPatient(incomingPending.patientId)} />}
-        {cover.absent && cover.need > 0 && <AbsentBanner count={cover.need} onShare={() => { const p = selectedPatient && !selectedPatient.cover ? selectedPatient : basePatients[0]; if (p) openTherapistShare(p) }} />}
+        {cover.absent && cover.need > 0 && <AbsentBanner count={cover.need} onShare={() => { const p = selectedPatient && !selectedPatient.cover ? selectedPatient : basePatients[0]; if (p) openHub(p, latestSigned(p), 'therapist') }} />}
         {patients.length === 0 ? (
           <p className="tnp2-empty-notes">No patients yet — they'll show up here once they book with you.</p>
         ) : (
@@ -1089,7 +1088,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
               onNewNote={startNew}
               onViewNote={openNote}
               onEditDraft={startEditDraft}
-              onShareNote={setShareTarget}
+              onShareNote={(n) => { const p = patients.find((x) => x.id === selectedId); if (p) openHub(p, n, 'guardian') }}
               onUnshare={doUnshare}
               isMobile={isMobile}
               coverUi={coverUi}
@@ -1119,8 +1118,8 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       </div>
       )}
 
-      {shareTarget && <ShareDialog note={shareTarget} onShare={doShare} onClose={() => setShareTarget(null)} tabs={<ShareTabs tab="guardian" onTab={(t) => { if (t === 'therapist') { const p = patients.find((x) => x.id === selectedId); if (p) openTherapistShare(p) } }} />} />}
-      {therapistShare && <ShareTherapistModal patient={therapistShare.patient} session={therapistShare.session} existing={therapistShare.existing} tabs={<ShareTabs tab="therapist" onTab={(t) => { if (t === 'guardian') guardianTab(therapistShare.patient) }} />} onDone={afterTherapistShare} onClose={() => setTherapistShare(null)} />}
+      {stopTarget && <StopShareModal share={stopTarget} busy={stopping} onCancel={() => setStopTarget(null)} onConfirm={confirmStop} />}
+      {hub && <ShareHub patient={hub.patient} guardianNote={hub.note && hub.note.signed ? hub.note : null} session={hubSession} existing={hub.existing} initialTab={hub.tab} onGuardianShare={doShare} onTherapistDone={afterTherapistShare} onClose={() => setHub(null)} />}
       {locked && <LockScreen reason={locked.reason} userName={user?.name} onUnlocked={() => setLocked(null)} onSignOut={onLogout} />}
     </TherapistPageShell>
   )

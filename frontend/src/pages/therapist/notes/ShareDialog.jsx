@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 const SECTIONS = [['subjective', 'Subjective'], ['objective', 'Objective'], ['assessment', 'Assessment'], ['plan', 'Plan']]
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
-export default function ShareDialog({ note, onShare, onClose, tabs = null }) {
+export default function ShareDialog({ note, onShare, onClose, tabs = null, embedded = false }) {
   const [sections, setSections] = useState(note.sharedSections || [])
   const [summary, setSummary] = useState('')
   const [domain, setDomain] = useState(DOMAINS[0])
@@ -28,9 +28,8 @@ export default function ShareDialog({ note, onShare, onClose, tabs = null }) {
     try { await onShare(sections, summary, domain) } catch (err) { setError(err.message); setBusy(false) }
   }
 
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="share-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: 22, width: 'min(460px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}>
+  const inner = (
+    <>
         {tabs}
         <h3 id="share-title" style={{ margin: 0, fontSize: 18, color: '#1f3d36' }}>Share with the guardian</h3>
         <p style={{ fontSize: 13, color: '#5d7770', lineHeight: 1.5 }}>Only the sections you tick are readable, in the app. The guardian gets an email saying a note is available — never its content. You can unshare at any time.</p>
@@ -54,6 +53,13 @@ export default function ShareDialog({ note, onShare, onClose, tabs = null }) {
           <button type="button" className="tnp-ghost-btn" onClick={onClose}>Cancel</button>
           <button type="button" className="tnp-primary-btn" onClick={submit} disabled={busy || (!sections.length && !summary.trim())}>{busy ? 'Sharing…' : 'Share'}</button>
         </div>
+    </>
+  )
+  if (embedded) return inner
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="share-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: 22, width: 'min(460px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}>
+        {inner}
       </div>
     </div>
   )

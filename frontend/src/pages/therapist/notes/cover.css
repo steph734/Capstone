@@ -140,3 +140,10 @@
 .cv-link { background: none; border: 0; padding: 0; min-height: 44px; font: inherit; font-weight: 800; color: #1d4e8f; text-decoration: underline; cursor: pointer; }
 .cv-pill.amber { background: #fdebc8; color: #9a4a00; } .cv-pill.green { background: #dcf6e6; color: #15803d; } .cv-pill.grey { background: #e5e9e7; color: #51606a; }
 @media (max-width: 600px) { .cv-big-btns { flex-direction: column; } }
+
+.cv-confirm { width: min(400px, 100%); text-align: center; padding: 28px 24px 22px; }
+.cv-confirm-ico { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 14px; background: #fde1e1; color: #b91c1c; display: flex; align-items: center; justify-content: center; }
+.cv-confirm p { margin: 0 0 20px; color: #51606a; line-height: 1.5; font-size: 14.5px; }
+.cv-actions.center { justify-content: center; margin-top: 0; }
+.cv-actions.center .cv-btn { flex: 1; min-height: 48px; }
+@media (max-width: 600px) { .cv-actions.center { flex-direction: column-reverse; } }

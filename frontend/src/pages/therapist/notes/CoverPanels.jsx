@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Clock, Lock, TriangleAlert, X } from 'lucide-react'
+import { Ban, Check, Clock, Lock, TriangleAlert, X } from 'lucide-react'
 import { acceptCoverShare, accessText, coverContext, coverLog, declineCoverShare, endsText, firstName, fmtDay, fmtTime, handBackCoverShare, time12 } from './coverApi'
 import './cover.css'
 
@@ -19,7 +19,7 @@ export function OwnerShareCard({ share, onView, onChange, onStop, onReload }) {
     let alive = true
     const load = () => coverLog(share.id).then((l) => { if (alive) setLog(l) }).catch(() => {})
     load()
-    const t = live ? setInterval(() => { load(); onReload?.() }, 20000) : null
+    const t = live ? setInterval(() => { if (!document.hidden) { load(); onReload?.() } }, 20000) : null
     return () => { alive = false; if (t) clearInterval(t) }
   }, [share.id, share.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -278,6 +278,29 @@ export function AbsentBanner({ count, onShare }) {
     <div className="cv-banner amber" role="status">
       <TriangleAlert size={18} aria-hidden="true" /><span><b>You&apos;re marked absent today.</b> {count} patient{count === 1 ? '' : 's'} need{count === 1 ? 's' : ''} a covering therapist for today&apos;s SOAP note.</span>
       <button type="button" onClick={onShare}>Share a note</button>
+    </div>
+  )
+}
+
+// "Stop sharing?" confirmation (replaces the browser's plain confirm box).
+export function StopShareModal({ share, busy, onCancel, onConfirm }) {
+  const first = firstName(share.cover.name)
+  useEffect(() => {
+    const on = (e) => { if (e.key === 'Escape' && !busy) onCancel() }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [onCancel, busy])
+  return (
+    <div className="cv-overlay" onClick={() => !busy && onCancel()}>
+      <div className="cv-modal cv-confirm" role="alertdialog" aria-modal="true" aria-labelledby="cv-stop" onClick={(e) => e.stopPropagation()}>
+        <span className="cv-confirm-ico"><Ban size={26} aria-hidden="true" /></span>
+        <h3 id="cv-stop">Stop sharing this note?</h3>
+        <p>{first} loses access to {share.patientName}&apos;s note right away{share.steps.writing ? ', including the draft they started' : ''}. {first} will be told. You can share it with someone else afterwards.</p>
+        <div className="cv-actions center">
+          <button type="button" className="cv-btn" onClick={onCancel} disabled={busy} autoFocus>Keep sharing</button>
+          <button type="button" className="cv-btn red" onClick={onConfirm} disabled={busy}>{busy ? 'Stopping…' : 'Stop sharing'}</button>
+        </div>
+      </div>
     </div>
   )
 }

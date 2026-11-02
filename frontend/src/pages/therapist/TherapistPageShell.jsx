@@ -15,9 +15,11 @@ export default function TherapistPageShell({ user, onLogout, title, subtitle, ic
   useEffect(() => {
     if (!menuItems?.some((m) => m.id === 'notes-progress')) return undefined
     let alive = true
-    const load = () => authFetch('/api/note-shares/shared-with-me').then((d) => { if (alive) setCoverCount(d.pendingCount || 0) }).catch(() => {})
+    let t
+    // Quiet badge refresh: skipped while the tab is hidden, and stopped for good if the server refuses (expired or locked session).
+    const load = () => { if (document.hidden) return; authFetch('/api/note-shares/shared-with-me').then((d) => { if (alive) setCoverCount(d.pendingCount || 0) }).catch((e) => { if (e?.status === 401 || e?.status === 403) clearInterval(t) }) }
     load()
-    const t = setInterval(load, 60000)
+    t = setInterval(load, 60000)
     return () => { alive = false; clearInterval(t) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const items = menuItems?.map((m) => (m.id === 'notes-progress' && coverCount > 0 ? { ...m, badge: coverCount } : m))

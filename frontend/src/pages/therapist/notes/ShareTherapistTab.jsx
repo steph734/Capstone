@@ -17,7 +17,7 @@ const AVAIL = { free: ['Free at', 'free'], busy: ['Busy at', 'busy'], unavailabl
 
 // "Another therapist" tab. `patient` = { id, name }, `session` = { id, date, start, end, noteId, noteStatus },
 // `existing` = an active share when the owner is changing the therapist.
-export default function ShareTherapistModal({ patient, session, existing, tabs, onDone, onClose }) {
+export default function ShareTherapistModal({ patient, session, existing, tabs, onDone, onClose, embedded = false }) {
   const [list, setList] = useState(() => cachedAvailable(session?.date, session?.start))
   const [q, setQ] = useState('')
   const [pick, setPick] = useState(null)
@@ -40,10 +40,11 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
     return () => { alive = false }
   }, [session?.date, session?.start])
   useEffect(() => {
+    if (embedded) return undefined // the hub owns Escape
     const on = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const shown = useMemo(() => (list || []).filter((t) => t.name.toLowerCase().includes(q.trim().toLowerCase())), [list, q])
   const chosen = (list || []).find((t) => t.id === pick)
@@ -62,9 +63,8 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
     } catch (e) { setError(e.message || 'Could not share this note.'); setBusy(false) }
   }
 
-  return (
-    <div className="cv-overlay" onClick={onClose}>
-      <div className="cv-modal" role="dialog" aria-modal="true" aria-labelledby="cv-title" onClick={(e) => e.stopPropagation()}>
+  const inner = (
+    <>
         {tabs}
         <h3 id="cv-title">{changing ? 'Change therapist' : existing ? 'Share with another therapist' : 'Share SOAP note with a therapist'}</h3>
         <p className="cv-help">Can&apos;t attend today? Let another therapist write and sign {patient.name}&apos;s note. They only see what you allow, and every view is logged.</p>
@@ -130,6 +130,13 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
           <button type="button" className="cv-btn" onClick={onClose}>Cancel</button>
           <button type="button" className="cv-btn primary" disabled={!chosen || busy || (endsKind === 'custom' && !customDate)} onClick={submit}>{busy ? 'Sharing…' : chosen ? `Share with ${first}` : 'Pick a therapist'}</button>
         </div>
+    </>
+  )
+  if (embedded) return inner
+  return (
+    <div className="cv-overlay" onClick={onClose}>
+      <div className="cv-modal" role="dialog" aria-modal="true" aria-labelledby="cv-title" onClick={(e) => e.stopPropagation()}>
+        {inner}
       </div>
     </div>
   )

@@ -118,3 +118,25 @@
   .cv-actions { flex-direction: column-reverse; } .cv-actions .cv-btn { width: 100%; }
   .cv-row > .cv-muted { display: none; }
 }
+.cv-form-wrap { width: 100%; min-width: 0; flex: 1 1 100%; }
+
+.cv-narrow { width: min(480px, 100%); }
+.cv-btn.red { background: #b4401c; border-color: #b4401c; color: #fff; }
+.cv-btn.red-outline { color: #9a3412; border-color: #e8b9a3; background: #fff; }
+.cv-btn.big { flex: 1; min-height: 56px; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.cv-btn.locked { background: #e3eae6; color: #6b7c75; border-color: #dfe7e3; display: inline-flex; align-items: center; gap: 8px; }
+.cv-big-btns { display: flex; gap: 12px; margin-top: 14px; }
+.cv-request { border: 2px solid #bcd0f0; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.cv-request-head { display: flex; align-items: center; gap: 12px; }
+.cv-request-head b { display: block; font-size: 19px; color: #1f2d27; } .cv-request-head small { color: #51606a; font-size: 14px; }
+.cv-avatar { width: 46px; height: 46px; border-radius: 50%; background: #e7efe9; color: #2c5a47; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; }
+.cv-label.sm { margin: 4px 0 0; font-size: 13px; }
+.cv-chips.static span { padding: 8px 14px; border-radius: 20px; background: #e3f3ea; color: #1f6b46; font-weight: 800; font-size: 13.5px; }
+.cv-locked { border: 1.5px dashed #cfd9d4; border-radius: 18px; padding: 14px; background: #f4f7f5; }
+.cv-locked p { margin: 10px 0 0; color: #51606a; font-size: 14px; }
+.cv-status.amber { background: #fdebc8; color: #9a4a00; } .cv-status.green { background: #dcf6e6; color: #15803d; } .cv-status.grey { background: #e5e9e7; color: #51606a; }
+.cv-detail > .cv-status { align-self: flex-start; }
+.cv-badge.amber { background: #fdebc8; color: #9a4a00; }
+.cv-link { background: none; border: 0; padding: 0; min-height: 44px; font: inherit; font-weight: 800; color: #1d4e8f; text-decoration: underline; cursor: pointer; }
+.cv-pill.amber { background: #fdebc8; color: #9a4a00; } .cv-pill.green { background: #dcf6e6; color: #15803d; } .cv-pill.grey { background: #e5e9e7; color: #51606a; }
+@media (max-width: 600px) { .cv-big-btns { flex-direction: column; } }

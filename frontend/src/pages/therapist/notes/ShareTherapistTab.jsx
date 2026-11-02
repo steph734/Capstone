@@ -31,6 +31,8 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const signed = session?.noteStatus === 'signed'
+  // Pending or accepted: change the therapist. Declined, stopped or expired: a new share with the same options.
+  const changing = Boolean(existing) && ['pending', 'accepted'].includes(existing.status)
 
   useEffect(() => {
     let alive = true
@@ -53,7 +55,7 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
     setBusy(true); setError('')
     try {
       const common = { endsKind, customDate, includePastNotes: past, includeGoals: goals, includeGameProgress: games, message }
-      const share = existing
+      const share = changing
         ? await changeCoverShare(existing.id, { coverId: chosen.id, ...common })
         : await createCoverShare({ patientId: patient.id, appointmentId: session?.id, noteId: session?.noteId || undefined, coverId: chosen.id, access: signed ? 'view' : access, ...common })
       onDone(share, chosen)
@@ -64,7 +66,7 @@ export default function ShareTherapistModal({ patient, session, existing, tabs, 
     <div className="cv-overlay" onClick={onClose}>
       <div className="cv-modal" role="dialog" aria-modal="true" aria-labelledby="cv-title" onClick={(e) => e.stopPropagation()}>
         {tabs}
-        <h3 id="cv-title">{existing ? 'Change therapist' : 'Share SOAP note with a therapist'}</h3>
+        <h3 id="cv-title">{changing ? 'Change therapist' : existing ? 'Share with another therapist' : 'Share SOAP note with a therapist'}</h3>
         <p className="cv-help">Can&apos;t attend today? Let another therapist write and sign {patient.name}&apos;s note. They only see what you allow, and every view is logged.</p>
 
         <h4 className="cv-label">Note to share</h4>

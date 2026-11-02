@@ -272,7 +272,7 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   }
 
   return (
-    <>
+    <div className="cv-form-wrap">
     {cover && <CoverFormBanner share={cover} onPast={() => setPastOpen(true)} />}
     <div className="vn-layout">
       <div className="vn-main">
@@ -351,7 +351,7 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
       )}
     </div>
     {pastOpen && cover && <ContextModal share={cover} part="past" onClose={() => setPastOpen(false)} />}
-    </>
+    </div>
   )
 }
 
@@ -544,7 +544,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
   )
 
   const detailBody = !selectedPatient ? null : selectedPatient.cover ? (
-    <CoverDetail patient={selectedPatient} share={selectedPatient.cover} meName={coverUi.meName} onNewNote={onNewNote} onContinue={(id) => onViewNote({ id })} onChanged={coverUi.onChanged} />
+    <CoverDetail patient={selectedPatient} share={selectedPatient.cover} meName={coverUi.meName} onNewNote={onNewNote} onContinue={(id) => onViewNote({ id })} onChanged={coverUi.onChanged} onFlash={coverUi.onFlash} />
   ) : (
     <>
       {selectedPatient.out && (
@@ -647,7 +647,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
                 <div className="tnp2-list-row-info">
                   <div className="tnp2-list-row-top">
                     <span className="tnp2-list-row-name">{p.name}</span>
-                    {p.cover ? <span className="cv-pill">Shared with me</span> : <><span className={statusPillClass(status)}>{status}</span>{isOut(p) && <span className="cv-pill">Shared</span>}</>}
+                    {p.cover ? <span className={`cv-pill ${p.cover.status === 'pending' ? 'amber' : p.cover.status === 'accepted' || p.cover.status === 'completed' ? 'green' : 'grey'}`}>{p.cover.status === 'pending' ? 'New request' : p.cover.status === 'accepted' ? 'Accepted' : p.cover.status === 'completed' ? 'Signed' : 'Declined'}</span> : <><span className={statusPillClass(status)}>{status}</span>{isOut(p) && <span className="cv-pill">Shared</span>}</>}
                   </div>
                   <span className="tnp2-list-row-sub">{p.cover ? `From ${p.cover.owner.name} · today` : isOut(p) ? `${p.diagnosis} · with ${p.out.cover.name}` : `${p.diagnosis} · ${pNotes.length} note${pNotes.length === 1 ? '' : 's'}`}</span>
                 </div>
@@ -1031,7 +1031,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   }
   const coverUi = {
     meName: user?.name || 'You', onShare: (p) => openTherapistShare(p), onChange: (p, sh) => openTherapistShare(p, sh), onStop: stopShare,
-    onChanged: () => { loadCover(); reload() },
+    onChanged: () => { loadCover(); reload() }, onFlash: showFlash,
   }
   const incomingPending = cover.inn.find((sh) => sh.status === 'pending')
   const doShare = async (sections, summary, domain) => {

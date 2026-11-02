@@ -23,7 +23,10 @@ const instant = (key, hhmm) => new Date(`${key}T${String(hhmm || '00:00').slice(
 const toMin = (hhmm) => { const [h, m] = String(hhmm || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
 export const fullName = (e) => [e?.first_name, e?.last_name].filter(Boolean).join(' ') || 'Therapist'
 
+export const DECLINE_REASONS = { busy_at_that_time: 'Has another session at that time', not_my_area: 'Not their area of therapy', too_many_patients: 'Too many patients today', other: 'Other reason' }
+
 export const ACTION_WORDS = {
+  accepted: 'accepted the request', handed_back: 'handed the note back',
   shared: 'shared the note', opened: 'opened the note', viewed_past_notes: 'viewed past signed notes', viewed_game_progress: 'viewed game progress',
   viewed_goals: 'viewed goals and diagnosis', edited: 'saved a draft', signed: 'signed the note', declined: 'declined the handoff',
   revoked: 'stopped sharing', changed: 'changed the access', expired: 'access expired',
@@ -35,7 +38,19 @@ export async function expireShares(db, extra = {}) {
     { status: { $in: ['pending', 'accepted'] }, ends_at: { $lt: new Date() }, ...extra },
     { $set: { status: 'expired' } }
   )
+  // A request nobody answered by the time the session starts expires, and the owner is told so they can pick someone else.
+  const stale = await db.collection(COLL).find({ status: 'pending', session_start: { $ne: null }, ...extra }).toArray()
+  for (const sh of stale) {
+    if (instant(sh.session_date, sh.session_start) > new Date()) continue
+    const r = await db.collection(COLL).updateOne({ _id: sh._id, status: 'pending' }, { $set: { status: 'expired' } })
+    if (!r.modifiedCount) continue
+    await logShare(db, sh, null, 'expired', { reason: 'not answered before the session' })
+    const [owner, cover] = await Promise.all([db.collection('employees').findOne({ _id: sh.owner_id }), db.collection('employees').findOne({ _id: sh.cover_id })])
+    const { notify } = await import('./sessionRecommendations.js')
+    await notify(db, { email: owner?.email, type: 'note_share', title: 'Request expired', body: `${fullName(cover)} did not answer before the session started. Pick another therapist.`, link: `/therapist/notes-progress?patient=${sh.patient_id}` })
+  }
 }
+export const isAccepted = (s) => Boolean(s) && s.status === 'accepted' && (!s.ends_at || s.ends_at > new Date())
 export const isActive = (s) => Boolean(s) && ['pending', 'accepted'].includes(s.status) && (!s.ends_at || s.ends_at > new Date())
 
 export async function logShare(db, share, user, action, meta = null) {
@@ -47,10 +62,11 @@ export async function logShare(db, share, user, action, meta = null) {
 // The covering therapist's active share for this patient (optionally pinned to one share id).
 export async function activeCoverShare(db, employeeId, patientId, shareId = null) {
   await expireShares(db, { cover_id: employeeId })
-  const q = { cover_id: employeeId, patient_id: patientId, status: { $in: ['pending', 'accepted'] } }
+  // Only an ACCEPTED share opens the note. A pending or declined one gives no access to anything but the request summary.
+  const q = { cover_id: employeeId, patient_id: patientId, status: 'accepted' }
   if (shareId) q._id = shareId
   const s = await db.collection(COLL).findOne(q, { sort: { created_at: -1 } })
-  return isActive(s) ? s : null
+  return isAccepted(s) ? s : null
 }
 
 // Colleagues a therapist may hand a session to, with availability at the session time.
@@ -108,7 +124,7 @@ export function endsFor(kind, customDate, sessionDay) {
 
 // What a share looks like to the browser.
 export function serializeShare(s, { owner, cover, patient, note } = {}) {
-  const steps = { shared: s.created_at, opened: s.opened_at || null, writing: s.writing_at || null, signed: s.signed_at || null }
+  const steps = { shared: s.created_at, accepted: s.accepted_at || null, writing: s.writing_at || null, signed: s.signed_at || null }
   return {
     id: String(s._id), patientId: String(s.patient_id), patientName: patient ? [patient.first_name, patient.last_name].filter(Boolean).join(' ') : null,
     diagnosis: patient?.primary_condition || patient?.condition || null,
@@ -116,7 +132,8 @@ export function serializeShare(s, { owner, cover, patient, note } = {}) {
     owner: owner ? { id: String(owner._id), name: fullName(owner) } : { id: String(s.owner_id) },
     cover: cover ? { id: String(cover._id), name: fullName(cover) } : { id: String(s.cover_id) },
     access: s.access, includePastNotes: s.include_past_notes, includeGoals: s.include_goals, includeGameProgress: s.include_game_progress,
-    message: s.message || '', endsKind: s.ends_kind, endsAt: s.ends_at ? s.ends_at.toISOString() : null, status: s.status, noteId: s.note_id ? String(s.note_id) : null,
+    message: s.message || '', acceptedAt: s.accepted_at ? s.accepted_at.toISOString() : null, declinedAt: s.declined_at ? s.declined_at.toISOString() : null,
+    declineReason: s.decline_reason || null, declineReasonText: DECLINE_REASONS[s.decline_reason] || null, declineMessage: s.decline_message || '', endsKind: s.ends_kind, endsAt: s.ends_at ? s.ends_at.toISOString() : null, status: s.status, noteId: s.note_id ? String(s.note_id) : null,
     noteStatus: note ? (note.voided ? 'void' : note.status) : 'not_started',
     steps: Object.fromEntries(Object.entries(steps).map(([k, v]) => [k, v ? new Date(v).toISOString() : null])),
   }
@@ -138,6 +155,6 @@ export async function finishCoverSign(db, share, { user, employee, noteId }) {
 // First draft saved by the covering therapist: the "Writing" step, and the note is linked to the share.
 export async function markCoverWriting(db, share, { user, noteId }) {
   if (share.writing_at && String(share.note_id) === String(noteId)) return
-  await db.collection(COLL).updateOne({ _id: share._id }, { $set: { writing_at: share.writing_at || new Date(), note_id: noteId, status: 'accepted', opened_at: share.opened_at || new Date() } })
+  await db.collection(COLL).updateOne({ _id: share._id }, { $set: { writing_at: share.writing_at || new Date(), note_id: noteId, status: 'accepted' } })
   await logShare(db, { ...share, note_id: noteId }, user, 'edited')
 }

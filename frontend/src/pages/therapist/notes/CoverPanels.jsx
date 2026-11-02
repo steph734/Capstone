@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Check, Share2, TriangleAlert, X } from 'lucide-react'
-import { acceptCoverShare, accessText, coverContext, coverLog, declineCoverShare, endsText, firstName, fmtDay, fmtTime, time12 } from './coverApi'
+import { Check, Clock, Lock, TriangleAlert, X } from 'lucide-react'
+import { acceptCoverShare, accessText, coverContext, coverLog, declineCoverShare, endsText, firstName, fmtDay, fmtTime, handBackCoverShare, time12 } from './coverApi'
 import './cover.css'
 
-const STEPS = [['shared', 'Shared'], ['opened', 'Opened'], ['writing', 'Writing'], ['signed', 'Signed']]
+const STEPS = [['shared', 'Shared'], ['accepted', 'Accepted'], ['writing', 'Writing'], ['signed', 'Signed']]
 const stepsDone = (s) => STEPS.filter(([k]) => s.steps[k]).length
+const initials = (n) => String(n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+const REASONS = [['busy_at_that_time', 'I have another session at that time'], ['not_my_area', 'Not my area of therapy'], ['too_many_patients', 'Too many patients today'], ['other', 'Other']]
 
 // Edward: the note card for a shared session, with progress, the access log and the actions.
 export function OwnerShareCard({ share, onView, onChange, onStop, onReload }) {
@@ -21,12 +23,17 @@ export function OwnerShareCard({ share, onView, onChange, onStop, onReload }) {
     return () => { alive = false; if (t) clearInterval(t) }
   }, [share.id, share.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const badge = share.status === 'completed' ? `Signed by ${cover} (covering)` : share.status === 'declined' ? `${first} declined` : share.status === 'revoked' ? 'Sharing stopped' : share.status === 'expired' ? 'Access expired' : `Shared with ${cover}`
+  const badge = share.status === 'completed' ? `Signed by ${cover} (covering)`
+    : share.status === 'declined' ? `Declined by ${first}${share.declineReasonText ? ` – ${share.declineReasonText.toLowerCase()}` : ''}`
+      : share.status === 'revoked' ? 'Sharing stopped' : share.status === 'expired' ? 'Request expired'
+        : share.status === 'pending' ? `Waiting for ${first} to accept` : `Accepted by ${first}`
+  const tone = share.status === 'completed' ? 'green' : share.status === 'pending' ? 'amber' : share.status === 'accepted' ? 'blue' : 'grey'
+  const reshare = share.status === 'declined' || share.status === 'revoked' || share.status === 'expired'
   return (
     <section className="cv-card" aria-label="Shared with a therapist">
       <div className="cv-card-top">
         <b>{fmtDay(share.sessionDate)}, {share.sessionDate?.slice(0, 4)} · {time12(share.sessionStart)}</b>
-        <span className={`cv-badge ${live ? 'blue' : share.status === 'completed' ? 'green' : 'grey'}`}>{badge}</span>
+        <span className={`cv-badge ${tone}`}>{badge}</span>
         {live && <span className="cv-badge ghost">{accessText(share)}</span>}
       </div>
       <ol className="cv-steps" aria-label="Progress">
@@ -34,11 +41,16 @@ export function OwnerShareCard({ share, onView, onChange, onStop, onReload }) {
           <li key={k} className={i < done ? 'on' : ''}><i /><b>{label}</b><small>{share.steps[k] ? fmtTime(share.steps[k]) : '—'}</small></li>
         ))}
       </ol>
-      {live && <p className="cv-note">Access ends {share.endsKind === 'signed' ? `when ${first} signs the note` : `${endsText(share).toLowerCase()}`}. You&apos;ll get the signed note back in your list.</p>}
-      {share.status === 'declined' && <p className="cv-note warn">{first} declined this handoff. Pick another therapist so the note is covered.</p>}
+      {share.status === 'pending' && <p className="cv-note">{first} hasn&apos;t answered yet. {first} can&apos;t open the note until accepting.</p>}
+      {share.status === 'accepted' && <p className="cv-note">Access ends {share.endsKind === 'signed' ? `when ${first} signs the note` : endsText(share).toLowerCase()}. You&apos;ll get the signed note back in your list.</p>}
+      {share.status === 'declined' && (
+        <p className="cv-note warn">{first} declined{share.declineReasonText ? `: ${share.declineReasonText}` : ''}.{share.declineMessage ? ` “${share.declineMessage}”` : ''} Pick another therapist so the note is covered.</p>
+      )}
+      {share.status === 'expired' && <p className="cv-note warn">{first} didn&apos;t answer before the session started. Pick another therapist.</p>}
       <div className="cv-btns">
-        {share.noteId && <button type="button" className="cv-btn primary" onClick={() => onView(share.noteId)}>View note</button>}
-        {(live || share.status === 'declined' || share.status === 'revoked' || share.status === 'expired') && <button type="button" className="cv-btn" onClick={() => onChange(share)}>{live ? 'Change therapist' : 'Share with someone else'}</button>}
+        {share.noteId && share.status !== 'declined' && <button type="button" className="cv-btn primary" onClick={() => onView(share.noteId)}>View note</button>}
+        {reshare && <button type="button" className="cv-btn primary" onClick={() => onChange(share)}>Share with another therapist</button>}
+        {live && <button type="button" className="cv-btn" onClick={() => onChange(share)}>Change therapist</button>}
         {live && <button type="button" className="cv-btn danger" onClick={() => onStop(share)}>Stop sharing</button>}
       </div>
       <h4 className="cv-label">Access log</h4>
@@ -51,7 +63,6 @@ export function OwnerShareCard({ share, onView, onChange, onStop, onReload }) {
   )
 }
 
-// Rene: past notes, in a modal (only when the owner allowed them).
 function Modal({ title, onClose, children }) {
   useEffect(() => {
     const on = (e) => { if (e.key === 'Escape') onClose() }
@@ -86,52 +97,148 @@ export function ContextModal({ share, part, onClose }) {
   )
 }
 
-// Rene: the "Shared with me" detail panel.
-export function CoverDetail({ patient, share, meName, onNewNote, onContinue, onChanged }) {
-  const [modal, setModal] = useState(null)
+// Rene: "Decline this request?" with a required reason.
+function DeclineModal({ share, onClose, onDeclined }) {
+  const [reason, setReason] = useState('busy_at_that_time')
+  const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const live = share.status === 'pending' || share.status === 'accepted'
+  const owner = firstName(share.owner.name)
+  const go = async () => {
+    setBusy(true); setError('')
+    try { await declineCoverShare(share.id, { reason, message }); onDeclined() } catch (e) { setError(e.message); setBusy(false) }
+  }
+  return (
+    <div className="cv-overlay" onClick={onClose}>
+      <div className="cv-modal cv-narrow" role="dialog" aria-modal="true" aria-labelledby="cv-dec" onClick={(e) => e.stopPropagation()}>
+        <h3 id="cv-dec">Decline this request?</h3>
+        <p className="cv-help">{owner} will be told right away so he/she can share {share.patientName}&apos;s note with another therapist.</p>
+        <h4 className="cv-label">Reason</h4>
+        <div role="radiogroup" aria-label="Reason">
+          {REASONS.map(([v, label]) => (
+            <button key={v} type="button" role="radio" aria-checked={reason === v} className={`cv-row${reason === v ? ' on' : ''}`} onClick={() => setReason(v)}>
+              <span className={`cv-radio${reason === v ? ' on' : ''}`} /><b>{label}</b>
+            </button>
+          ))}
+        </div>
+        <h4 className="cv-label">Message to {owner} <span className="cv-muted">(optional)</span></h4>
+        <textarea className="cv-text" rows={3} maxLength={500} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Sorry, I'm fully booked tonight." />
+        {error && <p className="cv-error" role="alert">{error}</p>}
+        <div className="cv-actions">
+          <button type="button" className="cv-btn" onClick={onClose}>Go back</button>
+          <button type="button" className="cv-btn red" disabled={busy} onClick={go}>{busy ? 'Declining…' : 'Decline request'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Rene: the "Shared with me" detail panel: a request to answer, then the accepted view.
+export function CoverDetail({ patient, share, meName, onNewNote, onContinue, onChanged, onFlash }) {
+  const [modal, setModal] = useState(null)
+  const [declining, setDeclining] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const pending = share.status === 'pending'
+  const accepted = share.status === 'accepted'
   const owner = share.owner.name
   const first = firstName(owner)
-  // Opening the panel counts as "opened" (the owner sees it).
-  useEffect(() => { if (share.status === 'pending') acceptCoverShare(share.id).then(() => onChanged?.()).catch(() => {}) }, [share.id, share.status]) // eslint-disable-line react-hooks/exhaustive-deps
-  const status = share.noteStatus === 'signed' ? 'Signed' : share.noteStatus === 'draft' ? 'Draft' : 'Note not started'
-  const decline = async () => {
-    if (!window.confirm(`Decline this note? ${first} will be told and can pick someone else.`)) return
+  const todayKey = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+  const when = `${share.sessionDate === todayKey ? 'Today' : fmtDay(share.sessionDate)}, ${time12(share.sessionStart)}`
+
+  const accept = async () => {
     setBusy(true); setError('')
-    try { await declineCoverShare(share.id); onChanged?.() } catch (e) { setError(e.message); setBusy(false) }
+    try { await acceptCoverShare(share.id); onFlash?.(`You accepted. You can now write ${patient.name}'s SOAP note. ${first} has been notified.`); onChanged?.() } catch (e) { setError(e.message); onChanged?.() } finally { setBusy(false) }
   }
+  const handBack = async () => {
+    if (!window.confirm(`Hand this note back to ${first}? ${first} will be told right away.`)) return
+    setBusy(true); setError('')
+    try { await handBackCoverShare(share.id); onFlash?.(`You handed ${patient.name}'s note back to ${first}.`); onChanged?.() } catch (e) { setError(e.message); setBusy(false) }
+  }
+
+  const status = pending ? ['Waiting for your answer', 'amber']
+    : accepted ? [share.noteStatus === 'draft' ? 'Accepted · draft' : share.noteStatus === 'signed' ? 'Signed' : 'Accepted · note not started', 'green']
+      : share.status === 'completed' ? ['Signed', 'green'] : share.status === 'declined' ? ['Declined', 'grey'] : ['Ended', 'grey']
+
+  const info = (
+    <div className="cv-info">
+      <div><small>SHARED BY</small><b>{owner} · absent</b></div>
+      <div><small>{pending ? 'ACCESS IF YOU ACCEPT' : 'YOUR ACCESS'}</small><b>{accessText(share)}</b></div>
+      <div className="wide"><small>ACCESS ENDS</small><b>{share.endsKind === 'signed' ? 'When you sign the note' : endsText(share)}</b></div>
+    </div>
+  )
+  const message = (
+    <div className="cv-msg"><small>Message from {first}</small>{share.message ? <p>{share.message}</p> : <p className="cv-muted"><i>No message.</i></p>}</div>
+  )
+
   return (
     <div className="cv-detail">
       <div className="cv-detail-top">
-        <div><h3>{patient.name}</h3><p>{patient.diagnosis} · {share.sessionType || 'Session'} · {share.sessionDate === new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10) ? 'Today' : fmtDay(share.sessionDate)}, {time12(share.sessionStart)}</p></div>
-        <span className={`cv-status ${share.noteStatus}`}>{status}</span>
+        <div><h3>{patient.name}</h3><p>{patient.diagnosis} · {share.sessionType || 'Session'} · {when}</p></div>
       </div>
-      <div className="cv-info">
-        <div><small>SHARED BY</small><b>{owner} · absent</b></div>
-        <div><small>YOUR ACCESS</small><b>{accessText(share)}</b></div>
-        <div className="wide"><small>ACCESS ENDS</small><b>{share.endsKind === 'signed' ? 'When you sign the note' : endsText(share)}</b></div>
-      </div>
-      <div className="cv-msg"><small>Message from {first}</small>{share.message ? <p>{share.message}</p> : <p className="cv-muted"><i>No message.</i></p>}</div>
-      <div className="cv-chips">
-        {share.includePastNotes && <button type="button" onClick={() => setModal('past')}>Past signed notes</button>}
-        {share.includeGoals && <button type="button" onClick={() => setModal('goals')}>Goals &amp; diagnosis</button>}
-        {share.includeGameProgress && <button type="button" onClick={() => setModal('games')}>Game progress</button>}
-      </div>
-      {error && <p className="cv-error" role="alert">{error}</p>}
-      {live ? (
-        <div className="cv-btns">
-          {share.access === 'write_sign' && (share.noteId && share.noteStatus === 'draft'
-            ? <button type="button" className="cv-btn primary" onClick={() => onContinue(share.noteId)}>Continue note</button>
-            : <button type="button" className="cv-btn primary" onClick={onNewNote}>+ New session note</button>)}
-          {share.access === 'view' && share.noteId && <button type="button" className="cv-btn primary" onClick={() => onContinue(share.noteId)}>View note</button>}
-          {share.includePastNotes && <button type="button" className="cv-btn" onClick={() => setModal('past')}>View past notes</button>}
-          {!share.steps.writing && <button type="button" className="cv-btn danger" disabled={busy} onClick={decline}>Decline</button>}
-        </div>
-      ) : <p className="cv-note">{share.status === 'completed' ? 'You signed this note. Your access has ended.' : 'This share has ended.'}</p>}
-      {live && share.access === 'write_sign' && <p className="cv-note">Your note will be signed as &quot;{meName}, covering for {owner}&quot;. {first} is notified when you sign.</p>}
+      <span className={`cv-status ${status[1]}`}>{status[0]}</span>
+
+      {pending && (
+        <>
+          <div className="cv-request">
+            <div className="cv-request-head">
+              <span className="cv-avatar">{initials(owner)}</span>
+              <div><b>{owner} wants you to cover this session</b><small>Sent today at {fmtTime(share.steps.shared)}</small></div>
+            </div>
+            {info}
+            {message}
+            <h4 className="cv-label sm">You&apos;ll also be able to see</h4>
+            <div className="cv-chips static">
+              {share.includePastNotes && <span>Past signed notes</span>}
+              {share.includeGoals && <span>Goals &amp; diagnosis</span>}
+              {share.includeGameProgress && <span>Game progress</span>}
+              {!share.includePastNotes && !share.includeGoals && !share.includeGameProgress && <span className="cv-muted">Nothing extra.</span>}
+            </div>
+            {error && <p className="cv-error" role="alert">{error}</p>}
+            <div className="cv-big-btns">
+              <button type="button" className="cv-btn primary big" disabled={busy} onClick={accept}><Check size={18} aria-hidden="true" /> {busy ? 'Accepting…' : 'Accept request'}</button>
+              <button type="button" className="cv-btn red-outline big" disabled={busy} onClick={() => setDeclining(true)}><X size={18} aria-hidden="true" /> Decline</button>
+            </div>
+          </div>
+          <div className="cv-locked">
+            <div className="cv-btns">
+              <button type="button" className="cv-btn locked" disabled><Lock size={15} aria-hidden="true" /> + New session note</button>
+              <button type="button" className="cv-btn locked" disabled><Lock size={15} aria-hidden="true" /> View past notes</button>
+            </div>
+            <p>Locked until you accept. The patient&apos;s notes stay private until then.</p>
+          </div>
+        </>
+      )}
+
+      {accepted && (
+        <>
+          <ol className="cv-steps" aria-label="Progress">
+            {STEPS.map(([k, label], i) => <li key={k} className={i < stepsDone(share) ? 'on' : ''}><i /><b>{label}</b><small>{share.steps[k] ? fmtTime(share.steps[k]) : '—'}</small></li>)}
+          </ol>
+          {info}
+          {message}
+          <div className="cv-chips">
+            {share.includePastNotes && <button type="button" onClick={() => setModal('past')}>Past signed notes</button>}
+            {share.includeGoals && <button type="button" onClick={() => setModal('goals')}>Goals &amp; diagnosis</button>}
+            {share.includeGameProgress && <button type="button" onClick={() => setModal('games')}>Game progress</button>}
+          </div>
+          {error && <p className="cv-error" role="alert">{error}</p>}
+          <div className="cv-btns">
+            {share.access === 'write_sign' && (share.noteId && share.noteStatus === 'draft'
+              ? <button type="button" className="cv-btn primary" onClick={() => onContinue(share.noteId)}>Continue note</button>
+              : <button type="button" className="cv-btn primary" onClick={onNewNote}>+ New session note</button>)}
+            {share.access === 'view' && share.noteId && <button type="button" className="cv-btn primary" onClick={() => onContinue(share.noteId)}>View note</button>}
+            {share.includePastNotes && <button type="button" className="cv-btn" onClick={() => setModal('past')}>View past notes</button>}
+          </div>
+          {share.access === 'write_sign' && (
+            <p className="cv-note">Your note will be signed as &quot;{meName}, covering for {owner}&quot;.{!share.steps.writing && <> Can&apos;t do it anymore? <button type="button" className="cv-link" disabled={busy} onClick={handBack}>Hand it back to {first}</button></>}</p>
+          )}
+        </>
+      )}
+
+      {!pending && !accepted && <p className="cv-note">{share.status === 'completed' ? 'You signed this note. Your access has ended.' : share.status === 'declined' ? `You declined this request. You have no access to ${patient.name}'s note.` : 'This share has ended.'}</p>}
       {modal && <ContextModal share={share} part={modal} onClose={() => setModal(null)} />}
+      {declining && <DeclineModal share={share} onClose={() => setDeclining(false)} onDeclined={() => { setDeclining(false); onFlash?.(`You declined. ${first} has been told.`); onChanged?.() }} />}
     </div>
   )
 }
@@ -146,7 +253,6 @@ export function CoverFormBanner({ share, onPast }) {
     </div>
   )
 }
-// Rene: the side panel next to the form (handoff message and what he may do).
 export function CoverSidePanel({ share }) {
   const can = [['Write & sign the SOAP note', share.access === 'write_sign'], ['See past notes', share.includePastNotes], ['See goals & diagnosis', share.includeGoals], ['See game progress', share.includeGameProgress]]
   return (
@@ -158,11 +264,11 @@ export function CoverSidePanel({ share }) {
   )
 }
 
-// Page banners: Rene is handed a note / Edward is absent with patients still uncovered.
+// Page banners: a request is waiting for Rene / Edward is absent with patients still uncovered.
 export function IncomingBanner({ share, onOpen }) {
   return (
-    <div className="cv-banner blue" role="status">
-      <Share2 size={18} aria-hidden="true" /><span><b>{share.owner.name} is absent today and shared {share.patientName}&apos;s SOAP note with you.</b></span>
+    <div className="cv-banner amber" role="status">
+      <Clock size={18} aria-hidden="true" /><span><b>New request: {share.owner.name} asked you to cover {share.patientName}&apos;s SOAP note. Accept or decline before the {time12(share.sessionStart)} session.</b></span>
       <button type="button" onClick={onOpen}>Open</button>
     </div>
   )

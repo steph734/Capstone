@@ -11,7 +11,7 @@ import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
 import { audit, employeeFor, isAssigned, decryptSoap } from '../noteAccess.js'
 import { notify } from '../sessionRecommendations.js'
-import { ACTION_WORDS, COLL, activeCoverShare, availableColleagues, dayKey, endsFor, expireShares, fullName, isActive, logShare, oid, serializeShare } from '../coverShares.js'
+import { ACTION_WORDS, COLL, DECLINE_REASONS, activeCoverShare, availableColleagues, isAccepted, dayKey, endsFor, expireShares, fullName, isActive, logShare, oid, serializeShare } from '../coverShares.js'
 
 const method = (req, res, ...allowed) => {
   if (allowed.includes(req.method)) return true
@@ -192,7 +192,7 @@ export async function sharesItem(req, res) {
   } catch (err) { return fail(res, err, 'note-shares item') }
 }
 
-// POST /api/note-shares/:id/accept | /decline
+// POST /api/note-shares/:id/accept | /decline | /hand-back  (the invited therapist only)
 export async function sharesRespond(req, res) {
   if (!method(req, res, 'POST')) return
   try {
@@ -202,30 +202,48 @@ export async function sharesRespond(req, res) {
     const share = await loadShare(db, req.params.id)
     if (!share || String(share.cover_id) !== String(employee._id)) {
       if (share) await audit(db, { user, action: 'denied', patientId: share.patient_id, ip, meta: { attempted: 'cover-share respond' } })
-      return res.status(share ? 403 : 404).json({ error: share ? 'This share is not addressed to you.' : 'Share not found.' })
+      return res.status(share ? 403 : 404).json({ error: share ? 'This request is not addressed to you.' : 'Request not found.' })
     }
-    if (!isActive(share)) return res.status(403).json({ error: 'This share is no longer active.' })
     const action = req.params.action
     const now = new Date()
+    const owner = await db.collection('employees').findOne({ _id: share.owner_id })
+    const patient = await db.collection('patients').findOne({ _id: share.patient_id }, { projection: { first_name: 1, last_name: 1 } })
+    const pname = [patient?.first_name, patient?.last_name].filter(Boolean).join(' ')
+    const link = `/therapist/notes-progress?patient=${share.patient_id}`
+
+    if (action === 'accept' || action === 'decline') {
+      if (share.status === 'accepted') return res.status(409).json({ error: 'You already accepted this request.' })
+      if (share.status === 'expired') return res.status(410).json({ error: 'This request expired before you answered. Ask the owner to share it again.' })
+      if (share.status !== 'pending') return res.status(409).json({ error: 'This request is no longer open.' })
+    }
     if (action === 'accept') {
-      const first = !share.opened_at
-      await db.collection(COLL).updateOne({ _id: share._id }, { $set: { status: 'accepted', accepted_at: share.accepted_at || now, opened_at: share.opened_at || now } })
-      if (first) {
-        await logShare(db, share, user, 'opened')
-        await audit(db, { user, action: 'cover_open', patientId: share.patient_id, noteId: share.note_id, ip, meta: { share_id: String(share._id) } })
-        const owner = await db.collection('employees').findOne({ _id: share.owner_id })
-        await notify(db, { email: owner?.email, type: 'note_share', title: 'Note opened', body: `${fullName(employee)} opened the note you shared.`, link: `/therapist/notes-progress?patient=${share.patient_id}` })
-      }
-      return res.status(200).json({ ok: true })
+      const r = await db.collection(COLL).updateOne({ _id: share._id, status: 'pending' }, { $set: { status: 'accepted', accepted_at: now, opened_at: share.opened_at || now } })
+      if (!r.modifiedCount) return res.status(409).json({ error: 'This request is no longer open.' })
+      await logShare(db, share, user, 'accepted')
+      await audit(db, { user, action: 'cover_accept', patientId: share.patient_id, ip, meta: { share_id: String(share._id) } })
+      await notify(db, { email: owner?.email, type: 'note_share', title: 'Request accepted', body: `${fullName(employee)} accepted to cover ${pname}'s note.`, link })
+      return res.status(200).json({ ok: true, status: 'accepted' })
     }
     if (action === 'decline') {
-      if (share.writing_at) return res.status(409).json({ error: 'You already started this note. Ask the owner to take it back.' })
-      await db.collection(COLL).updateOne({ _id: share._id }, { $set: { status: 'declined', declined_at: now } })
-      await logShare(db, share, user, 'declined')
-      await audit(db, { user, action: 'cover_decline', patientId: share.patient_id, noteId: share.note_id, ip, meta: { share_id: String(share._id) } })
-      const owner = await db.collection('employees').findOne({ _id: share.owner_id })
-      await notify(db, { email: owner?.email, type: 'note_share', title: 'Handoff declined', body: `${fullName(employee)} declined the note you shared. You can pick another therapist.`, link: `/therapist/notes-progress?patient=${share.patient_id}` })
-      return res.status(200).json({ ok: true })
+      const b = req.body || {}
+      if (!Object.keys(DECLINE_REASONS).includes(b.reason)) return res.status(400).json({ error: 'Choose a reason for declining.', fields: { reason: 'Required' } })
+      const message = String(b.message || '').trim().slice(0, 500)
+      const r = await db.collection(COLL).updateOne({ _id: share._id, status: 'pending' }, { $set: { status: 'declined', declined_at: now, decline_reason: b.reason, decline_message: message } })
+      if (!r.modifiedCount) return res.status(409).json({ error: 'This request is no longer open.' })
+      await logShare(db, share, user, 'declined', { reason: b.reason, message })
+      await audit(db, { user, action: 'cover_decline', patientId: share.patient_id, ip, meta: { share_id: String(share._id), reason: b.reason } })
+      await notify(db, { email: owner?.email, type: 'note_share', title: 'Request declined', body: `${fullName(employee)} declined to cover ${pname}'s note (${DECLINE_REASONS[b.reason].toLowerCase()}). You can pick another therapist.`, link })
+      return res.status(200).json({ ok: true, status: 'declined' })
+    }
+    if (action === 'hand-back') {
+      if (share.status !== 'accepted' || !isAccepted(share)) return res.status(409).json({ error: 'Only an accepted request can be handed back.' })
+      if (share.writing_at || share.signed_at) return res.status(409).json({ error: 'You already started this note, so it cannot be handed back. Ask the owner to take it back.' })
+      const r = await db.collection(COLL).updateOne({ _id: share._id, status: 'accepted', writing_at: null }, { $set: { status: 'declined', declined_at: now, decline_reason: 'other', decline_message: 'Handed back' } })
+      if (!r.modifiedCount) return res.status(409).json({ error: 'This request can no longer be handed back.' })
+      await logShare(db, share, user, 'handed_back')
+      await audit(db, { user, action: 'cover_hand_back', patientId: share.patient_id, ip, meta: { share_id: String(share._id) } })
+      await notify(db, { email: owner?.email, type: 'note_share', title: 'Note handed back', body: `${fullName(employee)} can't cover ${pname}'s note anymore. Pick another therapist.`, link })
+      return res.status(200).json({ ok: true, status: 'declined' })
     }
     return res.status(404).json({ error: 'Unknown action.' })
   } catch (err) { return fail(res, err, 'note-shares respond') }
@@ -240,11 +258,11 @@ export async function sharedWithMe(req, res) {
     const { db, employee } = ctx
     await expireShares(db, { cover_id: employee._id })
     const since = new Date(Date.now() - 7 * 86400000)
-    const rows = await db.collection(COLL).find({ cover_id: employee._id, $or: [{ status: { $in: ['pending', 'accepted'] } }, { status: 'completed', completed_at: { $gte: since } }] }).sort({ created_at: -1 }).toArray()
+    const rows = await db.collection(COLL).find({ cover_id: employee._id, $or: [{ status: { $in: ['pending', 'accepted'] } }, { status: 'completed', completed_at: { $gte: since } }, { status: 'declined', declined_at: { $gte: new Date(Date.now() - 86400000) } }] }).sort({ created_at: -1 }).toArray()
     const p = await people(db, rows)
     return res.status(200).json({
       shares: rows.map((s) => shape(s, p)),
-      pendingCount: rows.filter((s) => s.status === 'pending' || (s.status === 'accepted' && !s.signed_at)).length,
+      pendingCount: rows.filter((s) => s.status === 'pending').length,
     })
   } catch (err) { return fail(res, err, 'note-shares shared-with-me') }
 }
@@ -281,12 +299,12 @@ export async function sharesLog(req, res) {
     if (!ctx) return
     const { db, employee } = ctx
     const share = await loadShare(db, req.params.id)
-    const mine = share && (String(share.owner_id) === String(employee._id) || (String(share.cover_id) === String(employee._id) && isActive(share)))
+    const mine = share && (String(share.owner_id) === String(employee._id) || (String(share.cover_id) === String(employee._id) && isAccepted(share)))
     if (!mine) return res.status(share ? 403 : 404).json({ error: share ? 'You cannot see this log.' : 'Share not found.' })
     const rows = await db.collection('note_cover_log').find({ share_id: share._id }).sort({ created_at: 1 }).toArray()
     const actors = await db.collection('users').find({ _id: { $in: [...new Set(rows.map((r) => String(r.actor_id)))].map(oid).filter(Boolean) } }, { projection: { full_name: 1 } }).toArray()
     const by = new Map(actors.map((a) => [String(a._id), a.full_name]))
-    return res.status(200).json({ log: rows.map((r) => ({ action: r.action, actor: by.get(String(r.actor_id)) || 'Someone', text: ACTION_WORDS[r.action] || r.action, detail: r.meta?.count ? `${r.meta.count} note${r.meta.count === 1 ? '' : 's'}` : null, at: r.created_at.toISOString() })) })
+    return res.status(200).json({ log: rows.map((r) => ({ action: r.action, actor: r.actor_id ? (by.get(String(r.actor_id)) || 'Someone') : 'System', text: ACTION_WORDS[r.action] || r.action, detail: r.meta?.count ? `${r.meta.count} note${r.meta.count === 1 ? '' : 's'}` : r.meta?.reason ? `${DECLINE_REASONS[r.meta.reason] || r.meta.reason}${r.meta.message ? `: ${r.meta.message}` : ''}` : null, at: r.created_at.toISOString() })) })
   } catch (err) { return fail(res, err, 'note-shares log') }
 }
 
@@ -298,7 +316,7 @@ export async function sharesContext(req, res) {
     if (!ctx) return
     const { db, user, ip, employee } = ctx
     const share = await loadShare(db, req.params.id)
-    if (!share || String(share.cover_id) !== String(employee._id) || !isActive(share)) {
+    if (!share || String(share.cover_id) !== String(employee._id) || !isAccepted(share)) {
       if (share) await audit(db, { user, action: 'denied', patientId: share.patient_id, ip, meta: { attempted: 'cover-share context' } })
       return res.status(403).json({ error: 'You do not have access to this.' })
     }

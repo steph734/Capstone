@@ -151,6 +151,7 @@ import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
 import paoSeen from './_lib/routes/pao-seen.js'
 import * as gamePlans from './_lib/routes/game-plans.js'
 import * as homePractice from './_lib/routes/home-practice.js'
+import * as noteShares from './_lib/routes/note-shares.js'
 import gameSessionsStart from './_lib/routes/game-sessions-start.js'
 import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
 import gameSessionsComplete from './_lib/routes/game-sessions-complete.js'
@@ -230,6 +231,15 @@ app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/attendance/remind', attendanceRemind)
+app.all('/api/therapists/available', noteShares.therapistsAvailable)
+app.all('/api/note-shares/shared-with-me', noteShares.sharedWithMe)
+app.all('/api/note-shares/by-me', noteShares.sharesByMe)
+app.all('/api/note-shares/:id/log', noteShares.sharesLog)
+app.all('/api/note-shares/:id/context', noteShares.sharesContext)
+app.all('/api/note-shares/:id/accept', (req, res) => { req.params.action = 'accept'; return noteShares.sharesRespond(req, res) })
+app.all('/api/note-shares/:id/decline', (req, res) => { req.params.action = 'decline'; return noteShares.sharesRespond(req, res) })
+app.all('/api/note-shares/:id', noteShares.sharesItem)
+app.all('/api/note-shares', noteShares.sharesCollection)
 app.all('/api/notes/therapist-list', notesTherapistList)
 app.all('/api/notes/patient-list', notesPatientList)
 app.all('/api/notes/create', notesCreate)

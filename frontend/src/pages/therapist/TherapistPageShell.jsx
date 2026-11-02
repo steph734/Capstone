@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { authFetch } from '../../utils/session'
 import { useNavigate } from 'react-router-dom'
 import PatientSidebar from '../../components/PatientSidebar'
 import BetaTag from '../../components/BetaTag'
@@ -9,6 +10,17 @@ import '../admin/AdminPages.css'
 export default function TherapistPageShell({ user, onLogout, title, subtitle, icon, children, menuItems, beta, bare }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
+  // Notes handed to me by an absent colleague show as a count on Notes & Progress.
+  const [coverCount, setCoverCount] = useState(0)
+  useEffect(() => {
+    if (!menuItems?.some((m) => m.id === 'notes-progress')) return undefined
+    let alive = true
+    const load = () => authFetch('/api/note-shares/shared-with-me').then((d) => { if (alive) setCoverCount(d.pendingCount || 0) }).catch(() => {})
+    load()
+    const t = setInterval(load, 60000)
+    return () => { alive = false; clearInterval(t) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const items = menuItems?.map((m) => (m.id === 'notes-progress' && coverCount > 0 ? { ...m, badge: coverCount } : m))
 
   return (
     <div className="page-with-sidebar admin-page-shell">
@@ -17,7 +29,7 @@ export default function TherapistPageShell({ user, onLogout, title, subtitle, ic
         onLogout={onLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        menuItems={menuItems}
+        menuItems={items}
         bottomMenuItems={[]}
         profileRoleLabel="Therapist"
         profilePath="/therapist/profile"

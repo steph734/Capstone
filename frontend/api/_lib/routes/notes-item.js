@@ -23,6 +23,7 @@ import { checkSigningPassword } from '../passwordCheck.js'
 import { tooManyRequests } from '../rateLimit.js'
 import { SOAP_FIELDS, encryptField, decryptField, contentHash, addendumHash, validateSoap, validateReason, cleanText } from '../soapCrypto.js'
 import { employeeFor, isAssigned, guardianPatientIds, audit, decryptSoap, integrityOf, decryptAddendum, sealSignature, readSignature, SECTION_LABEL } from '../noteAccess.js'
+import { activeCoverShare, finishCoverSign, markCoverWriting } from '../coverShares.js'
 import { sendNoteSharedEmail } from '../noteEmailShared.js'
 import { SIGNATURE_RE } from './notes-create.js'
 
@@ -49,9 +50,16 @@ export default async function handler(req, res) {
 
     // ── Who may touch this note ─────────────────────────────────────────
     let employee = null
+    let cover = null // the active share that lets a covering therapist work on this note
     if (role === 'Therapist') {
       employee = await employeeFor(db, user)
-      if (!employee || !(await isAssigned(db, employee._id, note.patient_id))) {
+      if (employee && !(await isAssigned(db, employee._id, note.patient_id))) {
+        const sh = await activeCoverShare(db, employee._id, note.patient_id)
+        const mine = sh && ((sh.note_id && String(sh.note_id) === String(_id)) || String(note.cover_share_id) === String(sh._id))
+        const allowed = (req.method === 'GET' && action === '') || req.method === 'PATCH' || action === 'sign'
+        if (mine && allowed) cover = sh
+      }
+      if (!employee || (!cover && !(await isAssigned(db, employee._id, note.patient_id)))) {
         await audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: _id, ip, meta: { attempted: action || req.method } })
         return fail(res, 403, 'You are not assigned to this patient.')
       }
@@ -67,12 +75,19 @@ export default async function handler(req, res) {
         return fail(res, 403, 'You can only read notes shared with you.')
       }
     }
-    const isAuthor = employee && String(note.employee_id) === String(employee._id)
+    // A covering therapist may edit and sign only while the share is active and allows writing; the owner is locked out of a draft that is shared for writing.
+    const coverCanWrite = Boolean(cover) && cover.access === 'write_sign'
+    let ownerLocked = false
+    if (employee && !cover && note.status === 'draft') {
+      const live = await db.collection('note_cover_shares').findOne({ note_id: _id, access: 'write_sign', status: { $in: ['pending', 'accepted'] }, ends_at: { $gt: new Date() } })
+      ownerLocked = Boolean(live) && String(live.cover_id) !== String(employee._id)
+    }
+    const isAuthor = employee && ((String(note.employee_id) === String(employee._id) && !ownerLocked) || coverCanWrite)
     // Only the author may edit, sign, add an addendum or void. Anyone else is refused AND the attempt is logged.
     const needAuthor = () => {
       if (isAuthor) return null
       audit(db, { user, action: 'denied', patientId: note.patient_id, noteId: _id, ip, meta: { attempted: `${req.method} ${action || 'edit'}` } }).catch(() => {})
-      return fail(res, 403, 'Only the therapist who wrote this note can do that.')
+      return fail(res, 403, ownerLocked ? 'This note is shared with a covering therapist. Stop sharing to edit it yourself.' : 'Only the therapist who wrote this note can do that.')
     }
 
     // ── Open ─────────────────────────────────────────────────────────────
@@ -92,6 +107,7 @@ export default async function handler(req, res) {
       }
       const fields = decryptSoap(note)
       const integrity = integrityOf(note, fields)
+      if (cover) await db.collection('note_cover_log').insertOne({ share_id: cover._id, note_id: _id, patient_id: note.patient_id, actor_id: user._id, action: 'opened_note', meta: null, created_at: new Date() })
       await audit(db, { user, action: 'view', patientId: note.patient_id, noteId: _id, ip, meta: reason ? { reason } : integrity === 'mismatch' ? { integrity } : null })
 
       if (role === 'Patient') {
@@ -105,12 +121,13 @@ export default async function handler(req, res) {
           id, patientId: String(note.patient_id), patientName: note.patient_name, diagnosis: note.diagnosis,
           date: note.session_date, status: note.status, version: note.version || 1,
           ...fields, integrity,
-          signedAt: note.signed_at, signedByName: note.signed_at ? note.employee_name : null,
+          signedAt: note.signed_at, signedByName: note.signed_at ? (note.signed_by_name || note.employee_name) : null,
+          coveredFor: note.on_behalf_of ? await db.collection('employees').findOne({ _id: note.on_behalf_of }, { projection: { first_name: 1, last_name: 1 } }).then((e) => [e?.first_name, e?.last_name].filter(Boolean).join(' ') || null) : null,
           signatureImage: role === 'Therapist' ? readSignature(note) : null,
           voided: !!note.voided, voidReason: note.voided ? decryptField(note.void_reason, id, 'void_reason') : null, voidedAt: note.voided_at || null,
           share: share ? { sections: share.sections, summary: share.summary || '', domain: share.domain || null, sharedAt: share.shared_at } : null,
           addenda: addenda.map(decryptAddendum),
-          canEdit: role === 'Therapist' && isAuthor,
+          canEdit: role === 'Therapist' && Boolean(isAuthor) && note.status === 'draft',
         },
       })
     }
@@ -155,6 +172,7 @@ export default async function handler(req, res) {
       await db.collection('therapy_notes').updateOne({ _id }, { $set: { ...enc, version: (note.version || 1) + 1, updated_at: now } })
       await saveVersion('edit', enc, null)
       await audit(db, { user, action: 'edit', patientId, noteId: _id, ip })
+      if (cover) await markCoverWriting(db, cover, { user, noteId: _id })
       return res.status(200).json({ ok: true, version: (note.version || 1) + 1 })
     }
 
@@ -173,9 +191,10 @@ export default async function handler(req, res) {
       if (!check.ok) return fail(res, check.locked ? 423 : 401, check.error, { locked: !!check.locked, fields: { password: check.error } })
       const enc = Object.fromEntries(SOAP_FIELDS.map((f) => [f, encryptField(value[f], id, f)]))
       const hash = contentHash(value)
-      await db.collection('therapy_notes').updateOne({ _id }, { $set: { ...enc, status: 'signed', signature_image: sealSignature(body.signatureImage, id), signed_at: now, signed_by: employee._id, content_hash: hash, version: (note.version || 1) + 1, updated_at: now } })
+      await db.collection('therapy_notes').updateOne({ _id }, { $set: { ...enc, status: 'signed', signature_image: sealSignature(body.signatureImage, id), signed_at: now, signed_by: employee._id, signed_by_name: [employee.first_name, employee.last_name].filter(Boolean).join(' '), ...(cover ? { on_behalf_of: cover.owner_id, cover_share_id: cover._id, author_employee_id: employee._id } : {}), content_hash: hash, version: (note.version || 1) + 1, updated_at: now } })
       await saveVersion('sign', enc, hash)
       await audit(db, { user, action: 'sign', patientId, noteId: _id, ip })
+      if (cover) await finishCoverSign(db, cover, { user, employee, noteId: _id })
       return res.status(200).json({ ok: true, signedAt: now })
     }
 

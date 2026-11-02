@@ -12,6 +12,7 @@ import { manilaToday } from '../manilaDate.js'
 import { tooManyRequests } from '../rateLimit.js'
 import { SOAP_FIELDS, encryptField, contentHash, validateSoap, cleanText } from '../soapCrypto.js'
 import { employeeFor, isAssigned, audit, sealSignature } from '../noteAccess.js'
+import { activeCoverShare, finishCoverSign, markCoverWriting } from '../coverShares.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export const SIGNATURE_RE = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/
@@ -32,9 +33,14 @@ export default async function handler(req, res) {
     if (!employee) return res.status(403).json({ error: 'Your account is not linked to a staff record.' })
     if (!ObjectId.isValid(body.patientId)) return res.status(400).json({ error: 'Invalid patient.' })
     const patientId = new ObjectId(String(body.patientId))
+    // Not this therapist's own patient: only an ACTIVE write & sign share from the patient's therapist opens the way.
+    let cover = null
     if (!(await isAssigned(db, employee._id, patientId))) {
-      await audit(db, { user, action: 'denied', patientId, ip, meta: { attempted: 'create' } })
-      return res.status(403).json({ error: 'You are not assigned to this patient.' })
+      cover = await activeCoverShare(db, employee._id, patientId)
+      if (!cover || cover.access !== 'write_sign' || cover.note_id) {
+        await audit(db, { user, action: 'denied', patientId, ip, meta: { attempted: 'create' } })
+        return res.status(403).json({ error: cover?.note_id ? 'Open the shared draft to continue writing it.' : cover ? 'You were given view-only access to this patient.' : 'You are not assigned to this patient.' })
+      }
     }
     // The note date is the server's "today" (Philippine time). A date sent by the browser is ignored.
     const sessionDate = manilaToday()
@@ -76,6 +82,8 @@ export default async function handler(req, res) {
       signature_image: sign ? sealSignature(body.signatureImage, id) : null, // stored encrypted
       signed_at: sign ? now : null,
       signed_by: sign ? employee._id : null,
+      signed_by_name: sign ? [employee.first_name, employee.last_name].filter(Boolean).join(' ') : null,
+      ...(cover ? { on_behalf_of: cover.owner_id, cover_share_id: cover._id, author_employee_id: employee._id, appointment_id: cover.appointment_id } : {}),
       content_hash: hash,
       shared_with_guardian: false, shared_summary: null, shared_at: null,
       addendum_to: null,
@@ -92,6 +100,10 @@ export default async function handler(req, res) {
     })
     await audit(db, { user, action: 'create', patientId, noteId: _id, ip })
     if (sign) await audit(db, { user, action: 'sign', patientId, noteId: _id, ip })
+    if (cover) {
+      await markCoverWriting(db, cover, { user, noteId: _id })
+      if (sign) await finishCoverSign(db, cover, { user, employee, noteId: _id })
+    }
 
     return res.status(201).json({ id, status: doc.status, signedAt: doc.signed_at, createdAt: now, version: 1 })
   } catch (err) {

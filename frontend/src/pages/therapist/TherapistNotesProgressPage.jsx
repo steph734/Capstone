@@ -1,17 +1,21 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { manilaDateKey } from '../../utils/manilaTime'
 import NoteViewerSecure from './notes/NoteViewerSecure'
 import ShareDialog from './notes/ShareDialog'
+import ShareTherapistModal, { ShareTabs } from './notes/ShareTherapistTab'
+import { OwnerShareCard, CoverDetail, CoverFormBanner, CoverSidePanel, IncomingBanner, AbsentBanner, ContextModal } from './notes/CoverPanels'
+import { sharedByMe, sharedWithMe as fetchSharedWithMe, stopCoverShare, fmtDay as coverDay } from './notes/coverApi'
+import { authFetch } from '../../utils/session'
 import LockScreen, { useIdleLock } from './notes/IdleLock'
 import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote } from './notes/notesApi'
 import { sendVoiceEntries, fetchVoiceLog, useVoiceAccess } from './notes/voiceApi'
 import { VoiceBar, VoicePanel, SectionVoicePill, ClearSectionConfirm, VoiceDownloadMenu } from './notes/VoiceUI'
 import useVoiceNotes from '../../hooks/useVoiceNotes'
 import {
-  Calendar, ChartColumn, CircleCheck, ClipboardList, Download, Eye, FileText, KeyRound, Lock, MessageSquare, PenLine, Stethoscope, Sun, TriangleAlert, User,
+  Share2, Calendar, ChartColumn, CircleCheck, ClipboardList, Download, Eye, FileText, KeyRound, Lock, MessageSquare, PenLine, Stethoscope, Sun, TriangleAlert, User,
 } from 'lucide-react'
 import { unescapeHtml } from '../../utils/session'
 import { saveLocal, getDoc, listDocs } from '../../offline/repo'
@@ -96,6 +100,8 @@ function fromApiNote(n) {
   return {
     id: n.id,
     date: fmtNoteDate(n.date),
+    rawDate: String(n.date || '').slice(0, 10),
+    coveredBy: n.coveredBy || null,
     shortDate: fmtNoteDateShort(n.date),
     status: n.status,
     voided: !!n.voided,
@@ -121,7 +127,8 @@ const SOAP_SECTIONS = [
 const fieldErrStyle = { color: '#b91c1c', fontSize: 12, display: 'block', marginTop: 4 }
 const VOICE_FLUSH_MS = 30000
 
-function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked }) {
+function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, cover = null, meName = '' }) {
+  const [pastOpen, setPastOpen] = useState(false)
   // The note's date is set by the server. Show the server's date (or, when editing, the note's own date), never the browser clock.
   const [serverDate, setServerDate] = useState('')
   useEffect(() => {
@@ -265,6 +272,8 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
   }
 
   return (
+    <>
+    {cover && <CoverFormBanner share={cover} onPast={() => setPastOpen(true)} />}
     <div className="vn-layout">
       <div className="vn-main">
         <div className="tnp-notebook">
@@ -276,6 +285,7 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
               <div className="tnp-date-box"><span className="tnp-field-label"><Calendar size={14} aria-hidden="true" /> Date:</span><span className="tnp-field-val tnp-field-line">{today}</span></div>
             </div>
             <div className="tnp-field-row"><span className="tnp-field-label"><User size={14} aria-hidden="true" /> Patient:</span><span className="tnp-field-val tnp-field-line">{patient.name}</span></div>
+            {cover && <div className="tnp-field-row"><span className="tnp-field-label"><User size={14} aria-hidden="true" /> Therapist:</span><span className="tnp-field-val tnp-field-line">{meName} <span className="cv-pill">Covering for {cover.owner.name}</span></span></div>}
             <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label"><Stethoscope size={14} aria-hidden="true" /> Diagnosis:</span><span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span></div>
             <div className="tnp-rule" />
 
@@ -306,7 +316,8 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
             })}
 
             <div className="tnp-sig-section">
-              <div className="tnp-sig-title"><PenLine size={15} aria-hidden="true" /> Therapist Signature</div>
+              <div className="tnp-sig-title"><PenLine size={15} aria-hidden="true" /> {cover ? 'Covering Therapist Signature' : 'Therapist Signature'}</div>
+              {cover && <p className="cv-sigline">Signed as {meName}, covering for {cover.owner.name}. {cover.owner.name.split(' ')[0]} gets the signed note and is notified.</p>}
               <p className="tnp-sig-desc">Draw your signature, then re-enter your password to certify and lock this note. Signing can't be done by voice.</p>
               <SignaturePad onSign={(d) => { setSigData(d); setErrors((x) => ({ ...x, signature: '' })) }} onClear={() => setSigData(null)} />
               {errors.signature && <span role="alert" style={fieldErrStyle}>{errors.signature}</span>}
@@ -328,14 +339,19 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked })
         </div>
       </div>
 
+      <div className="cv-aside">
+      {cover && <CoverSidePanel share={cover} />}
       <VoicePanel log={fullLog} noteId={noteId} supported={voice.supported} enabled={access.allowed} disabledReason={access.loading ? '' : 'Voice dictation is available on Silver and Gold.'}
         notice={voiceMsg} onBeforeDownload={flushVoice} />
+      </div>
 
       {clearTarget && (
         <ClearSectionConfirm section={clearTarget} onCancel={() => setClearTarget(null)}
           onConfirm={() => { setText(clearTarget, ''); voice.clearUndo(clearTarget); setClearTarget(null) }} />
       )}
     </div>
+    {pastOpen && cover && <ContextModal share={cover} part="past" onClose={() => setPastOpen(false)} />}
+    </>
   )
 }
 
@@ -392,7 +408,7 @@ function CheckIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="5 12 10 17 19 7" /></svg>
 }
 
-function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, onViewNote, onEditDraft, onShareNote, onUnshare, isMobile }) {
+function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, onViewNote, onEditDraft, onShareNote, onUnshare, isMobile, coverUi }) {
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -430,6 +446,7 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
   }, [sheetOpen])
 
   const statusFor = (p) => {
+    if (p.cover) return 'Shared with me'
     const pNotes = notes[p.id] || []
     if (pNotes.length === 0) return 'No notes'
     return pNotes[0].signed ? 'Signed' : 'Draft'
@@ -443,7 +460,13 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
     noNotes: patients.filter(p => (notes[p.id] || []).length === 0).length,
   }
 
+  const isOut = (p) => Boolean(p.out) && ['pending', 'accepted', 'completed'].includes(p.out.status)
+  const outCount = patients.filter(isOut).length
+  const inCount = patients.filter((p) => p.cover).length
+  const FILTERS = [...PATIENT_FILTERS, ...(outCount ? ['Shared'] : []), ...(inCount ? ['Shared with me'] : [])]
+  const activeFilter = FILTERS.includes(filter) ? filter : 'All'
   const counts = {
+    Shared: outCount, 'Shared with me': inCount,
     All: patients.length,
     'Needs signing': patients.filter(p => statusFor(p) === 'Draft').length,
     Signed: patients.filter(p => statusFor(p) === 'Signed').length,
@@ -453,9 +476,11 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
   const filteredPatients = patients.filter(p => {
     const status = statusFor(p)
     const matchFilter =
-      filter === 'All' ? true :
-      filter === 'Needs signing' ? status === 'Draft' :
-      filter === 'Signed' ? status === 'Signed' :
+      activeFilter === 'All' ? true :
+      activeFilter === 'Needs signing' ? status === 'Draft' :
+      activeFilter === 'Signed' ? status === 'Signed' :
+      activeFilter === 'Shared' ? isOut(p) :
+      activeFilter === 'Shared with me' ? Boolean(p.cover) :
       status === 'No notes'
     const q = search.toLowerCase()
     const matchSearch = !q || p.name.toLowerCase().includes(q) || p.diagnosis.toLowerCase().includes(q)
@@ -518,11 +543,22 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
     </div>
   )
 
+  const detailBody = !selectedPatient ? null : selectedPatient.cover ? (
+    <CoverDetail patient={selectedPatient} share={selectedPatient.cover} meName={coverUi.meName} onNewNote={onNewNote} onContinue={(id) => onViewNote({ id })} onChanged={coverUi.onChanged} />
+  ) : (
+    <>
+      {selectedPatient.out && (
+        <OwnerShareCard share={selectedPatient.out} onView={(id) => onViewNote({ id })} onChange={(sh) => coverUi.onChange(selectedPatient, sh)} onStop={coverUi.onStop} onReload={coverUi.onChanged} />
+      )}
+      {notesBlock}
+    </>
+  )
+
   return (
     <div className="tnp2-shell" ref={rootRef}>
       {showList && (<>
       {/* KPI cards */}
-      <div className="tnp2-kpi-grid">
+      <div className={`tnp2-kpi-grid${outCount || inCount ? ' cv-five' : ''}`}>
         <div className="tnp2-kpi-card">
           <span className="tnp2-kpi-icon tnp2-kpi-icon-total"><NotesFileIcon /></span>
           <div className="tnp2-kpi-text">
@@ -544,6 +580,18 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
             <span className="tnp2-kpi-lbl">Shared with parents</span>
           </div>
         </div>
+        {outCount > 0 && (
+          <div className="tnp2-kpi-card cv-kpi">
+            <span className="tnp2-kpi-icon tnp2-kpi-icon-shared"><Share2 size={18} aria-hidden="true" /></span>
+            <div className="tnp2-kpi-text"><span className="tnp2-kpi-num">{outCount}</span><span className="tnp2-kpi-lbl">Shared with therapists</span></div>
+          </div>
+        )}
+        {inCount > 0 && (
+          <div className="tnp2-kpi-card cv-kpi">
+            <span className="tnp2-kpi-icon tnp2-kpi-icon-shared"><Share2 size={18} aria-hidden="true" /></span>
+            <div className="tnp2-kpi-text"><span className="tnp2-kpi-num">{inCount}</span><span className="tnp2-kpi-lbl">Shared with me</span></div>
+          </div>
+        )}
         <div className="tnp2-kpi-card">
           <span className="tnp2-kpi-icon tnp2-kpi-icon-empty"><InboxIcon /></span>
           <div className="tnp2-kpi-text">
@@ -556,8 +604,8 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
       {/* Toolbar */}
       <div className="tnp2-toolbar">
         <div className="tnp2-filter-tabs">
-          {PATIENT_FILTERS.map(f => (
-            <button key={f} className={`tnp2-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => changeFilter(f)}>
+          {FILTERS.map(f => (
+            <button key={f} className={`tnp2-filter-tab ${activeFilter === f ? 'active' : ''}`} onClick={() => changeFilter(f)}>
               {f} <span className="tnp2-filter-count">{counts[f]}</span>
             </button>
           ))}
@@ -599,9 +647,9 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
                 <div className="tnp2-list-row-info">
                   <div className="tnp2-list-row-top">
                     <span className="tnp2-list-row-name">{p.name}</span>
-                    <span className={statusPillClass(status)}>{status}</span>
+                    {p.cover ? <span className="cv-pill">Shared with me</span> : <><span className={statusPillClass(status)}>{status}</span>{isOut(p) && <span className="cv-pill">Shared</span>}</>}
                   </div>
-                  <span className="tnp2-list-row-sub">{p.diagnosis} · {pNotes.length} note{pNotes.length === 1 ? '' : 's'}</span>
+                  <span className="tnp2-list-row-sub">{p.cover ? `From ${p.cover.owner.name} · today` : isOut(p) ? `${p.diagnosis} · with ${p.out.cover.name}` : `${p.diagnosis} · ${pNotes.length} note${pNotes.length === 1 ? '' : 's'}`}</span>
                 </div>
                 <span className="tnp2-chevron" aria-hidden="true"><ChevronRightIcon /></span>
               </button>
@@ -645,9 +693,14 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
                 </div>
                 <button type="button" className="tnp2-switch-btn" onClick={() => setSheetOpen(true)}>Switch ▾</button>
               </div>
-              <button type="button" className="tnp2-new-note-btn tnp2-new-note-primary" onClick={onNewNote}>+ New session note</button>
-              <div className="tnp2-m-label">Session notes</div>
-              {notesBlock}
+              {!selectedPatient.cover && (
+                <div className="cv-hdr-btns">
+                  <button type="button" className="tnp2-new-note-btn tnp2-new-note-primary" onClick={onNewNote}>+ New session note</button>
+                  <button type="button" className="cv-share-btn" onClick={() => coverUi.onShare(selectedPatient)}><Share2 size={16} aria-hidden="true" /> Share…</button>
+                </div>
+              )}
+              {!selectedPatient.cover && <div className="tnp2-m-label">Session notes</div>}
+              {detailBody}
             </>
           ) : (
             <>
@@ -662,9 +715,14 @@ function NotesShell({ patients, notes, selectedId, onSelect, onBack, onNewNote, 
                   <h3>{selectedPatient.name}</h3>
                   <p>{selectedPatient.diagnosis} · {patientNotes.length} note{patientNotes.length === 1 ? '' : 's'}</p>
                 </div>
-                <button className="tnp2-new-note-btn" onClick={onNewNote}>+ New session note</button>
+                {!selectedPatient.cover && (
+                  <div className="cv-hdr-btns">
+                    <button className="tnp2-new-note-btn" onClick={onNewNote}>+ New session note</button>
+                    <button type="button" className="cv-share-btn" onClick={() => coverUi.onShare(selectedPatient)}><Share2 size={16} aria-hidden="true" /> Share…</button>
+                  </div>
+                )}
               </div>
-              {notesBlock}
+              {detailBody}
             </>
           )}
         </div>
@@ -722,7 +780,10 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const location = useLocation()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const [patients,    setPatients]    = useState([])
+  const [basePatients, setPatients]  = useState([])
+  const [cover,       setCover]       = useState({ out: [], inn: [], absent: false, need: 0 })
+  const [therapistShare, setTherapistShare] = useState(null) // { patient, session, existing }
+  const [flash,       setFlash]       = useState('')
   const [notes,       setNotes]       = useState({})
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState('')
@@ -733,6 +794,27 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   const [locked,      setLocked]      = useState(null)        // { reason } while the page is locked
   const [reloadKey,   setReloadKey]   = useState(0)
   const versionRef = useRef({}) // latest server version of each draft saved on this page
+
+  // Notes handed over by (or to) another therapist. Failures are ignored: the page works without them.
+  const loadCover = useCallback(async () => {
+    try {
+      const [byMe, withMe] = await Promise.all([sharedByMe().catch(() => ({ shares: [] })), fetchSharedWithMe().catch(() => ({ shares: [] }))])
+      setCover({ out: byMe.shares || [], inn: withMe.shares || [], absent: Boolean(byMe.absentToday), need: byMe.needCover || 0 })
+    } catch { /* keep what we have */ }
+  }, [])
+  const showFlash = (msg) => { setFlash(msg); setTimeout(() => setFlash(''), 7000) }
+
+  // The patient list: my own patients, plus (as "Shared with me") patients a colleague handed over. A handed-over
+  // patient is never added to my permanent list: it exists here only while the share does.
+  const patients = useMemo(() => {
+    const latest = (rows) => { const m = new Map(); for (const sh of rows) if (!m.has(sh.patientId)) m.set(sh.patientId, sh); return m }
+    const outBy = latest(cover.out.filter((sh) => sh.status !== 'revoked' && sh.status !== 'expired'))
+    const inBy = latest(cover.inn)
+    const own = new Set(basePatients.map((p) => p.id))
+    const mine = basePatients.map((p) => ({ ...p, out: outBy.get(p.id) || null }))
+    const extra = [...inBy.values()].filter((sh) => !own.has(sh.patientId)).map((sh) => ({ id: sh.patientId, name: sh.patientName || 'Patient', diagnosis: sh.diagnosis || 'No condition on file', cover: sh }))
+    return [...mine, ...extra]
+  }, [basePatients, cover])
 
   // Everything on this page comes from the secured API with the session
   // token. Note text lives only in React state — never in browser storage —
@@ -802,6 +884,7 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [user?.email, reloadKey, locked]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!locked) loadCover() }, [reloadKey, locked, loadCover])
 
   // The selected patient lives in the URL (?patient=<id>; ?patientId= is the
   // older link format). Desktop falls back to the first patient; phones start
@@ -920,6 +1003,37 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
   // Reopens a draft that is saved on this device. Its version is the server version it was based on.
   const openLocalDraft = (d) => { setEditing({ id: d._id, version: d.baseVersion, subjective: d.subjective, objective: d.objective, assessment: d.assessment, plan: d.plan }); setView('edit') }
 
+  // Opens the share modal for a patient: finds today's session and the state of today's note.
+  const openTherapistShare = async (patient, existing = null) => {
+    try {
+      const d = await authFetch('/api/therapist/today')
+      const sess = d.sessions.find((x) => x.patientId === patient.id)
+      const todayNote = (notes[patient.id] || []).find((n) => n.rawDate === d.today && !n.voided)
+      if (!sess && !existing) { showFlash('There is no session today for this patient, so there is no note to share yet.'); return }
+      const base = sess ? { id: sess.id, date: d.today, start: sess.start } : { id: existing.appointmentId, date: existing.sessionDate, start: existing.sessionStart }
+      setShareTarget(null)
+      setTherapistShare({ patient, existing, session: { ...base, dateLabel: coverDay(base.date), noteId: existing?.noteId || todayNote?.id || null, noteStatus: todayNote ? todayNote.status : 'none' } })
+    } catch (err) { if (!handleSessionErrorOnce(err)) showFlash(err.message || 'Could not open sharing.') }
+  }
+  const afterTherapistShare = (share, chosen) => {
+    const first = chosen.name.split(' ')[0]
+    setTherapistShare(null)
+    showFlash(`${share.access === 'view' ? "The note" : "Today's note"} for ${therapistShare.patient.name} was shared with ${chosen.name}. ${first} can ${share.access === 'view' ? 'view' : 'write and sign'} it.`)
+    loadCover(); reload()
+  }
+  const stopShare = async (sh) => {
+    if (!window.confirm(`Stop sharing with ${sh.cover.name}? They lose access right away.`)) return
+    try { await stopCoverShare(sh.id); showFlash('Sharing stopped.'); loadCover(); reload() } catch (err) { if (!handleSessionErrorOnce(err)) showFlash(err.message) }
+  }
+  const guardianTab = (patient) => {
+    const n = (notes[patient.id] || []).find((x) => x.signed && !x.voided)
+    if (n) { setTherapistShare(null); setShareTarget(n) } else showFlash('Open a signed note and tap Share… on it to share with the guardian.')
+  }
+  const coverUi = {
+    meName: user?.name || 'You', onShare: (p) => openTherapistShare(p), onChange: (p, sh) => openTherapistShare(p, sh), onStop: stopShare,
+    onChanged: () => { loadCover(); reload() },
+  }
+  const incomingPending = cover.inn.find((sh) => sh.status === 'pending')
   const doShare = async (sections, summary, domain) => {
     await shareNote(shareTarget.id, sections, summary, domain)
     setShareTarget(null)
@@ -949,6 +1063,9 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
         </div>
       ) : (
       <div className="tnp-page">
+        {flash && <div className="cv-toast" role="status"><Share2 size={18} aria-hidden="true" /> {flash}</div>}
+        {incomingPending && <IncomingBanner share={incomingPending} onOpen={() => selectPatient(incomingPending.patientId)} />}
+        {cover.absent && cover.need > 0 && <AbsentBanner count={cover.need} onShare={() => { const p = selectedPatient && !selectedPatient.cover ? selectedPatient : basePatients[0]; if (p) openTherapistShare(p) }} />}
         {patients.length === 0 ? (
           <p className="tnp2-empty-notes">No patients yet — they'll show up here once they book with you.</p>
         ) : (
@@ -968,13 +1085,14 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
               onShareNote={setShareTarget}
               onUnshare={doUnshare}
               isMobile={isMobile}
+              coverUi={coverUi}
             />
           </div>
         )}
 
         {(view === 'new' || view === 'edit') && selectedPatient && (
           <div className="tnp-scroll-area" ref={detailRef}>
-            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onEnsureDraft={ensureDraft} onCancel={backToOverview} locked={!!locked} />
+            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onEnsureDraft={ensureDraft} onCancel={backToOverview} locked={!!locked} cover={selectedPatient.cover || null} meName={user?.name || ''} />
           </div>
         )}
 
@@ -994,7 +1112,8 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
       </div>
       )}
 
-      {shareTarget && <ShareDialog note={shareTarget} onShare={doShare} onClose={() => setShareTarget(null)} />}
+      {shareTarget && <ShareDialog note={shareTarget} onShare={doShare} onClose={() => setShareTarget(null)} tabs={<ShareTabs tab="guardian" onTab={(t) => { if (t === 'therapist') { const p = patients.find((x) => x.id === selectedId); if (p) openTherapistShare(p) } }} />} />}
+      {therapistShare && <ShareTherapistModal patient={therapistShare.patient} session={therapistShare.session} existing={therapistShare.existing} tabs={<ShareTabs tab="therapist" onTab={(t) => { if (t === 'guardian') guardianTab(therapistShare.patient) }} />} onDone={afterTherapistShare} onClose={() => setTherapistShare(null)} />}
       {locked && <LockScreen reason={locked.reason} userName={user?.name} onUnlocked={() => setLocked(null)} onSignOut={onLogout} />}
     </TherapistPageShell>
   )

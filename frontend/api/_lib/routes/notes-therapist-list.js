@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const assigned = await db.collection('appointments').distinct('patient_id', { employee_id: employee._id, patient_id: { $ne: null } })
     const notes = await db.collection('therapy_notes')
-      .find({ employee_id: employee._id, patient_id: { $in: assigned }, is_archived: { $ne: true } },
+      .find({ $or: [{ employee_id: employee._id, patient_id: { $in: assigned } }, { on_behalf_of: employee._id }], is_archived: { $ne: true } },
         { projection: { subjective: 0, objective: 0, assessment: 0, plan: 0, signature_image: 0, addendum_text: 0, addendum_reason: 0 } })
       .sort({ session_date: -1, created_at: -1 }).toArray()
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       notes: mains.map((n) => {
         const s = shareBy.get(String(n._id))
-        return noteMeta(n, { addendaCount: addenda.get(String(n._id)) || 0, shared: !!s, sharedSections: s ? s.sections : [], sharedAt: s ? s.shared_at : null })
+        return noteMeta(n, { signedByName: n.signed_by_name || null, coveredBy: n.on_behalf_of && n.signed_by_name && String(n.on_behalf_of) === String(employee._id) ? n.signed_by_name : null, addendaCount: addenda.get(String(n._id)) || 0, shared: !!s, sharedSections: s ? s.sections : [], sharedAt: s ? s.shared_at : null })
       }),
     })
   } catch (err) {

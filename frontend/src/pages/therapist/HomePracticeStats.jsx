@@ -317,7 +317,7 @@ export default function HomePracticeStats({ data, firstName = 'This child', tab:
           chart={<GroupedBars caption="XP earned per week" categories={xpCats} series={SERIES} values={xpVals} decimals={0} />}
           table={<GroupedTable caption="XP earned per week" first="Week" categories={xpCats} series={SERIES} values={xpVals} decimals={0} />} />
       </div>
-      <ChartCard title="Character stat points gained" subtitle="Home practice vs therapy sessions" legend={legend} style={{ maxWidth: 680, width: '100%' }}
+      <ChartCard title="Character stat points gained" subtitle="Home practice vs therapy sessions" legend={legend}
         chart={<GroupedBars caption="Character stat points gained" categories={statCats} series={SERIES} values={statVals} decimals={0} />}
         table={<GroupedTable caption="Character stat points gained" first="Stat" categories={statCats} series={SERIES} values={statVals} decimals={0} />} />
     </div>

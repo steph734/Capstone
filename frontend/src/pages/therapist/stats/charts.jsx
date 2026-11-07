@@ -3,7 +3,8 @@ import { AMBER_FG, DataTable, GREEN_900, HOME, MUTED, THERAPY } from './ui'
 
 // Plain-SVG charts for the Patient Stats page. Every chart scales to its card (width 100%, fixed aspect ratio via
 // viewBox), has an aria-label that spells out the numbers, and shows a small bar (not nothing) for zero values.
-const W = 560
+const W = 760 // the Trends charts; the narrow Weekly completion card uses WW below so its text stays readable
+const WW = 560
 const GRID = '#EAF0ED'
 const trunc = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 const r1 = (n) => Math.round(n * 10) / 10
@@ -28,7 +29,7 @@ const niceTop = (max, min = 4) => { const m = Math.max(min, max); const step = m
 export function SessionLine({ points, color = THERAPY }) {
   const [hover, setHover] = useState(null)
   if (!points.length) return <p className="py-10 text-center" style={{ color: MUTED, fontSize: 15 }}>Not enough data yet.</p>
-  const H = 360, padL = 42, padR = 84, padT = 28, padB = 58
+  const H = 300, padL = 46, padR = 92, padT = 28, padB = 58
   const innerW = W - padL - padR, innerH = H - padT - padB
   const step = points.length > 1 ? innerW / (points.length - 1) : 0
   const x = (i) => (points.length > 1 ? padL + i * step : padL + innerW / 2)
@@ -75,7 +76,7 @@ export function SessionTable({ points }) {
 export function DayLines({ days, home, session }) {
   const avgBy = (pts) => { const m = new Map(); pts.forEach((p) => { const a = m.get(p.date) || []; a.push(p.value); m.set(p.date, a) }); return new Map([...m].map(([k, v]) => [k, r1(v.reduce((x, y) => x + y, 0) / v.length)])) }
   const h = avgBy(home), s = avgBy(session)
-  const H = 330, padL = 42, padR = 18, padT = 28, padB = 34
+  const H = 260, padL = 46, padR = 20, padT = 28, padB = 34
   const innerW = W - padL - padR, innerH = H - padT - padB
   const x = (i) => (days.length > 1 ? padL + (innerW * i) / (days.length - 1) : padL + innerW / 2)
   const y = (v) => padT + innerH - (v / 100) * innerH
@@ -99,7 +100,7 @@ export function DayLines({ days, home, session }) {
 // Grouped bars. categories: [{ label }]; series: [{ key, label, color }]; values[catIndex][seriesKey] = number | null.
 // Zero values draw a small bar with a "0" above it. `goal` draws a dashed amber line.
 export function GroupedBars({ categories, series, values, unit = '', goal = null, goalLabel, decimals = 1, caption }) {
-  const H = 340, padL = 42, padR = 14, padT = 28, padB = 36
+  const H = 280, padL = 46, padR = 16, padT = 28, padB = 36
   const innerW = W - padL - padR, innerH = H - padT - padB
   const flat = categories.flatMap((_, i) => series.map((s) => values[i][s.key] ?? 0))
   const top = unit === '%' ? 100 : niceTop(Math.max(0, goal || 0, ...flat), 4)
@@ -146,10 +147,10 @@ export function WeeklyBars({ weeks }) {
   const H = 280, padT = 34, padB = 30
   const innerH = H - padT - padB
   const max = Math.max(1, ...weeks.map((w) => Math.max(w.assigned || 0, w.completed || 0)))
-  const slot = W / Math.max(1, weeks.length)
+  const slot = WW / Math.max(1, weeks.length)
   const bw = Math.min(54, slot * 0.5)
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Games finished each week: ${weeks.map((w) => `${w.label} ${w.completed} of ${Math.max(w.assigned || 0, w.completed || 0)}`).join(', ')}.`}>
+    <svg viewBox={`0 0 ${WW} ${H}`} className="h-auto w-full" role="img" aria-label={`Games finished each week: ${weeks.map((w) => `${w.label} ${w.completed} of ${Math.max(w.assigned || 0, w.completed || 0)}`).join(', ')}.`}>
       {weeks.map((w, i) => {
         const total = Math.max(w.assigned || 0, w.completed || 0)
         const th = Math.max(4, (total / max) * innerH), dh = w.completed > 0 ? Math.max(4, (w.completed / max) * innerH) : 0

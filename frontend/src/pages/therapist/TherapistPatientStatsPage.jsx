@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import BadgeMedal from '../../components/BadgeMedal'
+import HomePracticeStats from './HomePracticeStats'
 
 // /therapist/gamified-activities/patients/:patientId — the full per-patient
 // Gamified Stats dashboard. Real data from
@@ -533,6 +534,9 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                     </div>
                   </div>
                 </div>
+
+                {/* Home practice vs therapy sessions: plays at home, mistakes, XP and character stats */}
+                <HomePracticeStats data={data.homePractice} firstName={data.profile.name.split(' ')[0]} />
 
                 {/* Recent sessions table */}
                 <div style={CARD}>

@@ -7,23 +7,17 @@
 // (only a whole-session duration), so there is no honest "response time"
 // series to report.
 
-const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000
+import { manilaDayKey, mondayWeekKey, MANILA_OFFSET_MS } from './manilaWeeks.js'
+import { buildHomePracticeStats } from './homePracticeStats.js'
+
 const STAT_KEYS = ['intelligence', 'focus', 'resistance', 'creativity', 'speed', 'memory']
 const STAT_LABEL = { intelligence: 'Intelligence', focus: 'Focus', resistance: 'Resistance', creativity: 'Creativity', speed: 'Speed', memory: 'Memory' }
 
-function manilaDayKey(d) { return new Date(new Date(d).getTime() + MANILA_OFFSET_MS).toISOString().slice(0, 10) }
 function manilaMidnightUtc(daysAgo) {
   const now = new Date(Date.now() + MANILA_OFFSET_MS)
   now.setUTCHours(0, 0, 0, 0)
   now.setUTCDate(now.getUTCDate() - daysAgo)
   return new Date(now.getTime() - MANILA_OFFSET_MS)
-}
-function mondayWeekKey(d) {
-  const manila = new Date(new Date(d).getTime() + MANILA_OFFSET_MS)
-  const day = manila.getUTCDay()
-  manila.setUTCDate(manila.getUTCDate() - ((day + 6) % 7))
-  manila.setUTCHours(0, 0, 0, 0)
-  return manila.toISOString().slice(0, 10)
 }
 function xpToNext(level) { return 100 + (Math.max(1, level) - 1) * 50 }
 function ageFromBirthdate(birthdate) {
@@ -74,7 +68,7 @@ export async function buildPatientStats(db, pid, days) {
     const prevFrom = manilaMidnightUtc(days * 2 - 1)
     const prevTo = from
 
-    const [patient, profile, allBadges, earnedBadges, games, curRaw, prevRaw, recentRaw, assignments, hiddenPlans] = await Promise.all([
+    const [patient, profile, allBadges, earnedBadges, games, curRaw, prevRaw, recentRaw, assignments, hiddenPlans, homePlansRaw] = await Promise.all([
       db.collection('patients').findOne({ _id: pid }, { projection: { first_name: 1, last_name: 1, birthdate: 1 } }),
       db.collection('pao_profiles').findOne({ patient_id: pid }),
       db.collection('badges').find({ is_active: true, status: { $in: ['active', null] } }).sort({ sort_order: 1, name: 1 }).toArray(),
@@ -85,6 +79,8 @@ export async function buildPatientStats(db, pid, days) {
       db.collection('game_sessions').find({ patient_id: pid, status: 'completed' }).sort({ completed_at: -1 }).limit(200).toArray(),
       db.collection('exercise_assignments').find({ patient_id: pid, is_archived: { $ne: true } }, { projection: { due_date: 1, status: 1 } }).toArray(),
       db.collection('home_practice_plans').find({ patient_id: pid, save_to_progress: false }, { projection: { _id: 1 } }).toArray(),
+      // Home practice plans that overlap the range (for the home-vs-session section).
+      db.collection('home_practice_plans').find({ patient_id: pid, starts_at: { $lt: toExclusive }, ends_at: { $gte: from } }).toArray(),
     ])
     if (!patient) return null
     // Home plays count in progress (tagged "At home") unless the therapist turned "Save home scores" off for that plan.
@@ -304,6 +300,11 @@ export async function buildPatientStats(db, pid, days) {
       badges: badgesOut, nextBadge, newThisRange,
       recentSessions, recentGames,
       paoSummary,
+      // Home practice: how often each assigned game was played, XP and stats earned at home, and mistakes,
+      // compared with the therapy sessions. Plans whose scores the therapist chose not to save are left out.
+      homePractice: buildHomePracticeStats({
+        sessions: curSessions, plans: homePlansRaw.filter((p) => p.save_to_progress !== false), gameById, weekKeys, firstName,
+      }),
       meta: {
         range: { days, from: from.toISOString(), to: toExclusive.toISOString(), tz: 'Asia/Manila' },
         definitions: {

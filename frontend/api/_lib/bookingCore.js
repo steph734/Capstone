@@ -102,15 +102,25 @@ export async function createBookingRecords(db, body, extra = {}) {
     profile_photo: photoRecord ? { photo_id: photoRecord.id, url: photoRecord.url, uploaded_at: now } : null,
     created_at: now, updated_at: now,
   }
-  const patientRes = await db.collection('patients').insertOne(patientDoc)
-  const patientId = patientRes.insertedId
+  // The same child booking again (same account email, name and birthdate) keeps ONE patient record. Creating a new
+  // record per booking is what left a guardian with many copies of the same child, so game plans, home practice and
+  // rewards ended up spread over different records.
+  const existingPatient = patientDoc.email
+    ? await db.collection('patients').findOne({
+      email: { $in: [patientDoc.email, patientDoc.email.toLowerCase()] },
+      first_name: { $regex: `^${patientDoc.first_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      last_name: { $regex: `^${patientDoc.last_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      birthdate: patientDoc.birthdate,
+    })
+    : null
+  const patientId = existingPatient ? existingPatient._id : (await db.collection('patients').insertOne(patientDoc)).insertedId
 
   if (photoRecord) {
     try { await db.collection('patient_photos').updateOne({ _id: photoRecord.id }, { $set: { patient_id: patientId } }) } catch (err) { console.error('booking: failed to link the photo:', err) }
   }
 
   // 2b. Best-effort: register the condition as a disorder + link it.
-  if (str(patient.condition)) {
+  if (str(patient.condition) && !existingPatient) { // (a reused record already has its condition linked)
     try {
       const name = str(patient.condition)
       const d = await db.collection('disorders').findOneAndUpdate({ disorder_name: name }, { $setOnInsert: { disorder_name: name } }, { upsert: true, returnDocument: 'after' })

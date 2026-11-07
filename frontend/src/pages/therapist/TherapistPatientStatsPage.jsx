@@ -246,15 +246,15 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                 <HomePracticeStats data={data.homePractice} firstName={first} tab={homeTab} onTabChange={setTab} onRemind={canRemind ? remind : undefined} onEditPlan={editPlan} />
 
                 <SectionLabel>Skills &amp; activity</SectionLabel>
-                <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-3">
-                  <section style={CARD} aria-label="Character stats">
+                <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[repeat(3,minmax(0,1fr))]">
+                  <section style={{ ...CARD, minWidth: 0 }} aria-label="Character stats">
                     <div className="flex items-baseline justify-between gap-2"><h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Character stats</h3><span style={{ fontSize: 14, color: MUTED, whiteSpace: 'nowrap' }}>vs. last month</span></div>
                     <ul className="mt-4 grid gap-4" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                       {data.characterStats.map((s) => (
-                        <li key={s.key} className="flex items-center gap-3">
+                        <li key={s.key} className="flex min-w-0 items-center gap-3">
                           <span aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[20px]" style={{ background: '#F1F5F3' }}>{STAT_ICON[s.key] || '⭐'}</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2" style={{ fontSize: 16, color: GREEN_900 }}>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 16, color: GREEN_900 }}>
                               <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{s.label}</span>
                               {s.key === lowestKey && !allSame && <Chip bg={AMBER_BG} fg={AMBER_FG} style={{ padding: '2px 10px', fontSize: 13 }}>Focus area</Chip>}
                               <span className="ml-auto flex items-center gap-1.5" style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{s.value} / 100{s.change ? <Chip bg="#D9F2E3" fg="#17803D" style={{ padding: '2px 8px', fontSize: 13 }}>↑ +{s.change}</Chip> : null}</span>

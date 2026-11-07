@@ -130,8 +130,12 @@ export async function buildPatientStats(db, pid, days) {
     const dayFlags = []
     for (let d = new Date(from); d < toExclusive; d = new Date(d.getTime() + 86400000)) dayFlags.push(activeDayKeySet.has(manilaDayKey(d)))
 
-    const earnedCount = earnedBadges.length
-    const newThisRange = earnedBadges.filter((b) => b.earned_at >= from && b.earned_at < toExclusive).length
+    // One source of truth for "badges earned": only records whose badge is still an active badge are counted, so the number
+    // card and the badges card always agree (an old record for a retired badge is not shown as a medal).
+    const activeCodes = new Set(allBadges.map((b) => b.code))
+    const earnedActive = earnedBadges.filter((b) => activeCodes.has(b.badge_code))
+    const earnedCount = new Set(earnedActive.map((b) => b.badge_code)).size
+    const newThisRange = earnedActive.filter((b) => b.earned_at >= from && b.earned_at < toExclusive).length
 
     const kpis = {
       games: { value: curSessions.length, previous: prevSessions.length, change: delta(curSessions.length, prevSessions.length, true), assigned: assignedCount, completionRate },
@@ -144,6 +148,8 @@ export async function buildPatientStats(db, pid, days) {
     // ── Accuracy over time (per-session points, newest-last) ────────────
     const series = curSessions.filter((s) => sessionAccuracy(s) !== null).map((s) => ({
       date: manilaDayKey(s.completed_at), value: Math.round(sessionAccuracy(s) * 10) / 10,
+      game: gameById.get(String(s.game_id))?.name || 'Game', minutes: Math.round(Math.min(3600, s.result?.duration_seconds || 0) / 60),
+      atHome: s.context === 'home',
     }))
     const trend = series.length >= 5 ? (() => {
       const ys = series.map((p) => p.value)
@@ -288,6 +294,26 @@ export async function buildPatientStats(db, pid, days) {
       return parts.join(' ')
     })()
 
+    // Insight rows for Pao's summary card (descriptive; a row is left out when there is nothing to say).
+    const hintsTotal = curSessions.reduce((a, x) => a + (Number(x.result?.hints_used) || 0), 0)
+    const topValue = Math.max(...characterStats.map((c) => c.value))
+    const lowValue = Math.min(...characterStats.map((c) => c.value))
+    const lowGames = (() => {
+      const per = new Map()
+      for (const s of curSessions) {
+        const id = String(s.game_id); const o = per.get(id) || { name: gameById.get(id)?.name || 'Game', correct: 0, attempts: 0 }
+        o.correct += Math.min(Number(s.result?.correct) || 0, Number(s.result?.attempts) || 0); o.attempts += Number(s.result?.attempts) || 0; per.set(id, o)
+      }
+      return [...per.values()].filter((o) => o.attempts > 0 && (o.correct / o.attempts) * 100 < 60).map((o) => ({ name: o.name, accuracy: Math.round((o.correct / o.attempts) * 100) }))
+    })()
+    const insights = {
+      strongest: topValue > 0 && topValue !== lowValue ? { labels: characterStats.filter((c) => c.value === topValue).map((c) => c.label), value: topValue } : null,
+      needsPractice: topValue !== lowValue ? { labels: characterStats.filter((c) => c.value === lowValue).map((c) => c.label), value: lowValue } : null,
+      lowGames,
+    }
+    const paoLine = curSessions.length === 0 ? null
+      : `${firstName} played ${curSessions.length} game${curSessions.length === 1 ? '' : 's'}${curAccuracy !== null ? ` at ${Math.round(curAccuracy)}% accuracy` : ''} and ${hintsTotal === 0 ? 'used no hints' : `used ${hintsTotal} hint${hintsTotal === 1 ? '' : 's'}`}.`
+
     return {
       profile: { id: patientId, name, age, level, xp, xpMax, lastPlayedAt, favoriteGame },
       kpis,
@@ -299,11 +325,12 @@ export async function buildPatientStats(db, pid, days) {
       characterStats,
       badges: badgesOut, nextBadge, newThisRange,
       recentSessions, recentGames,
-      paoSummary,
+      paoSummary, paoLine, insights, hintsTotal,
       // Home practice: how often each assigned game was played, XP and stats earned at home, and mistakes,
       // compared with the therapy sessions. Plans whose scores the therapist chose not to save are left out.
       homePractice: buildHomePracticeStats({
         sessions: curSessions, plans: homePlansRaw.filter((p) => p.save_to_progress !== false), gameById, weekKeys, firstName,
+        today: manilaDayKey(new Date(toExclusive.getTime() - 1)),
       }),
       meta: {
         range: { days, from: from.toISOString(), to: toExclusive.toISOString(), tz: 'Asia/Manila' },

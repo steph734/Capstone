@@ -27,6 +27,7 @@ export default function HomeSettingsForm({ value: h, onChange, first, sessionEnd
           <span className="hp-select">
             <select value={h.opens} onChange={(e) => set('opens', e.target.value)}>
               <option value="after">Right after today&apos;s session{sessionEnd ? ` · ${fmt12(sessionEnd)}` : ''}</option>
+              <option value="now">Right away (when I save)</option>
               <option value="custom">Pick a date and time</option>
             </select><ChevronDown size={14} aria-hidden="true" />
           </span>

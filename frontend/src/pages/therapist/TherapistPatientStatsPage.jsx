@@ -1,219 +1,80 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import BadgeMedal from '../../components/BadgeMedal'
-import HomePracticeStats from './HomePracticeStats'
+import HomePracticeStats, { HOME_TABS } from './HomePracticeStats'
+import { SessionLine, SessionTable, WeeklyBars } from './stats/charts'
+import { AMBER_BG, AMBER_FG, BORDER, Btn, CARD, ChartCard, Chip, GREEN_700, GREEN_900, HOME, MUTED, SectionLabel, THERAPY } from './stats/ui'
+import { apiPost } from '../../utils/api'
 
-// /therapist/gamified-activities/patients/:patientId — the full per-patient
-// Gamified Stats dashboard. Real data from
-// GET /api/therapist/gamified/patients/:patientId (therapist-gamified-patient.js).
-// Descriptive summary only: no prediction, no diagnosis, no red for a lower
-// number — a drop is shown in the same neutral grey as "no change".
-const GREEN_900 = '#1F3D36'
-const GREEN_700 = '#234C40'
-const MUTED = '#5D7770'
-const BORDER = '#E3E8E4'
-const CARD = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 18, padding: 20 }
-const TYPE_COLOR = { Cognitive: '#7C5CE0', Speech: '#1FA58A', Occupational: '#F59E0B', Physical: '#4A90D9' }
+// /therapist/gamified-activities/patients/:patientId — the per-patient Gamified Stats page.
+// Real data from GET /api/therapist/gamified/patients/:patientId (therapist-gamified-patient.js).
+// Descriptive summary only: no prediction, no diagnosis, no red for a lower number.
+// Layout: header · patient card · 4 number cards · progress + Pao's summary · HOME PRACTICE (3 tabs) · SKILLS & ACTIVITY.
+// The selected home-practice tab is kept in the URL (?tab=overview|by-game|trends) and the date range in ?range=.
 const RANGE_OPTIONS = [{ id: '7', label: 'Last 7 days', days: 7 }, { id: '30', label: 'Last 30 days', days: 30 }, { id: '90', label: 'Last 3 months', days: 90 }]
-const TABS = ['Cognitive', 'Occupational', 'Physical', 'Speech']
-const PAGE_SIZE = 10
-const TREND_LABEL = { improving: 'Improving', steady: 'Steady', 'needs more practice': 'Needs more practice', not_enough_data: 'Not enough data yet' }
+const TYPES = ['Cognitive', 'Occupational', 'Physical', 'Speech']
+const TYPE_COLOR = { Cognitive: THERAPY, Speech: HOME, Occupational: '#F59E0B', Physical: '#4A90D9' }
 const STAT_ICON = { intelligence: '🧠', focus: '🎯', resistance: '🛡️', creativity: '🎨', speed: '⚡', memory: '💭' }
-const STAT_COLOR = { intelligence: '#7C5CE0', focus: '#F59E0B', resistance: '#1FA58A', creativity: '#EC4899', speed: '#14B8A6', memory: '#4A90D9' }
-const GAME_ICON = { Cognitive: '🧩', Speech: '🗣️', Occupational: '🧶', Physical: '🏃' }
+const STAT_COLOR = { intelligence: THERAPY, focus: '#F59E0B', resistance: HOME, creativity: '#EC4899', speed: '#14B8A6', memory: '#4A90D9' }
+const PAGE_SIZE = 5
+const PAO_THUMBS_UP = '/games/pao-money-match-poses/pao-thumbs-up.png'
 
-function initials(name) { return (name || '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?' }
-function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—' }
+const initials = (name) => (name || '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?'
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')
+const joinNames = (labels) => labels.join(' & ')
 function fmtRangeLabel(days) {
   const to = new Date(); to.setHours(0, 0, 0, 0)
   const from = new Date(to); from.setDate(from.getDate() - (days - 1))
   const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${fmt(from)} – ${fmt(to)}, ${to.getFullYear()}`
 }
-function changeText(change, unit = '') {
-  if (change === null || change === undefined) return <span style={{ color: MUTED, fontWeight: 400 }}>No previous period to compare</span>
-  if (change === 0) return <span style={{ color: MUTED, fontWeight: 400 }}>No change vs previous period</span>
-  const sign = change > 0 ? '+' : ''
-  return <span style={{ color: change > 0 ? '#16a34a' : MUTED, fontWeight: 400 }}>{sign}{change}{unit} vs previous period</span>
-}
+const accColor = (v) => (v == null ? MUTED : v >= 80 ? '#17803D' : '#D63A73') // green at 80%+, pink below (pink, not red: a low score is not an alarm)
 
-// ── Reusable pieces ──────────────────────────────────────────────────────
-function SecondaryButton({ children, onClick, active, style, ...rest }) {
+function KpiCard({ icon, bg, label, children, note }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      {...rest}
-      className="tp-secondary-btn"
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        background: active ? '#F1F5F3' : '#fff',
-        border: `1px solid ${BORDER}`,
-        color: GREEN_900,
-        borderRadius: 999,
-        padding: '10px 16px',
-        fontSize: 13, fontWeight: 500,
-        cursor: 'pointer',
-        ...style,
-      }}
-    >{children}</button>
-  )
-}
-
-function PrimaryButton({ children, onClick, style }) {
-  return (
-    <button type="button" onClick={onClick} className="tp-primary-btn"
-      style={{ background: GREEN_700, color: '#fff', border: 'none', borderRadius: 999, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', ...style }}>
-      {children}
-    </button>
-  )
-}
-
-function CardTitle({ children, right }) {
-  return (
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: GREEN_900, margin: 0, letterSpacing: '-0.01em' }}>{children}</h2>
-      {right}
-    </div>
-  )
-}
-
-function SkeletonBlock({ className = '', style }) { return <div className={`animate-pulse rounded-2xl bg-[#EDF2F0] ${className}`} style={style} /> }
-
-function KpiTile({ icon, bg, label, value, caption }) {
-  return (
-    <div style={{ ...CARD, display: 'flex', gap: 12, minHeight: 128 }}>
-      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[18px]" style={{ background: bg }}>{icon}</span>
+    <div style={{ ...CARD, display: 'flex', gap: 14, minHeight: 150, padding: 22 }}>
+      <span aria-hidden="true" className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[22px]" style={{ background: bg }}>{icon}</span>
       <div className="min-w-0 flex-1">
-        <p style={{ fontSize: 14, fontWeight: 500, color: MUTED, margin: 0 }}>{label}</p>
-        <p style={{ fontSize: 36, fontWeight: 700, color: GREEN_900, margin: '2px 0 0', lineHeight: 1.1 }}>{value}</p>
-        {caption && <p style={{ fontSize: 12, fontWeight: 400, color: MUTED, margin: '4px 0 0' }}>{caption}</p>}
+        <p style={{ fontSize: 16, fontWeight: 600, color: MUTED, margin: 0, lineHeight: 1.2 }}>{label}</p>
+        <p style={{ fontSize: 44, fontWeight: 800, color: GREEN_900, margin: '4px 0 0', lineHeight: 1.05, whiteSpace: 'nowrap' }}>{children}</p>
+        {note}
       </div>
     </div>
   )
 }
+const KpiNote = ({ children }) => <p style={{ fontSize: 14, color: MUTED, margin: '6px 0 0', lineHeight: 1.35 }}>{children}</p>
 
-// Accuracy-over-time line chart with axes, gridlines, hover tooltip and a
-// "View as table" toggle. Smoothing: 3-point moving average, per the
-// analytics rules (plotted as a dashed trend line alongside the real series).
-function useContainerWidth(fallback) {
-  const ref = useRef(null)
-  const [width, setWidth] = useState(fallback)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.max(260, Math.floor(entry.contentRect.width))))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  return [ref, width]
-}
+function Skeleton({ h }) { return <div className="animate-pulse rounded-[22px]" style={{ background: '#E6EEEA', height: h }} /> }
 
-// Line chart used for accuracy (0-100%) and, with `unit=""`, for counts such as hints per game.
-function ProgressChart({ points, color = '#7C5CE0', height = 200, unit = '%', valueLabel = 'Accuracy' }) {
-  const [hover, setHover] = useState(null)
-  const [asTable, setAsTable] = useState(false)
-  const [boxRef, boxWidth] = useContainerWidth(760)
-  const w = Math.min(760, boxWidth), h = height, padL = 36, padR = 10, padT = 10, padB = 26
-  const innerW = w - padL - padR, innerH = h - padT - padB
-  const top = unit === '%' ? 100 : Math.max(4, Math.ceil(Math.max(1, ...points.map((p) => p.value)) / 4) * 4)
-  const xText = (p) => p.label ?? fmtDate(p.date)
-  const fmtTick = (v) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`
-
-  if (points.length === 0) {
-    return <p className="py-10 text-center text-[13px]" style={{ color: MUTED }}>Not enough data yet.</p>
-  }
-
-  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0
-  const yFor = (v) => padT + innerH - (Math.min(top, Math.max(0, v)) / top) * innerH
-  const xy = points.map((p, i) => [padL + i * stepX, yFor(p.value)])
-  const smoothed = xy.map((_, i) => {
-    const win = xy.slice(Math.max(0, i - 1), i + 2)
-    return [xy[i][0], win.reduce((s, p) => s + p[1], 0) / win.length]
-  })
-  const line = xy.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  const dashLine = smoothed.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  const area = `${line} L${xy[xy.length - 1][0]},${padT + innerH} L${xy[0][0]},${padT + innerH} Z`
-
-  // Thin x-axis down to ~6 labels so dates stay legible.
-  const labelEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(innerW / 64))))
-
-  if (asTable) {
-    return (
-      <div ref={boxRef}>
-        <button type="button" onClick={() => setAsTable(false)} className="mb-2 text-[12.5px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>← Back to chart</button>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
-            <thead><tr style={{ color: MUTED, textAlign: 'left' }}><th className="pb-1 pr-4">Date</th><th className="pb-1">{valueLabel}</th></tr></thead>
-            <tbody>{points.map((p, i) => <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}><td className="py-1 pr-4" style={{ color: GREEN_900 }}>{xText(p)}</td><td className="py-1" style={{ color: GREEN_900 }}>{p.value}{unit}</td></tr>)}</tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div ref={boxRef}>
-      <div className="relative" style={{ height: h }}>
-        <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" role="img"
-          aria-label={`${valueLabel}: ${points.map((p) => `${xText(p)} ${p.value}${unit}`).join(', ')}`}>
-          {[0, 0.25, 0.5, 0.75, 1].map((r) => {
-            const t = top * r
-            const y = yFor(t)
-            return (
-              <g key={r}>
-                <line x1={padL} x2={w - padR} y1={y} y2={y} stroke="#EEF2F0" strokeWidth="1" />
-                <text x={padL - 8} y={y + 3} fontSize="10" textAnchor="end" fill={MUTED}>{fmtTick(t)}</text>
-              </g>
-            )
-          })}
-          <path d={area} fill={color} opacity="0.12" />
-          <path d={dashLine} fill="none" stroke="#1FA58A" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.8" />
-          <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          {xy.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={hover === i ? 6 : 4} fill={color} stroke="#fff" strokeWidth="1.5"
-              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
-              tabIndex={0} style={{ cursor: 'pointer', outline: 'none' }} />
-          ))}
-          {points.map((p, i) => (i % labelEvery === 0 || i === points.length - 1) && (
-            <text key={i} x={xy[i][0]} y={h - 6} fontSize="10" textAnchor="middle" fill={MUTED}>{xText(p)}</text>
-          ))}
-        </svg>
-        {hover !== null && (
-          <div className="pointer-events-none absolute rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-white shadow"
-            style={{ background: GREEN_900, left: `${(xy[hover][0] / w) * 100}%`, top: `${(xy[hover][1] / h) * 100}%`, transform: 'translate(-50%,-130%)', whiteSpace: 'nowrap' }}>
-            {xText(points[hover])} · {points[hover].value}{unit}
-          </div>
-        )}
-      </div>
-      <button type="button" onClick={() => setAsTable(true)} className="mt-1 text-[12px] font-bold" style={{ color: GREEN_700, minHeight: 44 }}>View as table</button>
-    </div>
-  )
-}
-
-function Donut({ segments, total, unit }) {
+function Donut({ segments, total }) {
+  const by = Object.fromEntries(segments.map((s) => [s.type, s]))
+  const list = TYPES.map((t) => ({ type: t, share: by[t]?.share || 0, games: by[t]?.games || 0 }))
   let acc = 0
-  const stops = segments.map((s) => { const start = acc; acc += s.share; return `${TYPE_COLOR[s.type] || '#94A3B8'} ${start}% ${acc}%` })
-  const bg = segments.length ? `conic-gradient(${stops.join(',')})` : '#F1F5F3'
+  const stops = list.filter((s) => s.share > 0).map((s) => { const a = acc; acc += s.share; return `${TYPE_COLOR[s.type]} ${a}% ${acc}%` })
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative h-[100px] w-[100px] flex-shrink-0 rounded-full" style={{ background: bg }} role="img" aria-label={`Share by therapy type: ${segments.map((s) => `${s.type} ${s.share}%`).join(', ')}`}>
-        <div className="absolute inset-[13px] flex flex-col items-center justify-center rounded-full bg-white text-center">
-          <span className="text-[15px] font-extrabold" style={{ color: GREEN_900 }}>{total}</span>
-          <span className="text-[9px] font-bold" style={{ color: MUTED }}>{unit}</span>
+    <div>
+      <div className="flex flex-wrap items-center gap-5">
+        <div className="relative flex-shrink-0 rounded-full" style={{ width: 150, height: 150, background: stops.length ? `conic-gradient(${stops.join(',')})` : '#E8EFEC' }} role="img"
+          aria-label={`Time by therapy type, ${total} minutes: ${list.map((s) => `${s.type} ${s.share}%`).join(', ')}`}>
+          <div className="absolute flex flex-col items-center justify-center rounded-full bg-white" style={{ inset: 20 }}>
+            <span style={{ fontSize: 34, fontWeight: 800, color: GREEN_900, lineHeight: 1 }}>{total}</span>
+            <span style={{ fontSize: 14, color: MUTED }}>minutes</span>
+          </div>
         </div>
+        <ul className="grid gap-2" style={{ listStyle: 'none', margin: 0, padding: 0, flex: '1 1 140px' }}>
+          {list.map((s) => (
+            <li key={s.type} className="flex items-center gap-2" style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap', color: s.share ? GREEN_900 : '#9AB0A8' }}>
+              <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: s.share ? TYPE_COLOR[s.type] : '#D5E0DB' }} />{s.type} {s.share}%
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="flex flex-col gap-1">
-        {segments.map((s) => (
-          <li key={s.type} className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: GREEN_900 }}>
-            <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: TYPE_COLOR[s.type] || '#94A3B8' }} />
-            {s.type} <span style={{ color: MUTED, fontWeight: 400 }}>{s.share}%</span>
-          </li>
-        ))}
-        {segments.length === 0 && <li className="text-[12px]" style={{ color: MUTED }}>No data yet</li>}
-      </ul>
+      <p style={{ fontSize: 16, fontWeight: 700, color: GREEN_900, margin: '18px 0 8px' }}>Sessions by type</p>
+      <div className="flex flex-wrap gap-2">
+        {list.map((s) => <Chip key={s.type} bg={s.games ? GREEN_700 : 'transparent'} fg={s.games ? '#fff' : MUTED} style={s.games ? null : { border: `1px solid ${BORDER}` }}>{s.type} {s.games}</Chip>)}
+      </div>
     </div>
   )
 }
@@ -223,20 +84,19 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const rangeId = RANGE_OPTIONS.some((r) => r.id === params.get('range')) ? params.get('range') : '30'
-  const [tab, setTab] = useState('Cognitive')
+  const homeTab = HOME_TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'overview'
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [rangeOpen, setRangeOpen] = useState(false)
   const [showAllBadges, setShowAllBadges] = useState(false)
-  const [showAllGames, setShowAllGames] = useState(false)
 
-  const backHref = `/therapist/gamified-activities?${params.toString()}`
+  const backHref = `/therapist/gamified-activities?${new URLSearchParams([...params].filter(([k]) => k !== 'tab')).toString()}`
 
   const load = () => {
     if (!user?.email) return
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setData(null) // every section reloads together when the range changes
     fetch(`/api/therapist/gamified/patients/${patientId}?${new URLSearchParams({ email: user.email, range: rangeId })}`)
       .then((r) => r.json().then((b) => ({ ok: r.ok, b })))
       .then(({ ok, b }) => (ok ? setData(b) : setError(b.error || 'Could not load this patient’s stats.')))
@@ -245,332 +105,235 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
   }
   useEffect(load, [rangeId, patientId, user?.email]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setRange = (id) => setParams((p) => { const next = new URLSearchParams(p); next.set('range', id); return next })
-
+  const setRange = (id) => setParams((p) => { const next = new URLSearchParams(p); next.set('range', id); return next }, { replace: true })
+  const setTab = (id) => setParams((p) => { const next = new URLSearchParams(p); next.set('tab', id); return next }, { replace: true })
   const sessionsPage = useMemo(() => data?.recentSessions.slice(0, page * PAGE_SIZE) || [], [data, page])
 
-  const activeTabSessions = data?.analytics[tab.toLowerCase()]?.sessions?.length || 0
-  const tabCounts = Object.fromEntries(TABS.map((t) => [t, data?.analytics[t.toLowerCase()]?.sessions?.length ? data.analytics[t.toLowerCase()].sessions.length : (data?.analytics[t.toLowerCase()]?.accuracy?.length || 0)]))
+  const first = data?.profile.name.split(' ')[0] || ''
+  const assignHref = data ? `/therapist/assign-games?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}` : ''
+  const planAppt = data?.homePractice?.plan?.appointmentId
+  const editPlan = () => navigate(planAppt ? `/therapist/assign-games/${planAppt}/home` : assignHref)
+  const remind = async () => (await apiPost(`/api/patients/${data.profile.id}/home-practice/remind`, {})).message || 'Reminder sent.'
+  const canRemind = Boolean(data?.homePractice?.hasPlan)
+
+  const lowestKey = data ? [...data.characterStats].sort((a, b) => a.value - b.value)[0]?.key : null
+  const allSame = data ? new Set(data.characterStats.map((c) => c.value)).size === 1 : false
+  const badgesEarned = data?.kpis.badges.value ?? 0
+  const ins = data?.insights
 
   return (
     <TherapistPageShell user={user} onLogout={onLogout} title="Patient Stats" subtitle="Descriptive summary of recorded sessions" menuItems={getTherapistMenuItems(betaTier)} bare>
-      <style>{`
-        .tp-secondary-btn:hover { background: #F1F5F3 !important; }
-        .tp-primary-btn:hover { background: #1b3a30 !important; }
-      `}</style>
-      <div style={{ fontFamily: "'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif", letterSpacing: 'normal' }}>
-        <SecondaryButton onClick={() => navigate(backHref)} style={{ marginBottom: 16, padding: '8px 14px' }}>← All patients</SecondaryButton>
+      <div style={{ fontFamily: "'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif", letterSpacing: 'normal', paddingBottom: 96 /* keeps the floating Pao button off the last rows */ }}>
+        <div className="mb-4"><Btn onClick={() => navigate(backHref)} style={{ minHeight: 40, padding: '0 16px', fontSize: 14 }}>← All patients</Btn></div>
 
         {error && (
-          <div className="mb-5 flex items-center justify-between rounded-2xl border-2 p-4 text-[14px] font-bold" style={{ borderColor: '#F3D284', background: '#FFF7E6', color: '#92400E' }}>
+          <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4" style={{ border: '2px solid #F3D284', background: '#FFF7E6', color: '#92400E', fontSize: 15, fontWeight: 700 }}>
             <span>{error}</span>
-            <PrimaryButton onClick={load}>Retry</PrimaryButton>
+            <Btn primary onClick={load}>Retry</Btn>
           </div>
         )}
 
-        {loading && !data && (
-          <div className="grid grid-cols-1 gap-6">
-            <SkeletonBlock style={{ height: 130 }} />
-            <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4"><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /><SkeletonBlock style={{ height: 128 }} /></div>
-            <SkeletonBlock style={{ height: 280 }} />
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3"><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /><SkeletonBlock style={{ height: 260 }} /></div>
+        {loading && !data && !error && (
+          <div className="grid grid-cols-1 gap-5" aria-busy="true" aria-label="Loading patient stats">
+            <Skeleton h={140} />
+            <div className="grid grid-cols-2 gap-5 min-[1100px]:grid-cols-4"><Skeleton h={150} /><Skeleton h={150} /><Skeleton h={150} /><Skeleton h={150} /></div>
+            <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-3"><div className="min-[1100px]:col-span-2"><Skeleton h={380} /></div><Skeleton h={380} /></div>
+            <Skeleton h={420} />
           </div>
         )}
 
         {data && (
-          <div className="grid grid-cols-1 gap-6">
-            {/* Header — single baseline row, ~130px tall */}
-            <div className="flex flex-wrap items-center gap-4" style={{ ...CARD, minHeight: 130 }}>
-              <span className="flex flex-shrink-0 items-center justify-center rounded-full text-[20px] font-extrabold"
-                style={{ width: 72, height: 72, background: '#E3F6EA', border: `3px solid ${GREEN_700}`, color: GREEN_700 }}>{initials(data.profile.name)}</span>
-              <div className="min-w-0 flex-1" style={{ minWidth: 200 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 700, color: GREEN_900, margin: 0, letterSpacing: 'normal', lineHeight: 1.15 }}>{data.profile.name}</h1>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  {data.profile.age != null && <span className="rounded-full px-2.5 py-0.5 text-[12px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>Age {data.profile.age}</span>}
-                  {data.profile.favoriteGame && <span className="rounded-full px-2.5 py-0.5 text-[12px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>Favorite: {data.profile.favoriteGame}</span>}
-                  {data.profile.lastPlayedAt && <span className="rounded-full px-2.5 py-0.5 text-[12px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>Last played {fmtDate(data.profile.lastPlayedAt)}</span>}
+          <div className="grid grid-cols-1 gap-5">
+            {/* Patient card */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4" style={{ ...CARD, padding: 24 }}>
+              <span aria-hidden="true" className="flex flex-shrink-0 items-center justify-center rounded-full" style={{ width: 80, height: 80, background: '#fff', border: `4px solid ${GREEN_700}`, color: GREEN_700, fontSize: 28, fontWeight: 800 }}>{initials(data.profile.name)}</span>
+              <div className="min-w-0" style={{ flex: '1 1 260px' }}>
+                <h2 style={{ fontSize: 32, fontWeight: 800, color: GREEN_900, margin: 0, lineHeight: 1.15 }}>{data.profile.name}</h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {data.profile.age != null && <Chip>Age {data.profile.age}</Chip>}
+                  {data.profile.favoriteGame && <Chip>Favorite: {data.profile.favoriteGame}</Chip>}
+                  {data.profile.lastPlayedAt && <Chip>Last played {fmtDate(data.profile.lastPlayedAt)}</Chip>}
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: '#FFF1D6' }}>
-                <span className="rounded-full px-2.5 py-1 text-[12.5px] font-extrabold" style={{ background: '#FFE1A6', color: '#92400E' }}>⭐ LVL {data.profile.level}</span>
+                <Chip bg="#FFE1A6" fg="#7A4A06" style={{ fontWeight: 800 }}>★ LVL {data.profile.level}</Chip>
                 <div>
-                  <p className="text-[12.5px] font-bold" style={{ color: GREEN_900 }}>
-                    XP {data.profile.xp} / {data.profile.xpMax}
-                    <span style={{ color: MUTED, fontWeight: 400 }}> · {Math.max(0, data.profile.xpMax - data.profile.xp)} to go</span>
-                  </p>
-                  <div className="mt-1.5 h-2 w-[150px] overflow-hidden rounded-full" style={{ background: '#FFFFFF90' }}>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: GREEN_900, margin: 0, whiteSpace: 'nowrap' }}>XP {data.profile.xp} / {data.profile.xpMax} <span style={{ color: MUTED, fontWeight: 500 }}>· {Math.max(0, data.profile.xpMax - data.profile.xp)} to go</span></p>
+                  <div role="progressbar" aria-label="XP to next level" aria-valuemin={0} aria-valuemax={data.profile.xpMax} aria-valuenow={data.profile.xp} className="mt-1.5 h-2 overflow-hidden rounded-full" style={{ background: '#fff9', width: 200, maxWidth: '100%' }}>
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, (data.profile.xp / data.profile.xpMax) * 100)}%`, background: 'linear-gradient(90deg,#F59E0B,#FFC933)' }} />
                   </div>
                 </div>
               </div>
               <div className="relative">
-                <SecondaryButton onClick={() => setRangeOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={rangeOpen}>
-                  🗓️ {fmtRangeLabel(RANGE_OPTIONS.find((r) => r.id === rangeId)?.days)} <span style={{ color: MUTED }}>▾</span>
-                </SecondaryButton>
+                <Btn onClick={() => setRangeOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={rangeOpen}>📅 {fmtRangeLabel(RANGE_OPTIONS.find((r) => r.id === rangeId)?.days)} ▾</Btn>
                 {rangeOpen && (
-                  <ul role="listbox" className="absolute right-0 top-[calc(100%+6px)] z-10 w-40 overflow-hidden rounded-xl bg-white py-1 shadow-lg" style={{ border: `1px solid ${BORDER}` }}>
+                  <ul role="listbox" aria-label="Date range" className="absolute right-0 top-[calc(100%+6px)] z-10 w-48 overflow-hidden rounded-xl bg-white py-1 shadow-lg" style={{ border: `1px solid ${BORDER}`, listStyle: 'none', margin: 0, padding: '4px 0' }}>
                     {RANGE_OPTIONS.map((r) => (
-                      <li key={r.id}>
-                        <button type="button" role="option" aria-selected={rangeId === r.id} onClick={() => { setRange(r.id); setRangeOpen(false) }}
-                          className="block w-full px-3.5 py-2 text-left text-[12.5px] font-bold" style={{ background: rangeId === r.id ? '#F1F5F3' : 'transparent', color: GREEN_900 }}>{r.label}</button>
-                      </li>
+                      <li key={r.id}><button type="button" role="option" aria-selected={rangeId === r.id} onClick={() => { setRange(r.id); setRangeOpen(false) }}
+                        className="block w-full px-4 py-2.5 text-left" style={{ background: rangeId === r.id ? '#F1F5F3' : 'transparent', color: GREEN_900, fontSize: 15, fontWeight: 700 }}>{r.label}</button></li>
                     ))}
                   </ul>
                 )}
               </div>
             </div>
 
-            {data.kpis.games.value === 0 ? (
+            {data.kpis.games.value === 0 && !(data.homePractice?.totals.home.plays > 0) ? (
               <div className="text-center" style={{ ...CARD, padding: 48 }}>
-                <p style={{ fontSize: 16, fontWeight: 700, color: GREEN_900 }}>No games played yet.</p>
-                <p className="mt-1" style={{ fontSize: 13, color: MUTED }}>Stats will appear after the first session.</p>
-                <PrimaryButton onClick={() => navigate('/therapist/assign-games')} style={{ marginTop: 16 }}>Assign a game</PrimaryButton>
+                <p style={{ fontSize: 18, fontWeight: 700, color: GREEN_900, margin: 0 }}>No games played yet.</p>
+                <p style={{ fontSize: 15, color: MUTED, margin: '4px 0 16px' }}>Stats will appear after the first session.</p>
+                <Btn primary onClick={() => navigate('/therapist/assign-games')}>Assign a game</Btn>
               </div>
             ) : (
               <>
-                {/* KPI tiles */}
-                <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
-                  <KpiTile icon="🎮" bg="#DCEBFC"
-                    label="Games completed"
-                    value={data.kpis.games.assigned ? `${data.kpis.games.value} / ${data.kpis.games.assigned}` : data.kpis.games.value}
-                    caption={data.kpis.games.completionRate !== null ? `${data.kpis.games.completionRate}% of assigned` : 'recorded sessions'} />
-                  <KpiTile icon="🎯" bg="#D9F2E3"
-                    label="Average accuracy"
-                    value={data.kpis.accuracy.value !== null ? `${Math.round(data.kpis.accuracy.value)}%` : '—'}
-                    caption={changeText(data.kpis.accuracy.change, ' pts')} />
-                  <KpiTile icon="🏆" bg="#FDEBC8"
-                    label="Badges earned"
-                    value={`${data.kpis.badges.value} / ${data.kpis.badges.total}`}
-                    caption={data.kpis.badges.newThisRange > 0 ? `${data.kpis.badges.newThisRange} new this period` : 'No new badges this period'} />
-                  <div style={{ ...CARD, display: 'flex', gap: 12, minHeight: 128 }}>
-                    <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[18px]" style={{ background: '#FBDCE5' }}>💗</span>
-                    <div className="min-w-0 flex-1">
-                      <p style={{ fontSize: 14, fontWeight: 500, color: MUTED, margin: 0 }}>Active days</p>
-                      <p style={{ fontSize: 36, fontWeight: 700, color: GREEN_900, margin: '2px 0 0', lineHeight: 1.1 }}>
-                        {data.kpis.activeDays.value}<span style={{ fontSize: 16 }}> / {data.kpis.activeDays.daysInRange}</span>
-                      </p>
-                      {data.kpis.activeDays.dayFlags && (
-                        <div className="mt-1.5 grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(15, 8px)' }} role="img" aria-label={`${data.kpis.activeDays.value} active days out of ${data.kpis.activeDays.daysInRange}`}>
-                          {data.kpis.activeDays.dayFlags.map((played, i) => (
-                            <span key={i} title={`Day ${i + 1}: ${played ? 'active' : 'inactive'}`} className="rounded-sm" style={{ width: 8, height: 8, background: played ? '#1FA58A' : '#E3E8E4' }} />
-                          ))}
-                        </div>
+                {/* Number cards: 4 across, 2 x 2 below 1100px */}
+                <div className="grid grid-cols-2 gap-5 min-[1100px]:grid-cols-4">
+                  <KpiCard icon="🎮" bg="#E3EAFB" label="Games completed" note={<KpiNote>{data.kpis.games.completionRate !== null ? `${data.kpis.games.completionRate}% of assigned` : 'recorded sessions'}</KpiNote>}>
+                    {data.kpis.games.assigned ? `${data.kpis.games.value}` : data.kpis.games.value}{data.kpis.games.assigned ? <span style={{ fontSize: 20, color: MUTED }}> / {data.kpis.games.assigned}</span> : null}
+                  </KpiCard>
+                  <KpiCard icon="🎯" bg="#D9F2E3" label="Average accuracy"
+                    note={<KpiNote>{data.kpis.accuracy.change == null ? 'First period · nothing to compare yet' : data.kpis.accuracy.change === 0 ? 'No change vs previous period' : `${data.kpis.accuracy.change > 0 ? '+' : ''}${data.kpis.accuracy.change} pts vs previous period`}</KpiNote>}>
+                    {data.kpis.accuracy.value !== null ? <>{Math.round(data.kpis.accuracy.value)}<span style={{ fontSize: 24 }}>%</span></> : '—'}
+                  </KpiCard>
+                  <KpiCard icon="🏆" bg="#FDEBC8" label="Badges earned" note={<KpiNote>{data.kpis.badges.newThisRange > 0 ? `${data.kpis.badges.newThisRange} new this period` : 'No new badges this period'}</KpiNote>}>
+                    {badgesEarned}<span style={{ fontSize: 24, color: MUTED }}> / {data.kpis.badges.total}</span>
+                  </KpiCard>
+                  <KpiCard icon="💗" bg="#FBDCE5" label="Active days"
+                    note={data.kpis.activeDays.dayFlags ? (
+                      <div className="mt-3 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${Math.min(30, data.kpis.activeDays.dayFlags.length)}, minmax(0, 1fr))` }} role="img" aria-label={`${data.kpis.activeDays.value} active days out of ${data.kpis.activeDays.daysInRange}`}>
+                        {data.kpis.activeDays.dayFlags.slice(-30).map((on, i) => <span key={i} className="rounded-sm" style={{ height: 9, background: on ? HOME : '#E3EAE6' }} />)}
+                      </div>
+                    ) : null}>
+                    {data.kpis.activeDays.value}<span style={{ fontSize: 24, color: MUTED }}> / {data.kpis.activeDays.daysInRange}</span>
+                  </KpiCard>
+                </div>
+
+                {/* Progress over time (2/3) + Pao's summary (1/3) */}
+                <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-12">
+                  <div className="min-w-0 min-[1100px]:col-span-8">
+                    <ChartCard title="Progress over time" subtitle="Accuracy for each recorded session"
+                      legend={(
+                        <>
+                          <Chip bg="#EEE9FC" fg={THERAPY}>● Accuracy</Chip>
+                          <Chip bg="#DDF3EE" fg="#157A68">- - 3-session average</Chip>
+                          {data.series.length < 5 && <Chip bg={AMBER_BG} fg={AMBER_FG}>Only {data.series.length} session{data.series.length === 1 ? '' : 's'} so far</Chip>}
+                        </>
                       )}
-                    </div>
+                      chart={<SessionLine points={data.series} />} table={<SessionTable points={data.series} />} style={{ height: '100%' }} />
                   </div>
-                </div>
-
-                {/* Progress over time — full width, 240px */}
-                <div style={CARD}>
-                  <div className="mb-1 flex items-center justify-between">
+                  <section className="flex min-w-0 flex-col justify-between min-[1100px]:col-span-4" style={{ ...CARD, background: 'linear-gradient(160deg,#E3F0FD,#E6F5EE)' }} aria-label="Pao's summary">
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: GREEN_900, margin: 0, letterSpacing: 'normal' }}>Progress over time</h2>
-                      <p style={{ fontSize: 12.5, fontWeight: 400, color: MUTED, margin: '2px 0 0' }}>Accuracy per session · dashed line = 3-point average</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#2F6F9F', margin: 0 }}>Pao's summary</p>
+                          <p style={{ fontSize: 22, fontWeight: 800, color: GREEN_900, lineHeight: 1.3, margin: '8px 0 0' }}>{data.paoLine || data.paoSummary}</p>
+                        </div>
+                        <img src={PAO_THUMBS_UP} alt="" width="96" height="96" style={{ width: 96, height: 96, objectFit: 'contain', flexShrink: 0 }} />
+                      </div>
+                      <ul className="mt-5 grid gap-2.5" style={{ listStyle: 'none', margin: '20px 0 0', padding: 0 }}>
+                        {ins?.strongest && !allSame && <li style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', fontSize: 15, fontWeight: 700, color: GREEN_900 }}><span aria-hidden="true" style={{ color: '#17803D' }}>✔ </span>Strongest: {joinNames(ins.strongest.labels)} ({ins.strongest.value})</li>}
+                        {ins?.needsPractice && !allSame && <li style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', fontSize: 15, fontWeight: 700, color: GREEN_900 }}><span aria-hidden="true" style={{ color: '#D98A06' }}>▲ </span>Needs practice: {joinNames(ins.needsPractice.labels)} ({ins.needsPractice.value})</li>}
+                        {ins?.lowGames?.map((g) => <li key={g.name} style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', fontSize: 15, fontWeight: 700, color: GREEN_900 }}><span aria-hidden="true" style={{ color: '#D63A73' }}>! </span>{g.name}: {g.accuracy}% accuracy</li>)}
+                      </ul>
                     </div>
-                    <span className="rounded-full px-3 py-1 text-[12px] font-extrabold" style={{
-                      background: data.trend === 'improving' ? '#D9F2E3' : '#F1F5F3',
-                      color: data.trend === 'improving' ? '#16a34a' : MUTED,
-                    }}>{TREND_LABEL[data.trend]}</span>
-                  </div>
-                  <ProgressChart points={data.series} />
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      <Btn primary onClick={() => navigate(assignHref)}>Assign exercises</Btn>
+                      <Btn onClick={() => navigate(`/therapist/notes-progress?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Add a note</Btn>
+                    </div>
+                  </section>
                 </div>
 
-                {/* Character stats | Session analytics | Time by therapy type */}
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  <div style={CARD}>
-                    <CardTitle right={<span style={{ fontSize: 12, color: MUTED }}>vs. last month</span>}>Character stats</CardTitle>
-                    <div className="flex flex-col gap-3">
+                <SectionLabel>Home practice</SectionLabel>
+                <HomePracticeStats data={data.homePractice} firstName={first} tab={homeTab} onTabChange={setTab} onRemind={canRemind ? remind : undefined} onEditPlan={editPlan} />
+
+                <SectionLabel>Skills &amp; activity</SectionLabel>
+                <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-3">
+                  <section style={CARD} aria-label="Character stats">
+                    <div className="flex items-baseline justify-between gap-2"><h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Character stats</h3><span style={{ fontSize: 14, color: MUTED, whiteSpace: 'nowrap' }}>vs. last month</span></div>
+                    <ul className="mt-4 grid gap-4" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                       {data.characterStats.map((s) => (
-                        <div key={s.key} className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[16px]" style={{ background: '#F1F5F3' }}>{STAT_ICON[s.key] || '⭐'}</span>
+                        <li key={s.key} className="flex items-center gap-3">
+                          <span aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[20px]" style={{ background: '#F1F5F3' }}>{STAT_ICON[s.key] || '⭐'}</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between text-[13px]" style={{ color: GREEN_900 }}>
-                              <span style={{ fontWeight: 500 }}>{s.label}</span>
-                              <span style={{ fontWeight: 700 }}>{s.value} / 100 {s.change ? <span className="ml-1 rounded-full px-1.5 py-0.5" style={{ background: '#D9F2E3', color: '#16a34a', fontSize: 11 }}>↑ +{s.change}</span> : null}</span>
+                            <div className="flex items-center gap-2" style={{ fontSize: 16, color: GREEN_900 }}>
+                              <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{s.label}</span>
+                              {s.key === lowestKey && !allSame && <Chip bg={AMBER_BG} fg={AMBER_FG} style={{ padding: '2px 10px', fontSize: 13 }}>Focus area</Chip>}
+                              <span className="ml-auto flex items-center gap-1.5" style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{s.value} / 100{s.change ? <Chip bg="#D9F2E3" fg="#17803D" style={{ padding: '2px 8px', fontSize: 13 }}>↑ +{s.change}</Chip> : null}</span>
                             </div>
-                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full" style={{ background: '#F1F5F3' }}>
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, s.value)}%`, background: STAT_COLOR[s.key] || GREEN_700 }} />
+                            <div role="progressbar" aria-label={s.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={s.value} className="mt-1.5 h-2 overflow-hidden rounded-full" style={{ background: '#EAF0ED' }}>
+                              <div className="h-full rounded-full" style={{ width: `${Math.max(4, Math.min(100, s.value))}%`, background: STAT_COLOR[s.key] || GREEN_700 }} />
                             </div>
                           </div>
-                        </div>
+                        </li>
                       ))}
-                    </div>
-                  </div>
+                    </ul>
+                  </section>
 
-                  <div style={CARD}>
-                    <CardTitle>Session analytics</CardTitle>
-                    <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Therapy type">
-                      {TABS.map((t) => {
-                        const count = tabCounts[t] || 0
-                        return (
-                          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-                            className="h-8 rounded-full px-3 text-[12px] font-bold"
-                            style={{ background: tab === t ? GREEN_700 : '#fff', border: tab === t ? 'none' : `1px solid ${BORDER}`, color: tab === t ? '#fff' : (count === 0 ? MUTED : GREEN_900), opacity: count === 0 && tab !== t ? 0.6 : 1 }}>
-                            {t} <span style={{ opacity: 0.8 }}>{count}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {activeTabSessions < 2 ? (
-                      <div className="flex flex-col items-center py-6 text-center">
-                        <img src="/pao/png/pao-think.png" alt="" style={{ width: 72, height: 72, objectFit: 'contain' }} />
-                        <p className="mt-2 text-[12.5px]" style={{ color: MUTED, maxWidth: '28ch' }}>
-                          {activeTabSessions === 0 ? `No ${tab.toLowerCase()} sessions yet.` : `Only ${activeTabSessions} session so far.`} A trend will appear after a few more games.
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="mb-1 text-[12px] font-bold" style={{ color: MUTED }}>Accuracy over time (%)</p>
-                        <ProgressChart points={data.analytics[tab.toLowerCase()]?.accuracy || []} color={TYPE_COLOR[tab] || '#7C5CE0'} height={190} />
-                      </div>
-                    )}
-                    <p className="mb-1 mt-3 text-[12px] font-bold" style={{ color: MUTED }}>Last 3 sessions</p>
-                    <div className="flex flex-col divide-y" style={{ borderColor: '#EDF2F0' }}>
-                      {(data.analytics[tab.toLowerCase()]?.sessions || []).map((s, i) => (
-                        <div key={i} className="grid grid-cols-[56px_1fr_auto] items-center gap-2 py-2 text-[12.5px]" style={{ color: GREEN_900 }}>
-                          <span style={{ color: MUTED }}>{fmtDate(s.date)}</span><span className="truncate font-bold">{s.name}</span>
-                          <span style={{ color: MUTED }}>{s.accuracy !== null ? `${s.accuracy}%` : '—'} · {s.minutes} min</span>
-                        </div>
-                      ))}
-                      {(data.analytics[tab.toLowerCase()]?.sessions || []).length === 0 && <p className="py-2 text-[12.5px]" style={{ color: MUTED }}>No {tab.toLowerCase()} sessions in this range.</p>}
-                    </div>
-                  </div>
+                  <section style={CARD} aria-label="Time by therapy type">
+                    <h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: '0 0 16px' }}>Time by therapy type</h3>
+                    <Donut segments={data.shareByType} total={data.totalMinutes} />
+                  </section>
 
-                  <div style={CARD} className="md:col-span-2 lg:col-span-1">
-                    <CardTitle>Time by therapy type</CardTitle>
-                    <Donut segments={data.shareByType} total={data.totalMinutes} unit="minutes" />
-                    {data.typeNote && <p className="mt-3 text-[13px]" style={{ color: MUTED, maxWidth: '28ch', lineHeight: 1.4 }}>💡 {data.typeNote}</p>}
-                  </div>
+                  <section style={CARD} aria-label="Weekly completion">
+                    <h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Weekly completion</h3>
+                    <p style={{ fontSize: 14, color: MUTED, margin: '2px 0 12px' }}>Games finished each week</p>
+                    <WeeklyBars weeks={data.weekly.slice(-5)} />
+                    <div className="mt-2 flex flex-wrap gap-4"><span className="flex items-center gap-1.5" style={{ fontSize: 14, fontWeight: 700 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: HOME }} />Completed</span><span className="flex items-center gap-1.5" style={{ fontSize: 14, fontWeight: 700, color: MUTED }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: '#E3EAE6' }} />Assigned</span></div>
+                    <p style={{ background: '#E6F5EE', color: '#17613A', borderRadius: 14, padding: '10px 14px', fontSize: 15, fontWeight: 700, margin: '14px 0 0' }}>
+                      <span aria-hidden="true">💡 </span>Hints used: {data.hintsTotal ?? 0}{(data.hintsTotal ?? 0) === 0 ? ` — ${first} plays without help` : ''}
+                    </p>
+                  </section>
                 </div>
 
-                {/* Recent games | Weekly completion | Badges */}
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  <div style={CARD}>
-                    <CardTitle right={data.recentGames.length > 0 ? (
-                      <button type="button" onClick={() => setShowAllGames((v) => !v)} className="text-[12px] font-extrabold" style={{ color: GREEN_700 }}>{showAllGames ? 'Show less' : 'View all →'}</button>
-                    ) : null}>Recent games</CardTitle>
-                    <div className="flex flex-col gap-2.5">
-                      {(showAllGames ? data.recentSessions : data.recentGames).slice(0, showAllGames ? 100 : 5).map((g, i) => (
-                        <div key={i} className="flex items-center gap-2.5 text-[12.5px]" style={{ color: GREEN_900 }}>
-                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[14px]" style={{ background: '#F1F5F3' }}>{GAME_ICON[g.therapyType] || '🎮'}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate" style={{ fontWeight: 700 }}>{g.name || g.game}</p>
-                            <p style={{ fontSize: 11, color: MUTED }}>{g.therapyType || ''}{g.therapyType ? ' · ' : ''}{fmtDate(g.date)}</p>
-                          </div>
-                          {'stars' in g && <span style={{ color: '#F59E0B', fontSize: 11 }}>{'★'.repeat(g.stars)}{'☆'.repeat(5 - g.stars)}</span>}
-                          <span style={{ color: MUTED, fontWeight: 700 }}>{g.accuracy !== null ? `${g.accuracy}%` : '—'}</span>
-                        </div>
-                      ))}
-                      {data.recentGames.length === 0 && <p className="text-[12.5px]" style={{ color: MUTED }}>No games yet.</p>}
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-12">
+                  <section className="min-w-0 min-[1100px]:col-span-7" style={CARD} aria-label="Recent sessions">
+                    <h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Recent sessions</h3>
+                    <p style={{ fontSize: 14, color: MUTED, margin: '2px 0 10px' }}>Latest finished plays</p>
+                    {sessionsPage.length === 0 ? <p style={{ fontSize: 15, color: MUTED }}>No finished plays in this period.</p> : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse" style={{ minWidth: 420, fontSize: 15 }}>
+                          <thead><tr style={{ color: MUTED, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
+                            {['Date', 'Game', 'Accuracy', 'Hints', 'Min'].map((h) => <th key={h} scope="col" className="pb-2 pr-3" style={{ whiteSpace: 'nowrap' }}>{h}</th>)}
+                          </tr></thead>
+                          <tbody>
+                            {sessionsPage.map((s, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}>
+                                <td className="py-3 pr-3" style={{ color: MUTED, whiteSpace: 'nowrap' }}>{fmtDate(s.date)}</td>
+                                <td className="py-3 pr-3" style={{ fontWeight: 800, color: GREEN_900 }}>{s.game}{s.atHome && <Chip bg="#DDF3EE" fg="#157A68" style={{ marginLeft: 8, padding: '1px 8px', fontSize: 13 }}>At home</Chip>}</td>
+                                <td className="py-3 pr-3" style={{ fontWeight: 800, color: accColor(s.accuracy) }}>{s.accuracy !== null ? `${s.accuracy}%` : '—'}</td>
+                                <td className="py-3 pr-3" style={{ color: GREEN_900 }}>{s.hints}</td>
+                                <td className="py-3" style={{ color: GREEN_900 }}>{s.minutes}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {sessionsPage.length < data.recentSessions.length && <div className="mt-3"><Btn onClick={() => setPage((p) => p + 1)}>Show more</Btn></div>}
+                  </section>
 
-                  <div style={CARD}>
-                    <CardTitle>Weekly completion</CardTitle>
-                    <div className="flex items-end justify-between gap-2" style={{ height: 160 }}>
-                      {data.weekly.slice(-5).map((w) => {
-                        const max = Math.max(1, ...data.weekly.map((x) => x.assigned || x.completed || 1))
-                        const total = Math.max(w.assigned || 0, w.completed || 0)
-                        const totalH = Math.max(4, (total / max) * 130)
-                        const doneH = total > 0 ? (w.completed / total) * totalH : 0
-                        return (
-                          <div key={w.weekStart} className="flex flex-1 flex-col items-center justify-end gap-1" style={{ height: '100%' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: GREEN_900 }}>{w.completed}</span>
-                            <div className="relative overflow-hidden rounded-t" style={{ width: 28, height: totalH, background: '#F1F5F3' }} title={`${w.label}: ${w.completed} of ${w.assigned || w.completed}`}>
-                              <div className="absolute bottom-0 w-full rounded-t" style={{ height: doneH, background: '#1FA58A' }} />
-                            </div>
-                          </div>
-                        )
-                      })}
+                  <section className="min-w-0 min-[1100px]:col-span-5" style={CARD} aria-label="Badges earned">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Badges earned</h3>
+                      <Chip>{badgesEarned} of {data.kpis.badges.total}{data.kpis.badges.newThisRange ? ` · ${data.kpis.badges.newThisRange} new` : ''}</Chip>
                     </div>
-                    <div className="mt-2 flex justify-between text-[10.5px] font-bold" style={{ color: MUTED }}>
-                      {data.weekly.slice(-5).map((w) => <span key={w.weekStart}>{w.label}</span>)}
-                    </div>
-                    <div className="mt-3 flex items-center gap-3 text-[11.5px] font-bold" style={{ color: MUTED }}>
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#1FA58A' }} /> Completed</span>
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#F1F5F3' }} /> Assigned</span>
-                    </div>
-                  </div>
-
-                  <div style={CARD} className="md:col-span-2 lg:col-span-1">
-                    <CardTitle right={
-                      <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold" style={{ background: '#F1F5F3', color: MUTED }}>
-                        {data.badges.filter((b) => b.earned).length} of {data.badges.length}{data.newThisRange ? ` · ${data.newThisRange} new` : ''}
-                      </span>
-                    }>Badges earned</CardTitle>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5">
                       {data.badges.slice(0, showAllBadges ? data.badges.length : 6).map((b) => (
-                        <div key={b.code} className="flex flex-col items-center gap-1">
-                          <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={44} muted={!b.earned} />
-                          <span className="text-center text-[9.5px] font-bold" style={{ color: MUTED }}>{b.name}</span>
+                        <div key={b.code} className="flex flex-col items-center gap-1.5" style={{ minWidth: 0 }}>
+                          <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={64} muted={!b.earned} />
+                          <span className="text-center" style={{ fontSize: 14, fontWeight: 700, color: b.earned ? GREEN_900 : MUTED, lineHeight: 1.2 }}>{b.name}{b.earned ? '' : <span className="sr-only"> (locked)</span>}</span>
                         </div>
                       ))}
                     </div>
-                    {data.badges.length > 6 && (
-                      <button type="button" onClick={() => setShowAllBadges((v) => !v)} className="mt-2 text-[12px] font-extrabold" style={{ color: GREEN_700 }}>{showAllBadges ? 'Show less' : 'View all →'}</button>
-                    )}
-                    {data.nextBadge && <p className="mt-3 rounded-xl px-3 py-2 text-[12.5px] font-bold" style={{ background: '#FFF1D6', color: '#92400E' }}>Next badge: {data.nextBadge.name}</p>}
-                  </div>
-                </div>
-
-                {/* Independence | Pao's summary */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  <div style={CARD}>
-                    <CardTitle>Independence</CardTitle>
-                    <p className="mb-2 -mt-2" style={{ fontSize: 12.5, fontWeight: 400, color: MUTED }}>Hints used per game — fewer means {data.profile.name.split(' ')[0]} needs less help</p>
-                    <ProgressChart points={data.hintsWeekly} color="#EC4899" height={190} unit="" valueLabel="Hints per game" />
-                  </div>
-                  <div className="flex flex-col justify-between" style={{ ...CARD, background: 'linear-gradient(135deg,#E3F0FD,#E3F6EA)' }}>
-                    <div className="flex items-start gap-3">
-                      <img src="/pao/png/pao-hooray.png" alt="" className="h-16 w-16 flex-shrink-0 object-contain" />
-                      <div>
-                        <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: MUTED, margin: 0 }}>Pao's summary</p>
-                        <p className="mt-1" style={{ fontSize: 14, fontWeight: 500, color: GREEN_900, lineHeight: 1.45 }}>{data.paoSummary}</p>
-                      </div>
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3" style={{ background: '#FFF1D6' }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: '#7A4A06' }}>{data.nextBadge ? `Next badge: ${data.nextBadge.name}` : 'Every badge earned'}</span>
+                      {data.badges.length > 6 && <button type="button" onClick={() => setShowAllBadges((v) => !v)} style={{ fontSize: 15, fontWeight: 800, color: GREEN_700, minHeight: 44 }}>{showAllBadges ? 'Show less' : 'View all →'}</button>}
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <PrimaryButton onClick={() => navigate(`/therapist/assign-games?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Assign exercises</PrimaryButton>
-                      <SecondaryButton onClick={() => navigate(`/therapist/notes-progress?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}`)}>Add a note</SecondaryButton>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Home practice vs therapy sessions: plays at home, mistakes, XP and character stats */}
-                <HomePracticeStats data={data.homePractice} firstName={data.profile.name.split(' ')[0]} />
-
-                {/* Recent sessions table */}
-                <div style={CARD}>
-                  <CardTitle>Recent sessions</CardTitle>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[480px] border-collapse">
-                      <thead>
-                        <tr className="text-left text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
-                          <th scope="col" className="pb-2">Date</th><th scope="col" className="pb-2">Game</th><th scope="col" className="pb-2">Accuracy</th><th scope="col" className="pb-2">Hints</th><th scope="col" className="pb-2">Minutes</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sessionsPage.map((s, i) => (
-                          <tr key={i} style={{ borderTop: '1px solid #EDF2F0' }}>
-                            <td className="py-2.5 text-[13px]" style={{ color: MUTED }}>{fmtDate(s.date)}</td>
-                            <td className="py-2.5 text-[13px] font-bold" style={{ color: GREEN_900 }}>{s.game}{s.atHome && <span className="ml-2 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>At home</span>}</td>
-                            <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.accuracy !== null ? `${s.accuracy}%` : '—'}</td>
-                            <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.hints}</td>
-                            <td className="py-2.5 text-[13px]" style={{ color: GREEN_900 }}>{s.minutes}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {sessionsPage.length < data.recentSessions.length && (
-                    <div className="mt-3 flex justify-center">
-                      <SecondaryButton onClick={() => setPage((p) => p + 1)}>Show more</SecondaryButton>
-                    </div>
-                  )}
+                  </section>
                 </div>
               </>
             )}
 
-            <p className="text-center text-[11.5px]" style={{ color: MUTED }}>Descriptive summary of recorded sessions. It does not diagnose or predict.</p>
+            <p className="text-center" style={{ fontSize: 14, color: MUTED, margin: '8px 0 0' }}>Descriptive summary of recorded sessions. It does not diagnose or predict.</p>
           </div>
         )}
       </div>

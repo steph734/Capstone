@@ -20,6 +20,26 @@ export const dayRange = (days) => {
 }
 export const shortDate = (iso) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
 
+// The next moment home play really opens: the first practice day whose play hours are still ahead,
+// never before the plan's start. Returns { day: 'Today' | 'Mon' ..., time: '4:00 PM' } or null.
+export function nextOpening(plan, nowMs) {
+  const OFF = 8 * 3600000
+  const startMs = new Date(plan.startsAt).getTime()
+  const endMs = new Date(plan.endsAt).getTime()
+  const todayStart = Math.floor((nowMs + OFF) / 86400000) * 86400000 - OFF // Manila midnight today
+  for (let i = 0; i < 15; i += 1) {
+    const dayStart = todayStart + i * 86400000
+    const wd = new Date(dayStart + OFF).getUTCDay()
+    if (!plan.days.includes(wd)) continue
+    const winStart = dayStart + toMin(plan.dailyStart) * 60000
+    const winEnd = dayStart + toMin(plan.dailyEnd) * 60000
+    const at = Math.max(winStart, startMs)
+    if (at >= winEnd || at <= nowMs || at > endMs) continue
+    return { day: i === 0 ? 'today' : i === 1 ? 'tomorrow' : DAY_NAMES[wd].slice(0, 3), time: fmt12(new Date(at + OFF).toISOString().slice(11, 16)) }
+  }
+  return null
+}
+
 // What the home practice card should say right now. kind: none | open | done | later | closed
 export function homeStatus(data, secondsLeft, nowMs) {
   if (!data?.plan) return { kind: 'none', label: '' }
@@ -27,6 +47,10 @@ export function homeStatus(data, secondsLeft, nowMs) {
   const plan = data.plan
   if (w.open && secondsLeft > 0) return { kind: 'open', label: `Open now · until ${fmt12(plan.dailyEnd)}` }
   if (w.open || w.reason === 'home_limit') return { kind: 'done', label: 'Done for today' }
+  if (w.reason === 'home_hours' || w.reason === 'home_day') {
+    const n = nextOpening(plan, nowMs)
+    if (n) return { kind: n.day === 'today' ? 'later' : 'closed', label: `Opens ${n.day} at ${n.time}` }
+  }
   if (w.reason === 'home_hours') {
     const m = new Date(nowMs + 8 * 3600000)
     const min = m.getUTCHours() * 60 + m.getUTCMinutes()
@@ -36,6 +60,6 @@ export function homeStatus(data, secondsLeft, nowMs) {
     const wd = new Date(nowMs + 8 * 3600000).getUTCDay()
     for (let i = 1; i <= 7; i += 1) { const d = (wd + i) % 7; if (plan.days.includes(d)) return { kind: 'closed', label: `Next practice day: ${DAY_NAMES[d]}` } }
   }
-  if (w.reason === 'home_not_started') return { kind: 'closed', label: `Opens ${shortDate(plan.startsAt)}` }
+  if (w.reason === 'home_not_started') { const n = nextOpening(plan, nowMs); return { kind: 'later', label: n ? `Opens ${n.day} at ${n.time}` : `Opens ${shortDate(plan.startsAt)}` } }
   return { kind: 'closed', label: 'Closed right now' }
 }

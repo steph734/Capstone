@@ -17,7 +17,7 @@ function softBell() {
 }
 
 // Above every game: the "5 minutes left" toast and the friendly "Time's up" card.
-export default function PlanOverlays({ ps, muted }) {
+export default function PlanOverlays({ ps, muted, noOver = false }) {
   const { warnNow, state, plan, gameOpen, overDismissed } = ps
   const [shown, setShown] = useState(false) // keeps the overlay mounted for its fade-out
   useEffect(() => {
@@ -35,7 +35,8 @@ export default function PlanOverlays({ ps, muted }) {
   useEffect(() => { if (warnNow && !muted) softBell() }, [warnNow, muted])
   if (!ps.enabled) return null
   // With "finish the current game" on, an open game keeps going; the card shows once it is closed.
-  const showOver = state === 'over' && plan && !overDismissed && !(gameOpen && plan.allowFinishCurrent)
+  // A patient with home practice is not told "Time's up": their games continue at home, so there is nothing to lock out of.
+  const showOver = !noOver && state === 'over' && plan && !overDismissed && !(gameOpen && plan.allowFinishCurrent)
   return (
     <>
       {warnNow && (

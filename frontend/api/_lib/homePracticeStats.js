@@ -81,7 +81,7 @@ export function compare(home, session, firstName = 'The child') {
 
 // sessions: the patient's completed plays in the range (home ones have context 'home'); plans: home practice plans
 // that overlap the range; gameById: Map(id -> { name }); weekKeys: Monday keys of the range, oldest first.
-export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, firstName }) {
+export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, firstName, today = manilaDayKey(new Date()) }) {
   const isHome = (s) => s.context === 'home'
   const home = sessions.filter(isHome)
   const therapy = sessions.filter((s) => !isHome(s))
@@ -97,7 +97,8 @@ export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, fi
     const h = home.filter((s) => String(s.game_id) === id)
     const t = therapy.filter((s) => String(s.game_id) === id)
     const last = h.length ? h[h.length - 1].completed_at : null
-    return { gameId: id, name: nameOf(id), assigned: planGameIds.includes(id), home: summarise(h), session: summarise(t), lastHomeAt: last ? new Date(last).toISOString() : null }
+    const lastT = t.length ? t[t.length - 1].completed_at : null
+    return { gameId: id, name: nameOf(id), assigned: planGameIds.includes(id), home: summarise(h), session: summarise(t), lastHomeAt: last ? new Date(last).toISOString() : null, lastSessionAt: lastT ? new Date(lastT).toISOString() : null }
   })
 
   // Home plays per week (stacked by game), with the therapist's goal (plays per game per week).
@@ -121,11 +122,15 @@ export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, fi
     return { weekStart: wk, label: `Wk ${i + 1}`, homeXp: h.xp, sessionXp: t.xp, homeStats: h.statsTotal, sessionStats: t.statsTotal }
   })
 
+  // The days drawn on the accuracy chart: the last 6 days up to today, plus any earlier day that has plays.
+  const lastSix = Array.from({ length: 6 }, (_, i) => manilaDayKey(new Date(new Date(`${today}T12:00:00Z`).getTime() - (5 - i) * 86400000)))
+  const dayKeys = [...new Set([...lastSix, ...home.map((s) => manilaDayKey(s.completed_at)), ...therapy.map((s) => manilaDayKey(s.completed_at))])].sort()
+
   const totals = { home: summarise(home), session: summarise(therapy) }
   return {
     hasPlan: Boolean(plan),
     plan: plan ? {
-      status: plan.status, goalPerGamePerWeek: goal, startsAt: plan.starts_at, endsAt: plan.ends_at,
+      status: plan.status, appointmentId: plan.appointment_id ? String(plan.appointment_id) : null, goalPerGamePerWeek: goal, startsAt: plan.starts_at, endsAt: plan.ends_at,
       games: planGameIds.map((id) => ({ gameId: id, name: nameOf(id) })),
     } : null,
     totals,
@@ -133,7 +138,7 @@ export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, fi
     perGame,
     weeklyPlays,
     accuracySeries: { home: series(home), session: series(therapy) },
-    xpByWeek,
+    xpByWeek, dayKeys,
     minHomePlays: MIN_HOME_PLAYS,
   }
 }

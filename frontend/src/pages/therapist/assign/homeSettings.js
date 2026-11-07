@@ -21,7 +21,8 @@ export function defaultHome(today, nextSession) {
 // Home settings back from a saved plan.
 export function homeFromPlan(p) {
   return {
-    opens: 'custom', customStart: `${manilaDayOf(p.startsAt)}T${manilaHHMM(p.startsAt)}`, until: manilaDayOf(p.endsAt),
+    // An edit never keeps a stale opening time: if the plan already opened, saving opens it from now.
+    opens: new Date(p.startsAt).getTime() > Date.now() ? 'custom' : 'now', customStart: `${manilaDayOf(p.startsAt)}T${manilaHHMM(p.startsAt)}`, until: manilaDayOf(p.endsAt),
     days: p.days, dailyStart: p.dailyStart, dailyEnd: p.dailyEnd, limit: p.dailyLimitMinutes, goal: p.goalPerGamePerWeek,
     notify: p.notifyCaregiver, save: p.saveToProgress, autoLevel: p.autoLevelUp,
   }
@@ -41,7 +42,7 @@ export const homeSummary = (h) => `${daysText(h.days)} · ${fmt12(h.dailyStart).
 
 // The request body for POST/PATCH /api/home-practice-plans. `sessionEnd` = 'HH:MM' of the session end today.
 export function homeBody(h, { patientId, day, sessionEnd, sessionPlanId, appointmentId, games }) {
-  const startsAt = h.opens === 'after' ? manilaInstant(day, sessionEnd || '12:00') : new Date(`${h.customStart}:00+08:00`)
+  const startsAt = h.opens === 'now' ? new Date() : h.opens === 'after' ? manilaInstant(day, sessionEnd || '12:00') : new Date(`${h.customStart}:00+08:00`)
   return {
     patientId, sessionPlanId: sessionPlanId || undefined, appointmentId: appointmentId || undefined, games,
     startsAt: startsAt.toISOString(), endsAt: manilaInstant(h.until, '23:59').toISOString(), days: h.days,

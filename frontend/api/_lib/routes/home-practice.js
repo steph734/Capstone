@@ -3,6 +3,7 @@
 //   POST  /api/home-practice-plans              create (replaces the patient's active plan)
 //   PATCH /api/home-practice-plans/:id          edit settings / games, or { status: 'cancelled' }
 //   GET   /api/patients/:id/home-practice       plan + this week's progress (+ the session's played games)
+//   POST  /api/patients/:id/home-practice/remind   gentle reminder to the guardian (once every 6 hours)
 //   GET   /api/home-practice/me                 what the signed-in patient may play right now
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
@@ -210,6 +211,31 @@ export async function patientHomePractice(req, res) {
       sessionGames: await playedInSession(db, patientId, key),
     })
   } catch (err) { return fail(res, err, 'patients/home-practice') }
+}
+
+// POST /api/patients/:id/home-practice/remind   (Therapist) - "Send a reminder" on the Patient Stats page.
+// Notifies the guardian that home practice is open. Needs an active plan; at most one reminder per plan every 6 hours.
+const REMIND_EVERY_MS = 6 * 3600000
+export async function homePracticeRemind(req, res) {
+  if (!method(req, res, 'POST')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    const { db, employee, user, ip } = ctx
+    const patientId = oid(req.params.id)
+    if (!patientId || !(await activeAssignment(db, patientId, employee._id))) return res.status(403).json({ error: 'This patient is not assigned to you.' })
+    const plan = await HomePracticePlan.findOne({ patient_id: patientId, status: 'active' }).sort({ created_at: -1 })
+    if (!plan || plan.ends_at <= new Date()) return res.status(409).json({ error: 'There is no active home practice plan. Send games home first.' })
+    const patient = await db.collection('patients').findOne({ _id: patientId })
+    const to = patient?.email || patient?.guardian_email
+    if (!to) return res.status(409).json({ error: 'This patient has no guardian email on file, so a reminder cannot be sent.' })
+    const recent = await db.collection('notifications').findOne({ recipient_email: String(to).toLowerCase(), type: 'home_practice_reminder', request_id: String(plan._id), created_at: { $gte: new Date(Date.now() - REMIND_EVERY_MS) } })
+    if (recent) return res.status(429).json({ error: 'A reminder was already sent in the last 6 hours.' })
+    const first = patient.nickname || patient.first_name || 'your child'
+    await notify(db, { email: to, type: 'home_practice_reminder', title: 'Time for home practice', body: `A gentle reminder from ${employee.first_name || 'your therapist'}: ${first}'s home practice games are open.`, link: '/patient/gamified-activities', requestId: String(plan._id) })
+    await audit(db, { user, role: user.role, action: 'home_practice_reminder', patientId, ip, meta: { plan_id: String(plan._id) } })
+    return res.status(200).json({ ok: true, message: `Reminder sent for ${first}.` })
+  } catch (err) { return fail(res, err, 'home-practice remind') }
 }
 
 // GET /api/home-practice/me   (Patient)

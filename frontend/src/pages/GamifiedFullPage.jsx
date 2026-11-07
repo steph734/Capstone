@@ -460,7 +460,7 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
       <AppErrorBoundary label="games" onReset={() => navigate(rest.backPath || '/dashboard')}>
         <Suspense fallback={null}>
           <GamifiedFullPageInner requirePlayer={requirePlayer} plan={plan} home={home} activitySessionId={requirePlayer ? activity.session?.id : null} {...rest} />
-          <PlanOverlays ps={plan} />
+          <PlanOverlays ps={plan} noOver={Boolean(home.plan)} />
           <HomeOverlays hp={home} gameOpen={plan.gameOpen} />
         </Suspense>
       </AppErrorBoundary>

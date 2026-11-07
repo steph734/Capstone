@@ -104,28 +104,48 @@ describe('building the home practice section', () => {
   })
 })
 
-describe('the section renders (screen reader text, tables, no crash)', () => {
+describe('the section renders (tabs, tables, empty states, no crash)', () => {
   const sessions = [
     play(G1, '2026-10-28T05:00:00Z', 'session', { correct: 6, attempts: 10 }),
     play(G1, '2026-11-03T05:00:00Z', 'home', { correct: 10, attempts: 10 }),
     play(G1, '2026-11-04T05:00:00Z', 'home', { correct: 10, attempts: 10 }),
     play(G2, '2026-11-05T05:00:00Z', 'home', { correct: 9, attempts: 10 }),
   ]
-  it('shows the verdict, the tables and described charts', () => {
-    const data = buildHomePracticeStats({ sessions, plans: [plan], gameById: games, weekKeys, firstName: 'Rene' })
-    const html = renderToStaticMarkup(createElement(HomePracticeStats, { data, firstName: 'Rene' }))
-    expect(html).toContain('Home practice vs therapy sessions')
+  const build = (list, plans = [plan]) => buildHomePracticeStats({ sessions: list, plans, gameById: games, weekKeys, firstName: 'Rene', today: '2026-11-08' })
+  const render = (data, props = {}) => renderToStaticMarkup(createElement(HomePracticeStats, { data, firstName: 'Rene', ...props }))
+  it('overview: goal cards, comparison table and per-game cards, with a tablist', () => {
+    const html = render(build(sessions))
+    expect(html).toContain('role="tablist"')
     expect(html).toContain('Therapy sessions vs home practice')
-    expect(html).toContain('Mistakes per play')
-    expect(html).toContain('XP and character stats earned')
-    expect(html).toContain('role="img"')
-    expect(html).toContain('View as table')
+    expect(html).toContain('How each game went')
     expect(html).toContain('Money Match')
   })
+  it('by game: one card per game with both columns', () => {
+    const html = render(build(sessions), { tab: 'by-game' })
+    expect(html).toContain('Therapy sessions')
+    expect(html).toContain('Home practice')
+    expect(html).toContain('Last played at home')
+  })
+  it('trends: charts with a Chart | Table switch and described charts', () => {
+    const html = render(build(sessions), { tab: 'trends' })
+    expect(html).toContain('Accuracy over time')
+    expect(html).toContain('Mistakes per play, by game')
+    expect(html).toContain('XP earned per week')
+    expect(html).toContain('Character stat points gained')
+    expect(html).toContain('role="img"')
+    expect(html).toContain('>Table<')
+  })
+  it('shows the empty state with fewer than 3 home plays', () => {
+    const html = render(build(sessions.filter((s) => s.context !== 'home')), { onRemind: () => {}, onEditPlan: () => {} })
+    expect(html).toContain('No home plays yet')
+    expect(html).toContain('Send a reminder')
+    expect(html).toContain('Edit home plan')
+  })
+  it('the accuracy chart always has at least 6 days', () => {
+    expect(build(sessions.filter((s) => s.context !== 'home')).dayKeys.length).toBeGreaterThanOrEqual(6)
+  })
   it('with no plan and no home plays it explains how the section fills in', () => {
-    const data = buildHomePracticeStats({ sessions: [], plans: [], gameById: games, weekKeys, firstName: 'Rene' })
-    const html = renderToStaticMarkup(createElement(HomePracticeStats, { data, firstName: 'Rene' }))
-    expect(html).toContain('No home practice plan was active in this period')
+    expect(render(build([], []))).toContain('No home practice plan was active in this period')
   })
   it('renders nothing if the server sent no home practice data (older API)', () => {
     expect(renderToStaticMarkup(createElement(HomePracticeStats, { data: undefined }))).toBe('')

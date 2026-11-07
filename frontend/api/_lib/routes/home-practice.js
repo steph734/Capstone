@@ -8,6 +8,7 @@ import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
 import { audit } from '../noteAccess.js'
 import { notify } from '../sessionRecommendations.js'
+import { pickPatientByEmail } from '../resolvePatient.js' // which child this guardian account plays as (see resolvePatient.js)
 import { sendEmail } from '../brevo.js'
 import { HomePracticePlan } from '../models/homePracticePlan.js'
 import { activeAssignment, employeeFor, gameDifficulty, manilaDayKey, oid, serializeGame } from '../gamePlans.js'

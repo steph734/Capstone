@@ -3,6 +3,7 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import AssignGamesPlanner from './assign/AssignGamesPlanner'
+import { authFetch } from '../../utils/session'
 import './TherapistAssignExercisesPage.css'
 
 function dueLabel(iso) {
@@ -66,6 +67,7 @@ function fromApiAssignment(a) {
 export default function TherapistAssignExercisesPage({ user, onLogout, betaTier }) {
   const [assignments, setAssignments] = useState([])
   const [toast, setToast] = useState('')
+  const [plans, setPlans] = useState([])
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3200) }
 
@@ -79,6 +81,15 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
       .catch(() => {})
     return () => { cancelled = true }
   }, [user?.email])
+
+  // The games this therapist assigned (session plans), kept fresh while the page is open.
+  useEffect(() => {
+    let alive = true
+    const load = () => { if (!document.hidden) authFetch('/api/therapist/game-plans/history').then((d) => { if (alive) setPlans(d.plans || []) }).catch(() => {}) }
+    load()
+    const t = setInterval(load, 15000)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
 
   const handleDelete = async (id) => {
     const assignment = assignments.find((a) => a.id === id)
@@ -120,7 +131,23 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
           </div>
 
           <div className="tae-list">
-            {assignments.length === 0 && <p className="tae-empty">No active assignments yet.</p>}
+            {assignments.length === 0 && plans.length === 0 && <p className="tae-empty">No active assignments yet.</p>}
+            {plans.map((p) => {
+              const c = avatarColor(p.patientName)
+              const done = p.games.filter((g) => g.status === 'done').length
+              const label = p.status === 'ended' ? 'Ended' : p.status === 'paused' ? 'Paused' : p.status === 'active' ? (p.games.some((g) => g.status === 'in_progress') ? 'Playing' : 'Open now') : 'Scheduled'
+              return (
+                <div key={p.id} className="tae-assignment">
+                  <span className="tae-avatar" style={{ background: c.bg, color: c.color }}>{initials(p.patientName)}</span>
+                  <div className="tae-assignment-body">
+                    <span className="tae-assignment-name">{p.patientName}</span>
+                    <span className="tae-assignment-meta">{p.games.map((g) => g.name).join(', ')}</span>
+                    <span className={`tae-due ${dueTone(p.date)}`}><CalMiniIcon /> {dueLabel(p.date)} · {done} of {p.games.length} done{p.atHomeUntil ? ' · home practice on' : ''}</span>
+                    <span className="tae-pill">{label}</span>
+                  </div>
+                </div>
+              )
+            })}
             {assignments.map((a) => {
               const c = avatarColor(a.patient)
               return (

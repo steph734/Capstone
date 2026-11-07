@@ -5,6 +5,7 @@ import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
 import { audit } from '../noteAccess.js'
 import { notify } from '../sessionRecommendations.js'
+import { pickPatientByEmail } from '../resolvePatient.js' // which child this guardian account plays as (see resolvePatient.js)
 import { SessionGamePlan } from '../models/sessionGamePlan.js'
 import { HomePracticePlan } from '../models/homePracticePlan.js'
 import { GamePlayEvent, ensureEventIndexes } from '../models/gamePlayEvent.js'
@@ -403,4 +404,33 @@ export async function planEvents(req, res) {
     }
     return res.status(200).json({ ok: true })
   } catch (err) { return fail(res, err, 'game-plans events') }
+}
+
+// GET /api/therapist/game-plans/history -> every game plan this therapist set in the last 30 days (their assigned games, with progress)
+export async function plansHistory(req, res) {
+  if (!method(req, res, 'GET')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    const { db, employee } = ctx
+    const plans = await SessionGamePlan.find({ employee_id: employee._id, status: { $ne: 'cancelled' }, plan_date: { $gte: new Date(Date.now() - 30 * 86400000) } }).sort({ plan_date: -1, created_at: -1 }).limit(60)
+    for (const p of plans) await refreshPlan(p)
+    const [pats, homes] = await Promise.all([
+      db.collection('patients').find({ _id: { $in: [...new Set(plans.map((p) => String(p.patient_id)))].map(oid) } }, { projection: { first_name: 1, last_name: 1 } }).toArray(),
+      db.collection('home_practice_plans').find({ therapist_id: employee._id, status: 'active', patient_id: { $in: plans.map((p) => p.patient_id) } }, { projection: { patient_id: 1, ends_at: 1 } }).toArray(),
+    ])
+    const name = new Map(pats.map((p) => [String(p._id), pretty(p)]))
+    const home = new Map(homes.map((h) => [String(h.patient_id), h]))
+    const out = []
+    for (const p of plans) {
+      const sp = await serializePlan(db, p)
+      out.push({
+        id: sp.id, patientId: sp.patientId, patientName: name.get(sp.patientId) || 'Patient', date: sp.planDate, status: sp.status, playStart: sp.playStart, playEnd: sp.playEnd,
+        games: sp.games.map((g) => ({ name: g.name, difficulty: g.difficulty, minutes: g.minutes, status: g.status })),
+        atHomeUntil: home.get(sp.patientId)?.ends_at ? home.get(sp.patientId).ends_at.toISOString() : null,
+      })
+    }
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(200).json({ plans: out })
+  } catch (err) { return fail(res, err, 'therapist/game-plans/history') }
 }

@@ -110,6 +110,10 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
   const sessionsPage = useMemo(() => data?.recentSessions.slice(0, page * PAGE_SIZE) || [], [data, page])
 
   const first = data?.profile.name.split(' ')[0] || ''
+  // Weekly completion starts at the first week with a finished game (Wk 1), not at empty weeks before it.
+  const weeklyAll = data?.weekly || []
+  const firstData = Math.max(0, weeklyAll.findIndex((w) => w.completed > 0 || w.assigned > 0))
+  const weeklyShown = weeklyAll.slice(firstData).slice(0, 8).map((w, i) => ({ ...w, label: `Wk ${i + 1}` }))
   const assignHref = data ? `/therapist/assign-games?patientId=${data.profile.id}&patientName=${encodeURIComponent(data.profile.name)}` : ''
   const planAppt = data?.homePractice?.plan?.appointmentId
   const editPlan = () => navigate(planAppt ? `/therapist/assign-games/${planAppt}/home` : assignHref)
@@ -276,7 +280,7 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                   <section style={CARD} aria-label="Weekly completion">
                     <h3 style={{ fontSize: 20, fontWeight: 700, color: GREEN_900, margin: 0 }}>Weekly completion</h3>
                     <p style={{ fontSize: 14, color: MUTED, margin: '2px 0 12px' }}>Games finished each week</p>
-                    <WeeklyBars weeks={data.weekly.slice(-5)} />
+                    <WeeklyBars weeks={weeklyShown} />
                     <div className="mt-2 flex flex-wrap gap-4"><span className="flex items-center gap-1.5" style={{ fontSize: 14, fontWeight: 700 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: HOME }} />Completed</span><span className="flex items-center gap-1.5" style={{ fontSize: 14, fontWeight: 700, color: MUTED }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: '#E3EAE6' }} />Assigned</span></div>
                     <p style={{ background: '#E6F5EE', color: '#17613A', borderRadius: 14, padding: '10px 14px', fontSize: 15, fontWeight: 700, margin: '14px 0 0' }}>
                       <span aria-hidden="true">💡 </span>Hints used: {data.hintsTotal ?? 0}{(data.hintsTotal ?? 0) === 0 ? ` — ${first} plays without help` : ''}

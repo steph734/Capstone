@@ -278,12 +278,16 @@ export default function HomePracticeStats({ data, firstName = 'This child', tab:
   const legend = <>{SERIES.map((x) => <LegendDot key={x.key} color={x.color} label={x.label} />)}</>
   const cats = games.map((g) => ({ label: g.name }))
   const mistakeVals = games.map((g) => ({ a: g.session.plays ? g.session.mistakesPerPlay : 0, b: g.home.plays ? g.home.mistakesPerPlay : 0 }))
-  const wkCats = weeklyPlays.map((w) => ({ label: w.label }))
+  // Week charts start at the first week that has any plays or XP (Wk 1), instead of showing empty weeks before it.
+  const firstWk = Math.max(0, weeklyPlays.findIndex((w, i) => w.total > 0 || xpByWeek[i]?.homeXp > 0 || xpByWeek[i]?.sessionXp > 0))
+  const weeksShown = weeklyPlays.slice(firstWk).map((w, i) => ({ ...w, label: `Wk ${i + 1}` }))
+  const xpShown = xpByWeek.slice(firstWk).map((w, i) => ({ ...w, label: `Wk ${i + 1}` }))
+  const wkCats = weeksShown.map((w) => ({ label: w.label }))
   const wkSeries = games.map((g) => ({ key: g.gameId, label: g.name, color: color(g) }))
-  const wkVals = weeklyPlays.map((w) => Object.fromEntries(w.byGame.map((b) => [b.gameId, b.count])))
+  const wkVals = weeksShown.map((w) => Object.fromEntries(w.byGame.map((b) => [b.gameId, b.count])))
   const goalTotal = weeklyPlays[0]?.goalTotal || null
-  const xpCats = xpByWeek.map((w) => ({ label: w.label }))
-  const xpVals = xpByWeek.map((w) => ({ a: w.sessionXp, b: w.homeXp }))
+  const xpCats = xpShown.map((w) => ({ label: w.label }))
+  const xpVals = xpShown.map((w) => ({ a: w.sessionXp, b: w.homeXp }))
   const statCats = STATS.map(([, label]) => ({ label }))
   const statVals = STATS.map(([k]) => ({ a: s.stats[k], b: h.stats[k] }))
   const dayRows = days.map((d) => {
@@ -296,7 +300,7 @@ export default function HomePracticeStats({ data, firstName = 'This child', tab:
         <PaoNote tone="blue" src={PAO_LOOK_DOWN} eyebrow="What the trends show" actions={onRemind ? <Btn primary onClick={remind} disabled={reminding}>{reminding ? 'Sending…' : 'Send a reminder'}</Btn> : null}>{trendText}</PaoNote>
         {status}
       </div>
-      <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 min-[1800px]:grid-cols-2">
         <ChartCard title="Accuracy over time" subtitle="Each day with plays · home vs therapy" legend={legend}
           chart={<DayLines days={days} home={accuracySeries.home} session={accuracySeries.session} />}
           table={<DataTable caption="Accuracy by day" head={['Day', 'Therapy sessions', 'Home practice']} rows={dayRows} />}
@@ -313,7 +317,7 @@ export default function HomePracticeStats({ data, firstName = 'This child', tab:
           chart={<GroupedBars caption="XP earned per week" categories={xpCats} series={SERIES} values={xpVals} decimals={0} />}
           table={<GroupedTable caption="XP earned per week" first="Week" categories={xpCats} series={SERIES} values={xpVals} decimals={0} />} />
       </div>
-      <ChartCard title="Character stat points gained" subtitle="Home practice vs therapy sessions" legend={legend}
+      <ChartCard title="Character stat points gained" subtitle="Home practice vs therapy sessions" legend={legend} style={{ maxWidth: 820, width: '100%' }}
         chart={<GroupedBars caption="Character stat points gained" categories={statCats} series={SERIES} values={statVals} decimals={0} />}
         table={<GroupedTable caption="Character stat points gained" first="Stat" categories={statCats} series={SERIES} values={statVals} decimals={0} />} />
     </div>

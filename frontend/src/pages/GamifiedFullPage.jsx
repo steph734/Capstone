@@ -468,7 +468,7 @@ export default function GamifiedFullPage({ requirePlayer = false, ...rest }) {
   )
 }
 
-function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null, plan, home, activitySessionId = null }) {
+function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', patientEmail = null, requirePlayer = false, therapistEmail = null, previewGameId = null, plan, home, activitySessionId = null, patientName: patientNameProp = null }) {
   const navigate = useNavigate()
   const pao = usePao()
 
@@ -595,9 +595,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     xp: pao.profile?.xp ?? 0,
     xpNeeded: pao.profile?.xpToNext ?? Math.max(1, pao.profile?.xp ?? 1),
   }
+  // The real player's name (the signed-in patient, or the child a therapist picked). The demo name is only a last resort.
+  const realName = requirePlayer ? (activity.isPractice ? '' : activity.patient?.displayName || '') : String(patientNameProp || '').trim().split(/s+/)[0]
+  const playerName = realName || progress.patientName
   const headerName = requirePlayer
     ? (activity.isPractice ? 'Practice mode' : (activity.patient?.displayName || ''))
-    : progress.patientName
+    : playerName
 
   const advTimer = useRef(null)
   const stageRef = useRef(0)
@@ -761,7 +764,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
     plan.enabled ? (card) => authFetch('/api/patient/game-access', { query: { name: card.title, ...(activitySessionId ? { activitySessionId } : {}) } }) : undefined,
     [plan.enabled, activitySessionId]
   )
-  const launcher = launching ? <GameLauncher card={launching} check={checkAccess} playerName={progress.patientName} onLaunch={afterLoading} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
+  const launcher = launching ? <GameLauncher card={launching} check={checkAccess} playerName={playerName} onLaunch={afterLoading} onCancel={() => { setLaunching(null); if (previewGameId) navigate(backPath) }}/> : null
 
   // Owner "Preview" (see OwnerGamePreviewPage): launch one game straight
   // away. There's no player / activity session here, so the PaoProvider has no
@@ -796,7 +799,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }, [phase, home.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (phase === 'profile') {
-    return <GamifiedProfileView progress={progress} pao={pao.profile} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
+    return <GamifiedProfileView progress={{ ...progress, patientName: playerName }} pao={pao.profile} onViewAllBadges={() => setPhase('badges')} onBack={backToGames}/>
   }
 
   if (phase === 'badges') {
@@ -838,7 +841,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'daily-routines') {
-    return <DailyRoutinesPage patientName={progress.patientName} settingsKey={patientEmail || String(patientId)} canEdit={Boolean(therapistEmail)} onExit={backToGames}/>
+    return <DailyRoutinesPage patientName={playerName} settingsKey={patientEmail || String(patientId)} canEdit={Boolean(therapistEmail)} onExit={backToGames}/>
   }
 
   if (phase === 'feed-pao') {
@@ -859,22 +862,22 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'sound-hunt') {
     const key = patientEmail || String(patientId)
-    return <SoundHunt patientName={progress.patientName} settings={loadSoundSettings(key)} settingsKey={key} onExit={backToGames}/>
+    return <SoundHunt patientName={playerName} settings={loadSoundSettings(key)} settingsKey={key} onExit={backToGames}/>
   }
 
   if (phase === 'sentence-builder') {
     const key = patientEmail || String(patientId)
-    return <SentenceBuilder patientName={progress.patientName} settings={loadSentenceSettings(key)} settingsKey={key} onExit={backToGames}/>
+    return <SentenceBuilder patientName={playerName} settings={loadSentenceSettings(key)} settingsKey={key} onExit={backToGames}/>
   }
 
   if (phase === 'rhyme-time') {
     const key = patientEmail || String(patientId)
-    return <RhymeTime patientName={progress.patientName} settings={loadRhymeSettings(key)} settingsKey={key} onExit={backToGames}/>
+    return <RhymeTime patientName={playerName} settings={loadRhymeSettings(key)} settingsKey={key} onExit={backToGames}/>
   }
 
   if (phase === 'alphabet') {
     const key = patientEmail || String(patientId)
-    return <AlphabetBlast patientName={progress.patientName} settings={loadSettings(key)} settingsKey={key} onExit={backToGames}/>
+    return <AlphabetBlast patientName={playerName} settings={loadSettings(key)} settingsKey={key} onExit={backToGames}/>
   }
 
   if (phase === 'spot-difference') {
@@ -1178,8 +1181,8 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
                 isGamePublished(g.title)
               )
               return home.enabled
-                ? <PatientHub ps={plan} hp={home} cards={shownCards} allCards={allGames.filter(g => isGamePublished(g.title))} onPlay={startGame} name={progress.patientName}/>
-                : <PlanPanel ps={plan} name={progress.patientName} onPlay={startGame} cards={shownCards}/>
+                ? <PatientHub ps={plan} hp={home} cards={shownCards} allCards={allGames.filter(g => isGamePublished(g.title))} onPlay={startGame} name={playerName}/>
+                : <PlanPanel ps={plan} name={playerName} onPlay={startGame} cards={shownCards}/>
             })()) : (
             <div className="gf-games-grid">
               {allGames.filter(g =>

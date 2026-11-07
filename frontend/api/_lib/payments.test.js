@@ -266,8 +266,8 @@ describe('QR payments (GCash / Maya) are never confirmed automatically', () => {
   it('submitting keeps the booking unpaid and waiting for the therapist', async () => {
     const appt = await makeHold()
     const attempt = await newAttempt(appt, 'gcash')
-    await pay.submitQr(db, attempt, appt, { reference: 'GC 123456789' })
-    expect(store.payment_attempts[0]).toMatchObject({ status: 'pending_verification', provider_ref: 'GC 123456789' })
+    await pay.submitQr(db, attempt, appt, { reference: '1234 567 890 123' })
+    expect(store.payment_attempts[0]).toMatchObject({ status: 'pending_verification', provider_ref: '1234567890123', qr_details_sent: true })
     expect(store.appointments[0].payment_state).toBe('pending_verification')
     expect(store.payments || []).toHaveLength(0)
     expect(mocks.email).not.toHaveBeenCalled()
@@ -349,5 +349,45 @@ describe('Stripe webhook', () => {
   it('ignores payments that are not bookings (e.g. subscriptions)', async () => {
     const out = await run({ type: 'payment_intent.succeeded', data: { object: { id: 'pi_other', amount_received: 5000 } } })
     expect(out.body).toMatchObject({ ignored: true })
+  })
+})
+
+describe('QR "Payment submitted" screen data', () => {
+  it('a GCash reference must be exactly 13 digits; Maya 10 to 16; empty is allowed (optional)', () => {
+    expect(pay.cleanReference('1234 567 890 123', 'gcash')).toEqual({ value: '1234567890123' })
+    expect(pay.cleanReference('12345', 'gcash').error).toMatch(/13-digit/)
+    expect(pay.cleanReference('12345678901234', 'gcash').error).toMatch(/13-digit/)
+    expect(pay.cleanReference('abc', 'gcash')).toEqual({ value: '' }) // letters are dropped, nothing left = nothing sent
+    expect(pay.cleanReference('1234567890', 'paymaya')).toEqual({ value: '1234567890' })
+    expect(pay.cleanReference('123', 'paymaya').error).toMatch(/Maya/)
+    expect(pay.cleanReference('', 'gcash')).toEqual({ value: '' })
+  })
+  it('an invalid reference is refused and nothing is saved', async () => {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    await pay.submitQr(db, attempt, appt, {})
+    await expect(pay.submitQr(db, store.payment_attempts[0], appt, { reference: '123' })).rejects.toMatchObject({ code: 'INVALID_REFERENCE' })
+    expect(store.payment_attempts[0].provider_ref).toBe(null)
+  })
+  it('the first submit says "Being verified"; sending details flips it to "Checking your details"', async () => {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    await pay.submitQr(db, attempt, appt, {})
+    const first = pay.attemptView(store.payment_attempts[0], store.appointments[0])
+    expect(first).toMatchObject({ status: 'pending_verification', detailsSent: false, reviewHours: 24 })
+    await pay.submitQr(db, store.payment_attempts[0], appt, { screenshot: 'data:image/jpeg;base64,AAAA' })
+    const second = pay.attemptView(store.payment_attempts[0], store.appointments[0])
+    expect(second).toMatchObject({ detailsSent: true, hasScreenshot: true })
+    expect(JSON.stringify(second)).not.toContain('AAAA') // the screenshot itself is never sent back
+  })
+  it('"Payment sent" keeps the time of the first submit, and the view carries the real hold expiry', async () => {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    await pay.submitQr(db, attempt, appt, {})
+    const sentAt = store.payment_attempts[0].qr_submitted_at
+    await pay.submitQr(db, store.payment_attempts[0], appt, { reference: '1234567890123' })
+    expect(store.payment_attempts[0].qr_submitted_at).toBe(sentAt)
+    const view = pay.attemptView(store.payment_attempts[0], store.appointments[0])
+    expect(new Date(view.booking.holdExpiresAt).getTime()).toBeGreaterThan(Date.now() + 24 * 3600 * 1000) // held longer than the promised review time
   })
 })

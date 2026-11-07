@@ -61,3 +61,21 @@ describe('booking payment helpers', () => {
     expect(init.headers['x-booking-token']).toBe('secret-token')
   })
 })
+
+describe('Payment submitted screen helpers', () => {
+  it('formats a reference in groups and keeps only digits', async () => {
+    const { formatReference, referenceDigits } = await import('../components/PendingVerification.jsx')
+    expect(formatReference('1234567890123')).toBe('1234 567 890 123')
+    expect(formatReference('12a3-4 5')).toBe('1234 5')
+    expect(formatReference('12345678901234567890')).toBe('1234 567 890 123 456') // capped at 16 digits
+    expect(referenceDigits('1234 567 890 123')).toBe('1234567890123')
+  })
+  it('validates like the server: GCash exactly 13 digits, Maya 10 to 16, empty is fine', async () => {
+    const { referenceError } = await import('../components/PendingVerification.jsx')
+    expect(referenceError('')).toBe('')
+    expect(referenceError('1234 567 890 123', false)).toBe('')
+    expect(referenceError('1234 567', false)).toMatch(/13-digit/)
+    expect(referenceError('1234567890', true)).toBe('')
+    expect(referenceError('12345', true)).toMatch(/Maya/)
+  })
+})

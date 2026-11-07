@@ -10,9 +10,11 @@ export const CURRENCY = 'PHP'
 
 // A held (unpaid) slot is kept for this long.
 export const HOLD_MS = 15 * 60 * 1000
-// A QR payment waits for the therapist to verify it. The slot stays held this long (the patient is told "within 24 hours").
-export const QR_REVIEW_HOLD_MS = 72 * 60 * 60 * 1000
+// A QR payment waits for the therapist to verify it. QR_REVIEW_HOURS is the ONE setting behind the patient-facing
+// "usually within X hours" (the server sends it to the checkout screen). The slot is held three times that long, so a
+// slow verification does not lose the patient's slot.
 export const QR_REVIEW_HOURS = 24
+export const QR_REVIEW_HOLD_MS = QR_REVIEW_HOURS * 3 * 60 * 60 * 1000
 
 // An online booking only counts as a real appointment once its payment is verified. Until then (held, waiting for a
 // therapist to verify a QR payment) and after it fell through (expired, failed, cancelled) it must not show up as a

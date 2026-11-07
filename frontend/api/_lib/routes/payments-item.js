@@ -46,7 +46,13 @@ export default async function handler(req, res) {
     // qr-submit
     if (attempt.method === 'card') return res.status(400).json({ error: 'This is a card payment.' })
     if (attempt.status !== 'pending_verification') return res.status(409).json({ error: 'This payment is no longer waiting for verification.' })
-    await submitQr(db, attempt, appointment, { reference: req.body?.reference, screenshot: req.body?.screenshot })
+    if (!String(req.body?.reference || '').trim() && !req.body?.screenshot) return res.status(400).json({ error: 'Add a reference number or a screenshot first.', code: 'EMPTY_DETAILS' })
+    try {
+      await submitQr(db, attempt, appointment, { reference: req.body?.reference, screenshot: req.body?.screenshot })
+    } catch (err) {
+      if (err.code === 'INVALID_REFERENCE') return res.status(400).json({ error: err.message, code: err.code })
+      throw err
+    }
     const next = await db.collection('payment_attempts').findOne({ _id: attempt._id })
     return res.status(200).json(attemptView(next, await db.collection('appointments').findOne({ _id: appointment._id })))
   } catch (err) {

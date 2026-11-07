@@ -7,6 +7,7 @@ import {
   newKey, loadSaved, save, clearSaved, startBooking, createAttempt, getBookingState, cancelBooking, getStatus, submitQrDetails, TERMINAL,
 } from '../utils/bookingPayments'
 import { downloadReceipt, manilaDateTime } from '../utils/receiptPdf'
+import PendingVerification from './PendingVerification'
 
 // The checkout modal. The LEFT column (amount, what you are paying for, total) is the same in every state.
 // The RIGHT column is one state machine:
@@ -119,19 +120,6 @@ function DetailList({ rows }) {
   )
 }
 
-// Shrinks a screenshot before it is uploaded (a phone photo can be several MB).
-async function shrinkImage(file, max = 900) {
-  const url = URL.createObjectURL(file)
-  try {
-    const img = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = url })
-    const scale = Math.min(1, max / Math.max(img.width, img.height))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale)
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-    return canvas.toDataURL('image/jpeg', 0.7)
-  } finally { URL.revokeObjectURL(url) }
-}
-
 /* ─────────────────────────  the state machine (inside <Elements>)  ───────────────────────── */
 
 function RealCheckoutBody(props) {
@@ -161,11 +149,6 @@ function CheckoutBody({
   const [progress, setProgress] = useState('checking') // 'checking' | 'booking'
   const [count, setCount] = useState(redirectSeconds)
   const [countActive, setCountActive] = useState(true)
-  const [qrRef, setQrRef] = useState('')
-  const [qrShot, setQrShot] = useState('')
-  const [qrSending, setQrSending] = useState(false)
-  const [qrSent, setQrSent] = useState(false)
-  const [qrError, setQrError] = useState('')
 
   const alive = useRef(true)
   const holdKey = useRef(resumeSaved?.holdKey || newKey())
@@ -345,19 +328,11 @@ function CheckoutBody({
   // Tell the shell which state we are in, so its close button / Esc / backdrop do the right thing.
   useEffect(() => { onPhase?.(phase) }, [phase, onPhase])
 
-  /* ── QR: optional reference / screenshot after submitting ── */
-  const sendQrDetails = async () => {
-    if (!result?.attemptId || !booking) return
-    setQrSending(true); setQrError('')
-    try {
-      await submitQrDetails(result.attemptId, booking.token, { reference: qrRef, screenshot: qrShot })
-      setQrSent(true)
-    } catch (err) { setQrError(err.message) } finally { setQrSending(false) }
-  }
-  const onShot = async (e) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-    try { setQrShot(await shrinkImage(f)) } catch { setQrError('That image could not be read. Please try another one.') }
+  /* ── QR: optional reference / screenshot after submitting (the form lives in PendingVerification.jsx) ── */
+  const sendQrDetails = async ({ reference, screenshot }) => {
+    if (!result?.attemptId || !booking) throw new Error('We could not find your payment. Please refresh and try again.')
+    const view = await submitQrDetails(result.attemptId, booking.token, { reference, screenshot })
+    setResult(view) // the server's view now says the details were sent ("Checking your details")
   }
 
   const rows = useMemo(() => ({
@@ -423,29 +398,15 @@ function CheckoutBody({
   /* ───────── PENDING VERIFICATION (GCash / Maya) ───────── */
   if (phase === 'pending_verification') {
     return (
-      <div className="flex flex-col items-center text-center">
-        <span className="mb-3 mt-1 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600"><ClockIcon size={34} /></span>
-        {heading('Payment submitted', 'text-amber-700')}
-        <p role="status" className="mt-1 text-sm text-slate-600">We&apos;ll confirm your booking once your payment is verified (usually within 24 hours).</p>
-        <div className="mt-4 w-full rounded-xl border border-slate-200 p-4 text-left">
-          {qrSent ? (
-            <p className="flex items-center gap-2 text-sm font-semibold text-pm-green-dark"><CheckIcon size={16} w={3.5} /> Thanks, we added your details. The therapist will check your payment.</p>
-          ) : (
-            <>
-              <p className="text-sm font-semibold text-slate-700">Help us find your payment <span className="font-normal text-slate-400">(optional)</span></p>
-              <label className="mt-2 block text-xs font-medium text-slate-500" htmlFor="qr-ref">{qrProvider === 'maya' ? 'Maya' : 'GCash'} reference number</label>
-              <input id="qr-ref" value={qrRef} maxLength={40} onChange={(e) => setQrRef(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-pm-green" />
-              <label className="mt-3 block text-xs font-medium text-slate-500" htmlFor="qr-shot">Screenshot of your payment</label>
-              <input id="qr-shot" type="file" accept="image/*" onChange={onShot} className="mt-1 block w-full text-xs text-slate-500" />
-              {qrShot && <p className="mt-1 text-xs text-slate-400">Screenshot ready to send.</p>}
-              {qrError && <p role="alert" className="mt-2 text-xs text-red-600">{qrError}</p>}
-              <button type="button" className={`${btnOutline} mt-3 w-full`} onClick={sendQrDetails} disabled={qrSending || (!qrRef.trim() && !qrShot)}>{qrSending ? 'Sending…' : 'Send these details'}</button>
-            </>
-          )}
-        </div>
-        <button type="button" className={`${btnPrimary} mt-4 w-full`} onClick={closeFinished}>Go to my appointments</button>
-        <p className="mt-3 text-xs text-slate-500">Your time slot stays reserved while we verify it.</p>
-      </div>
+      <PendingVerification
+        attempt={result}
+        isMaya={methodRef.current === 'paymaya' || result?.method === 'paymaya'}
+        fallbackSession={sessionLabel}
+        fallbackTherapist={therapistLabel}
+        headingRef={headingRef}
+        onSend={sendQrDetails}
+        onDone={closeFinished}
+      />
     )
   }
 

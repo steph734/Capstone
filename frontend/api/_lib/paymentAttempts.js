@@ -10,7 +10,7 @@
 import crypto from 'crypto'
 import { insertPaymentWithRef } from './paymentRef.js'
 import { getStripeClient } from './stripeClient.js'
-import { ONLINE_AMOUNT_PESOS, ONLINE_AMOUNT_CENTAVOS, CURRENCY, HOLD_MS, QR_REVIEW_HOLD_MS } from './pricing.js'
+import { ONLINE_AMOUNT_PESOS, ONLINE_AMOUNT_CENTAVOS, CURRENCY, HOLD_MS, QR_REVIEW_HOLD_MS, QR_REVIEW_HOURS } from './pricing.js'
 import { slotKey, releaseHold, releaseSlotLock, extendSlotLock, acquireSlotLock, activeSlotFilter, markAvailability } from './bookingCore.js'
 import { sendAppointmentConfirmationEmail } from './appointmentEmail.js'
 import { sendAppointmentConfirmationSms } from './appointmentSms.js'
@@ -280,12 +280,25 @@ async function refundLate(db, attempt, via) {
 /* ───────────────────────── QR (GCash / Maya) ───────────────────────── */
 
 // The patient says they sent the money. Nothing is confirmed: the booked therapist verifies it. The slot stays held meanwhile.
+// The reference number a GCash receipt shows is 13 digits. Maya's is shorter and varies, so it accepts 10 to 16 digits.
+export const REFERENCE_RULE = { gcash: { min: 13, max: 13, text: 'Enter the 13-digit reference number from your GCash receipt.' }, paymaya: { min: 10, max: 16, text: 'Enter the reference number from your Maya receipt (digits only).' } }
+export function cleanReference(raw, method) {
+  const digits = String(raw || '').replace(/\D/g, '')
+  if (!digits) return { value: '' } // optional
+  const rule = REFERENCE_RULE[method] || REFERENCE_RULE.gcash
+  if (digits.length < rule.min || digits.length > rule.max) return { error: rule.text }
+  return { value: digits }
+}
+
 export async function submitQr(db, attempt, appointment, { reference = '', screenshot = '' } = {}) {
   const now = new Date()
-  const ref = String(reference || '').replace(/[^\w -]/g, '').slice(0, 40)
+  const cleaned = cleanReference(reference, attempt.method)
+  if (cleaned.error) throw Object.assign(new Error(cleaned.error), { status: 400, code: 'INVALID_REFERENCE' })
+  const ref = cleaned.value
   const shot = typeof screenshot === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(screenshot) && screenshot.length <= 1_500_000 ? screenshot : null
   await db.collection('payment_attempts').updateOne({ _id: attempt._id }, { $set: {
-    status: 'pending_verification', provider_ref: ref || attempt.provider_ref || null, ...(shot ? { qr_screenshot: shot } : {}), qr_submitted_at: now, updated_at: now,
+    status: 'pending_verification', provider_ref: ref || attempt.provider_ref || null, ...(shot ? { qr_screenshot: shot } : {}),
+    ...(ref || shot ? { qr_details_sent: true } : {}), qr_submitted_at: attempt.qr_submitted_at || now, updated_at: now,
   } })
   await db.collection('appointments').updateOne({ _id: appointment._id }, { $set: { payment_state: 'pending_verification', hold_expires_at: new Date(now.getTime() + QR_REVIEW_HOLD_MS), updated_at: now } })
   if (appointment.employee_id) await extendSlotLock(db, slotKey(appointment.employee_id, appointment.session_date, appointment.start_time), appointment._id, QR_REVIEW_HOLD_MS, now)
@@ -326,6 +339,12 @@ export function attemptView(attempt, appointment) {
       ? { code: attempt.failure_code || 'unknown', message: attempt.failure_message || PAYMENT_MESSAGES[attempt.failure_code] || PAYMENT_MESSAGES.unknown }
       : null,
     slotLost: attempt.failure_code === 'slot_taken',
+    // QR (GCash / Maya) waiting screen
+    reviewHours: QR_REVIEW_HOURS, // the single "usually within X hours" setting (api/_lib/pricing.js)
+    paymentSentAt: attempt.qr_submitted_at || attempt.created_at,
+    detailsSent: Boolean(attempt.qr_details_sent), // the patient added a reference number and/or screenshot
+    hasScreenshot: Boolean(attempt.qr_screenshot),
+    reference: attempt.method !== 'card' ? attempt.provider_ref || null : null,
     booking: appointment ? {
       appointmentId: String(appointment._id), therapist: appointment.therapist_name, therapistRole: appointment.therapist_role,
       date: appointment.session_date, timeLabel: appointment.time_slot_label, paymentState: appointment.payment_state || null,

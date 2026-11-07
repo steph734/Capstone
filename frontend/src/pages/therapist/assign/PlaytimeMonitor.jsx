@@ -62,7 +62,7 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
   const lastTapMin = np ? Math.max(0, Math.floor((nowMs - new Date(np.lastInputAt).getTime()) / 60000)) : 0
   const running = lv.status === 'active' || lv.status === 'paused' || lv.status === 'scheduled'
   const maxed = (lv.extendedSeconds || 0) >= 1800
-  const toggle = () => { if (lv.status === 'active') onAct('pause'); else if (lv.status === 'paused') onAct('resume') }
+  const toggle = () => { if (lv.status === 'active') setConfirm('pause'); else if (lv.status === 'paused') setConfirm('resume') }
   const onKey = (e) => { if (e.code === 'Space' && e.target === e.currentTarget) { e.preventDefault(); toggle() } }
   const infoLine = lv.status === 'scheduled'
     ? `Planned ${fmt12(lv.playStart)} – ${fmt12(lv.playEnd)} · warning ${lv.warnBeforeMinutes || 5} min before end · finish current game: ${lv.allowFinishCurrent ? 'on' : 'off'}`
@@ -87,8 +87,8 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
           {paused && <p className="pm-pausedfor"><Pause size={14} aria-hidden="true" /> Paused for {mmss(pausedFor)}</p>}
           <div className="pm-btns">
             {lv.status === 'scheduled' && <button type="button" className="pm-primary pm-bigstart" onClick={() => (early ? setConfirm('start') : onAct('start'))}><Play size={18} /> Start play time</button>}
-            {lv.status === 'active' && <button type="button" onClick={() => onAct('pause')}><Pause size={16} /> Pause</button>}
-            {lv.status === 'paused' && <button type="button" className="pm-primary" onClick={() => onAct('resume')}><Play size={16} /> Resume</button>}
+            {lv.status === 'active' && <button type="button" onClick={() => setConfirm('pause')}><Pause size={16} /> Pause</button>}
+            {lv.status === 'paused' && <button type="button" className="pm-primary" onClick={() => setConfirm('resume')}><Play size={16} /> Resume</button>}
             {lv.status === 'ended' && <button type="button" className="pm-primary" onClick={() => setConfirm('restart')}><RotateCcw size={16} /> Restart play time</button>}
             {running && <button type="button" onClick={() => onExtend(5)} disabled={maxed} title={maxed ? 'You can add at most 30 minutes in total' : ''}><Plus size={16} /> +5 min</button>}
             {lv.status !== 'ended' && <button type="button" onClick={onEdit}><GripVertical size={16} /> Edit plan</button>}
@@ -132,12 +132,12 @@ export default function PlaytimeMonitor({ lv, first, offset, today, onAct, onExt
 
       {confirm && (
         <ConfirmModal
-          tone={confirm === 'start' ? 'go' : 'warn'}
-          icon={confirm === 'start' ? Play : RotateCcw}
-          title={confirm === 'start' ? 'Start play time now?' : 'Restart play time?'}
+          tone={confirm === 'start' || confirm === 'resume' ? 'go' : 'warn'}
+          icon={confirm === 'start' || confirm === 'resume' ? Play : confirm === 'pause' ? Pause : RotateCcw}
+          title={confirm === 'start' ? 'Start play time now?' : confirm === 'pause' ? 'Pause play time?' : confirm === 'resume' ? 'Resume play time?' : 'Restart play time?'}
           detail={confirm === 'start' ? `Planned start was ${fmt12(lv.playStart)}.` : null}
-          text={confirm === 'start' ? `${first}'s games open right away and the timer begins.` : `The timer and today's game progress start over for ${first}.`}
-          cancelLabel="Cancel" confirmLabel={confirm === 'start' ? 'Start now' : 'Restart'}
+          text={confirm === 'start' ? `${first}'s games open right away and the timer begins.` : confirm === 'pause' ? `The timer stops and ${first}'s games lock until you resume. The time left is kept, and the end time moves later.` : confirm === 'resume' ? `The timer starts again and ${first}'s games open right away.` : `The timer and today's game progress start over for ${first}.`}
+          cancelLabel="Cancel" confirmLabel={confirm === 'start' ? 'Start now' : confirm === 'pause' ? 'Pause' : confirm === 'resume' ? 'Resume' : 'Restart'}
           onCancel={() => setConfirm(null)} onConfirm={() => { const act = confirm; setConfirm(null); onAct(act) }}
         />
       )}

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Calendar, ChevronDown, Minus, Plus } from 'lucide-react'
 import { DAY_CHIPS, LIMITS, fmt12 } from './homeSettings'
 
@@ -13,6 +14,9 @@ function Switch({ on, onChange, title, hint }) {
 // The "Home practice settings" panel. value = see defaultHome(); onChange gets the whole new object.
 export default function HomeSettingsForm({ value: h, onChange, first, sessionEnd, nextSession }) {
   const set = (k, v) => onChange({ ...h, [k]: v })
+  const dateRef = useRef(null)
+  // The page's global input reset hides the browser's own picker button, so the calendar icon opens it.
+  const openCalendar = () => { const el = dateRef.current; if (!el) return; try { el.showPicker() } catch { el.focus(); el.click() } }
   const toggleDay = (d) => set('days', h.days.includes(d) ? (h.days.length > 1 ? h.days.filter((x) => x !== d) : h.days) : [...h.days, d])
   const isNext = nextSession && nextSession.date === h.until
   return (
@@ -29,7 +33,10 @@ export default function HomeSettingsForm({ value: h, onChange, first, sessionEnd
           {h.opens === 'custom' && <input type="datetime-local" value={h.customStart} onChange={(e) => set('customStart', e.target.value)} aria-label="Home access opens" />}
         </label>
         <label className="hp-field">Keep unlocked until
-          <span className="hp-select"><input type="date" value={h.until} onChange={(e) => e.target.value && set('until', e.target.value)} /><Calendar size={15} aria-hidden="true" /></span>
+          <span className="hp-select">
+            <input ref={dateRef} type="date" value={h.until} min={new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)} onChange={(e) => e.target.value && set('until', e.target.value)} onClick={openCalendar} />
+            <button type="button" className="hp-cal" onClick={openCalendar} aria-label="Open calendar"><Calendar size={16} aria-hidden="true" /></button>
+          </span>
           {isNext && <small>The day of {first}&apos;s next session</small>}
         </label>
       </div>

@@ -121,3 +121,8 @@
   .sh-table td { border: 0 !important; padding: 6px 8px; background: transparent !important; }
   .sh-top h1 { font-size: 25px; }
 }
+
+.hp-select .hp-cal { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; min-height: 0; border: 0; background: transparent; color: #51606a; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; border-radius: 10px; }
+.hp-select input[type='date'] { cursor: pointer; }
+.hp-select input[type='date']::-webkit-calendar-picker-indicator { display: none; }
+.hp-hours input { color: #1f2d27; -webkit-text-fill-color: #1f2d27; }

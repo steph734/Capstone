@@ -109,11 +109,12 @@ export function useGameSession({ gameName }) {
     }
     try {
       if (!navigator.onLine) { const queued = await queueOffline(); if (queued) return queued }
-      const s = sessionRef.current || (await startRef.current) || (await startSession())
+      let s = sessionRef.current || (await startRef.current) || (await startSession())
       if (!s) return fail(lastError.current)
       const payload = JSON.stringify({ result })
       let message = 'No internet connection.'
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      let restarted = false
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           const res = await fetch(`/api/sessions/${s.id}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })
           const data = await res.json().catch(() => ({}))
@@ -128,6 +129,14 @@ export function useGameSession({ gameName }) {
             return data
           }
           message = data.error || `The server said ${res.status}.`
+          // The server closed this session before the result arrived (a newer one started, or it was abandoned):
+          // open a fresh one once and send the same result, so the child's rewards are not lost.
+          if (res.status === 400 && /already ended/i.test(message) && !restarted) {
+            restarted = true
+            sessionRef.current = null
+            const fresh = await startSession()
+            if (fresh) { s = fresh; continue }
+          }
           if (res.status >= 400 && res.status < 500) break // a 4xx won't succeed on retry
         } catch { /* network blip: retry once */ }
       }

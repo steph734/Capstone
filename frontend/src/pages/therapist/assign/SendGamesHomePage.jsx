@@ -26,6 +26,8 @@ export default function SendGamesHomePage({ user, onLogout, betaTier }) {
   const [catalog, setCatalog] = useState([])
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
+  const [confirming, setConfirming] = useState(false) // "Send / update games at home?"
+  const [sent, setSent] = useState(null) // success card: { count, updated }
   const say = (m) => { setToast(m); setTimeout(() => setToast(''), 3400) }
   const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
 
@@ -75,9 +77,10 @@ export default function SendGamesHomePage({ user, onLogout, betaTier }) {
         const { patientId, sessionPlanId, appointmentId, ...patch } = body // eslint-disable-line no-unused-vars
         await authFetch(`/api/home-practice-plans/${data.plan.id}`, { method: 'PATCH', body: patch })
       } else await authFetch('/api/home-practice-plans', { method: 'POST', body })
-      say(`${chosen.length} game${chosen.length === 1 ? '' : 's'} sent home to ${first}.`)
+      setConfirming(false)
+      setSent({ count: chosen.length, updated: Boolean(data.plan), names: chosen.map((g) => g.name) })
       await load()
-    } catch (e) { say(e.message || 'Could not send these games home.') } finally { setBusy(false) }
+    } catch (e) { setConfirming(false); say(e.message || 'Could not send these games home.') } finally { setBusy(false) }
   }
   const stop = async () => {
     if (!data?.plan) return
@@ -139,7 +142,7 @@ export default function SendGamesHomePage({ user, onLogout, betaTier }) {
                 <div><dt>Unlocked until</dt><dd>{longDay(home.until)}</dd></div>
               </dl>
               <button type="button" className="hp-btn ghost" onClick={() => setEditing(true)}>Edit plan</button>
-              <button type="button" className="hp-btn" disabled={!chosen.length || busy} onClick={send}>
+              <button type="button" className="hp-btn" disabled={!chosen.length || busy} onClick={() => setConfirming(true)}>
                 <Send size={16} aria-hidden="true" /> {busy ? 'Sending…' : data.plan ? `Update ${chosen.length} game${chosen.length === 1 ? '' : 's'} at home` : `Send ${chosen.length} game${chosen.length === 1 ? '' : 's'} home`}
               </button>
               {data.plan && <button type="button" className="hp-btn ghost" onClick={stop}>Stop home practice</button>}
@@ -189,6 +192,32 @@ export default function SendGamesHomePage({ user, onLogout, betaTier }) {
               <div key={g.id} className="hp-pick"><span><b>{g.name}</b><br /><small>{cap(g.difficulty)} · {g.minutes} min</small></span>
                 <button type="button" className="hp-btn ghost" onClick={() => { setExtra((x) => [...x, { id: g.id, name: g.name, difficulty: g.difficulty }]); setPicked((p) => ({ ...p, [g.id]: true })) }}><Plus size={15} aria-hidden="true" /> Add</button></div>
             ))}
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <div className="pm-modal" role="alertdialog" aria-modal="true" aria-labelledby="sh-cf" onClick={(e) => e.target === e.currentTarget && !busy && setConfirming(false)}>
+          <div className="pm-box go">
+            <span className="pm-ico"><Send size={26} aria-hidden="true" /></span>
+            <h3 id="sh-cf">{data?.plan ? `Update ${chosen.length} game${chosen.length === 1 ? '' : 's'} at home?` : `Send ${chosen.length} game${chosen.length === 1 ? '' : 's'} home?`}</h3>
+            <p>{first} can play {chosen.map((g) => g.name).join(', ')} at home {daysText(home.days).toLowerCase()}, {fmt12(home.dailyStart)}–{fmt12(home.dailyEnd)}, up to {home.limit} min a day, until {longDay(home.until)}.{home.notify ? ` The parent or caregiver is notified.` : ''}</p>
+            <div className="pm-actions">
+              <button type="button" onClick={() => setConfirming(false)} disabled={busy}>Cancel</button>
+              <button type="button" className="pm-confirm" onClick={send} disabled={busy} autoFocus>{busy ? 'Saving…' : data?.plan ? 'Update' : 'Send home'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {sent && (
+        <div className="pm-modal" role="dialog" aria-modal="true" aria-labelledby="sh-ok" onClick={(e) => e.target === e.currentTarget && setSent(null)}>
+          <div className="pm-box go">
+            <span className="pm-ico"><Check size={28} aria-hidden="true" /></span>
+            <h3 id="sh-ok">{sent.updated ? 'Home games updated' : 'Games sent home'}</h3>
+            <p>{sent.count} game{sent.count === 1 ? ' is' : 's are'} now open at home for {first}: {sent.names.join(', ')}.{home.notify ? ` The parent or caregiver has been notified.` : ''} Every home play is saved to Notes &amp; Progress.</p>
+            <div className="pm-actions">
+              <button type="button" onClick={() => navigate('/therapist/assign-games')}>Back to Assign Games</button>
+              <button type="button" className="pm-confirm" onClick={() => setSent(null)} autoFocus>Done</button>
+            </div>
           </div>
         </div>
       )}

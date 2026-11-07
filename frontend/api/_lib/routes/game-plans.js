@@ -294,7 +294,7 @@ async function playerCtx(req, res) {
   if (!ctx) return null
   const { db, user } = ctx
   if (user.role === 'Patient') {
-    const patient = await db.collection('patients').findOne({ email: String(user.email).toLowerCase() })
+    const patient = await pickPatientByEmail(db, user.email)
     if (!patient) { res.status(404).json({ error: 'No patient record is linked to this account yet.' }); return null }
     return { ...ctx, patient }
   }

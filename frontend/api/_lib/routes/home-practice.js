@@ -219,7 +219,7 @@ export async function homePracticeMe(req, res) {
     const ctx = await requireSession(req, res, { roles: ['Patient'] })
     if (!ctx) return
     const { db, user } = ctx
-    const patient = await db.collection('patients').findOne({ email: String(user.email).toLowerCase() })
+    const patient = await pickPatientByEmail(db, user.email)
     if (!patient) return res.status(404).json({ error: 'No patient record is linked to this account yet.' })
     res.setHeader('Cache-Control', 'no-store')
     const now = new Date()

@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { apiPost } from '../utils/api'
 
 // Bumped to v2 so browsers with old cached progress (pre level/stats reset)
 // automatically pick up the fresh baseline instead of keeping stale data.
@@ -119,17 +118,7 @@ export function ProgressProvider({ children }) {
   // failures are swallowed since local progress must keep working even if
   // the backend is unreachable.
   const recordGameSession = ({ patientId, gameId, domain, accuracy, durationMinutes = 0 }) => update((prev) => {
-    apiPost('/api/game-sessions', {
-      patientId: patientId || prev.patientName,
-      patientName: prev.patientName,
-      gameId: gameId || null,
-      domain,
-      accuracy,
-      durationMinutes,
-      xpEarned: 100,
-      completedAt: new Date().toISOString(),
-    }).catch((err) => console.warn('Could not record game session to backend:', err.message))
-
+    // Real plays are saved by the game-session API (see hooks/useGameSession); this only updates the local snapshot.
     const domainKey = domain.toLowerCase()
     const bumpPeriod = (period) => ({
       ...period,

@@ -1,78 +1,15 @@
-import mongoose from 'mongoose'
 import crypto from 'crypto'
 import { getDb } from '../mongo.js'
 import { insertPaymentWithRef } from '../paymentRef.js'
+import { createBookingRecords, activeSlotFilter, markAvailability, expireStaleHolds, str } from '../bookingCore.js'
 
-const { ObjectId } = mongoose.Types
-
-const PHOTO_MIME_TYPES = ['image/webp', 'image/jpeg', 'image/png']
-const MAX_PHOTO_BYTES = 1 * 1024 * 1024 // generous ceiling — the client sends a 512×512 compressed image, normally 30–120KB
-
-// `photo` arrives as a data URL (already center-cropped to 512×512 and
-// compressed client-side — see the photo upload box on step 1 of the
-// booking form). Returns { buffer, contentType } or null if there's nothing
-// usable to store, so a booking never fails just because the photo was bad.
-function decodePhoto(photo) {
-  const dataUrl = String(photo || '').trim()
-  if (!dataUrl) return null
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-  if (!match) return null
-  const [, mimeType, base64] = match
-  if (!PHOTO_MIME_TYPES.includes(mimeType)) return null
-  let buffer
-  try {
-    buffer = Buffer.from(base64, 'base64')
-  } catch {
-    return null
-  }
-  if (!buffer.length || buffer.length > MAX_PHOTO_BYTES) return null
-  return { buffer, contentType: mimeType }
-}
-
-// Maps the booking form's single "session mode" dropdown onto the schema's two
-// axes (delivery mode + therapy focus).
-const MODE_MAP = {
-  'in-person': { session_mode: 'In-Person', session_type: null },
-  cognitive: { session_mode: 'In-Person', session_type: 'Cognitive' },
-  speech: { session_mode: 'In-Person', session_type: 'Speech' },
-  behavioral: { session_mode: 'In-Person', session_type: 'Behavioral' },
-}
-
-const PAYMENT_MAP = { cash: 'Cash', stripe: 'Stripe', gcash: 'GCash QR' }
-
-// Maps the free-form label CheckoutModal reports (e.g. "Card", "GCash QR",
-// "GrabPay") onto the `payments` collection's strict method enum
-// (gcash | card | bank_transfer | cash | paymaya). GrabPay and anything else
-// Stripe reports that has no matching slot falls back to "card" rather than
-// fail the schema-validated insert.
-function resolvePaymentMethod(payment) {
-  const top = String(payment.method || '').toLowerCase()
-  if (top === 'cash') return 'cash'
-  if (top === 'stripe') {
-    const online = str(payment.onlineMethod).toLowerCase()
-    if (online.includes('gcash')) return 'gcash'
-    if (online.includes('maya')) return 'paymaya'
-    return 'card'
-  }
-  return null
-}
-
-// "10:00 - 11:00 AM" / "1:00 - 2:00 PM"  ->  { start: "10:00", end: "11:00" }
-function parseSlot(label) {
-  const m = String(label || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i)
-  if (!m) return { start: '00:00', end: '00:00' }
-  const mer = m[5].toUpperCase()
-  const to24 = (h, mm) => {
-    let hh = parseInt(h, 10)
-    if (mer === 'PM' && hh !== 12) hh += 12
-    if (mer === 'AM' && hh === 12) hh = 0
-    return `${String(hh).padStart(2, '0')}:${mm}`
-  }
-  return { start: to24(m[1], m[2]), end: to24(m[3], m[4]) }
-}
-
-const asObjectId = (v) => (typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v) ? new ObjectId(v) : null)
-const str = (v) => (v == null ? '' : String(v).trim())
+// POST /api/appointments/create: a pay-at-clinic (cash) booking.
+//
+// Online payments (card, GCash QR, Maya QR) do NOT come through here any more. They go through the
+// secure checkout: POST /api/bookings/start holds the slot first, and the booking is only confirmed after
+// the payment is verified on the SERVER (see bookings-start.js, payments-status.js and stripe-webhook.js).
+// This route used to trust the browser's claim "I paid", which let anyone create a paid booking for free.
+const resolvePaymentMethod = (payment) => (String(payment.method || '').toLowerCase() === 'cash' ? 'cash' : null)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -80,7 +17,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { patient = {}, therapist = {}, session = {}, payment = {}, bookedBy = {}, photo = null } = req.body || {}
+  const body = req.body || {}
+  const { patient = {}, therapist = {}, session = {}, payment = {} } = body
 
   if (!str(patient.firstName) || !str(patient.lastName)) {
     return res.status(400).json({ error: 'Patient first and last name are required.' })
@@ -88,179 +26,32 @@ export default async function handler(req, res) {
   if (!str(patient.birthdate) || !str(patient.address)) {
     return res.status(400).json({ error: 'Patient birthdate and address are required.' })
   }
+  if (String(payment.method || '').toLowerCase() !== 'cash') {
+    return res.status(400).json({ error: 'Online payments are booked through the secure checkout. Please start your booking again.' })
+  }
 
   try {
     const db = await getDb()
     const now = new Date()
+    await expireStaleHolds(db, now).catch(() => {})
 
-    // 1. Who booked it — an id if we have one, else look the user up by email.
-    let bookedById = asObjectId(bookedBy.id)
-    if (!bookedById && str(bookedBy.email)) {
-      const u = await db.collection('users').findOne({ email: str(bookedBy.email).toLowerCase() })
-      if (u) bookedById = u._id
-    }
+    const { appointmentId, patientId, appointmentDoc } = await createBookingRecords(db, body)
 
-    // 1b. Photo, if the parent uploaded one — stored before the patient doc
-    // so profile_photo can be set on insert rather than a follow-up update.
-    // Best-effort: a decode/insert failure must not fail the whole booking.
-    let photoRecord = null
-    const decodedPhoto = decodePhoto(photo)
-    if (decodedPhoto) {
-      try {
-        const publicId = crypto.randomBytes(16).toString('hex')
-        const photoRes = await db.collection('patient_photos').insertOne({
-          public_id: publicId,
-          patient_id: null, // backfilled just below once the patient exists
-          content_type: decodedPhoto.contentType,
-          data: decodedPhoto.buffer,
-          size_bytes: decodedPhoto.buffer.length,
-          width: 512,
-          height: 512,
-          created_at: now,
-        })
-        photoRecord = { id: photoRes.insertedId, publicId, url: `/api/patient-photos/${publicId}` }
-      } catch (err) {
-        console.error('appointments/create: failed to store the photo:', err)
+    // The slot must still be free (a held or booked slot blocks it).
+    if (appointmentDoc.employee_id && appointmentDoc.start_time) {
+      const clash = await db.collection('appointments').findOne(activeSlotFilter(appointmentDoc.employee_id, appointmentDoc.session_date, appointmentDoc.start_time, now, appointmentId))
+      if (clash) {
+        await db.collection('appointments').updateOne({ _id: appointmentId }, { $set: { status: 'Cancelled', cancelled_reason: 'Time slot was already taken', updated_at: new Date() } })
+        return res.status(409).json({ error: 'That time slot was just taken. Please pick another time.', code: 'SLOT_TAKEN' })
       }
     }
 
-    // 2. Patient record (created straight from the booking; user_id may be null).
-    // `patients` has a unique index on `PatientID` (a legacy *ID-style key,
-    // same pattern as `OtpID` on user_otps) that the app never reads — it just
-    // needs a unique value per insert so it doesn't collide on `null`.
-    const patientDoc = {
-      PatientID: new ObjectId().toString(),
-      user_id: bookedById || null,
-      first_name: str(patient.firstName),
-      middle_name: null,
-      last_name: str(patient.lastName),
-      nickname: str(patient.nickname) || null,
-      gender: ['Male', 'Female', 'Other'].includes(patient.gender) ? patient.gender : 'Other',
-      birthdate: new Date(patient.birthdate),
-      address: str(patient.address),
-      contact_number: str(patient.contactNumber),
-      email: str(patient.email) || null,
-      guardian_first_name: str(patient.guardianFirst),
-      guardian_last_name: str(patient.guardianLast),
-      guardian_relationship: ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other']
-        .includes(patient.relationship) ? patient.relationship : 'Guardian',
-      guardian_contact_number: str(patient.contactNumber) || null,
-      guardian_email: str(patient.email) || null,
-      profile_photo: photoRecord ? { photo_id: photoRecord.id, url: photoRecord.url, uploaded_at: now } : null,
-      created_at: now,
-      updated_at: now,
-    }
-    const patientRes = await db.collection('patients').insertOne(patientDoc)
-    const patientId = patientRes.insertedId
+    // Flip the therapist's availability slot (if they opened one) so a second patient can't book it too.
+    await markAvailability(db, appointmentDoc, true)
 
-    if (photoRecord) {
-      try {
-        await db.collection('patient_photos').updateOne({ _id: photoRecord.id }, { $set: { patient_id: patientId } })
-      } catch (err) {
-        console.error('appointments/create: failed to link the photo to the patient:', err)
-      }
-    }
-
-    // 2b. Best-effort: register the condition as a disorder + link it.
-    if (str(patient.condition)) {
-      try {
-        const name = str(patient.condition)
-        const d = await db.collection('disorders').findOneAndUpdate(
-          { disorder_name: name },
-          { $setOnInsert: { disorder_name: name } },
-          { upsert: true, returnDocument: 'after' }
-        )
-        const disorderId = (d && (d.value?._id || d._id)) || null
-        if (disorderId) {
-          await db.collection('patient_disorders').insertOne({
-            patient_id: patientId,
-            disorder_id: disorderId,
-          })
-        }
-      } catch {
-        /* non-critical */
-      }
-    }
-
-    // 3. Appointment.
-    const { start, end } = parseSlot(session.timeSlot)
-    const modeMap = MODE_MAP[session.mode] || { session_mode: 'In-Person', session_type: null }
-    const year = Number(session.year)
-    const month = Number(session.month) // 0-based, as the calendar keys it
-    const day = Number(session.day)
-    const sessionDate = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)
-      ? new Date(Date.UTC(year, month, day))
-      : now
-
+    // Payment row. Cash is recorded as pending until the clinic receives it. `paymentRecorded` is returned
+    // so the confirmation screen can tell the payer whether the payment row was really written.
     const total = Number(payment.total) || null
-    const method = PAYMENT_MAP[String(payment.method || '').toLowerCase()] || null
-
-    const appointmentDoc = {
-      employee_id: asObjectId(therapist.id) || null,
-      patient_id: patientId,
-      payment_id: null,
-      booked_by: bookedById || null,
-
-      patient_name: `${patientDoc.first_name} ${patientDoc.last_name}`.trim(),
-      patient_photo_id: photoRecord?.id || null,
-      patient_photo_url: photoRecord?.url || null,
-      therapist_name: str(therapist.name) || null,
-      therapist_role: str(therapist.role) || null,
-      guardian_name: `${patientDoc.guardian_first_name} ${patientDoc.guardian_last_name}`.trim() || null,
-      contact_number: patientDoc.contact_number || null,
-      contact_email: patientDoc.email,
-
-      session_date: sessionDate,
-      start_time: start,
-      end_time: end,
-      time_slot_label: str(session.timeSlot) || null,
-
-      session_mode: modeMap.session_mode,
-      session_type: modeMap.session_type,
-      condition: str(patient.condition) || null,
-
-      status: 'Pending',
-      cancelled_reason: null,
-
-      session_fee: Number(payment.sessionFee) || null,
-      service_charge: Number(payment.serviceCharge) || null,
-      total_due: total,
-      payment_method: method,
-
-      created_at: now,
-      updated_at: now,
-      is_archived: false,
-      archived_at: null,
-    }
-    const apptRes = await db.collection('appointments').insertOne(appointmentDoc)
-    const appointmentId = apptRes.insertedId
-
-    // 3b. Best-effort: flip the matching therapist_availability slot (if the
-    // therapist opened one up for this day) from 'available' to 'booked' and
-    // link this appointment to it. Without this, the slot stays 'available'
-    // forever as far as that collection is concerned — a second patient could
-    // book the same slot, and the therapist's own attendance page would never
-    // show it as taken.
-    const employeeId = asObjectId(therapist.id)
-    if (employeeId && start && Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
-      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      try {
-        await db.collection('therapist_availability').updateOne(
-          { therapist: employeeId, date: dateKey, slots: { $elemMatch: { start, status: 'available' } } },
-          { $set: { 'slots.$.status': 'booked', 'slots.$.appointment': appointmentId, updated_at: new Date() } }
-        )
-      } catch (err) {
-        console.error('appointments/create: failed to mark the availability slot booked:', err)
-      }
-    }
-
-    // 4. Best-effort payment row. `method` here is the raw one constrained to
-    // the appointments enum (Cash/Stripe); paymentMethod is the specific
-    // method the payments collection actually records (cash/card/gcash/paymaya).
-    // `paymentRecorded` is surfaced in the response so the booking confirmation
-    // screen can tell the payer whether their payment actually made it into
-    // the payments collection, instead of assuming success just because the
-    // appointment itself was saved.
     const paymentMethod = resolvePaymentMethod(payment)
     let paymentRecorded = false
     let paymentError = null
@@ -268,10 +59,7 @@ export default async function handler(req, res) {
     if (paymentMethod && total != null) {
       try {
         const payDoc = await insertPaymentWithRef(db.collection('payments'), {
-          // The collection has a unique index on PaymentID (a legacy key the
-          // app never reads) — without a value here every insert after the
-          // first collides on null and silently fails, which is exactly why
-          // payments were going missing.
+          // Unique legacy key (the collection has a unique index on PaymentID); without a value every second insert collides on null.
           PaymentID: `PAY-${crypto.randomUUID()}`,
           payment_for: 'appointment',
           appointment_id: appointmentId,
@@ -280,30 +68,18 @@ export default async function handler(req, res) {
           currency: 'PHP',
           method: paymentMethod,
           payment_date: now,
-          status: paymentMethod === 'cash' ? 'pending' : 'completed',
+          status: 'pending',
         })
-        await db.collection('appointments').updateOne(
-          { _id: appointmentId },
-          { $set: { payment_id: payDoc._id, updated_at: new Date() } }
-        )
+        await db.collection('appointments').updateOne({ _id: appointmentId }, { $set: { payment_id: payDoc._id, updated_at: new Date() } })
         paymentRecorded = true
         paymentRef = payDoc.payment_ref
       } catch (err) {
-        // Not fatal to the booking, but must not vanish silently — this is
-        // exactly the kind of failure (e.g. schema/index violations) that
-        // would otherwise leave a booking "successful" with no payment row.
         console.error('appointments/create: failed to record payment:', err)
         paymentError = err.message || 'Could not record the payment.'
       }
     }
 
-    // amount/method echoed back so the confirmation screen and email use
-    // exactly what was persisted, instead of recomputing it client-side and
-    // risking the two drifting apart.
-    return res.status(201).json({
-      success: true, appointmentId, patientId, paymentRecorded, paymentError,
-      paymentRef, amount: total, method: paymentMethod,
-    })
+    return res.status(201).json({ success: true, appointmentId, patientId, paymentRecorded, paymentError, paymentRef, amount: total, method: paymentMethod })
   } catch (err) {
     console.error('appointments/create error:', err)
     return res.status(500).json({ error: err.message || 'Could not save the appointment.' })

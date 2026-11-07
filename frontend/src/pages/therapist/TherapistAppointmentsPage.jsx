@@ -8,6 +8,7 @@ import { apiGet, apiPatch } from '../../utils/api'
 import RecommendSessionModal from '../../components/RecommendSessionModal'
 import { manilaDateKey } from '../../utils/manilaTime'
 import { saveLocal } from '../../offline/repo'
+import PaymentVerificationPanel from '../../components/PaymentVerificationPanel'
 import './TherapistAppointmentsPage.css'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -955,6 +956,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       icon="🗓️"
       menuItems={getTherapistMenuItems(betaTier)}
     >
+      {/* GCash / Maya payments waiting for this therapist to verify */}
+      <PaymentVerificationPanel />
       {loading ? (
         <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your appointments…</p>
       ) : loadError ? (

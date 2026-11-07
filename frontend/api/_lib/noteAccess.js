@@ -2,6 +2,7 @@
 // is made from the verified session, never from a query-string patient or
 // email the browser supplies.
 import { SOAP_FIELDS, decryptField, encryptField, isEncrypted, contentHash, addendumHash } from './soapCrypto.js'
+import { NOT_A_REAL_BOOKING } from './pricing.js'
 
 // Employee (therapist) record for a signed-in user, matched on login email.
 export async function employeeFor(db, user) {
@@ -11,7 +12,8 @@ export async function employeeFor(db, user) {
 // A therapist is assigned to a patient when they have an appointment with
 // them — the same link used everywhere else in the app.
 export async function isAssigned(db, employeeId, patientId) {
-  return Boolean(await db.collection('appointments').findOne({ employee_id: employeeId, patient_id: patientId }, { projection: { _id: 1 } }))
+  // An unpaid or abandoned online hold does not make a therapist "assigned" to a patient.
+  return Boolean(await db.collection('appointments').findOne({ employee_id: employeeId, patient_id: patientId, payment_state: { $nin: NOT_A_REAL_BOOKING } }, { projection: { _id: 1 } }))
 }
 
 // A guardian's patient records (matched on the account email, like the rest of the app).

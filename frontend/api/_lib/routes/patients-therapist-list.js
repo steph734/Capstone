@@ -1,4 +1,5 @@
 import { getMongo, getDb } from '../mongo.js'
+import { realBookingsOnly } from '../bookingCore.js'
 import { Employee } from '../models/employee.js'
 import { canRecommend } from '../sessionRecommendations.js'
 
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
 
     const db = await getDb()
     const docs = await db.collection('appointments').aggregate([
-      { $match: { employee_id: employee._id } },
+      { $match: { employee_id: employee._id, ...realBookingsOnly } }, // unpaid holds do not make a patient yours
       { $lookup: { from: 'patients', localField: 'patient_id', foreignField: '_id', as: 'patient' } },
       { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
       { $sort: { session_date: 1, start_time: 1 } },

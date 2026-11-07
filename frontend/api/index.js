@@ -14,6 +14,12 @@
 import express from 'express'
 import { securityHeaders, sameSiteOnly, sanitizeBody } from './_lib/hardening.js'
 import serverTime from './_lib/routes/server-time.js'
+import bookingsStart from './_lib/routes/bookings-start.js'
+import bookingsItem from './_lib/routes/bookings-item.js'
+import bookingsExpire from './_lib/routes/bookings-expire.js'
+import paymentsItem from './_lib/routes/payments-item.js'
+import paymentsAwaiting from './_lib/routes/payments-awaiting.js'
+import stripeWebhook from './_lib/routes/stripe-webhook.js'
 
 import createPaymentIntent from './_lib/routes/create-payment-intent.js'
 import createSetupIntent from './_lib/routes/create-setup-intent.js'
@@ -170,9 +176,18 @@ const app = express()
 // the photo upload box on step 1 of the booking form.
 app.use(securityHeaders) // Helmet: nosniff, no framing, HSTS ...
 app.use(sameSiteOnly) // changes must come from our own site (or ALLOWED_ORIGINS)
+// Stripe's webhook needs the RAW body (its signature is checked against the exact bytes), so it is mounted
+// before the JSON parser.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook)
 app.use(express.json({ limit: '3mb' }))
 app.use(sanitizeBody) // drop $operators from request bodies
 app.all('/api/server-time', serverTime) // the server's date for the note form
+// Online booking + payment: hold the slot first, confirm only after the payment is verified on the server.
+app.all('/api/bookings/start', bookingsStart)
+app.all('/api/bookings/expire-holds', bookingsExpire)
+app.all('/api/bookings/:id/:action', bookingsItem)
+app.all('/api/payments/awaiting-verification', paymentsAwaiting)
+app.all('/api/payments/:id/:action', paymentsItem)
 
 app.all('/api/create-payment-intent', createPaymentIntent)
 app.all('/api/create-setup-intent', createSetupIntent)

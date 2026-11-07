@@ -16,6 +16,7 @@ import { ObjectId } from 'mongodb'
 import { SOAP_FIELDS, encryptField, decryptField, validateSoap, cleanText } from './soapCrypto.js'
 import { isAssigned, audit, sealSignature } from './noteAccess.js'
 import { boundedOfflineDate } from './manilaDate.js'
+import { NOT_A_REAL_BOOKING } from './pricing.js'
 import completeGameSession from './routes/game-sessions-complete.js'
 import ownerLeaveRequests from './routes/owner-leave-requests.js'
 
@@ -295,7 +296,7 @@ export async function applyEntry(ctx, entry) {
 // their own draft notes, and their own recordings. Nothing else from the clinic.
 export async function pullFor(ctx, since) {
   const { db, user, employee, ip } = ctx
-  const myAppointments = await db.collection('appointments').find({ employee_id: employee._id, is_archived: { $ne: true } }).toArray()
+  const myAppointments = await db.collection('appointments').find({ employee_id: employee._id, is_archived: { $ne: true }, payment_state: { $nin: NOT_A_REAL_BOOKING } }).toArray()
   const patientIds = [...new Set(myAppointments.map((a) => a.patient_id).filter(Boolean).map(String))].map((s) => new ObjectId(s))
 
   // Small sets, so assigned patients are always sent in full (older rows may lack updated_at).

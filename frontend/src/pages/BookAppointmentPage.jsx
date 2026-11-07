@@ -4,6 +4,7 @@ import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
 import { SESSION_MODES } from '../data/sessionModes'
 import { logActivity } from '../utils/auditLog'
+import { loadSaved } from '../utils/bookingPayments'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -191,6 +192,10 @@ export default function BookAppointmentPage({ user }) {
 
   // Pay Online (Stripe): the checkout modal runs before the confirmation screen.
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  // A checkout that was in progress when the page was refreshed or closed: reopen it and let the SERVER say where it is
+  // (still processing, paid, failed or waiting for verification). Nothing is guessed from the browser.
+  const [resumeCheckout, setResumeCheckout] = useState(false)
+  useEffect(() => { if (loadSaved()?.bookingId) { setResumeCheckout(true); setCheckoutOpen(true) } }, [])
   const [onlinePayment, setOnlinePayment] = useState(null) // { method, dateLabel }
 
   /* ── Validation ── */
@@ -231,6 +236,8 @@ export default function BookAppointmentPage({ user }) {
 
   const handleCheckoutDone = () => {
     setCheckoutOpen(false)
+    // After a refresh the booking form is empty, so the details screen cannot be drawn: go to the appointments list.
+    if (resumeCheckout) { navigate('/appointments'); return }
     setStep(3)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -270,6 +277,20 @@ export default function BookAppointmentPage({ user }) {
   useEffect(() => {
     if (step !== 3 || loggedBookingRef.current) return
     loggedBookingRef.current = true
+
+    // Online payment: the server already created, verified and confirmed this booking (and sent the email/text).
+    // Creating it again from here is what used to allow free or duplicate bookings, so we only show the result.
+    if (onlinePayment?.appointmentId) {
+      setSaveStatus('saved')
+      setPaymentRecordStatus('recorded')
+      setPaymentRef(onlinePayment.referenceNo || null)
+      logActivity({
+        role: 'Patient', user: user?.name || 'Patient', email: user?.email || '—', actionIcon: '📅', action: 'Appointment',
+        description: `Booked ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`,
+        entity: `Appointment · ${bookingDateLabel}`, status: 'Success',
+      })
+      return
+    }
 
     // Save the appointment (and a patient record) to MongoDB via the serverless
     // function. Non-blocking — the success screen shows regardless; the outcome
@@ -827,7 +848,7 @@ export default function BookAppointmentPage({ user }) {
               )}
               {emailStatus === 'error' && (
                 <p className="confirm-email-note err">
-                  Couldn't email the confirmation to {form1.email}. {emailError}
+                  We couldn't email the confirmation to {form1.email}, but your booking is saved.
                 </p>
               )}
 
@@ -839,7 +860,7 @@ export default function BookAppointmentPage({ user }) {
               )}
               {smsStatus === 'error' && (
                 <p className="confirm-email-note err">
-                  Couldn't text the confirmation to {form1.contactNumber}. {smsError}
+                  We couldn't text a confirmation, but your booking is confirmed.
                 </p>
               )}
 
@@ -936,7 +957,28 @@ export default function BookAppointmentPage({ user }) {
 
       <CheckoutModal
         open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
+        resume={resumeCheckout}
+        onClose={() => { setCheckoutOpen(false); setResumeCheckout(false) }}
+        onPickAnotherTime={() => navigate('/appointments')}
+        bookingBody={{
+          patient: {
+            firstName: form1.firstName, lastName: form1.lastName, nickname: form1.nickname, gender: form1.gender, birthdate: form1.birthdate,
+            address: form1.address, condition: form1.condition, guardianFirst: form1.guardianFirst, guardianLast: form1.guardianLast,
+            relationship: form1.relationship, contactNumber: form1.contactNumber, email: form1.email,
+          },
+          therapist: { id: therapistObj?.id || '', name: therapistObj?.name || '', role: therapistObj?.role || '' },
+          session: { mode: sessionMode, timeSlot: pickedTime || '', year: preselectedYear, month: preselectedMonth, day: preselectedDate },
+          bookedBy: { id: user?.id, email: user?.email },
+          photo: photo?.dataUrl || null,
+        }}
+        payer={{
+          name: `${form1.guardianFirst} ${form1.guardianLast}`.trim() || user?.name || '',
+          email: form1.email.trim(),
+          phone: form1.contactNumber.trim(),
+        }}
+        sessionLabel={`${bookingDateLabel} · ${pickedTime || ''}`}
+        therapistLabel={`${therapistObj?.name || ''}${sessionModeObj?.label ? ` · ${sessionModeObj.label}` : ''}`}
+        patientName={fullName}
         merchantName={`TherapyPro · ${sessionModeObj?.label || 'Session'} with ${therapistObj?.name || 'Therapist'}`}
         amountCentavos={SESSION_FEE * 100}
         lineItems={[
@@ -951,7 +993,7 @@ export default function BookAppointmentPage({ user }) {
           appointment_time: pickedTime || '',
         }}
         redirectSeconds={5}
-        onSuccess={(meta) => setOnlinePayment(meta)}
+        onSuccess={(meta) => setOnlinePayment(meta)} // { method, dateLabel, referenceNo, appointmentId } from the server
         onRedirect={handleCheckoutDone}
       />
     </div>

@@ -9,7 +9,9 @@ import './support.css'
 // ?ticket=<id> (from a notification) opens that ticket straight away.
 export default function SupportCenter({ isOwner = false }) {
   const [params, setParams] = useSearchParams()
-  const [tab, setTab] = useState(params.get('ticket') ? 'thread' : 'tickets')
+  // /help?new=1&subject=...&message=... opens the new-ticket form already filled in (used by the payment screens).
+  const prefill = { subject: params.get('subject') || '', message: params.get('message') || '' }
+  const [tab, setTab] = useState(params.get('ticket') ? 'thread' : params.get('new') ? 'new' : 'tickets')
   const [threadId, setThreadId] = useState(params.get('ticket'))
   const [tickets, setTickets] = useState(null)
   const [error, setError] = useState('')
@@ -31,7 +33,7 @@ export default function SupportCenter({ isOwner = false }) {
       {sent && <p role="status" className="sup-sent"><CheckCircle2 size={16} aria-hidden="true" /> Ticket {sent.ticket_no} sent. We usually reply within 4 hours.</p>}
       {tab === 'tickets' && <TicketList tickets={tickets} onOpen={open} empty="You have no tickets yet. Use “New ticket” to contact the support team." />}
       {tab === 'thread' && <TicketThread ticketId={threadId} onBack={back} onChanged={load} />}
-      {tab === 'new' && <TicketForm source="help_page" isOwner={isOwner} onSent={(t) => { setSent(t); setTab('tickets'); load() }} onCancel={() => setTab('tickets')} />}
+      {tab === 'new' && <TicketForm source="help_page" initial={prefill} isOwner={isOwner} onSent={(t) => { setSent(t); setTab('tickets'); load() }} onCancel={() => setTab('tickets')} />}
     </div>
   )
 }

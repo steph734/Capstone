@@ -1,4 +1,5 @@
 import { getMongo } from '../mongo.js'
+import { realBookingsOnly } from '../bookingCore.js'
 import { requireSession } from '../session.js'
 
 // GET /api/owner/appointments -> every (non-archived) record in the `appointments`
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
     const { db } = ctx
 
     const [appts, employees, branches] = await Promise.all([
-      db.collection('appointments').find({ is_archived: { $ne: true } }).sort({ session_date: -1, start_time: -1 }).toArray(),
+      db.collection('appointments').find({ is_archived: { $ne: true }, ...realBookingsOnly }).sort({ session_date: -1, start_time: -1 }).toArray(),
       db.collection('employees').find({}, { projection: { branch_id: 1, first_name: 1, last_name: 1 } }).toArray(),
       db.collection('branchs').find({}, { projection: { branch_name: 1 } }).toArray(),
     ])

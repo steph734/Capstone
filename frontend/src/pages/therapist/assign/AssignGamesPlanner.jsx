@@ -118,7 +118,11 @@ export default function AssignGamesPlanner({ onToast, onAssigned }) {
       setNextSession(next); setHomePlan(existing)
       setHome(existing ? homeFromPlan(existing) : defaultHome(day, next))
       const homeIds = new Set((existing?.games || []).map((g) => g.id))
-      if (!d.plan) return
+      if (!d.plan) {
+        // Games a finished home set queued for this session come pre-selected; the therapist still confirms the play time.
+        if (sel.queued?.length) setPlan(sel.queued.map((g) => ({ gameId: g.id, name: g.name, difficulty: g.difficulty, minutes: g.minutes, atHome: true })))
+        return
+      }
       setSaved(d.plan)
       setPlan(d.plan.games.map((g) => ({ gameId: g.gameId, name: g.name, difficulty: g.difficulty, minutes: g.minutes, atHome: existing ? homeIds.has(g.gameId) : true })))
       setStart(manilaHHMM(d.plan.playStart)); setEnd(manilaHHMM(d.plan.playEnd))

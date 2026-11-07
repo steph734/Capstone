@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import AssignGamesPlanner from './assign/AssignGamesPlanner'
+import HomePracticeTab from './assign/homeSets/HomePracticeTab'
+import TherapySessionTab from './assign/homeSets/TherapySessionTab'
+import useHomeSets from './assign/homeSets/useHomeSets'
+import './assign/homeSets/homeSets.css'
 import { authFetch } from '../../utils/session'
 import './TherapistAssignExercisesPage.css'
 
@@ -68,6 +73,18 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
   const [assignments, setAssignments] = useState([])
   const [toast, setToast] = useState('')
   const [plans, setPlans] = useState([])
+  // Two tabs: Therapy session (today) and Home practice (sets of games at home). The tab lives in the URL: ?tab=therapy|home.
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'home' ? 'home' : 'therapy'
+  const setTab = (id) => setParams((p) => { const n = new URLSearchParams(p); n.set('tab', id); return n }, { replace: true })
+  const home = useHomeSets()
+  const needsNew = (home.data?.patients || []).filter((p) => p.needsNew)
+  const tabRefs = useRef([])
+  const onTabKey = (e, i) => {
+    const n = e.key === 'ArrowRight' ? (i + 1) % 2 : e.key === 'ArrowLeft' ? (i + 1) % 2 : null
+    if (n == null) return
+    e.preventDefault(); setTab(['therapy', 'home'][n]); tabRefs.current[n]?.focus()
+  }
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3200) }
 
@@ -114,12 +131,26 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
       user={user}
       onLogout={onLogout}
       title="Assign Games"
-      subtitle={`${todayLong} · pick today's games for each session. Only these games unlock for the patient.`}
+      subtitle={tab === 'home' ? `${todayLong} · manage the games each patient plays at home.` : `${todayLong} · pick today's games for each session. Only these games unlock for the patient.`}
       icon="🎯"
       menuItems={getTherapistMenuItems(betaTier)}
     >
       <div className="tae-page">
-        <AssignGamesPlanner onToast={showToast} />
+        <div className="hs-tabs" role="tablist" aria-label="Assign games">
+          <button ref={(el) => { tabRefs.current[0] = el }} type="button" role="tab" id="tab-therapy" aria-selected={tab === 'therapy'} aria-controls="panel-therapy" tabIndex={tab === 'therapy' ? 0 : -1} className="hs-tab-btn therapy" onClick={() => setTab('therapy')} onKeyDown={(e) => onTabKey(e, 0)}>
+            <span className="ico" aria-hidden="true">📅</span><span className="txt"><b>Therapy session</b><small>Games for today&apos;s session</small></span>
+          </button>
+          <button ref={(el) => { tabRefs.current[1] = el }} type="button" role="tab" id="tab-home" aria-selected={tab === 'home'} aria-controls="panel-home" tabIndex={tab === 'home' ? 0 : -1} className="hs-tab-btn home" onClick={() => setTab('home')} onKeyDown={(e) => onTabKey(e, 1)}>
+            <span className="ico" aria-hidden="true">🏠</span><span className="txt"><b>Home practice</b><small>Games each patient plays at home</small></span>
+            {needsNew.length > 0 && <span className="hs-count-badge">{needsNew.length} needs new games</span>}
+          </button>
+        </div>
+
+        {tab === 'home' ? (
+          <HomePracticeTab overview={home.data} loading={home.loading} error={home.error} onReload={home.reload} onSetupHome={() => setTab('therapy')} />
+        ) : (
+        <TherapySessionTab needsNew={needsNew} onGoHome={() => setTab('home')}>
+        <AssignGamesPlanner onToast={showToast} onAssigned={home.reload} />
 
         <section className="tae-card tae-assigned-card">
           <div className="tae-card-head">
@@ -173,6 +204,8 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
             </div>
           </div>
         </section>
+        </TherapySessionTab>
+        )}
       </div>
 
       {toast && <div className="tae-toast">{toast}</div>}

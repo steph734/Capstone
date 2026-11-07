@@ -8,6 +8,7 @@ import { notify } from '../sessionRecommendations.js'
 import { pickPatientByEmail } from '../resolvePatient.js' // which child this guardian account plays as (see resolvePatient.js)
 import { SessionGamePlan } from '../models/sessionGamePlan.js'
 import { HomePracticePlan } from '../models/homePracticePlan.js'
+import { queuedGamesByAppointment } from '../homeSets.js'
 import { GamePlayEvent, ensureEventIndexes } from '../models/gamePlayEvent.js'
 import { computeLive, soapText } from '../gameLive.js'
 import {
@@ -69,6 +70,7 @@ export async function therapistToday(req, res) {
     for (const p of plans) await refreshPlan(p)
     const planBy = new Map(plans.map((p) => [String(p.patient_id), p]))
     const homeBy = new Map((appts.length ? await HomePracticePlan.find({ patient_id: { $in: appts.map((a) => a.patient_id) }, status: 'active' }).lean() : []).map((h) => [String(h.patient_id), h]))
+    const queuedBy = await queuedGamesByAppointment(db, appts.map((a) => a._id)) // games a finished home set queued for this session
     return res.status(200).json({
       today: key,
       sessions: appts.map((a) => {
@@ -78,7 +80,7 @@ export async function therapistToday(req, res) {
           start: a.start_time, end: a.end_time, sessionType: a.session_type || a.session_mode || 'Session',
           therapyTypes: a.assign?.therapy_types || [String(a.session_type || 'cognitive').toLowerCase()], assignmentId: a.assign ? String(a.assign._id) : null,
           plan: plan ? { id: String(plan._id), status: plan.status, gamesCount: plan.games.length } : null,
-          completed: a.status === 'Completed',
+          completed: a.status === 'Completed', queued: queuedBy.get(String(a._id)) || [],
           home: homeBy.get(String(a.patient_id)) ? { id: String(homeBy.get(String(a.patient_id))._id), gamesCount: homeBy.get(String(a.patient_id)).games.length } : null,
         }
       }),

@@ -49,14 +49,14 @@ function HomeTab({ hp, cards, onPlay }) {
               <h3>{g.name}</h3>
               <p>{g.description || 'Keep practicing to get stronger!'}</p>
               <div className="hm-stats">
-                <span><Dots done={g.playsThisWeek} goal={plan.goalPerGamePerWeek} /> {g.playsThisWeek} of {plan.goalPerGamePerWeek} this week</span>
+                <span><Dots done={g.homePlays ?? g.playsThisWeek} goal={g.playsLimit ?? plan.goalPerGamePerWeek} /> {g.homePlays ?? g.playsThisWeek} of {g.playsLimit ?? plan.goalPerGamePerWeek} plays{g.finished ? ' · finished' : ''}</span>
                 <span>Session score <b>{g.sessionScore != null ? `${g.sessionScore}%` : '—'}</b></span>
                 <span>Best at home <b>{g.bestHome != null ? `${g.bestHome}%` : '—'}</b></span>
               </div>
               <footer>
                 <span className="hm-meta"><Clock size={14} aria-hidden="true" /> {g.minutes} min · +100 XP</span>
-                <button type="button" className="hm-play lg" disabled={!open || !card} onClick={() => onPlay(card)}>
-                  {open ? <><Play size={16} aria-hidden="true" /> {g.playsThisWeek ? 'Play again' : 'Play'}</> : <><Lock size={16} aria-hidden="true" /> {hp.status.label}</>}
+                <button type="button" className="hm-play lg" disabled={!open || !card || g.finished} onClick={() => onPlay(card)}>
+                  {g.finished ? <>✓ All {g.playsLimit} plays done</> : open ? <><Play size={16} aria-hidden="true" /> {(g.homePlays ?? g.playsThisWeek) ? 'Play again' : 'Play'}</> : <><Lock size={16} aria-hidden="true" /> {hp.status.label}</>}
                 </button>
               </footer>
             </article>

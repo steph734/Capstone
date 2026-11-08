@@ -77,7 +77,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
           <img src="/games/pao-money-match-poses/pao-level-complete.png" alt="" width="84" height="84" />
           <div>
             <h2 id="hs-modal-title">Choose the next set of games</h2>
-            <p>{patient.name} mastered {masteredText}. Pick the games for the next therapy session and home practice.</p>
+            <p>{patient.name} finished {masteredText}. Pick the games for the next therapy session and home practice.</p>
           </div>
           <button type="button" className="hs-x" onClick={onClose} aria-label="Close">×</button>
         </header>

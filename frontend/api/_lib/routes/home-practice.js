@@ -11,6 +11,7 @@ import { audit } from '../noteAccess.js'
 import { notify } from '../sessionRecommendations.js'
 import { pickPatientByEmail } from '../resolvePatient.js' // which child this guardian account plays as (see resolvePatient.js)
 import { sendEmail } from '../brevo.js'
+import { HOME_PLAYS_PER_GAME } from '../homeSetConfig.js'
 import { HomePracticePlan } from '../models/homePracticePlan.js'
 import { activeAssignment, employeeFor, gameDifficulty, manilaDayKey, oid, serializeGame } from '../gamePlans.js'
 import {
@@ -60,6 +61,7 @@ async function viewPlan(db, plan) {
       return {
         ...(d ? serializeGame(d) : { id: String(g.game_id), name: 'Game', difficulty: 'easy', minutes: 5 }),
         source: g.source, order: g.order,
+        homePlays: p.homePlays || 0, playsLimit: HOME_PLAYS_PER_GAME, finished: (p.homePlays || 0) >= HOME_PLAYS_PER_GAME,
         playsThisWeek: p.playsThisWeek || 0, playsByDay: p.byDay || [0, 0, 0, 0, 0, 0, 0], bestHome: p.bestHome ?? null, sessionScore: p.sessionScore ?? null,
         lastHomeAt: p.lastHomeAt ? p.lastHomeAt.toISOString() : null,
         needsPractice: p.sessionScore != null && p.sessionScore < 60,

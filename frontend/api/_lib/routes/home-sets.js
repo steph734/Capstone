@@ -4,12 +4,14 @@
 //   GET  /api/therapist/home-sets/games?patientId=   games to pick from, tagged new / played / mastered / recommended
 //   POST /api/therapist/home-sets/assign             { patientId, gameIds[], startingLevel, useInTherapy, useAtHome }
 //   POST /api/therapist/home-sets/undo               { patientId, setId }  (a few seconds after assigning)
+//   GET  /api/therapist/home-sets/summary?setId=     text for the home practice SOAP note (Objective)
+//   POST /api/therapist/home-sets/soap               { setId, noteId }  links the SOAP note written for the set
 //   POST /api/therapist/home-sets/dismiss            { setId }  ("Keep this set")
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
 import { audit } from '../noteAccess.js'
 import { activeAssignment, employeeFor, oid } from '../gamePlans.js'
-import { assignNewSet, availableGames, buildOverview, dismissSetComplete, undoNewSet } from '../homeSets.js'
+import { assignNewSet, availableGames, buildOverview, dismissSetComplete, homeSetSummary, linkSoapNote, undoNewSet } from '../homeSets.js'
 
 const method = (req, res, ...allowed) => {
   if (allowed.includes(req.method)) return true
@@ -88,4 +90,24 @@ export async function homeSetsDismiss(req, res) {
     const out = await dismissSetComplete(ctx.db, { setId: req.body?.setId, employee: ctx.employee, assigned: (pid, eid) => activeAssignment(ctx.db, pid, eid) })
     return res.status(200).json(out)
   } catch (err) { return fail(res, err, 'home-sets dismiss') }
+}
+
+export async function homeSetsSummary(req, res) {
+  if (!method(req, res, 'GET')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    return res.status(200).json(await homeSetSummary(ctx.db, { setId: req.query.setId, employee: ctx.employee, assigned: (pid, eid) => activeAssignment(ctx.db, pid, eid) }))
+  } catch (err) { return fail(res, err, 'home-sets summary') }
+}
+
+export async function homeSetsSoap(req, res) {
+  if (!method(req, res, 'POST')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    const out = await linkSoapNote(ctx.db, { setId: req.body?.setId, noteId: req.body?.noteId, employee: ctx.employee, assigned: (pid, eid) => activeAssignment(ctx.db, pid, eid) })
+    await audit(ctx.db, { user: ctx.user, role: ctx.user.role, action: 'home_set_soap_linked', patientId: null, ip: ctx.ip, meta: { set_id: String(req.body?.setId), note_id: String(req.body?.noteId) } })
+    return res.status(200).json(out)
+  } catch (err) { return fail(res, err, 'home-sets soap') }
 }

@@ -5,28 +5,37 @@ import { renderToStaticMarkup as render } from 'react-dom/server'
 import PatientHomeCard from './PatientHomeCard.jsx'
 import TherapySessionTab from './TherapySessionTab.jsx'
 
-const game = (name, status, masteredPlays, plays = masteredPlays) => ({ gameId: name, name, status, masteredPlays, plays, required: 3 })
+const game = (name, status, plays, masteredPlays = plays) => ({ gameId: name, name, status, masteredPlays, plays, required: 3 })
 const base = { patientId: 'p1', name: 'Rene Baterbonia', firstName: 'Rene', setId: 's1', setNumber: 1, startedAt: '2026-10-21T02:00:00Z', assignedAt: '2026-10-21T02:00:00Z', useAtHome: true, nextSession: null, history: [], dismissed: false }
 const card = (p) => render(h(PatientHomeCard, { patient: { ...base, ...p }, onChoose() {}, onKeep() {}, openSetup() {} }))
 
 describe('patient home card', () => {
   const done = [game('Money Match', 'mastered', 3), game('Copy the Colors', 'mastered', 3), game('Sort the Basket', 'mastered', 3)]
+  it('complete set without a SOAP note: banner asks for the note first and locks Choose new games', () => {
+    const html = card({ games: done, complete: true, needsNew: true, soapDone: false, playedCount: 3 })
+    expect(html).toContain('Write SOAP note')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Choose new games →/)
+  })
   it('complete set: gold game cards, "Set complete" and the celebration banner with both buttons', () => {
-    const html = card({ games: done, complete: true, needsNew: true, playedCount: 3 })
+    const html = card({ games: done, complete: true, needsNew: true, soapDone: true, playedCount: 3 })
     expect(html).toContain('✓ Set complete')
     expect(html).toContain('★ Mastered')
-    expect(html).toContain('All 3 home games mastered!')
+    expect(html).toContain('All 3 home games finished!')
     expect(html).toContain('Choose new games →')
+    expect(html).not.toContain('Write SOAP note')
     expect(html).toContain('Keep this set')
     expect(html).toContain('3 of 3')
   })
+  it('finished with imperfect plays shows the Finished pill', () => {
+    expect(card({ games: [game('Money Match', 'finished', 3, 1)], complete: true, needsNew: false, playedCount: 1 })).toContain('✓ Finished')
+  })
   it('kept set: no banner, but a way to choose new games later', () => {
-    const html = card({ games: done, complete: true, needsNew: false, dismissed: true, playedCount: 3 })
-    expect(html).not.toContain('All 3 home games mastered!')
+    const html = card({ games: done, complete: true, needsNew: false, dismissed: true, soapDone: true, playedCount: 3 })
+    expect(html).not.toContain('All 3 home games finished!')
     expect(html).toContain('Choose new games')
   })
   it('partly mastered: per-game progress and no banner', () => {
-    const html = card({ games: [game('Money Match', 'practicing', 1), game('Puzzle Pals', 'not_started', 0)], complete: false, needsNew: false, playedCount: 1 })
+    const html = card({ games: [game('Money Match', 'practicing', 1, 0), game('Puzzle Pals', 'not_started', 0)], complete: false, needsNew: false, playedCount: 1 })
     expect(html).toContain('▶ Practicing')
     expect(html).toContain('○ Not started')
     expect(html).toContain('1 of 3')

@@ -16,6 +16,7 @@ const LOCK_TEXT = {
   home_limit: 'You used all your home play time today. Great job! Come back on your next practice day.',
   home_not_started: 'Home practice has not opened yet.',
   expired: 'Home practice has ended.',
+  game_finished: 'You played this game all 3 times. Great job! Your therapist will pick new games soon.',
 }
 
 // Every game goes through here: access check -> loading modal -> game.

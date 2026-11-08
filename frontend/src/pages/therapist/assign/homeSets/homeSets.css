@@ -125,3 +125,16 @@
   .hs-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) { .hs-grid, .hs-games { grid-template-columns: 1fr; } .hs-modal { padding: 18px; } .hs-modal-head h2 { font-size: 24px; } }
+
+.hs-game.finished { background: #f3faf5; border: 2px solid #9fd5b0; }
+.hs-pill.finished { background: #dcf3e4; color: #15803d; }
+.hs-game.finished .hs-bar i { background: #15803d; }
+.hs-steps { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 10px 0 0; padding: 0; }
+.hs-steps li { background: #fff; border: 1px solid #d7e6de; border-radius: 999px; padding: 4px 14px; font-size: 14px; font-weight: 800; color: #5b7469; white-space: nowrap; }
+.hs-steps li.now { border-color: #15803d; color: #15803d; } .hs-steps li.done { background: #dcf3e4; color: #15803d; border-color: #9fd5b0; }
+.hs-soap { display: grid; gap: 14px; margin-top: 8px; } .hs-soap label { display: grid; gap: 6px; font-weight: 800; font-size: 15px; color: #1e3a31; }
+.hs-soap label small { font-weight: 600; color: #5b7469; font-size: 14px; }
+.hs-soap textarea { width: 100%; min-height: 110px; border: 1px solid #cfdcd6; border-radius: 14px; padding: 12px 14px; font: inherit; font-size: 15px; color: #1e3a31; resize: vertical; box-sizing: border-box; }
+.hs-soap textarea:focus { outline: 3px solid #2f5fd0; outline-offset: 1px; }
+.hs-soap .hs-fielderr { color: #b42318; font-size: 14px; font-weight: 700; }
+.hs-soap-modal { width: min(820px, 100%); }

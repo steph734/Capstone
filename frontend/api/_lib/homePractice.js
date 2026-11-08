@@ -2,6 +2,7 @@
 // All days and times are Asia/Manila (the clinic's timezone; there is no per-patient timezone in this app).
 import { ObjectId } from 'mongodb'
 import { HomePracticePlan } from './models/homePracticePlan.js'
+import { HOME_PLAYS_PER_GAME } from './homeSetConfig.js'
 
 const OFFSET = 8 * 3600 * 1000
 const DAY = 86400000
@@ -95,6 +96,9 @@ export async function checkHomeAccess(db, patientId, gameId) {
   const plan = await activeHomePlan(patientId)
   if (!plan) return { ok: false, inPlan: false, reason: 'no_plan' }
   if (!plan.games.some((g) => String(g.game_id) === String(gameId))) return { ok: false, inPlan: false, reason: 'not_assigned' }
+  // Each home game can be played HOME_PLAYS_PER_GAME times per set; after that it is finished and locked.
+  const playsDone = await db.collection('game_sessions').countDocuments({ patient_id: patientId, game_id: oid(gameId), context: 'home', home_plan_id: plan._id, status: 'completed' })
+  if (playsDone >= HOME_PLAYS_PER_GAME) return { ok: false, inPlan: true, reason: 'game_finished', plan }
   const w = homeWindow(plan, await homeSecondsToday(db, patientId, plan._id))
   return w.open ? { ok: true, inPlan: true, plan } : { ok: false, inPlan: true, reason: w.reason, plan }
 }
@@ -128,12 +132,13 @@ export async function weekProgress(db, patientId, plan, now = new Date()) {
   const plays = await db.collection('game_sessions').find({
     patient_id: patientId, game_id: { $in: ids }, status: 'completed', completed_at: { $ne: null },
   }).project({ game_id: 1, context: 1, home_plan_id: 1, completed_at: 1, result: 1 }).sort({ completed_at: 1 }).toArray()
-  const out = new Map(ids.map((id) => [String(id), { playsThisWeek: 0, byDay: [0, 0, 0, 0, 0, 0, 0], bestHome: null, sessionScore: null, lastHomeAt: null }]))
+  const out = new Map(ids.map((id) => [String(id), { homePlays: 0, playsThisWeek: 0, byDay: [0, 0, 0, 0, 0, 0, 0], bestHome: null, sessionScore: null, lastHomeAt: null }]))
   for (const p of plays) {
     const o = out.get(String(p.game_id))
     if (!o) continue
     const pct = playPercent(p.result)
     if (p.context === 'home') {
+      if (String(p.home_plan_id) === String(plan._id)) o.homePlays += 1 // all plays under this plan (the per-game limit)
       if (String(p.home_plan_id) === String(plan._id) && p.completed_at >= from) {
         o.playsThisWeek += 1
         o.byDay[(weekday(p.completed_at) + 6) % 7] += 1

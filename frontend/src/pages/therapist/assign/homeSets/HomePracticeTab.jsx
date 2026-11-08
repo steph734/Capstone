@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { authFetch } from '../../../../utils/session'
 import PatientHomeCard from './PatientHomeCard'
 import ChooseNextSetModal from './ChooseNextSetModal'
+import HomeSoapModal from './HomeSoapModal'
 import { sessionText } from './gameIcons'
 import './homeSets.css'
 
@@ -12,6 +13,7 @@ const matches = (p, f) => (f === 'all' ? true : f === 'needs' ? p.needsNew : f =
 export default function HomePracticeTab({ overview, loading, error, onReload, onSetupHome }) {
   const [filter, setFilter] = useState('all')
   const [modalFor, setModalFor] = useState(null)
+  const [soapFor, setSoapFor] = useState(null)
   const [keeping, setKeeping] = useState(null)
   const [toast, setToast] = useState(null) // { text, undo: { patientId, setId } | null }
   const [note, setNote] = useState('')
@@ -51,7 +53,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
       {toast && (
         <div className="hs-toast" role="status"><span>✓ {toast.text}</span>{toast.undo && <button type="button" onClick={undo}>Undo</button>}</div>
       )}
-      <div className="hs-title"><h2>Home practice</h2><p>A game is mastered after {overview?.config?.masteredPlaysRequired ?? 3} plays at {overview?.config?.masteredAccuracy ?? 100}% accuracy. When every game in a set is mastered, choose the next set.</p></div>
+      <div className="hs-title"><h2>Home practice</h2><p>Each game can be played {overview?.config?.playsPerGame ?? 3} times at home; it is mastered when every play is at {overview?.config?.masteredAccuracy ?? 100}% accuracy. When every game in a set is finished, write the SOAP note, then choose the next set.</p></div>
       {note && <p className="hs-error-line" role="alert">{note}</p>}
 
       {error && !overview && <div className="hs-error" role="alert"><span>{error}</span><button type="button" className="hs-btn green" onClick={onReload}>Retry</button></div>}
@@ -62,7 +64,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
           <div className="hs-tiles">
             <div className="hs-tile"><b>{s.patients}</b><span>Patients with home practice</span></div>
             <div className="hs-tile amber"><b>{s.needNew}</b><span>Need new games</span></div>
-            <div className="hs-tile gold"><b>{s.mastered}</b><span>Games mastered</span></div>
+            <div className="hs-tile gold"><b>{s.finished}</b><span>Games finished</span></div>
             <div className="hs-tile blue"><b>{s.notFinished}</b><span>Not finished yet</span></div>
           </div>
 
@@ -74,7 +76,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
                 {FILTERS.map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} className={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>{label}{id !== 'all' ? ` · ${counts[id]}` : ''}</button>)}
               </div>
               <div className="hs-list">
-                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onChoose={setModalFor} onKeep={keep} keeping={keeping === p.setId} openSetup={onSetupHome} />)}
+                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onChoose={setModalFor} onSoap={setSoapFor} onKeep={keep} keeping={keeping === p.setId} openSetup={onSetupHome} />)}
                 {shown.length === 0 && <p className="hs-muted">No patients in this group.</p>}
               </div>
             </>
@@ -82,6 +84,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
         </>
       )}
 
+      {soapFor && <HomeSoapModal patient={soapFor} onClose={() => setSoapFor(null)} onSaved={async () => { setSoapFor(null); setToast({ text: `SOAP note saved for ${soapFor.firstName}. You can choose the next set now.`, undo: null }); await onReload() }} />}
       {modalFor && <ChooseNextSetModal patient={modalFor} config={overview?.config} onClose={() => setModalFor(null)} onAssigned={assigned} />}
     </div>
   )

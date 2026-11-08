@@ -46,8 +46,8 @@ export default function HomeCard({ hp, onPlay }) {
           return (
             <li key={g.id}>
               <span className="hm-gico"><Icon size={22} aria-hidden="true" /></span>
-              <div className="hm-ginfo"><b>{g.name}</b><small><Dots done={g.playsThisWeek} goal={plan.goalPerGamePerWeek} /> {g.playsThisWeek} of {plan.goalPerGamePerWeek} this week{g.bestHome != null ? ` · Best ${g.bestHome}%` : ''}</small></div>
-              <button type="button" className="hm-play" disabled={!open} onClick={() => onPlay(g)} aria-label={`${g.playsThisWeek ? 'Play again' : 'Play'} ${g.name}`}>
+              <div className="hm-ginfo"><b>{g.name}</b><small><Dots done={g.homePlays ?? g.playsThisWeek} goal={g.playsLimit ?? plan.goalPerGamePerWeek} /> {g.homePlays ?? g.playsThisWeek} of {g.playsLimit ?? plan.goalPerGamePerWeek} plays{g.bestHome != null ? ` · Best ${g.bestHome}%` : ''}</small></div>
+              <button type="button" className="hm-play" disabled={!open || g.finished} onClick={() => onPlay(g)} aria-label={`${g.playsThisWeek ? 'Play again' : 'Play'} ${g.name}`}>
                 {open ? (g.playsThisWeek ? <><RotateCcw size={15} aria-hidden="true" /> Play again</> : <><Play size={15} aria-hidden="true" /> Play</>) : <><Lock size={15} aria-hidden="true" /> Play</>}
               </button>
             </li>

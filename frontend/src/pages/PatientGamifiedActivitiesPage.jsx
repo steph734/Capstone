@@ -14,6 +14,7 @@ export default function PatientGamifiedActivitiesPage({ user }) {
           <Lock size={44} color="#51647a" aria-hidden="true" />
           <h2 style={{ margin: '12px 0 6px', fontSize: 24, color: '#1d3557' }}>Gamified Activities are locked</h2>
           <p style={{ margin: '0 0 20px', color: '#51647a', fontSize: 16, lineHeight: 1.5 }}>Games are part of the clinic&apos;s Gold plan. They will unlock here as soon as the clinic subscribes to Gold.</p>
+          {clinic.why && <p style={{ margin: '-8px 0 18px', color: '#7b8794', fontSize: 13, lineHeight: 1.4 }}>Reason: {clinic.why}</p>}
           <button type="button" onClick={() => navigate('/dashboard')} style={{ minHeight: 48, padding: '0 28px', borderRadius: 14, border: 0, background: '#2c5a47', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>Back to home</button>
         </div>
       </div>

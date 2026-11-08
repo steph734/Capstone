@@ -1,4 +1,4 @@
-import { loadPlansAndFeatures, loadSubscriptions, paidTierEmails } from './plans.js'
+import { loadPlansAndFeatures, loadSubscriptions, monthlyAmount, paidTierEmails } from './plans.js'
 
 const OFF = String(process.env.GAMES_REQUIRE_GOLD || '').trim().toLowerCase() === 'false'
 const cache = { at: 0, ttl: 0, info: null }
@@ -25,6 +25,15 @@ export async function clinicTierInfo(db) {
     } else {
       if (owners.some((e) => paidTierEmails(plans.filter((p) => p.slug === 'gold'), subs).has(e))) { tier = 'gold'; why = 'The Owner has an active Gold subscription in Stripe.' }
       else if (tier === 'free' && owners.some((e) => paidTierEmails(plans.filter((p) => p.slug === 'silver'), subs).has(e))) { tier = 'silver'; why = 'The Owner has an active Silver subscription in Stripe.' }
+      // A live subscription of the Owner whose Stripe price id we don't know (a re-created price, another Stripe account) still counts when it
+      // bills exactly the monthly price of the Gold (or Silver) plan on the Subscription page.
+      if (tier === 'free') {
+        const price = (slug) => { const v = plans.find((p) => p.slug === slug)?.price; return Number(String(v?.$numberDecimal ?? v ?? 0)) }
+        const ownerLiveSubs = subs.filter((x) => ['active', 'trialing', 'past_due'].includes(x.status) && !x.ended_at && owners.includes(String(x.customer?.email || '').toLowerCase()))
+        const bills = (slug) => price(slug) > 0 && ownerLiveSubs.some((x) => Math.round(monthlyAmount(x)) === Math.round(price(slug)))
+        if (bills('gold')) { tier = 'gold'; why = 'The Owner has a live Stripe subscription billing the Gold price.' }
+        else if (bills('silver')) { tier = 'silver'; why = 'The Owner has a live Stripe subscription billing the Silver price.' }
+      }
       if (tier === 'free') {
         const live = subs.filter((s) => ['active', 'trialing', 'past_due'].includes(s.status) && !s.ended_at)
         const ownerLive = live.filter((s) => owners.includes(String(s.customer?.email || '').toLowerCase()))

@@ -13,5 +13,5 @@ export default function useClinicPlan(enabled = true) {
     authFetch('/api/clinic/plan').then((d) => { if (!alive) return; setPlan(d); try { sessionStorage.setItem(KEY, JSON.stringify(d)) } catch { /* private mode */ } }).catch(() => {})
     return () => { alive = false }
   }, [enabled])
-  return { tier: plan?.tier || null, gamified: plan ? Boolean(plan.gamified) : null }
+  return { tier: plan?.tier || null, gamified: plan ? Boolean(plan.gamified) : null, why: plan?.why || '' }
 }

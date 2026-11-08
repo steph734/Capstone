@@ -10,6 +10,7 @@ const LOCK_TEXT = {
   not_started: 'Your therapist will start play time soon.',
   paused: 'Your therapist paused play time. Wait a moment!',
   time_over: 'Play time is over. Great playing today!',
+  plan: "Gamified Activities are part of the clinic's Gold plan. Ask your clinic to upgrade.",
   no_plan: 'No games today yet. Your therapist will pick them during your session.',
   home_day: 'Home practice is closed today. Check your practice days.',
   home_hours: 'Home practice is open at a different time of day. Come back during your home play hours.',

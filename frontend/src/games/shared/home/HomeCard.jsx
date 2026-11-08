@@ -2,9 +2,9 @@ import { Clock, House, Lock, Play, RotateCcw } from 'lucide-react'
 import { SHORT_DAYS, fmt12, iconFor } from './homeUtil'
 import './home.css'
 
-export function Dots({ done, goal }) {
+export function Dots({ done, goal, finished = false }) {
   return (
-    <span className="hm-dots" aria-label={`${done} of ${goal} plays this week`}>
+    <span className={`hm-dots${finished ? ' fin' : ''}`} aria-label={`${done} of ${goal} plays used`}>
       {Array.from({ length: Math.max(goal, done) }, (_, i) => <i key={i} className={i < done ? 'on' : ''} />)}
     </span>
   )

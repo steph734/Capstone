@@ -7,6 +7,12 @@ import './home.css'
 
 const CAT = { cognitive: 'Cognitive', speech: 'Speech & Language' }
 const DIFF = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
+const POSE = '/games/pao-money-match-poses/'
+const nextText = (date, time) => {
+  if (!date) return ''
+  const d = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return time ? `${d}, ${time}` : d
+}
 const day = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
 
 function HomeTab({ hp, cards, onPlay }) {
@@ -16,47 +22,72 @@ function HomeTab({ hp, cards, onPlay }) {
   }
   const open = hp.status.kind === 'open'
   const sessionOnly = hp.data.sessionOnly || []
+  // Each game can be played 3 times: progress, Pao's message and the "all finished" state follow the plays used.
+  const limit = plan.games[0]?.playsLimit ?? 3
+  const playsUsed = hp.data.set?.playsUsed ?? plan.games.reduce((s, g) => s + Math.min(g.homePlays || 0, limit), 0)
+  const playsAllowed = hp.data.set?.playsAllowed ?? plan.games.length * limit
+  const allFinished = plan.games.length > 0 && playsUsed >= playsAllowed
+  const finishedGame = plan.games.find((g) => g.finished)
+  const nextGame = plan.games.find((g) => !g.finished && g.homePlays > 0) || plan.games.find((g) => !g.finished)
+  const left = nextGame ? limit - (nextGame.homePlays || 0) : 0
+  const paoText = allFinished
+    ? `Hooray, ${hp.data.firstName}! You played every game ${limit} times. You finished ALL your home games! Your therapist will give you new games soon.`
+    : finishedGame && nextGame
+      ? `Great job on ${finishedGame.name}! You played it ${limit} times, so it is finished. ${nextGame.name} has ${left} play${left === 1 ? '' : 's'} left!`
+      : `You can play each game ${limit} times. Pick a game to play!`
   return (
     <div className="hm-tab">
+      <div className="hm-pao" role="status">
+        <img src={`${POSE}${allFinished ? 'pao-heart-eyes' : 'pao-point-side'}.png`} alt="" width="96" height="96" />
+        <p>{paoText}</p>
+      </div>
       <div className="hm-banner">
         <div className="hm-banner-top">
           <span className="hm-ico w"><House size={22} aria-hidden="true" /></span>
           <div>
             <b>{plan.therapistName} sent these games home</b>
-            <small>Open until {day(plan.endsAt)} · {dayRange(plan.days)}, {fmt12(plan.dailyStart)}–{fmt12(plan.dailyEnd)} · goal {plan.goalPerGamePerWeek}× a week</small>
+            <small>Open until {day(plan.endsAt)} · {dayRange(plan.days)}, {fmt12(plan.dailyStart)}–{fmt12(plan.dailyEnd)} · <b>each game can be played {limit} times</b></small>
           </div>
-          <span className={`hm-pill on-blue ${hp.status.kind}`}>{hp.status.label}</span>
+          <span className="hm-pill on-blue">{playsUsed} of {playsAllowed} plays used</span>
         </div>
         <TimeLeft hp={hp} />
         <p className="hm-remind"><Bell size={14} aria-hidden="true" /> You&apos;ll get a reminder 5 min before time ends.</p>
       </div>
+
+      {allFinished && (
+        <div className="hm-done" role="status">
+          <span aria-hidden="true" className="hm-done-ico">🎉</span>
+          <div><b>Home games finished!</b><small>Your therapist is getting your next set ready.{hp.data.nextSession ? ` See you at your next session on ${nextText(hp.data.nextSession, hp.data.nextSessionTime)}.` : ''}</small></div>
+          <span className="hm-pill wait">Waiting for new games</span>
+        </div>
+      )}
 
       <div className="hm-grid">
         {plan.games.map((g) => {
           const Icon = iconFor(g.name)
           const card = cardFor(cards, g.name)
           return (
-            <article key={g.id} className="hm-gcard" style={{ '--c': card?.color || '#2563eb' }}>
+            <article key={g.id} className={`hm-gcard${g.finished ? ' fin' : ''}`} style={{ '--c': card?.color || '#2563eb' }}>
               <header>
                 <span className="hm-gico big"><Icon size={26} aria-hidden="true" /></span>
                 <div className="hm-tags">
                   <span className="t">{CAT[g.therapyType] || g.therapyType}</span>
                   <span className={`d ${g.difficulty}`}>{DIFF[g.difficulty]}</span>
                   <span className="h">At home</span>
-                  {g.needsPractice && <span className="p">Practice this one</span>}
+                  {g.finished ? <span className="fin">★ Finished</span> : (g.homePlays || 0) === (g.playsLimit ?? limit) - 1 ? <span className="left">1 play left</span> : g.needsPractice && <span className="p">Practice this one</span>}
                 </div>
               </header>
               <h3>{g.name}</h3>
               <p>{g.description || 'Keep practicing to get stronger!'}</p>
               <div className="hm-stats">
-                <span><Dots done={g.homePlays ?? g.playsThisWeek} goal={g.playsLimit ?? plan.goalPerGamePerWeek} /> {g.homePlays ?? g.playsThisWeek} of {g.playsLimit ?? plan.goalPerGamePerWeek} plays{g.finished ? ' · finished' : ''}</span>
+                <span><Dots done={g.homePlays ?? 0} goal={g.playsLimit ?? limit} finished={g.finished} /> <b>{Math.min(g.homePlays ?? 0, g.playsLimit ?? limit)} of {g.playsLimit ?? limit}</b> plays used</span>
                 <span>Session score <b>{g.sessionScore != null ? `${g.sessionScore}%` : '—'}</b></span>
                 <span>Best at home <b>{g.bestHome != null ? `${g.bestHome}%` : '—'}</b></span>
               </div>
               <footer>
                 <span className="hm-meta"><Clock size={14} aria-hidden="true" /> {g.minutes} min · +100 XP</span>
                 <button type="button" className="hm-play lg" disabled={!open || !card || g.finished} onClick={() => onPlay(card)}>
-                  {g.finished ? <>✓ All {g.playsLimit} plays done</> : open ? <><Play size={16} aria-hidden="true" /> {(g.homePlays ?? g.playsThisWeek) ? 'Play again' : 'Play'}</> : <><Lock size={16} aria-hidden="true" /> {hp.status.label}</>}
+                  {g.finished ? <><Lock size={16} aria-hidden="true" /> Finished</> : open ? <><Play size={16} aria-hidden="true" /> {(g.homePlays ?? g.playsThisWeek) ? 'Play again' : 'Play'}</> : <><Lock size={16} aria-hidden="true" /> {hp.status.label}</>}
                 </button>
               </footer>
             </article>

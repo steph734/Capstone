@@ -20,8 +20,9 @@ vi.mock('./models/homePracticePlan.js', () => {
 })
 vi.mock('./sessionRecommendations.js', () => ({ notify: async (_db, n) => { mocks.notified.push(n) } }))
 
-const { masteryForGames, setIsComplete, statusOf, assignNewSet, undoNewSet, syncActiveSet, linkSoapNote, homeSetSummary } = await import('./homeSets.js')
+const { masteryForGames, setIsComplete, statusOf, assignNewSet, undoNewSet, syncActiveSet } = await import('./homeSets.js')
 const { MASTERED_PLAYS_REQUIRED } = await import('./homeSetConfig.js')
+const { checkHomeAccess } = await import('./homePractice.js')
 
 const P = new ObjectId(), EMP = { _id: new ObjectId(), first_name: 'Edward' }
 const G = [new ObjectId(), new ObjectId(), new ObjectId(), new ObjectId(), new ObjectId()]
@@ -48,7 +49,7 @@ function fakeDb(state) {
         find: (q) => arr(state.plays.filter((p) => q.game_id.$in.some((i) => String(i) === String(p.game_id)) && p.completed_at >= q.completed_at.$gte && (!q.completed_at.$lte || p.completed_at <= q.completed_at.$lte) && (!q.context || p.context === q.context))),
         countDocuments: async () => state.plays.filter((p) => p.completed_at >= state.sets.at(-1).started_at).length,
       },
-      therapy_notes: { findOne: async (q) => state.notes.find((n) => String(n._id) === String(q._id) && String(n.patient_id) === String(q.patient_id) && (!q.employee_id || String(n.employee_id) === String(q.employee_id))) || null },
+      therapy_notes: { findOne: async (q) => state.notes.find((n) => String(n._id) === String(q._id) && String(n.patient_id) === String(q.patient_id) && (!q.status || n.status === q.status)) || null },
       notifications: { deleteMany: async () => { state.notificationsDeleted = true; return {} } },
     }[name]),
   }
@@ -67,7 +68,7 @@ const seedSet = (setNumber = 1) => {
 }
 const masterAll = () => [0, 1, 2].forEach((i) => [1, 2, 3].forEach((n) => state.plays.push(perfect(G[i], day(10 - n - i * 0.1)))))
 // the therapist's SOAP note for the set (the step before choosing the next set)
-const writeNote = (setIndex = 0) => { const note = { _id: new ObjectId(), patient_id: P, employee_id: EMP._id }; state.notes.push(note); state.sets[setIndex].soap_note_id = note._id; return note }
+const writeNote = (setIndex = 0, status = 'signed') => { const note = { _id: new ObjectId(), patient_id: P, employee_id: EMP._id, status, signed_at: new Date() }; state.notes.push(note); state.sets[setIndex].soap_draft_id = note._id; return note }
 const body = (extra = {}) => ({ employee: EMP, patientId: P, gameIds: [G[3], G[4]], startingLevel: 'warmup', useInTherapy: true, useAtHome: true, ...extra })
 
 describe('progress rule: 3 plays per game', () => {
@@ -127,11 +128,13 @@ describe('assign new set', () => {
     await expect(assignNewSet(fakeDb(state), body())).rejects.toMatchObject({ status: 409 })
     expect(state.sets[0].status).toBe('active')
   })
-  it('refuses until the SOAP note for the home practice is written', async () => {
+  it('refuses until the SOAP note is SIGNED (a draft does not unlock it)', async () => {
     seedSet(); masterAll()
-    await expect(assignNewSet(fakeDb(state), body())).rejects.toMatchObject({ status: 409, message: expect.stringContaining('SOAP note') })
+    await expect(assignNewSet(fakeDb(state), body())).rejects.toMatchObject({ status: 403, code: 'SOAP_NOTE_REQUIRED' })
+    writeNote(0, 'draft')
+    await expect(assignNewSet(fakeDb(state), body())).rejects.toMatchObject({ status: 403, code: 'SOAP_NOTE_REQUIRED' })
     expect(state.sets[0].status).toBe('active')
-    writeNote()
+    state.notes[0].status = 'signed'
     await expect(assignNewSet(fakeDb(state), body())).resolves.toMatchObject({ setNumber: 2 })
   })
   it('a finished set with imperfect plays can move on too', async () => {
@@ -185,23 +188,16 @@ describe('undo', () => {
   })
 })
 
-describe('SOAP note for a set', () => {
-  const assigned = async () => true
-  it('links only your own note for this patient', async () => {
+describe('the 3-play limit on the patient side', () => {
+  const dbWith = (count) => ({ collection: () => ({ countDocuments: async () => count, find: () => ({ project: () => ({ toArray: async () => [] }), toArray: async () => [] }) }) })
+  it('refuses the 4th play of a home game, whatever the time of day', async () => {
     seedSet()
-    const note = { _id: new ObjectId(), patient_id: P, employee_id: EMP._id }
-    const other = { _id: new ObjectId(), patient_id: new ObjectId(), employee_id: EMP._id }
-    state.notes.push(note, other)
-    const setId = String(state.sets[0]._id)
-    await expect(linkSoapNote(fakeDb(state), { setId, noteId: String(other._id), employee: EMP, assigned })).rejects.toMatchObject({ status: 400 })
-    await expect(linkSoapNote(fakeDb(state), { setId, noteId: String(note._id), employee: EMP, assigned: async () => false })).rejects.toMatchObject({ status: 404 })
-    await linkSoapNote(fakeDb(state), { setId, noteId: String(note._id), employee: EMP, assigned })
-    expect(String(state.sets[0].soap_note_id)).toBe(String(note._id))
+    const r = await checkHomeAccess(dbWith(3), P, G[0])
+    expect(r).toMatchObject({ ok: false, inPlan: true, reason: 'game_finished' })
   })
-  it('prefills the Objective from the plays recorded at home', async () => {
-    seedSet(); masterAll(); state.plays.push(perfect(G[0], day(1), 'session'))
-    const r = await homeSetSummary(fakeDb(state), { setId: String(state.sets[0]._id), employee: EMP, assigned })
-    expect(r.text).toContain('Game 1: 3 of 3 plays at home, accuracy 100%')
-    expect(r.text).toContain('Overall: 9 plays')
+  it('still lets a game with 2 plays through the limit check', async () => {
+    seedSet()
+    const r = await checkHomeAccess(dbWith(2), P, G[0])
+    expect(r.reason).not.toBe('game_finished')
   })
 })

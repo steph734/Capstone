@@ -73,7 +73,8 @@ export function SessionTable({ points }) {
 }
 
 // Accuracy by day, therapy vs home. `days` is the full list of day keys (the last 6 days minimum).
-export function DayLines({ days, home, session }) {
+// refLine { value, label }: a grey dashed reference (the previous set's average). empty { title, sub }: shown when nothing was played yet.
+export function DayLines({ days, home, session, refLine = null, empty = null }) {
   const avgBy = (pts) => { const m = new Map(); pts.forEach((p) => { const a = m.get(p.date) || []; a.push(p.value); m.set(p.date, a) }); return new Map([...m].map(([k, v]) => [k, r1(v.reduce((x, y) => x + y, 0) / v.length)])) }
   const h = avgBy(home), s = avgBy(session)
   const H = 260, padL = 46, padR = 20, padT = 28, padB = 34
@@ -88,10 +89,12 @@ export function DayLines({ days, home, session }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img"
       aria-label={`Accuracy by day. Therapy sessions: ${sp.map((p) => `${dayLabel(p.d)} ${p.v}%`).join(', ') || 'no plays'}. Home practice: ${hp.map((p) => `${dayLabel(p.d)} ${p.v}%`).join(', ') || 'no plays'}.`}>
       <YAxis top={100} unit="%" padL={padL} padT={padT} innerH={innerH} w={W} padR={padR} />
+      {refLine && <g><line x1={padL} x2={W - padR} y1={y(refLine.value)} y2={y(refLine.value)} stroke="#8A9A94" strokeWidth="1.6" strokeDasharray="5 4" /><text x={padL + 8} y={y(refLine.value) - 6} fontSize="13" fontWeight="700" fill="#5D7770">{refLine.label}</text></g>}
+      {empty && !hp.length && !sp.length && <g><text x={W / 2} y={padT + innerH / 2} fontSize="17" fontWeight="800" textAnchor="middle" fill="#5D7770">{empty.title}</text><text x={W / 2} y={padT + innerH / 2 + 22} fontSize="14" textAnchor="middle" fill="#7C908A">{empty.sub}</text></g>}
       {sp.length > 1 && <path d={path(sp)} fill="none" stroke={THERAPY} strokeWidth="2.4" strokeLinejoin="round" />}
       {hp.length > 1 && <path d={path(hp)} fill="none" stroke={HOME} strokeWidth="2.4" strokeLinejoin="round" />}
-      {sp.map((p) => (<g key={`s${p.d}`}><circle cx={p.x} cy={p.y} r="6" fill={THERAPY} stroke="#fff" strokeWidth="2"><title>{`Therapy ${dayLabel(p.d)}: ${p.v}%`}</title></circle><text x={p.x} y={p.y - 12} fontSize="13" fontWeight="800" textAnchor="middle" fill={GREEN_900}>{Math.round(p.v)}%</text></g>))}
-      {hp.map((p) => (<g key={`h${p.d}`}><rect x={p.x - 6} y={p.y - 6} width="12" height="12" rx="3" fill={HOME} stroke="#fff" strokeWidth="2"><title>{`Home ${dayLabel(p.d)}: ${p.v}%`}</title></rect><text x={p.x} y={p.y + 24} fontSize="13" fontWeight="800" textAnchor="middle" fill={GREEN_900}>{Math.round(p.v)}%</text></g>))}
+      {sp.map((p) => (<g key={`s${p.d}`}><circle cx={p.x} cy={p.y} r="6" fill={THERAPY} stroke="#fff" strokeWidth="2"><title>{`Therapy ${dayLabel(p.d)}: ${p.v}%`}</title></circle><text x={p.x} y={p.y + 26} fontSize="13" fontWeight="800" textAnchor="middle" fill={GREEN_900}>{Math.round(p.v)}%</text></g>))}
+      {hp.map((p) => (<g key={`h${p.d}`}><rect x={p.x - 6} y={p.y - 6} width="12" height="12" rx="3" fill={HOME} stroke="#fff" strokeWidth="2"><title>{`Home ${dayLabel(p.d)}: ${p.v}%`}</title></rect><text x={p.x} y={p.y - 12} fontSize="13" fontWeight="800" textAnchor="middle" fill={GREEN_900}>{Math.round(p.v)}%</text></g>))}
       {days.map((d, i) => (i % every === 0 || i === days.length - 1) && <text key={d} x={x(i)} y={H - 10} fontSize="13" textAnchor="middle" fill={MUTED}>{dayLabel(d)}</text>)}
     </svg>
   )

@@ -81,7 +81,8 @@ export function compare(home, session, firstName = 'The child') {
 
 // sessions: the patient's completed plays in the range (home ones have context 'home'); plans: home practice plans
 // that overlap the range; gameById: Map(id -> { name }); weekKeys: Monday keys of the range, oldest first.
-export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, firstName, today = manilaDayKey(new Date()) }) {
+// weekOf(date) -> the week key a play belongs to (default: its Monday); the set stats pass weeks that start on the set's first day.
+export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, weekOf = mondayWeekKey, firstName, today = manilaDayKey(new Date()) }) {
   const isHome = (s) => s.context === 'home'
   const home = sessions.filter(isHome)
   const therapy = sessions.filter((s) => !isHome(s))
@@ -104,7 +105,7 @@ export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, fi
   // Home plays per week (stacked by game), with the therapist's goal (plays per game per week).
   const goal = plan?.goal_per_game_per_week || null
   const weeklyPlays = weekKeys.map((wk, i) => {
-    const inWeek = home.filter((s) => mondayWeekKey(s.completed_at) === wk)
+    const inWeek = home.filter((s) => weekOf(s.completed_at) === wk)
     return {
       weekStart: wk, label: `Wk ${i + 1}`, total: inWeek.length,
       byGame: gameIds.map((id) => ({ gameId: id, count: inWeek.filter((s) => String(s.game_id) === id).length })),
@@ -117,8 +118,8 @@ export function buildHomePracticeStats({ sessions, plans, gameById, weekKeys, fi
 
   // XP and stats earned per week, home vs therapy.
   const xpByWeek = weekKeys.map((wk, i) => {
-    const h = summarise(home.filter((s) => mondayWeekKey(s.completed_at) === wk))
-    const t = summarise(therapy.filter((s) => mondayWeekKey(s.completed_at) === wk))
+    const h = summarise(home.filter((s) => weekOf(s.completed_at) === wk))
+    const t = summarise(therapy.filter((s) => weekOf(s.completed_at) === wk))
     return { weekStart: wk, label: `Wk ${i + 1}`, homeXp: h.xp, sessionXp: t.xp, homeStats: h.statsTotal, sessionStats: t.statsTotal }
   })
 

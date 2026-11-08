@@ -83,3 +83,16 @@
   .hm-grid { grid-template-columns: minmax(0, 1fr); }
   .hm-tabs button { flex: 1 1 auto; padding: 0 12px; font-size: 13.5px; }
 }
+
+/* 3 plays per game */
+.hm-dots.fin i.on { background: #16a34a; }
+.hm-tags .fin { background: #fff3c8; color: #8a6100; border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 14px; }
+.hm-tags .left { background: #ffe9d6; color: #b45309; border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 14px; }
+.hm-gcard.fin { border: 3px solid #f0cf5a; }
+.hm-gcard.fin .hm-play { background: #e6ebf0; color: #7c8b99; box-shadow: none; cursor: not-allowed; pointer-events: none; }
+.hm-pao { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.hm-pao img { width: 96px; height: 96px; object-fit: contain; flex-shrink: 0; }
+.hm-pao p { margin: 0; flex: 1; background: #e6f3fe; border-radius: 26px; padding: 18px 24px; font-size: 20px; font-weight: 800; color: #1d3557; line-height: 1.35; }
+.hm-done { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fff; border: 3px solid #bfe7d4; border-radius: 22px; padding: 14px 20px; margin-bottom: 14px; }
+.hm-done-ico { font-size: 34px; } .hm-done > div { flex: 1 1 260px; display: grid; } .hm-done b { font-size: 24px; color: #14532d; } .hm-done small { font-size: 16px; color: #3f5a50; }
+.hm-pill.wait { background: #e4ecfb; color: #2f5fd0; font-weight: 800; border-radius: 999px; padding: 8px 18px; white-space: nowrap; }

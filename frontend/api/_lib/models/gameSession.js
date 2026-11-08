@@ -43,6 +43,8 @@ const gameSessionSchema = new mongoose.Schema(
     // 'home' = played at home under a home practice plan; anything else (or missing) is a therapy-session play.
     context: { type: String, enum: ['session', 'home'], default: 'session' },
     home_plan_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+    // 1, 2 or 3: which completed home play this is for its plan and game (a unique index stops a 4th, see ensureHomePlayIndex).
+    home_play_number: { type: Number, default: null },
     language: { type: String, enum: ['en', 'tl', 'ceb'], default: 'en' },
 
     status: { type: String, required: true, enum: ['in_progress', 'completed', 'abandoned'], default: 'in_progress' },

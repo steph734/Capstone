@@ -10,7 +10,7 @@ import { OwnerShareCard, CoverDetail, CoverFormBanner, CoverSidePanel, IncomingB
 import { sharedByMe, sharedWithMe as fetchSharedWithMe, stopCoverShare, listAvailable, fmtDay as coverDay } from './notes/coverApi'
 import { authFetch } from '../../utils/session'
 import LockScreen, { useIdleLock } from './notes/IdleLock'
-import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote } from './notes/notesApi'
+import { listNotes, createNote, updateDraft, signDraft, shareNote, unshareNote, openNote as fetchNoteById } from './notes/notesApi'
 import { sendVoiceEntries, fetchVoiceLog, useVoiceAccess } from './notes/voiceApi'
 import { VoiceBar, VoicePanel, SectionVoicePill, ClearSectionConfirm, VoiceDownloadMenu } from './notes/VoiceUI'
 import useVoiceNotes from '../../hooks/useVoiceNotes'
@@ -26,6 +26,7 @@ import SignaturePad from './notes/SignaturePad'
 const isNetworkError = (err) => !err?.status
 import './TherapistNotesProgressPage.css'
 import './notes/voice.css'
+import './assign/homeSets/homeSets.css'
 
 const DOMAINS = ['Cognitive', 'Physical', 'Occupational', 'Speech']
 
@@ -127,7 +128,9 @@ const SOAP_SECTIONS = [
 const fieldErrStyle = { color: '#b91c1c', fontSize: 12, display: 'block', marginTop: 4 }
 const VOICE_FLUSH_MS = 30000
 
-function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, cover = null, meName = '' }) {
+// `home`: set when this is an auto-drafted HOME PRACTICE note opened from Assign Games (see homeSetDrafts.js). It adds the banner, per-section
+// review ticks, the "Drafted from play data" card, Redraft, autosave, and blocks signing until every section is reviewed.
+function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, cover = null, meName = '', home = null, onHomeBack = null, onReviewNext = null, onOpenSigned = null, refreshVersion = null }) {
   const [pastOpen, setPastOpen] = useState(false)
   // The note's date is set by the server. Show the server's date (or, when editing, the note's own date), never the browser clock.
   const [serverDate, setServerDate] = useState('')
@@ -151,6 +154,29 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
 
+  // ── Home practice note: review state, edits, autosave ──
+  const [reviewed, setReviewed] = useState(() => Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, Boolean(home?.sections?.[key]?.reviewed)])))
+  const reviewedRef = useRef(reviewed); reviewedRef.current = reviewed
+  const editedRef = useRef(new Set()) // sections changed since the review state was last sent
+  const [editedUi, setEditedUi] = useState(() => new Set(SOAP_SECTIONS.filter(({ key }) => home?.sections?.[key]?.edited).map(({ key }) => key)))
+  const lastSavedRef = useRef('')
+  const touch = (field) => {
+    if (!home) return
+    setReviewed((r) => (r[field] ? { ...r, [field]: false } : r)) // editing a reviewed section clears its tick
+    editedRef.current.add(field)
+    setEditedUi((s) => (s.has(field) ? s : new Set(s).add(field)))
+  }
+  const persistReview = async (next) => {
+    if (!home) return
+    try {
+      const sent = [...editedRef.current]
+      await authFetch('/api/therapist/home-sets/note-review', { method: 'POST', body: { noteId: home.noteId, reviewed: next || reviewedRef.current, edited: sent } })
+      sent.forEach((f) => editedRef.current.delete(f))
+    } catch { /* the next autosave tries again */ }
+  }
+  const toggleReviewed = (field) => { const next = { ...reviewedRef.current, [field]: !reviewedRef.current[field] }; setReviewed(next); persistReview(next) }
+  const reviewedCount = Object.values(reviewed).filter(Boolean).length
+
   // ── Voice dictation ──
   const [noteId, setNoteId] = useState(initial?.id || null)
   const noteIdRef = useRef(initial?.id || null)
@@ -163,8 +189,9 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   const saveDraftRef = useRef(() => {})
 
   const writeSoap = (next) => { soapRef.current = next; setSoap(next) }
-  const setText = (section, text) => { writeSoap({ ...soapRef.current, [section]: text }); setErrors((x) => ({ ...x, [section]: '' })) }
-  const set = (field) => (e) => { writeSoap({ ...soapRef.current, [field]: e.target.value }); setErrors((x) => ({ ...x, [field]: '' })) }
+  const setText = (section, text) => { writeSoap({ ...soapRef.current, [section]: text }); setErrors((x) => ({ ...x, [section]: '' })); touch(section) }
+  const set = (field) => (e) => { writeSoap({ ...soapRef.current, [field]: e.target.value }); setErrors((x) => ({ ...x, [field]: '' })); touch(field) }
+  if (!lastSavedRef.current) lastSavedRef.current = JSON.stringify(soapRef.current)
 
   // A voice log belongs to a saved note: create the draft first when needed.
   const ensureId = async () => {
@@ -231,8 +258,38 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   const dictatedSections = new Set(fullLog.filter((e) => e.type === 'dictation').map((e) => e.section))
   const disabledReason = access.loading ? 'Checking your plan…' : 'Available on Silver and Gold'
 
+  // Autosave the draft every few seconds while the text changes (home practice notes only), then send the review state.
+  const busyRef = useRef(''); busyRef.current = busy
+  useEffect(() => {
+    if (!home || done || locked) return undefined
+    const t = setInterval(async () => {
+      const snap = JSON.stringify(soapRef.current)
+      if (snap === lastSavedRef.current || busyRef.current) return
+      try { await onSave({ ...soapRef.current, sign: false, noteId: noteIdRef.current }); lastSavedRef.current = snap; await persistReview() } catch { /* try again next tick */ }
+    }, 6000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home, done, locked])
+
+  const redraftNote = async () => {
+    if (!home || busy) return
+    const replace = editedUi.size > 0 && window.confirm('Replace the sections you edited with a fresh draft from the play data?\n\nOK = replace my edits.  Cancel = keep what I typed.')
+    try {
+      const { text } = await authFetch('/api/therapist/home-sets/note-redraft', { method: 'POST', body: { noteId: home.noteId, replaceEdits: replace } })
+      const next = Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, unescapeHtml(text[key] || '')]))
+      writeSoap(next); lastSavedRef.current = JSON.stringify(next)
+      setReviewed(Object.fromEntries(SOAP_SECTIONS.map(({ key }) => [key, false]))); editedRef.current = new Set()
+      if (replace) setEditedUi(new Set())
+      await refreshVersion?.(home.noteId)
+      setFormError('')
+    } catch (err) { setFormError(err.message || 'Could not redraft the note.') }
+  }
+  const homeBlock = !home ? '' : soap.subjective.includes(home.mark) ? 'Replace the highlighted placeholder in Subjective with the caregiver report.' : reviewedCount < 4 ? `Review all 4 sections to sign (${reviewedCount} of 4 done).` : ''
+
   const submit = async (sign) => {
     const e = {}
+    if (sign && homeBlock) { setFormError(homeBlock); return }
+    if (sign && home) await persistReview()
     const password = pwRef.current?.value || '' // read once, used for this request only
     if (sign) {
       for (const { key } of SOAP_SECTIONS) {
@@ -260,6 +317,26 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   }
   saveDraftRef.current = () => { if (!busy) submit(false) }
 
+  if (done === 'signed' && home) {
+    return (
+      <div className="tnp-saved-state hp-signed">
+        <div className="tnp-saved-icon"><CircleCheck size={40} aria-hidden="true" /></div>
+        <h3>Note signed and saved!</h3>
+        <ul className="hp-check" style={{ textAlign: 'left' }}>
+          <li className="on"><b>✓</b> Added to {patient.name}'s Notes &amp; Progress</li>
+          <li className="on"><b>✓</b> Linked to Set {home.setNumber} results in Patient Stats</li>
+          <li className="on"><b>✓</b> {home.nextSetNames.length ? `Recommended Set ${home.setNumber + 1} is now unlocked` : 'The next set is now unlocked'}</li>
+        </ul>
+        <p style={{ margin: 0 }}>Nothing is shared with the family until you choose. Open the signed note to share it, print it or add an addendum.</p>
+        <div className="hp-next"><span><b>Review next set</b><br />Recommended games, reasons and objectives</span><button type="button" onClick={onReviewNext}>Review next set →</button></div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button className="tnp-ghost-btn" type="button" onClick={() => onOpenSigned?.(noteIdRef.current)}>Open signed note</button>
+          <button className="tnp-ghost-btn" type="button" onClick={onCancel}>Back to Patient</button>
+        </div>
+      </div>
+    )
+  }
+
   if (done) {
     return (
       <div className="tnp-saved-state">
@@ -274,6 +351,13 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
   return (
     <div className="cv-form-wrap">
     {cover && <CoverFormBanner share={cover} onPast={() => setPastOpen(true)} />}
+    {home && (
+      <div className="hp-banner">
+        <img src="/games/pao-money-match-poses/pao-thumbs-up.png" alt="" width="64" height="64" />
+        <div><b>Opened from Assign Games · {patient.name.split(' ')[0]}'s Set {home.setNumber} home practice note</b><p>Drafted automatically from play data. Review each section, add the caregiver report, then sign to unlock the next set.</p></div>
+        <button type="button" className="tnp-ghost-btn" onClick={onHomeBack}>← Back to Assign Games</button>
+      </div>
+    )}
     <div className="vn-layout">
       <div className="vn-main">
         <div className="tnp-notebook">
@@ -281,12 +365,13 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
           <div className="tnp-paper">
             <div className="tnp-deco-tr"><ClipboardList size={22} aria-hidden="true" /></div>
             <div className="tnp-title-row">
-              <h2 className="tnp-title">{initial ? 'Edit Draft' : 'Session Note'}</h2>
+              <h2 className="tnp-title">{home ? 'Home Practice Note' : initial ? 'Edit Draft' : 'Session Note'}</h2>
               <div className="tnp-date-box"><span className="tnp-field-label"><Calendar size={14} aria-hidden="true" /> Date:</span><span className="tnp-field-val tnp-field-line">{today}</span></div>
             </div>
             <div className="tnp-field-row"><span className="tnp-field-label"><User size={14} aria-hidden="true" /> Patient:</span><span className="tnp-field-val tnp-field-line">{patient.name}</span></div>
             {cover && <div className="tnp-field-row"><span className="tnp-field-label"><User size={14} aria-hidden="true" /> Therapist:</span><span className="tnp-field-val tnp-field-line">{meName} <span className="cv-pill">Covering for {cover.owner.name}</span></span></div>}
-            <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label"><Stethoscope size={14} aria-hidden="true" /> Diagnosis:</span><span className="tnp-field-val tnp-field-line">{patient.diagnosis}</span></div>
+            <div className="tnp-field-row tnp-field-row-last"><span className="tnp-field-label"><Stethoscope size={14} aria-hidden="true" /> Diagnosis:</span><span className="tnp-field-val tnp-field-line">{home ? (home.diagnosis ? unescapeHtml(home.diagnosis) : <span style={{ color: '#9aa9a3', fontStyle: 'italic' }}>From patient profile</span>) : patient.diagnosis}</span></div>
+            {home && <div className="tnp-field-row"><span className="tnp-field-label"><ClipboardList size={14} aria-hidden="true" /> Home set:</span><span className="tnp-field-val tnp-field-line">{unescapeHtml(home.label)}</span></div>}
             <div className="tnp-rule" />
 
             {voice.supported && <VoiceBar voice={voice} enabled={voiceEnabled} disabledReason={disabledReason} />}
@@ -298,6 +383,14 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
                 <div key={key} className={`tnp-section vn-section${active ? ' vn-active' : ''}`}>
                   <div className="vn-section-head">
                     <div className={`tnp-section-label ${cls}`}><Icon size={14} aria-hidden="true" /> {label}</div>
+                    {home && (
+                      <span className="hp-tags">
+                        <span>{editedUi.has(key) ? 'Edited by you' : 'Auto-drafted'}</span>
+                        {key === 'subjective' && soap.subjective.includes(home.mark) && <span className="warn">Needs your caregiver report</span>}
+                        {key === 'assessment' && <span className="warn">Review: confirm your clinical view</span>}
+                        {home.sections?.[key]?.basedOn?.map((b) => <span key={b} className="blue">{b}</span>)}
+                      </span>
+                    )}
                     {voice.supported && (
                       <SectionVoicePill listening={active} dictated={dictatedSections.has(key)} disabled={!voiceEnabled}
                         title={voiceEnabled ? `Dictate into ${label}` : disabledReason}
@@ -311,6 +404,7 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
                     <span>{errors[key] && <span role="alert" style={fieldErrStyle}>{errors[key]}</span>}</span>
                     <span>{soap[key].length} / 5000</span>
                   </div>
+                  {home && <label className="hp-review"><input type="checkbox" checked={Boolean(reviewed[key])} onChange={() => toggleReviewed(key)} /> Mark as reviewed</label>}
                 </div>
               )
             })}
@@ -331,15 +425,35 @@ function NoteForm({ patient, initial, onSave, onEnsureDraft, onCancel, locked, c
 
             {formError && <p role="alert" style={{ ...fieldErrStyle, fontSize: 13 }}>{formError}</p>}
             <div className="tnp-form-footer" style={{ flexWrap: 'wrap', gap: 8 }}>
+              {home && <p style={{ flex: '1 1 220px', margin: 0, fontSize: 13, color: '#6b7c75' }}>{homeBlock || 'All 4 sections reviewed. Sign to unlock the next set.'} Nothing is shared with the family until you choose.</p>}
+              {home && <button className="tnp-ghost-btn" onClick={redraftNote} disabled={!!busy} type="button">↻ Redraft</button>}
               <button className="tnp-ghost-btn" onClick={onCancel} type="button">Cancel</button>
               <button className="tnp-ghost-btn" onClick={() => submit(false)} disabled={!!busy} type="button">{busy === 'draft' ? 'Saving…' : <><FileText size={15} aria-hidden="true" /> Save draft</>}</button>
-              <button className="tnp-primary-btn" onClick={() => submit(true)} disabled={!!busy} type="button">{busy === 'sign' ? 'Signing…' : <><Lock size={15} aria-hidden="true" /> Sign &amp; lock note</>}</button>
+              <button className="tnp-primary-btn" onClick={() => submit(true)} disabled={!!busy || Boolean(homeBlock)} title={homeBlock || ''} type="button">{busy === 'sign' ? 'Signing…' : <><Lock size={15} aria-hidden="true" /> {home ? 'Sign & save' : 'Sign & lock note'}</>}</button>
             </div>
           </div>
         </div>
       </div>
 
       <div className="cv-aside">
+      {home && (
+        <section className="hp-side" aria-label="Drafted from play data">
+          <h4>Drafted from play data <span className="hs-auto-pill" style={{ marginLeft: 6, fontSize: 12 }}>✨ Auto-draft</span></h4>
+          <p style={{ margin: '4px 0 0', fontSize: 14, color: '#5b7469' }}>{reviewedCount} of 4 sections reviewed</p>
+          <div className="hp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={4} aria-valuenow={reviewedCount}><i style={{ width: `${(reviewedCount / 4) * 100}%` }} /></div>
+          <ul className="hp-check">
+            {[['subjective', 'S', 'Caregiver report added'], ['objective', 'O', 'Numbers match the play data'], ['assessment', 'A', 'Assessment matches your view'], ['plan', 'P', `Plan matches Set ${home.setNumber + 1}`]].map(([k, l, t]) => (
+              <li key={k} className={reviewed[k] ? 'on' : ''}><b aria-hidden="true">{reviewed[k] ? '✓' : ''}</b><span><b style={{ all: 'unset', fontWeight: 800 }}>{l}</b> {t}</span></li>
+            ))}
+          </ul>
+          <div className="hp-scores"><p className="hs-cap" style={{ margin: '8px 0 2px' }}>PLAY SCORES USED</p>
+            {home.scores.map((g) => (
+              <div key={g.name}><span>{g.name}</span><span>{[0, 1, 2].map((i) => { const a = g.plays[i]; return <span key={i} className={a == null ? '' : a >= 80 ? 'hi' : 'lo'} style={{ marginLeft: 8 }}>{a == null ? '—' : `${a}%`}</span> })}</span></div>
+            ))}
+          </div>
+          {home.history.length > 0 && <div className="hp-scores"><p className="hs-cap" style={{ margin: '10px 0 2px' }}>EDIT HISTORY</p>{home.history.slice(0, 5).map((h, i) => <div key={i}><span>{new Date(h.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}</span><span>{h.note || h.sections.join(', ')}</span></div>)}</div>}
+        </section>
+      )}
       {cover && <CoverSidePanel share={cover} />}
       <VoicePanel log={fullLog} noteId={noteId} supported={voice.supported} enabled={access.allowed} disabledReason={access.loading ? '' : 'Voice dictation is available on Silver and Gold.'}
         notice={voiceMsg} onBeforeDownload={flushVoice} />
@@ -928,6 +1042,34 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
     if (noteOrMeta.subjective !== undefined) { setEditing(noteOrMeta); setView('edit'); return }
     setViewingId(noteOrMeta.id); setView('viewer')
   }
+  // ?draft=<noteId>: an auto-drafted home practice note opened from Assign Games. A draft opens in the notebook, a signed one in the viewer.
+  const draftId = searchParams.get('draft')
+  const [homeCtx, setHomeCtx] = useState(null)
+  useEffect(() => {
+    if (!draftId || loading || locked || loadError) return undefined
+    let alive = true
+    ;(async () => {
+      try {
+        const ctx = await authFetch('/api/therapist/home-sets/note-context', { query: { noteId: draftId } })
+        if (!alive) return
+        if (urlPatient !== ctx.patientId) { const n = new URLSearchParams(searchParams); n.set('patient', ctx.patientId); n.delete('patientId'); setSearchParams(n, { replace: true }); return } // the effect runs again with the right patient
+        setHomeCtx(ctx)
+        if (ctx.status === 'signed') { setViewingId(draftId); setView('viewer'); return }
+        const note = await fetchNoteById(draftId)
+        if (!alive) return
+        versionRef.current[draftId] = note.version
+        setEditing(note); setView('edit')
+      } catch (err) {
+        if (!alive) return
+        if (handleSessionErrorOnce(err)) return
+        showFlash('That home practice note could not be opened.')
+        navigate('/therapist/assign-games?tab=home', { replace: true })
+      }
+    })()
+    return () => { alive = false }
+  }, [draftId, loading, locked, loadError, urlPatient]) // eslint-disable-line react-hooks/exhaustive-deps
+  const leaveHomeNote = (to) => { const n = new URLSearchParams(searchParams); n.delete('draft'); setSearchParams(n, { replace: true }); setHomeCtx(null); if (to) navigate(to) }
+
   const reload = () => setReloadKey((k) => k + 1)
   const backToOverview = () => { setView('overview'); setViewingId(null); setEditing(null); reload() }
 
@@ -1098,12 +1240,20 @@ export default function TherapistNotesProgressPage({ user, onLogout, betaTier })
 
         {(view === 'new' || view === 'edit') && selectedPatient && (
           <div className="tnp-scroll-area" ref={detailRef}>
-            <NoteForm patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onEnsureDraft={ensureDraft} onCancel={backToOverview} locked={!!locked} cover={selectedPatient.cover || null} meName={user?.name || ''} />
+            <NoteForm key={editing?.id || 'new'} patient={selectedPatient} initial={view === 'edit' ? editing : null} onSave={saveNote} onEnsureDraft={ensureDraft} onCancel={() => { if (homeCtx) leaveHomeNote(); backToOverview() }} locked={!!locked} cover={selectedPatient.cover || null} meName={user?.name || ''}
+              home={view === 'edit' && homeCtx && homeCtx.noteId === editing?.id ? homeCtx : null}
+              onHomeBack={() => leaveHomeNote('/therapist/assign-games?tab=home')}
+              onReviewNext={() => leaveHomeNote(`/therapist/assign-games?tab=home&review=${homeCtx?.setId}`)}
+              onOpenSigned={(id) => { setHomeCtx((c) => (c ? { ...c, status: 'signed' } : c)); setViewingId(id); setView('viewer') }}
+              refreshVersion={async (id) => { const n = await fetchNoteById(id); versionRef.current[id] = n.version }} />
           </div>
         )}
 
         {view === 'viewer' && viewingId && (
           <div className="tnp-scroll-area" ref={detailRef}>
+            {homeCtx && homeCtx.noteId === viewingId && homeCtx.status === 'signed' && (
+              <div className="hp-next" style={{ marginBottom: 12 }}><span><b>Home practice note signed.</b> The recommended Set {homeCtx.setNumber + 1} is unlocked.</span><span style={{ display: 'flex', gap: 8 }}><button type="button" onClick={() => leaveHomeNote('/therapist/assign-games?tab=home')}>← Back to Assign Games</button><button type="button" onClick={() => leaveHomeNote(`/therapist/assign-games?tab=home&review=${homeCtx.setId}`)}>Review next set →</button></span></div>
+            )}
             <NoteViewerSecure
               noteId={viewingId}
               patient={selectedPatient}

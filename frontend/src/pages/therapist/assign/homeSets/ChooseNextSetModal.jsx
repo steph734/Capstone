@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { authFetch } from '../../../../utils/session'
 import { daysText, fmt12 } from '../homeSettings'
 import { gameEmoji, sessionLong, shortDay } from './gameIcons'
+import Steps from './Steps'
 
 // "Choose the next set of games": pick 2 to 4 games, where to use them, and the starting level. Esc or X closes it; nothing changes until
 // "Assign new set". Focus stays inside the dialog while it is open.
-const FILTERS = [['all', 'All games'], ['new', 'New for'], ['mastered', 'Mastered (review)']]
+const FILTERS = [['all', 'All games'], ['new', 'New for'], ['mastered', 'Finished (review)']]
 const LEVELS = [['warmup', 'Level 1 · Warm-up'], ['continue', 'Continue at Level 2']]
 
 function Switch({ on, onChange, disabled, label }) {
@@ -32,7 +33,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
     authFetch('/api/therapist/home-sets/games', { query: { patientId: patient.patientId } }).then((d) => {
       setData(d)
       if (!d.nextSession) setUseTherapy(false)
-      setPicked((cur) => (cur.length ? cur : d.games.filter((g) => g.status === 'new').slice(0, min).map((g) => g.id)))
+      setPicked((cur) => (cur.length ? cur : patient.preselect?.length ? patient.preselect.filter((id) => d.games.some((g) => g.id === id)) : d.games.filter((g) => g.status === 'new').slice(0, min).map((g) => g.id)))
     }).catch((e) => setError(e.message || 'Could not load the games.'))
   }, [patient.patientId, min])
   useEffect(() => { load() }, [load])
@@ -65,7 +66,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
     if (!ok) return
     setBusy(true); setSubmitError('')
     try {
-      const r = await authFetch('/api/therapist/home-sets/assign', { method: 'POST', body: { patientId: patient.patientId, gameIds: picked, startingLevel: level, useInTherapy: useTherapy, useAtHome: useHome } })
+      const r = await authFetch('/api/therapist/home-sets/assign', { method: 'POST', body: { patientId: patient.patientId, gameIds: picked, startingLevel: level, useInTherapy: useTherapy, useAtHome: useHome, objectives: patient.objectives } })
       onAssigned(r)
     } catch (e) { setSubmitError(e.message || 'Could not assign the new set.'); setBusy(false) }
   }
@@ -73,11 +74,12 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
   return (
     <div className="hs-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="hs-modal" role="dialog" aria-modal="true" aria-labelledby="hs-modal-title" tabIndex={-1} ref={box}>
+        <Steps step={3} playsText={`${patient.playsUsed} of ${patient.playsAllowed} plays done`} style={{ marginBottom: 14 }} />
         <header className="hs-modal-head">
           <img src="/games/pao-money-match-poses/pao-level-complete.png" alt="" width="84" height="84" />
           <div>
             <h2 id="hs-modal-title">Choose the next set of games</h2>
-            <p>{patient.name} finished {masteredText}. Pick the games for the next therapy session and home practice.</p>
+            <p>{first} used all {patient.games[0]?.required ?? 3} plays on {masteredText}, and the SOAP note is saved. Pick the games for the next therapy session and home practice.</p>
           </div>
           <button type="button" className="hs-x" onClick={onClose} aria-label="Close">×</button>
         </header>
@@ -103,7 +105,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
                         <span className="hs-pick-head"><span className="hs-game-ico" aria-hidden="true">{gameEmoji(g.name)}</span><b>{g.name}</b><span className={`hs-check${on ? ' on' : ''}`} aria-hidden="true">{on ? '✓' : ''}</span></span>
                         <span className="hs-pick-desc">{g.description || 'A therapy game.'}</span>
                         <span className={`hs-tag ${g.recommended ? 'rec' : g.status}`}>
-                          {g.recommended ? `★ Recommended · new for ${first}` : g.status === 'new' ? `New for ${first}` : g.status === 'mastered' ? `★ Mastered ${shortDay(g.masteredAt)}` : 'Played before'}
+                          {g.recommended ? `★ Recommended · new for ${first}` : g.status === 'new' ? `New for ${first}` : g.status === 'mastered' ? `★ Finished ${shortDay(g.masteredAt)}` : 'Played before'}
                         </span>
                       </button>
                     </li>
@@ -124,7 +126,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
               <h4>Where to use them</h4>
               <div className="hs-where">
                 <div><div><b>Next therapy session</b><small>{data.nextSession ? `${sessionLong(data.nextSession)} · ${first} unlocks only these games` : 'No upcoming session is scheduled'}</small></div><Switch on={useTherapy} onChange={setUseTherapy} disabled={!data.nextSession} label="Use in the next therapy session" /></div>
-                <div><div><b>Home practice</b><small>Goal {data.home.goal}× per game each week · {daysText(data.home.days)}, {fmt12(data.home.dailyStart).replace(':00', '')}–{fmt12(data.home.dailyEnd).replace(':00', '')}</small></div><Switch on={useHome} onChange={setUseHome} label="Use for home practice" /></div>
+                <div><div><b>Home practice</b><small>{patient.games[0]?.required ?? 3} plays per game · {daysText(data.home.days)}, {fmt12(data.home.dailyStart).replace(':00', '')}–{fmt12(data.home.dailyEnd).replace(':00', '')}</small></div><Switch on={useHome} onChange={setUseHome} label="Use for home practice" /></div>
               </div>
               {!useTherapy && !useHome && <p className="hs-count warn" role="alert">Choose at least one place to use the games.</p>}
 
@@ -132,7 +134,7 @@ export default function ChooseNextSetModal({ patient, config, onClose, onAssigne
               <div className="hs-levels" role="radiogroup" aria-label="Starting level">
                 {LEVELS.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={level === id} className={level === id ? 'on' : ''} onClick={() => setLevel(id)}>{label}</button>)}
               </div>
-              <p className="hs-info">Set {data.setNumber - 1} moves to <b>Completed sets</b>. Mastered games stay available to replay for review.</p>
+              <p className="hs-info">Set {data.setNumber - 1} and its SOAP note move to <b>Completed sets</b>. Finished games stay available to replay for review.</p>
             </aside>
           </div>
         )}

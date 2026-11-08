@@ -158,6 +158,7 @@ import paoSeen from './_lib/routes/pao-seen.js'
 import * as gamePlans from './_lib/routes/game-plans.js'
 import * as homePractice from './_lib/routes/home-practice.js'
 import * as homeSets from './_lib/routes/home-sets.js'
+import clinicPlan from './_lib/routes/clinic-plan.js'
 import * as noteShares from './_lib/routes/note-shares.js'
 import gameSessionsStart from './_lib/routes/game-sessions-start.js'
 import gameSessionsAbandon from './_lib/routes/game-sessions-abandon.js'
@@ -247,6 +248,7 @@ app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/attendance/remind', attendanceRemind)
+app.all('/api/clinic/plan', clinicPlan)
 app.all('/api/therapists/available', noteShares.therapistsAvailable)
 app.all('/api/note-shares/shared-with-me', noteShares.sharedWithMe)
 app.all('/api/note-shares/by-me', noteShares.sharesByMe)
@@ -329,13 +331,17 @@ app.all('/api/home-practice-plans/:id', homePractice.homePlansItem)
 app.all('/api/patients/:id/home-practice', homePractice.patientHomePractice)
 app.all('/api/patients/:id/home-practice/remind', homePractice.homePracticeRemind)
 app.all('/api/home-practice/me', homePractice.homePracticeMe)
+app.all('/api/therapist/patients/:id/home-practice-stats', homeSets.homeSetStats)
+app.all('/api/therapist/patients/:id/home-sets', homeSets.homeSetsOfPatient)
 app.all('/api/therapist/home-sets', homeSets.homeSetsOverview)
 app.all('/api/therapist/home-sets/games', homeSets.homeSetsGames)
 app.all('/api/therapist/home-sets/assign', homeSets.homeSetsAssign)
 app.all('/api/therapist/home-sets/undo', homeSets.homeSetsUndo)
 app.all('/api/therapist/home-sets/dismiss', homeSets.homeSetsDismiss)
-app.all('/api/therapist/home-sets/summary', homeSets.homeSetsSummary)
-app.all('/api/therapist/home-sets/soap', homeSets.homeSetsSoap)
+app.all('/api/therapist/home-sets/note-context', homeSets.homeSetsNoteContext)
+app.all('/api/therapist/home-sets/note-review', homeSets.homeSetsNoteReview)
+app.all('/api/therapist/home-sets/note-redraft', homeSets.homeSetsNoteRedraft)
+app.all('/api/therapist/home-sets/:id/recommendation', homeSets.homeSetsRecommendation)
 app.all('/api/therapist/today', gamePlans.therapistToday)
 app.all('/api/therapist/games', gamePlans.therapistGames)
 app.all('/api/game-plans', gamePlans.plansCollection)

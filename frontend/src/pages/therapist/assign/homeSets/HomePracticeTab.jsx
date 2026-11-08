@@ -1,20 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { authFetch } from '../../../../utils/session'
 import PatientHomeCard from './PatientHomeCard'
 import ChooseNextSetModal from './ChooseNextSetModal'
-import HomeSoapModal from './HomeSoapModal'
+import RecommendedSetModal from './RecommendedSetModal'
 import { sessionText } from './gameIcons'
 import './homeSets.css'
 
 // Home practice tab: summary tiles, filter pills, one card per patient, and the "choose the next set" flow.
-const FILTERS = [['all', 'All patients'], ['needs', 'Needs new games'], ['progress', 'In progress'], ['idle', 'Not started']]
-const matches = (p, f) => (f === 'all' ? true : f === 'needs' ? p.needsNew : f === 'progress' ? !p.needsNew && p.playedCount > 0 : p.playedCount === 0 && !p.needsNew)
+const FILTERS = [['all', 'All patients'], ['needs', 'SOAP note needed'], ['progress', 'In progress'], ['idle', 'Not started']]
+const matches = (p, f) => (f === 'all' ? true : f === 'needs' ? p.needsSoap : f === 'progress' ? !p.needsSoap && p.playsUsed > 0 : p.playsUsed === 0)
 
 export default function HomePracticeTab({ overview, loading, error, onReload, onSetupHome }) {
   const [filter, setFilter] = useState('all')
   const [modalFor, setModalFor] = useState(null)
-  const [soapFor, setSoapFor] = useState(null)
-  const [keeping, setKeeping] = useState(null)
+  const [recFor, setRecFor] = useState(null)
+  const [params, setParams] = useSearchParams()
   const [toast, setToast] = useState(null) // { text, undo: { patientId, setId } | null }
   const [note, setNote] = useState('')
 
@@ -24,16 +25,10 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
     return () => clearTimeout(t)
   }, [toast?.undo?.setId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const keep = useCallback(async (p) => {
-    setKeeping(p.setId); setNote('')
-    try { await authFetch('/api/therapist/home-sets/dismiss', { method: 'POST', body: { setId: p.setId } }); await onReload() }
-    catch (e) { setNote(e.message || 'Could not save that choice.') } finally { setKeeping(null) }
-  }, [onReload])
-
-  const assigned = async (r) => {
-    setModalFor(null)
-    const where = [r.useInTherapy ? `therapy session${r.therapyDate ? ` ${sessionText({ date: r.therapyDate })}` : ''}` : '', r.useAtHome ? `home practice (goal ${r.goal}× per game each week)` : ''].filter(Boolean).join(' and ')
-    setToast({ text: `New set assigned for ${r.firstName}: ${where}.`, undo: { patientId: modalFor.patientId, setId: r.setId } })
+  const assigned = async (r) => { const p = modalFor; setModalFor(null); await afterAssigned(r, p) }
+  const afterAssigned = async (r, p) => {
+    const where = [r.useInTherapy ? `therapy session${r.therapyDate ? ` ${sessionText({ date: r.therapyDate })}` : ''}` : '', r.useAtHome ? `home practice (${r.plays ?? 3} plays per game)` : ''].filter(Boolean).join(' and ')
+    setToast({ text: `New set assigned for ${r.firstName}: ${where}.`, undo: { patientId: p.patientId, setId: r.setId } })
     await onReload()
   }
   const undo = async () => {
@@ -44,6 +39,14 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
   }
 
   const patients = overview?.patients || []
+  // "Review next set →" from Notes & Progress comes back here with ?review=<setId>: open that recommendation once.
+  const reviewId = params.get('review')
+  useEffect(() => {
+    if (!reviewId || !overview) return
+    const p = overview.patients.find((x) => x.setId === reviewId)
+    if (p) setRecFor(p)
+    setParams((cur) => { const n = new URLSearchParams(cur); n.delete('review'); return n }, { replace: true })
+  }, [reviewId, overview]) // eslint-disable-line react-hooks/exhaustive-deps
   const counts = Object.fromEntries(FILTERS.map(([id]) => [id, patients.filter((p) => matches(p, id)).length]))
   const shown = patients.filter((p) => matches(p, filter))
   const s = overview?.summary
@@ -53,7 +56,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
       {toast && (
         <div className="hs-toast" role="status"><span>✓ {toast.text}</span>{toast.undo && <button type="button" onClick={undo}>Undo</button>}</div>
       )}
-      <div className="hs-title"><h2>Home practice</h2><p>Each game can be played {overview?.config?.playsPerGame ?? 3} times at home; it is mastered when every play is at {overview?.config?.masteredAccuracy ?? 100}% accuracy. When every game in a set is finished, write the SOAP note, then choose the next set.</p></div>
+      <div className="hs-title"><h2>Home practice</h2><p>Each game can be played {overview?.config?.playsPerGame ?? 3} times. When a set is finished, a SOAP note and the next set are drafted for you. You review, edit and approve both.</p></div>
       {note && <p className="hs-error-line" role="alert">{note}</p>}
 
       {error && !overview && <div className="hs-error" role="alert"><span>{error}</span><button type="button" className="hs-btn green" onClick={onReload}>Retry</button></div>}
@@ -63,9 +66,9 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
         <>
           <div className="hs-tiles">
             <div className="hs-tile"><b>{s.patients}</b><span>Patients with home practice</span></div>
-            <div className="hs-tile amber"><b>{s.needNew}</b><span>Need new games</span></div>
-            <div className="hs-tile gold"><b>{s.finished}</b><span>Games finished</span></div>
-            <div className="hs-tile blue"><b>{s.notFinished}</b><span>Not finished yet</span></div>
+            <div className="hs-tile amber"><b>{s.needSoap}</b><span>Set finished · SOAP note needed</span></div>
+            <div className="hs-tile blue"><b>{s.playsUsed} of {s.playsAllowed}</b><span>Plays used</span></div>
+            <div className="hs-tile"><b>{s.notStarted}</b><span>Not started yet</span></div>
           </div>
 
           {patients.length === 0 ? (
@@ -76,7 +79,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
                 {FILTERS.map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} className={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>{label}{id !== 'all' ? ` · ${counts[id]}` : ''}</button>)}
               </div>
               <div className="hs-list">
-                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onChoose={setModalFor} onSoap={setSoapFor} onKeep={keep} keeping={keeping === p.setId} openSetup={onSetupHome} />)}
+                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onReview={setRecFor} onRetry={onReload} openSetup={onSetupHome} />)}
                 {shown.length === 0 && <p className="hs-muted">No patients in this group.</p>}
               </div>
             </>
@@ -84,7 +87,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
         </>
       )}
 
-      {soapFor && <HomeSoapModal patient={soapFor} onClose={() => setSoapFor(null)} onSaved={async () => { setSoapFor(null); setToast({ text: `SOAP note saved for ${soapFor.firstName}. You can choose the next set now.`, undo: null }); await onReload() }} />}
+      {recFor && <RecommendedSetModal patient={recFor} config={overview?.config} onClose={() => setRecFor(null)} onAssigned={async (r) => { const p = recFor; setRecFor(null); await afterAssigned(r, p) }} onChangeGames={(rec) => { setModalFor({ ...recFor, preselect: rec?.games.map((g) => g.gameId) || [] }); setRecFor(null) }} />}
       {modalFor && <ChooseNextSetModal patient={modalFor} config={overview?.config} onClose={() => setModalFor(null)} onAssigned={assigned} />}
     </div>
   )

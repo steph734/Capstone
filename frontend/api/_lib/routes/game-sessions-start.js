@@ -69,6 +69,7 @@ export default async function handler(req, res) {
 
     // Gamified Activities are locked to today's game plan and its play-time window.
     const access = await checkGameAccess(await getDb(), patientId, game._id)
+    if (!access.ok && access.reason === 'game_finished') return res.status(409).json({ error: 'You already played this game 3 times. Great job! Your therapist will pick new games soon.', code: 'PLAY_LIMIT_REACHED', reason: 'game_finished' })
     if (!access.ok) return res.status(403).json({ error: 'This game is locked right now.', code: access.code, reason: access.reason })
 
     const profile = await getOrCreateProfile(patientId)

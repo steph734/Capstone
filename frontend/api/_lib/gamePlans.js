@@ -3,6 +3,7 @@
 import { ObjectId } from 'mongodb'
 import { SessionGamePlan } from './models/sessionGamePlan.js'
 import { checkHomeAccess } from './homePractice.js'
+import { hasGold } from './clinicPlan.js'
 
 const MANILA_OFFSET_MS = 8 * 3600 * 1000
 export const DAY_MS = 86400000
@@ -152,6 +153,8 @@ async function checkSessionAccess(db, patientId, gameId) {
 // A game opens during the therapy session window, or at home inside the home practice window.
 //   { ok: true, plan } (session) | { ok: true, home: true, homePlan } | { ok: false, code, reason }
 export async function checkGameAccess(db, patientId, gameId) {
+  // Gamified Activities belong to the Gold plan of the clinic's Owner.
+  if (!(await hasGold(db))) return { ok: false, code: 'GAME_LOCKED', reason: 'plan' }
   const s = await checkSessionAccess(db, patientId, gameId)
   if (s.ok || s.code === 'GAME_PAUSED') return s
   const h = await checkHomeAccess(db, patientId, gameId)

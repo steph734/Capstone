@@ -78,7 +78,7 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
   const tab = params.get('tab') === 'home' ? 'home' : 'therapy'
   const setTab = (id) => setParams((p) => { const n = new URLSearchParams(p); n.set('tab', id); return n }, { replace: true })
   const home = useHomeSets()
-  const needsNew = (home.data?.patients || []).filter((p) => p.needsNew)
+  const needsNew = (home.data?.patients || []).filter((p) => p.complete) // finished every home game
   const tabRefs = useRef([])
   const onTabKey = (e, i) => {
     const n = e.key === 'ArrowRight' ? (i + 1) % 2 : e.key === 'ArrowLeft' ? (i + 1) % 2 : null
@@ -142,7 +142,7 @@ export default function TherapistAssignExercisesPage({ user, onLogout, betaTier 
           </button>
           <button ref={(el) => { tabRefs.current[1] = el }} type="button" role="tab" id="tab-home" aria-selected={tab === 'home'} aria-controls="panel-home" tabIndex={tab === 'home' ? 0 : -1} className="hs-tab-btn home" onClick={() => setTab('home')} onKeyDown={(e) => onTabKey(e, 1)}>
             <span className="ico" aria-hidden="true">🏠</span><span className="txt"><b>Home practice</b><small>Games each patient plays at home</small></span>
-            {needsNew.length > 0 && <span className="hs-count-badge">{needsNew.length} needs new games</span>}
+            {needsNew.length > 0 && <span className="hs-count-badge">{needsNew.length} needs your review</span>}
           </button>
         </div>
 

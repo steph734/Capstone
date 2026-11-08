@@ -4,6 +4,7 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import BadgeMedal from '../../components/BadgeMedal'
 import HomePracticeStats, { HOME_TABS } from './HomePracticeStats'
+import SetStats from './SetStats'
 import { SessionLine, SessionTable, WeeklyBars } from './stats/charts'
 import { AMBER_BG, AMBER_FG, BORDER, Btn, CARD, ChartCard, Chip, GREEN_700, GREEN_900, HOME, MUTED, SectionLabel, THERAPY } from './stats/ui'
 import { apiPost } from '../../utils/api'
@@ -106,6 +107,9 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
   useEffect(load, [rangeId, patientId, user?.email]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setRange = (id) => setParams((p) => { const next = new URLSearchParams(p); next.set('range', id); return next }, { replace: true })
+  // The home-practice set shown in that section: ?set=<id|current|all> (kept on refresh and when switching tabs).
+  const setParam = params.get('set') || 'current'
+  const setSet = (id) => setParams((p) => { const n = new URLSearchParams(p); n.set('set', id); return n }, { replace: true })
   const setTab = (id) => setParams((p) => { const next = new URLSearchParams(p); next.set('tab', id); return next }, { replace: true })
   const sessionsPage = useMemo(() => data?.recentSessions.slice(0, page * PAGE_SIZE) || [], [data, page])
 
@@ -247,7 +251,9 @@ export default function TherapistPatientStatsPage({ user, onLogout, betaTier }) 
                 </div>
 
                 <SectionLabel>Home practice</SectionLabel>
-                <HomePracticeStats data={data.homePractice} firstName={first} tab={homeTab} onTabChange={setTab} onRemind={canRemind ? remind : undefined} onEditPlan={editPlan} />
+                <SetStats patientId={data.profile.id} range={rangeId} firstName={first} setParam={setParam} onSetChange={setSet} tab={homeTab} onTabChange={setTab}
+                  onRemind={canRemind ? remind : undefined} onEditPlan={editPlan}
+                  fallback={<HomePracticeStats data={data.homePractice} firstName={first} tab={homeTab} onTabChange={setTab} onRemind={canRemind ? remind : undefined} onEditPlan={editPlan} />} />
 
                 <SectionLabel>Skills &amp; activity</SectionLabel>
                 <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[repeat(3,minmax(0,1fr))]">

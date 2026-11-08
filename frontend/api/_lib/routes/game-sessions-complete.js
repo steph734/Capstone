@@ -21,7 +21,9 @@ import { serializePaoProfile } from '../serializePaoProfile.js'
 import { serializeBadge } from '../serializeBadge.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 import { markPlanGame } from '../gamePlans.js'
-import { maybeLevelUp, playPercent } from '../homePractice.js'
+import { ensureHomePlayIndex, maybeLevelUp, playPercent } from '../homePractice.js'
+import { HOME_PLAYS_PER_GAME } from '../homeSetConfig.js'
+import { maybeFinishSet } from '../homeSetDrafts.js'
 import { serializePaoHair } from '../serializePaoHair.js'
 import {
   computeXpEarned, applyXp, statGainsForGame, applyStatGains, isPerfectResult, manilaDayRange,
@@ -129,6 +131,7 @@ export default async function handler(req, res) {
     const game = { ...gameDoc, points_per_play: gameDoc.points_per_play ?? 50 }
 
     const patientId = existing.patient_id
+    if (existing.context === 'home') await ensureHomePlayIndex(db)
 
     const session = await mongoose.startSession()
     let response
@@ -279,12 +282,19 @@ export default async function handler(req, res) {
         // transaction: only the request that still finds status:'in_progress'
         // gets to write. A lost race aborts and falls back to the idempotent
         // "already completed" replay below.
+        // Home play: this is play number N for its plan and game. The 4th is refused (and the unique index catches a race).
+        let homePlayNumber = null
+        if (existing.context === 'home' && existing.home_plan_id) {
+          homePlayNumber = (await GameSession.countDocuments({ patient_id: patientId, game_id: game._id, home_plan_id: existing.home_plan_id, status: 'completed' }).session(session)) + 1
+          if (homePlayNumber > HOME_PLAYS_PER_GAME) throw Object.assign(new Error('Play limit reached.'), { playLimit: true })
+        }
         const closeResult = await GameSession.updateOne(
           { _id: existing._id, status: 'in_progress' },
           {
             $set: {
               status: 'completed',
               completed_at: now,
+              ...(homePlayNumber ? { home_play_number: homePlayNumber } : {}),
               result: {
                 correct: result.correct ?? null,
                 attempts: result.attempts ?? null,
@@ -329,6 +339,10 @@ export default async function handler(req, res) {
         }
       })
     } catch (err) {
+      if (err?.playLimit || (err?.code === 11000 && /home_play_number/.test(String(err.message)))) {
+        await GameSession.updateOne({ _id: existing._id, status: 'in_progress' }, { $set: { status: 'abandoned', completed_at: new Date() } })
+        return res.status(409).json({ error: 'You already played this game 3 times. Great job!', code: 'PLAY_LIMIT_REACHED' })
+      }
       if (err?.raceLost) {
         // Another request completed this session first — replay its result.
         const saved = await GameSession.findById(id).lean()
@@ -359,6 +373,7 @@ export default async function handler(req, res) {
       // Home practice: auto level-up when the score is 80% or more (only if the therapist turned it on).
       const pct = playPercent(result)
       if (existing.home_plan_id && pct != null && pct >= 80) await maybeLevelUp(await getDb(), existing.home_plan_id, game._id)
+      await maybeFinishSet(await getDb(), patientId) // the last play of a set prepares the SOAP note draft and the recommended next set
     } else await markPlanGame(patientId, game._id, 'done')
     return res.status(200).json(response)
   } catch (err) {

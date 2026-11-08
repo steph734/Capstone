@@ -25,6 +25,7 @@ import { SOAP_FIELDS, encryptField, decryptField, contentHash, addendumHash, val
 import { employeeFor, isAssigned, guardianPatientIds, audit, decryptSoap, integrityOf, decryptAddendum, sealSignature, readSignature, SECTION_LABEL } from '../noteAccess.js'
 import { activeCoverShare, finishCoverSign, markCoverWriting } from '../coverShares.js'
 import { sendNoteSharedEmail } from '../noteEmailShared.js'
+import { homeNoteSignBlock } from '../homeSetDrafts.js'
 import { SIGNATURE_RE } from './notes-create.js'
 
 const fail = (res, status, error, extra = {}) => res.status(status).json({ error, ...extra })
@@ -185,6 +186,8 @@ export default async function handler(req, res) {
       if (note.status !== 'draft' || note.voided) return fail(res, 409, 'This note is already signed or voided.')
       const { errors, value } = validateSoap(body, { complete: true })
       if (Object.keys(errors).length) return fail(res, 400, 'Please fix the highlighted sections.', { fields: errors })
+      const homeBlock = await homeNoteSignBlock(db, note, value) // a home practice note needs the caregiver report and every section reviewed
+      if (homeBlock) return fail(res, 409, homeBlock)
       if (!SIGNATURE_RE.test(String(body.signatureImage || '')) || body.signatureImage.length > 600000) return fail(res, 400, 'Draw your signature to sign this note.', { fields: { signature: 'A signature is required.' } })
       // Wrong passwords are logged, and 5 of them lock signing for 15 minutes (see passwordCheck.js).
       const check = await checkSigningPassword(db, user, body.password, { ip, patientId, noteId: _id })

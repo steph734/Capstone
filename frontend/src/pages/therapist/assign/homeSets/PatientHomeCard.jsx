@@ -8,21 +8,21 @@ const colorOf = (n) => COLORS[[...String(n || '')].reduce((h, c) => (h + c.charC
 const initials = (n) => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?'
 
 // One patient: header, a row of game cards, the celebration banner when the whole set is mastered, and finished sets.
-export default function PatientHomeCard({ patient: p, onChoose, onSoap, onKeep, keeping, openSetup }) {
+export default function PatientHomeCard({ patient: p, onReview, onRetry, openSetup }) {
   const [showHistory, setShowHistory] = useState(false)
   const [bg, fg] = colorOf(p.name)
   const today = dayKeyOf(new Date())
   const freshSet = p.setNumber > 1 && dayKeyOf(p.assignedAt) === today && !p.complete
   const subtitle = p.complete
-    ? `Set ${p.setNumber} · started ${shortDay(p.startedAt)} · all home games finished`
+    ? `Set ${p.setNumber} · started ${shortDay(p.startedAt)} · ${p.playsUsed} of ${p.playsAllowed} plays used`
     : freshSet
       ? `Set ${p.setNumber} · assigned today${p.nextSession ? ` · next session ${sessionText(p.nextSession)}` : ''}`
-      : `Set ${p.setNumber} · ${relativeDay(p.startedAt) === 'Yesterday' || relativeDay(p.startedAt) === 'Today' ? relativeDay(p.startedAt) : `started ${shortDay(p.startedAt)}`} · ${p.playedCount} of ${p.games.length} played`
-  const badge = p.complete ? ['done', '✓ Set complete'] : freshSet ? ['fresh', '● New set active'] : p.useAtHome ? ['on', 'Home practice on'] : ['off', 'Home practice off']
+      : `Set ${p.setNumber} · ${relativeDay(p.startedAt) === 'Yesterday' || relativeDay(p.startedAt) === 'Today' ? relativeDay(p.startedAt) : `started ${shortDay(p.startedAt)}`} · ${p.playsUsed} of ${p.playsAllowed} plays used`
+  const badge = p.complete ? ['done', '✓ Set finished'] : freshSet ? ['fresh', '● New set active'] : p.useAtHome ? ['on', 'Home practice on'] : ['off', 'Home practice off']
   const last = p.history[0]
 
   return (
-    <article className={`hs-card${p.needsNew ? ' complete' : ''}${freshSet ? ' fresh' : ''}`} aria-label={`${p.name}, set ${p.setNumber}`}>
+    <article className={`hs-card${p.complete ? ' complete' : ''}${freshSet ? ' fresh' : ''}`} aria-label={`${p.name}, set ${p.setNumber}`}>
       <header className="hs-card-head">
         <span className="hs-avatar" style={{ background: bg, color: fg }} aria-hidden="true">{initials(p.name)}</span>
         <div className="hs-card-title"><h3>{p.name}</h3><p>{subtitle}</p></div>
@@ -35,18 +35,13 @@ export default function PatientHomeCard({ patient: p, onChoose, onSoap, onKeep, 
         <ul className="hs-games" style={{ '--cols': Math.min(4, p.games.length) }}>{p.games.map((g) => <GameStatusCard key={g.gameId} game={g} />)}</ul>
       )}
 
-      {p.needsNew && <SetCompleteBanner patient={p} onChoose={() => onChoose(p)} onSoap={() => onSoap(p)} onKeep={() => onKeep(p)} keeping={keeping} />}
-      {p.complete && p.dismissed && (
-        <p className="hs-keep-note">This set stays as it is. {p.soapDone
-          ? <><button type="button" className="hs-link" onClick={() => onChoose(p)}>Choose new games</button> whenever you are ready.</>
-          : <><button type="button" className="hs-link" onClick={() => onSoap(p)}>Write the SOAP note</button> first, then choose new games.</>}</p>
-      )}
+      {p.complete && <SetCompleteBanner patient={p} onReview={() => onReview(p)} onRetry={onRetry} />}
 
       {last && (
         <div className="hs-history">
           <div className="hs-history-row">
             <span aria-hidden="true">📦</span>
-            <span><b>Set {last.setNumber} · completed {shortDay(last.completedAt)}</b> — {last.games.join(', ')} · all finished</span>
+            <span><b>Set {last.setNumber} · completed {shortDay(last.completedAt)}</b> — {last.games.join(', ')} · all plays used</span>
             <button type="button" className="hs-link" aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>{showHistory ? 'Hide history' : 'View history'}</button>
           </div>
           {showHistory && (

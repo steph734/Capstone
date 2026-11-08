@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import useClinicPlan from '../hooks/useClinicPlan'
 import useHomePractice from '../games/shared/home/useHomePractice'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
@@ -163,7 +164,9 @@ export default function PatientSidebar({
 }) {
   // Home practice games open right now show as a count on Gamified Activities (patients only).
   const homePractice = useHomePractice(user?.role === 'Patient')
-  const resolvedMenuItems = (menuItems ?? getPatientMenuItems(betaTier)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
+  // Gamified Activities are a Gold-plan feature of the clinic: patients only see them when the Owner is on Gold.
+  const clinic = useClinicPlan(user?.role === 'Patient')
+  const resolvedMenuItems = (menuItems ?? getPatientMenuItems(betaTier)).filter((it) => !(user?.role === 'Patient' && it.id === 'gamified-activities' && clinic.gamified === false)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
   const unreadCount = useUnreadCount()
   const emailUnreadCount = useEmailUnreadCount(user?.email)
   const navigate = useNavigate()

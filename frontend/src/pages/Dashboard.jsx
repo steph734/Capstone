@@ -5,6 +5,7 @@ import PatientSidebar from '../components/PatientSidebar'
 import 'react-calendar/dist/Calendar.css'
 import './Dashboard.css'
 import SyncStatus from '../offline/SyncStatus'
+import useClinicPlan from '../hooks/useClinicPlan'
 import useHomePractice from '../games/shared/home/useHomePractice'
 import HomeCard from '../games/shared/home/HomeCard'
 
@@ -174,7 +175,8 @@ const CLINIC = {
 
 export default function Dashboard({ onLogout, user, betaTier }) {
   const navigate = useNavigate()
-  const homePractice = useHomePractice(user?.role === 'Patient')
+  const clinicPlan = useClinicPlan(user?.role === 'Patient')
+  const homePractice = useHomePractice(user?.role === 'Patient' && clinicPlan.gamified !== false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentUser] = useState(user || {
     name: 'Alvrin',
@@ -444,6 +446,8 @@ export default function Dashboard({ onLogout, user, betaTier }) {
               </p>
               <button
                 className="hero-play-btn"
+                disabled={clinicPlan.gamified === false}
+                title={clinicPlan.gamified === false ? "Games unlock when the clinic is on the Gold plan" : undefined}
                 onClick={() => navigate('/patient/gamified-activities')}
               >
                 Play a game

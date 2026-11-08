@@ -279,7 +279,7 @@ export async function homePracticeMe(req, res) {
       gameId: id, name: names.get(id)?.name || 'Game', difficulty: names.get(id) ? gameDifficulty(names.get(id)) : 'easy', therapyType: names.get(id)?.therapy_type || null,
       reason: lastSession.get(id) === 100 ? 'Mastered – opens again in your next session' : 'Opens again in your next session',
     }))
-    const base = { now: now.toISOString(), firstName: patient.nickname || patient.first_name || 'friend', nextSession: nextAppt ? new Date(nextAppt.session_date).toISOString().slice(0, 10) : null, sessionOnly, history }
+    const base = { now: now.toISOString(), firstName: patient.nickname || patient.first_name || 'friend', nextSession: nextAppt ? new Date(nextAppt.session_date).toISOString().slice(0, 10) : null, nextSessionTime: nextAppt?.start_time || null, sessionOnly, history }
     if (!plan) return res.status(200).json({ ...base, plan: null })
 
     const used = await homeSecondsToday(db, patient._id, plan._id, now)
@@ -287,11 +287,14 @@ export async function homePracticeMe(req, res) {
     const view = await viewPlan(db, plan)
     const goalTotal = view.games.length * plan.goal_per_game_per_week
     const doneTotal = view.games.reduce((s, g) => s + Math.min(g.playsThisWeek, plan.goal_per_game_per_week), 0)
+    const playsAllowed = view.games.length * HOME_PLAYS_PER_GAME
+    const playsUsed = view.games.reduce((s, g) => s + Math.min(g.homePlays, HOME_PLAYS_PER_GAME), 0)
     return res.status(200).json({
       ...base,
       plan: view,
       window: { open: w.open, reason: w.reason, usedSeconds: used, limitSeconds: w.limitSeconds, secondsLeft: w.secondsLeft },
       week: { played: doneTotal, goal: goalTotal },
+      set: { playsUsed, playsAllowed, allFinished: view.games.length > 0 && playsUsed >= playsAllowed },
     })
   } catch (err) { return fail(res, err, 'home-practice/me') }
 }

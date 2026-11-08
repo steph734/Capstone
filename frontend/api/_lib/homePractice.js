@@ -92,6 +92,17 @@ export function homeWindow(plan, usedSeconds, now = new Date()) {
 }
 
 // Server gate for one game at home. { ok, inPlan, reason, plan }
+// Unique index so two requests can never both save the same home play number (a 4th play is impossible). Created once per server instance.
+let homePlayIndex = null
+export function ensureHomePlayIndex(db) {
+  if (!homePlayIndex) {
+    homePlayIndex = db.collection('game_sessions')
+      .createIndex({ home_plan_id: 1, game_id: 1, home_play_number: 1 }, { unique: true, partialFilterExpression: { home_play_number: { $type: 'number' } }, name: 'home_play_number_unique' })
+      .catch((err) => { console.error('home play index failed:', err.message); homePlayIndex = null })
+  }
+  return homePlayIndex
+}
+
 export async function checkHomeAccess(db, patientId, gameId) {
   const plan = await activeHomePlan(patientId)
   if (!plan) return { ok: false, inPlan: false, reason: 'no_plan' }

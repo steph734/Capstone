@@ -8,29 +8,34 @@
 // always agree and nothing needs to be recomputed when a play is saved. Each home game can be played HOME_PLAYS_PER_GAME times per set
 // (the patient side locks it after that): 1-2 plays = practicing, all plays used = finished, and finished with every play at
 // MASTERED_ACCURACY percent = mastered. The set is complete when every game is finished. Before the next set can be assigned the therapist
-// writes a SOAP note about the home practice (soap_note_id on the set). See homeSetConfig.js.
+// reviews and SIGNS the auto-drafted home practice SOAP note (soap_draft_id on the set; only a signed note unlocks it). See homeSetDrafts.js.
 import { ObjectId } from 'mongodb'
 import { HomePracticePlan } from './models/homePracticePlan.js'
 import { playPercent } from './homePractice.js'
 import { manilaDayKey, serializeGame } from './gamePlans.js'
 import { notify } from './sessionRecommendations.js'
-import { summarise } from './homePracticeStats.js'
 import { HOME_PLAYS_PER_GAME, MASTERED_ACCURACY, MASTERED_PLAYS_REQUIRED, MAX_SET_GAMES, MIN_SET_GAMES, STARTING_LEVELS, UNDO_GRACE_MS, UNDO_WINDOW_MS } from './homeSetConfig.js'
 
 const DAY = 86400000
 const toId = (v) => { try { return v && ObjectId.isValid(String(v)) ? new ObjectId(String(v)) : null } catch { return null } }
-const httpError = (status, message) => Object.assign(new Error(message), { status })
+const httpError = (status, message, code) => Object.assign(new Error(message), { status, ...(code ? { code } : {}) })
 const fullName = (p) => [p?.first_name, p?.last_name].filter(Boolean).join(' ') || 'Patient'
 
 export const statusOf = (plays, mastered) => (mastered >= MASTERED_PLAYS_REQUIRED ? 'mastered' : plays >= HOME_PLAYS_PER_GAME ? 'finished' : plays > 0 ? 'practicing' : 'not_started')
 export const gameIsDone = (status) => status === 'mastered' || status === 'finished'
+// The set's SOAP note when it has been signed (the only kind that unlocks the next set), else null.
+export async function signedNoteOf(db, set) {
+  const id = set.soap_draft_id || set.soap_note_id
+  if (!id) return null
+  return db.collection('therapy_notes').findOne({ _id: id, patient_id: set.patient_id, status: 'signed', voided: { $ne: true } }, { projection: { _id: 1, signed_at: 1 } })
+}
 export const setIsComplete = (games) => games.length > 0 && games.every((g) => gameIsDone(g.status))
 // Home sets count plays made at home; a therapy-only set counts every play.
 const contextOf = (set) => (set.use_at_home === false ? null : 'home')
 
 // Per game: completed plays, plays at the mastery accuracy, status, and the day the game became mastered.
 export async function masteryForGames(db, patientId, gameIds, since, until = null, context = null) {
-  const out = new Map(gameIds.map((id) => [String(id), { plays: 0, masteredPlays: 0, masteredAt: null, status: 'not_started' }]))
+  const out = new Map(gameIds.map((id) => [String(id), { plays: 0, masteredPlays: 0, masteredAt: null, status: 'not_started', playList: [] }]))
   if (!gameIds.length) return out
   const when = { $gte: since, ...(until ? { $lte: until } : {}) }
   const rows = await db.collection('game_sessions').find(
@@ -42,6 +47,7 @@ export async function masteryForGames(db, patientId, gameIds, since, until = nul
     if (!o) continue
     o.plays += 1
     const pct = playPercent(r.result)
+    o.playList.push({ n: o.plays, accuracy: pct, seconds: Number(r.result?.duration_seconds) || 0 })
     if (pct != null && pct >= MASTERED_ACCURACY) {
       o.masteredPlays += 1
       if (o.masteredPlays === MASTERED_PLAYS_REQUIRED) o.masteredAt = r.completed_at
@@ -110,10 +116,14 @@ export async function buildOverview(db, employee) {
   const histGameIds = [...new Set(history.flatMap((h) => h.game_ids.map(String)))].filter((id) => !gameBy.has(id)).map(toId)
   if (histGameIds.length) (await db.collection('games').find({ _id: { $in: histGameIds } }, { projection: { name: 1 } }).toArray()).forEach((g) => gameBy.set(String(g._id), g))
 
+  const noteIds = sets.map(([, s]) => s.soap_draft_id || s.soap_note_id).filter(Boolean)
+  const noteBy = new Map((noteIds.length ? await db.collection('therapy_notes').find({ _id: { $in: noteIds }, voided: { $ne: true } }, { projection: { status: 1, signed_at: 1 } }).toArray() : []).map((n) => [String(n._id), n]))
   const rows = await Promise.all(sets.map(async ([pid, set]) => {
+    const note = noteBy.get(String(set.soap_draft_id || set.soap_note_id)) || null
     const m = await masteryForGames(db, pid, set.game_ids, set.started_at, null, contextOf(set))
-    const list = set.game_ids.map((id) => { const o = m.get(String(id)); return { gameId: String(id), name: gameBy.get(String(id))?.name || 'Game', ...o, plays: Math.min(o.plays, HOME_PLAYS_PER_GAME), required: HOME_PLAYS_PER_GAME } })
+    const list = set.game_ids.map((id) => { const o = m.get(String(id)); return { gameId: String(id), name: gameBy.get(String(id))?.name || 'Game', ...o, plays: Math.min(o.plays, HOME_PLAYS_PER_GAME), playList: o.playList.slice(0, HOME_PLAYS_PER_GAME), required: HOME_PLAYS_PER_GAME } })
     const complete = setIsComplete(list)
+    const therapyPlays = await db.collection('game_sessions').countDocuments({ patient_id: pid, game_id: { $in: set.game_ids }, status: 'completed', context: { $ne: 'home' }, completed_at: { $gte: new Date(`${manilaDayKey(set.started_at)}T00:00:00+08:00`), $lte: set.completed_at || new Date() } })
     const p = patientBy.get(String(pid))
     const name = fullName(p)
     return {
@@ -122,7 +132,12 @@ export async function buildOverview(db, employee) {
       useAtHome: set.use_at_home !== false, useInTherapy: Boolean(set.use_in_therapy), startingLevel: set.starting_level || 'warmup',
       nextSession: set.next_session ? { date: set.next_session.date, start: set.next_session.start } : null,
       games: list, playedCount: list.filter((g) => g.plays > 0).length, masteredCount: list.filter((g) => g.status === 'mastered').length, finishedCount: list.filter((g) => gameIsDone(g.status)).length,
-      complete, dismissed: Boolean(set.keep_set_at), needsNew: complete && !set.keep_set_at, soapDone: Boolean(set.soap_note_id), needsSoap: complete && !set.soap_note_id,
+      playsUsed: list.reduce((a, g) => a + g.plays, 0), playsAllowed: list.length * HOME_PLAYS_PER_GAME, homePlays: list.reduce((a, g) => a + g.plays, 0), therapyPlays,
+      complete, dismissed: Boolean(set.keep_set_at), needsNew: complete && !set.keep_set_at, soapDone: note?.status === 'signed', soapAt: note?.status === 'signed' ? note.signed_at : null, needsSoap: complete && note?.status !== 'signed',
+      soapDraftId: set.soap_draft_id ? String(set.soap_draft_id) : null, draftReady: Boolean(set.soap_draft_id && set.recommendation), draftsError: set.drafts_error || null,
+      draftTouched: Boolean(note?.status === 'draft' && ((set.soap_meta?.history || []).length || Object.values(set.soap_meta?.sections || {}).some((x) => x.reviewed))),
+      reviewedCount: Object.values(set.soap_meta?.sections || {}).filter((x) => x.reviewed).length,
+      recommendation: set.recommendation ? { games: set.recommendation.games.map((g) => ({ gameId: g.gameId, name: g.name, reasons: g.reasons.slice(0, 2) })), reviewGame: set.recommendation.reviewGame || null } : null,
       history: history.filter((h) => String(h.patient_id) === String(pid)).map((h) => ({
         setId: String(h._id), setNumber: h.set_number, startedAt: h.started_at, completedAt: h.completed_at, games: h.game_ids.map((id) => gameBy.get(String(id))?.name || 'Game'),
       })),
@@ -133,7 +148,8 @@ export async function buildOverview(db, employee) {
     config: { playsPerGame: HOME_PLAYS_PER_GAME, masteredPlaysRequired: MASTERED_PLAYS_REQUIRED, masteredAccuracy: MASTERED_ACCURACY, minGames: MIN_SET_GAMES, maxGames: MAX_SET_GAMES, undoWindowMs: UNDO_WINDOW_MS },
     patients: rows,
     summary: {
-      patients: rows.length, needNew: rows.filter((r) => r.needsNew).length,
+      patients: rows.length, needNew: rows.filter((r) => r.needsNew).length, needSoap: rows.filter((r) => r.needsSoap).length,
+      playsUsed: rows.reduce((a, r) => a + r.playsUsed, 0), playsAllowed: rows.reduce((a, r) => a + r.playsAllowed, 0), notStarted: rows.filter((r) => r.playsUsed === 0).length,
       finished: rows.reduce((a, r) => a + r.finishedCount, 0), notFinished: rows.filter((r) => !r.complete).length,
     },
   }
@@ -152,7 +168,7 @@ export async function availableGames(db, patientId, employee) {
   const masteredAt = new Map()
   for (const s of sets) {
     const m = await masteryForGames(db, patientId, s.game_ids, s.started_at, s.completed_at, contextOf(s))
-    for (const [id, o] of m) if (o.status === 'mastered' && (!masteredAt.has(id) || o.masteredAt > masteredAt.get(id))) masteredAt.set(id, o.masteredAt)
+    for (const [id, o] of m) if (gameIsDone(o.status) && (!masteredAt.has(id) || o.masteredAt > masteredAt.get(id))) masteredAt.set(id, o.masteredAt)
   }
   const ordered = [...docs].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999) || String(a.name).localeCompare(String(b.name)))
   const games = ordered.map((d) => {
@@ -173,7 +189,7 @@ export async function availableGames(db, patientId, employee) {
 
 // "Assign new set": completes the current set and starts the next. Steps run in order and are undone if one fails
 // (MongoDB multi-document transactions are not used because the plan is written through Mongoose and the rest through the driver).
-export async function assignNewSet(db, { employee, patientId, gameIds, startingLevel, useInTherapy, useAtHome }) {
+export async function assignNewSet(db, { employee, patientId, gameIds, startingLevel, useInTherapy, useAtHome, objectives = null }) {
   const ids = (Array.isArray(gameIds) ? gameIds : []).map(toId)
   if (ids.some((i) => !i) || new Set(ids.map(String)).size !== ids.length) throw httpError(400, 'Pick different, valid games.')
   if (ids.length < MIN_SET_GAMES || ids.length > MAX_SET_GAMES) throw httpError(400, `Pick ${MIN_SET_GAMES} to ${MAX_SET_GAMES} games.`)
@@ -188,8 +204,7 @@ export async function assignNewSet(db, { employee, patientId, gameIds, startingL
   const m = await masteryForGames(db, patientId, current.game_ids, current.started_at, null, contextOf(current))
   if (!setIsComplete(current.game_ids.map((id) => m.get(String(id))))) throw httpError(409, 'The current set is not complete yet: every game needs all its plays first.')
   // The therapist documents the home practice before moving on.
-  const note = current.soap_note_id && await db.collection('therapy_notes').findOne({ _id: current.soap_note_id, patient_id: patientId, voided: { $ne: true } }, { projection: { _id: 1 } })
-  if (!note) throw httpError(409, 'Write the SOAP note for this home practice set first, then choose the next set.')
+  if (!(await signedNoteOf(db, current))) throw httpError(403, 'Sign the SOAP note for this home practice set first, then assign the next set.', 'SOAP_NOTE_REQUIRED')
 
   const now = new Date()
   const oldPlan = current.plan_id ? await HomePracticePlan.findById(current.plan_id) : null
@@ -217,6 +232,10 @@ export async function assignNewSet(db, { employee, patientId, gameIds, startingL
       patient_id: patientId, set_number: current.set_number + 1, status: 'active', plan_id: newPlan ? newPlan._id : null,
       started_at: now, completed_at: null, starting_level: startingLevel, use_in_therapy: Boolean(useInTherapy), use_at_home: Boolean(useAtHome),
       game_ids: ids, next_session: next, keep_set_at: null, created_by: employee._id, created_at: now,
+      // which games came from the system's recommendation (and why), and the objectives the therapist approved for this set
+      recommended_by_system: ids.filter((id) => (current.recommendation?.games || []).some((g) => g.gameId === String(id))).map(String),
+      game_reasons: Object.fromEntries((current.recommendation?.games || []).filter((g) => ids.some((id) => String(id) === g.gameId)).map((g) => [g.gameId, g.reasons])),
+      objectives: Array.isArray(objectives) && objectives.length ? objectives : current.objectives || null,
       undo: { previous_set_id: current._id, previous_plan_id: oldPlan ? oldPlan._id : null, new_plan_id: newPlan ? newPlan._id : null, until: new Date(now.getTime() + UNDO_WINDOW_MS + UNDO_GRACE_MS) },
     }
     newSetId = (await sets.insertOne(doc)).insertedId
@@ -274,44 +293,4 @@ export async function queuedGamesByAppointment(db, appointmentIds) {
   const docs = ids.length ? await db.collection('games').find({ _id: { $in: ids }, status: 'published' }).toArray() : []
   const by = new Map(docs.map((d) => [String(d._id), serializeGame(d)]))
   return new Map(sets.map((s) => [String(s.next_session.appointment_id), s.game_ids.map((id) => by.get(String(id))).filter(Boolean)]))
-}
-
-// A finished set the therapist owns (patient assigned to them). Throws 404 otherwise.
-async function ownedActiveSet(db, { setId, employee, assigned }) {
-  const sid = toId(setId)
-  const set = sid && await db.collection('home_sets').findOne({ _id: sid, status: 'active' })
-  if (!set || !(await assigned(set.patient_id, employee._id))) throw httpError(404, 'Set not found.')
-  return set
-}
-
-// Text for the Objective section of the home practice SOAP note: what was played and how it went, from the recorded plays only.
-export async function homeSetSummary(db, { setId, employee, assigned }) {
-  const set = await ownedActiveSet(db, { setId, employee, assigned })
-  const ctx = contextOf(set)
-  const [games, plays] = await Promise.all([
-    db.collection('games').find({ _id: { $in: set.game_ids } }, { projection: { name: 1 } }).toArray(),
-    db.collection('game_sessions').find({ patient_id: set.patient_id, game_id: { $in: set.game_ids }, status: 'completed', completed_at: { $gte: set.started_at }, ...(ctx ? { context: ctx } : {}) }).sort({ completed_at: 1 }).toArray(),
-  ])
-  const nameBy = new Map(games.map((g) => [String(g._id), g.name]))
-  const day = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
-  const lines = set.game_ids.map((id) => {
-    const mine = plays.filter((p) => String(p.game_id) === String(id))
-    const s = summarise(mine)
-    const used = Math.min(s.plays, HOME_PLAYS_PER_GAME)
-    return `- ${nameBy.get(String(id)) || 'Game'}: ${used} of ${HOME_PLAYS_PER_GAME} plays at home${s.accuracy != null ? `, accuracy ${s.accuracy}%` : ''}, ${s.mistakes} mistake${s.mistakes === 1 ? '' : 's'}, ${s.hints} hint${s.hints === 1 ? '' : 's'}`
-  })
-  const all = summarise(plays)
-  const text = [`Home practice, set ${set.set_number} (${day(set.started_at)} to ${day(plays.length ? plays[plays.length - 1].completed_at : new Date())}).`, ...lines,
-    `Overall: ${all.plays} play${all.plays === 1 ? '' : 's'}${all.accuracy != null ? `, accuracy ${all.accuracy}%` : ''}, ${all.minutes} min played, ${all.xp} XP earned.`].join(String.fromCharCode(10))
-  return { text, setNumber: set.set_number, patientId: String(set.patient_id) }
-}
-
-// Remembers which SOAP note documents this set. The note must be the therapist's own, for this patient, and not voided.
-export async function linkSoapNote(db, { setId, noteId, employee, assigned }) {
-  const set = await ownedActiveSet(db, { setId, employee, assigned })
-  const nid = toId(noteId)
-  const note = nid && await db.collection('therapy_notes').findOne({ _id: nid, patient_id: set.patient_id, employee_id: employee._id, voided: { $ne: true } }, { projection: { _id: 1 } })
-  if (!note) throw httpError(400, 'That SOAP note was not found for this patient.')
-  await db.collection('home_sets').updateOne({ _id: set._id }, { $set: { soap_note_id: note._id, soap_at: new Date() } })
-  return { ok: true }
 }

@@ -3,7 +3,7 @@ const { sendEmail } = require('./email');
 const BRAND = 'TherapyPro';
 
 function buildApplicationReceivedHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
@@ -66,7 +66,7 @@ function setPasswordUrl(token) {
 }
 
 function buildHiredHtml({ name, email, tempPassword, setupToken }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   const link = setPasswordUrl(setupToken);
   return `<!doctype html>
 <html>
@@ -150,7 +150,7 @@ function escapeHtml(str) {
 }
 
 function buildRejectedHtml({ name, reason, note }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
@@ -218,7 +218,7 @@ async function sendRejectedEmail({ email, name, reason, note }) {
 }
 
 function buildIdCardHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
@@ -263,7 +263,7 @@ async function sendIdCardEmail({ email, name, pdfBase64, fileName }) {
 }
 
 function buildTimeInReminderHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
@@ -307,7 +307,7 @@ async function sendTimeInReminderEmail({ email, name }) {
 }
 
 function buildTimeOutReminderHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">

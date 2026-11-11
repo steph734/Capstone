@@ -2,6 +2,7 @@ import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { Attendance } from '../models/attendance.js'
 import '../models/branch.js'
+import { requireSelfOrRoles } from '../session.js'
 
 const CLINIC_TIMEZONE = 'Asia/Manila'
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -33,6 +34,7 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name')
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })

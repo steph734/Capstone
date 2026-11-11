@@ -18,8 +18,7 @@ const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_DURATION_MS = 5 * 60 * 1000;
 
 function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) return String(forwarded).split(',')[0].trim();
+  // req.ip honours the 'trust proxy' setting; the raw X-Forwarded-For header is client-controlled and could be forged to dodge the lockout.
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 

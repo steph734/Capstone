@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 const { sendEmail } = require('./email');
 
+// Escapes text before it is placed inside an HTML email, so a name like <a href=...> can't inject markup.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 const BRAND = 'TherapyPro';
 
 // How long a code stays valid, and how many wrong guesses before it is burned.
@@ -15,7 +20,7 @@ function generateCode() {
 }
 
 function buildOtpHtml({ name, code }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">

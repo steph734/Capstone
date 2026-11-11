@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
+import { toCsv } from '../../utils/miniXlsx'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { Sparkline, TrendChart, BreakdownChart } from './ReportCharts'
@@ -191,8 +191,7 @@ const REPORTS = [
 
 // ── Export helpers ────────────────────────────────────────────
 function csvStringFor(cols, rows) {
-  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows])
-  return XLSX.utils.sheet_to_csv(ws)
+  return toCsv([cols, ...rows])
 }
 
 function buildPDFDoc(title, cols, rows) {

@@ -105,3 +105,17 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
     return null
   }
 }
+
+// For routes keyed by an email address (?email=... or body.email): the caller must either be that
+// same person, or hold one of `staffRoles`. Stops one signed-in user reading another's records
+// just by changing the email in the URL. Returns the session context, or null after sending 401/403.
+export async function requireSelfOrRoles(req, res, email, staffRoles = ['Owner', 'Super Admin']) {
+  const ctx = await requireSession(req, res)
+  if (!ctx) return null
+  const same = String(ctx.user.email || '').trim().toLowerCase() === String(email || '').trim().toLowerCase()
+  if (!same && !staffRoles.includes(ctx.user.role)) {
+    res.status(403).json({ error: 'You do not have access to this.', code: 'FORBIDDEN' })
+    return null
+  }
+  return ctx
+}

@@ -13,6 +13,7 @@
 // below. No new file under /api, so no extra function.
 import express from 'express'
 import { securityHeaders, sameSiteOnly, sanitizeBody } from './_lib/hardening.js'
+import { sanitizeQuery, apiGuard } from './_lib/guard.js'
 import serverTime from './_lib/routes/server-time.js'
 import bookingsStart from './_lib/routes/bookings-start.js'
 import bookingsItem from './_lib/routes/bookings-item.js'
@@ -183,6 +184,8 @@ app.use(sameSiteOnly) // changes must come from our own site (or ALLOWED_ORIGINS
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook)
 app.use(express.json({ limit: '3mb' }))
 app.use(sanitizeBody) // drop $operators from request bodies
+app.use(sanitizeQuery) // ...and from the URL query string (?email[$ne]=x)
+app.use(apiGuard) // default deny: every route needs a sign-in unless listed as public in _lib/guard.js
 app.all('/api/server-time', serverTime) // the server's date for the note form
 // Online booking + payment: hold the slot first, confirm only after the payment is verified on the server.
 app.all('/api/bookings/start', bookingsStart)

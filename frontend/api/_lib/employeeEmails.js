@@ -23,7 +23,7 @@ function escapeHtml(str) {
 // ── Application received ────────────────────────────────────────────────────
 
 function buildApplicationReceivedHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   return `<!doctype html>
 <html><body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
 <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
@@ -55,7 +55,7 @@ export async function sendApplicationReceivedEmail({ email, name }) {
 // ── Hired ────────────────────────────────────────────────────────────────────
 
 function buildHiredHtml({ name, email, tempPassword, setupToken }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   const link = setPasswordUrl(setupToken)
   return `<!doctype html>
 <html><body style="margin:0;background:#05100b;font-family:Arial,Helvetica,sans-serif;color:#e7f3ee;">
@@ -96,7 +96,7 @@ export async function sendHiredEmail({ email, name, tempPassword, setupToken }) 
 // ── Rejected ─────────────────────────────────────────────────────────────────
 
 function buildRejectedHtml({ name, reason, note }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   return `<!doctype html>
 <html><body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
 <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
@@ -134,7 +134,7 @@ export async function sendRejectedEmail({ email, name, reason, note }) {
 // ── ID card ──────────────────────────────────────────────────────────────────
 
 function buildIdCardHtml({ name }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   return `<!doctype html>
 <html><body style="margin:0;background:#f5faf8;font-family:Arial,Helvetica,sans-serif;color:#2c4a3e;">
 <div style="max-width:520px;margin:0 auto;padding:32px 16px;">

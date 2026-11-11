@@ -4,6 +4,7 @@
 // id so it also works for demo/local-only staff rows that have no Mongo doc.
 import multer from 'multer'
 import { sendIdCardEmail } from '../employeeEmails.js'
+import { requireSession } from '../session.js'
 
 const uploadIdCardPdfField = multer({
   storage: multer.memoryStorage(),
@@ -28,6 +29,9 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Owner / Super Admin only.
+  if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
 
   try {
     await runUpload(req, res)

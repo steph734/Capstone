@@ -11,19 +11,28 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
+const crypto = require('crypto');
+// Seed passwords come from the environment, or are generated randomly and printed once. Never hard-code them.
+function seedPassword(envName) {
+  const fromEnv = String(process.env[envName] || '');
+  if (fromEnv.length >= 12) return fromEnv;
+  const generated = crypto.randomBytes(12).toString('base64url');
+  console.log(`NOTE: ${envName} not set (or shorter than 12 chars); generated a one-time password: ${generated}`);
+  return generated;
+}
 
 const SEED_USERS = [
   {
     username: 'owner',
     email: 'owner@gmail.com',
-    password: 'owner123',
+    password: seedPassword('SEED_OWNER_PASSWORD'),
     full_name: 'Owner',
     role: 'Owner',
   },
   {
     username: 'superadmin',
     email: 'superadmin@gmail.com',
-    password: 'superadmin123',
+    password: seedPassword('SEED_SUPERADMIN_PASSWORD'),
     full_name: 'Super Admin',
     role: 'Super Admin',
   },

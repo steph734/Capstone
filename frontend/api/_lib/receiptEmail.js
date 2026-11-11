@@ -3,6 +3,11 @@ import { sendEmail } from './brevo.js'
 import { getDb } from './mongo.js'
 import { insertPaymentWithRef } from './paymentRef.js'
 
+// Escapes text before it is placed inside an HTML email, so a name like <a href=...> can't inject markup.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 const BRAND = 'TherapyPro'
 
 function formatMoney(amountMinor, currency) {
@@ -26,7 +31,7 @@ function buildReceiptHtml({ brand, amount, dateStr, description, cardLine, recei
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
           <tr>
             <td style="padding:8px 0;color:#6b7c75;">Description</td>
-            <td style="padding:8px 0;text-align:right;font-weight:600;">${description}</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600;">${escapeHtml(description)}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#6b7c75;">Date</td>

@@ -3,6 +3,7 @@
 import mongoose from 'mongoose'
 import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
+import { requireSession } from '../session.js'
 
 const DOC_KEYS = ['ptr', 'prc', 'diploma', 'id']
 
@@ -19,6 +20,9 @@ export default async function handler(req, res) {
   if (!mongoose.isValidObjectId(id)) {
     return res.status(400).json({ error: 'Invalid employee id.' })
   }
+
+  // Owner / Super Admin only.
+  if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
 
   try {
     await getMongo()

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, X } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { downloadXlsx } from '../../../utils/miniXlsx'
 import { authFetch } from '../../../utils/session'
 import { buildPatientPdf, buildReportExcel, buildReportPdf } from './exportReport'
 
@@ -47,7 +47,7 @@ export default function ExportPreview({ format, type, label, filters, filtersTex
   const download = async () => {
     const name = `${patientMode ? 'patient-report' : `${type}-report`}-${filters.from}`
     if (format === 'pdf') docRef.current.save(`${name}.pdf`)
-    else XLSX.writeFile(sheetRef.current, `${name}.xlsx`)
+    else downloadXlsx(sheetRef.current, `${name}.xlsx`)
     try { await authFetch('/api/reports/export-log', { method: 'POST', body: { type: patientMode ? 'patient' : type, format: format === 'pdf' ? 'pdf' : 'xlsx', anonymized: anonymize, filters } }) } catch { /* the file is already saved */ }
     onDone(format === 'pdf' ? 'PDF exported successfully!' : 'Excel file exported successfully!')
   }

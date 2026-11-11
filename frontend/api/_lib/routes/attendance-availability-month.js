@@ -1,6 +1,7 @@
 import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { TherapistAvailability } from '../models/therapistAvailability.js'
+import { requireSelfOrRoles } from '../session.js'
 
 // GET /api/attendance/availability-month?email=...&month=YYYY-MM -> every
 // therapist_availability record this therapist has for the given month —
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email })
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })

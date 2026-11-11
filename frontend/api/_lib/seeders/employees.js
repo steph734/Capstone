@@ -8,6 +8,7 @@
 // Usage (from the frontend/ folder, so it picks up frontend/.env):
 //   node api/_lib/seeders/employees.js
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { getMongo } from '../mongo.js'
 import { User } from '../models/user.js'
 import { Branch } from '../models/branch.js'
@@ -22,7 +23,15 @@ try {
   // no .env in the cwd — fine if MONGO_URI is set some other way
 }
 
-const DEFAULT_PASSWORD = 'therapist123'
+// Seed passwords come from the environment, or are generated randomly and printed once. Never hard-code them.
+function seedPassword(envName) {
+  const fromEnv = String(process.env[envName] || '')
+  if (fromEnv.length >= 12) return fromEnv
+  const generated = crypto.randomBytes(12).toString('base64url')
+  console.log(`NOTE: ${envName} not set (or shorter than 12 chars); generated a one-time password: ${generated}`)
+  return generated
+}
+const DEFAULT_PASSWORD = seedPassword('SEED_THERAPIST_PASSWORD')
 
 // Upserted by branch_name — reuses an existing branch instead of duplicating
 // one if branches have already been seeded/created through the app.
@@ -330,7 +339,7 @@ async function main() {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )
-    console.log(`Upserted employee -> ${seed.employee_id} (${employeeFields.first_name} ${employeeFields.last_name}) / login: ${seed.email} / ${DEFAULT_PASSWORD}`)
+    console.log(`Upserted employee -> ${seed.employee_id} (${employeeFields.first_name} ${employeeFields.last_name}) / login: ${seed.email}`)
   }
 
   console.log('Done.')

@@ -2,6 +2,7 @@ import { getMongo } from '../mongo.js'
 import { Employee } from '../models/employee.js'
 import { Attendance } from '../models/attendance.js'
 import '../models/branch.js'
+import { requireSession } from '../session.js'
 
 // Calendar-day key, fixed to Philippine local time (the clinic's only
 // timezone, which never observes DST) — see backend/routes/attendance.js for
@@ -73,6 +74,9 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // The badge scanner runs on the Owner's signed-in device; an anonymous caller must not be able to clock people in.
+  if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
 
   const raw = String(req.body?.employee_id || '').trim()
   if (!raw) {

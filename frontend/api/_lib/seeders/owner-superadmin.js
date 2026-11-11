@@ -9,18 +9,27 @@ function sha256Hex(text) {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+// Seed passwords come from the environment, or are generated randomly and printed once. Never hard-code them.
+function seedPassword(envName) {
+  const fromEnv = String(process.env[envName] || '')
+  if (fromEnv.length >= 12) return fromEnv
+  const generated = crypto.randomBytes(12).toString('base64url')
+  console.log(`NOTE: ${envName} not set (or shorter than 12 chars); generated a one-time password: ${generated}`)
+  return generated
+}
+
 const SEED_USERS = [
   {
     username: 'owner',
     email: 'owner@gmail.com',
-    password: 'owner123', // raw password — hashed below, never stored as-is
+    password: seedPassword('SEED_OWNER_PASSWORD'), // raw password — hashed below, never stored as-is
     full_name: 'Owner',
     role: 'Owner',
   },
   {
     username: 'superadmin',
     email: 'superadmin@gmail.com',
-    password: 'superadmin123',
+    password: seedPassword('SEED_SUPERADMIN_PASSWORD'),
     full_name: 'Super Admin',
     role: 'Super Admin',
   },

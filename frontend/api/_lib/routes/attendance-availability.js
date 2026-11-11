@@ -3,6 +3,7 @@ import { Employee } from '../models/employee.js'
 import { Attendance } from '../models/attendance.js'
 import { TherapistAvailability } from '../models/therapistAvailability.js'
 import '../models/branch.js'
+import { requireSelfOrRoles } from '../session.js'
 
 const CLINIC_TIMEZONE = 'Asia/Manila'
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -42,6 +43,7 @@ async function handleGet(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email })
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })
@@ -80,6 +82,7 @@ async function handlePost(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name')
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })

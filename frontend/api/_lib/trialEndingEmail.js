@@ -1,5 +1,10 @@
 import { sendEmail } from './brevo.js'
 
+// Escapes text before it is placed inside an HTML email, so a name like <a href=...> can't inject markup.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 const BRAND = 'TherapyPro'
 
 function formatMoney(amount) {
@@ -18,13 +23,13 @@ function buildHtml({ brand, planName, priceStr, endDateStr, daysPhrase, manageUr
       <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
         <h1 style="margin:0 0 4px;font-size:20px;">Your free trial ends ${daysPhrase}</h1>
         <p style="margin:0 0 20px;color:#6b7c75;font-size:13px;">
-          Your ${brand} <strong>${planName}</strong> 7-day free trial is almost over.
+          Your ${escapeHtml(brand)} <strong>${escapeHtml(planName)}</strong> 7-day free trial is almost over.
         </p>
 
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
           <tr>
             <td style="padding:8px 0;color:#6b7c75;">Plan</td>
-            <td style="padding:8px 0;text-align:right;font-weight:600;">${brand}: ${planName}</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600;">${escapeHtml(brand)}: ${escapeHtml(planName)}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#6b7c75;">Trial ends</td>
@@ -37,7 +42,7 @@ function buildHtml({ brand, planName, priceStr, endDateStr, daysPhrase, manageUr
         </table>
 
         <p style="margin:20px 0 0;font-size:13px;color:#2c4a3e;">
-          To keep your ${planName} features, add a payment method before the trial ends. If you don&rsquo;t
+          To keep your ${escapeHtml(planName)} features, add a payment method before the trial ends. If you don&rsquo;t
           subscribe, your account moves back to the Free plan and the premium features are locked until you pay
           the regular monthly price.
         </p>
@@ -49,7 +54,7 @@ function buildHtml({ brand, planName, priceStr, endDateStr, daysPhrase, manageUr
         }
 
         <p style="margin:22px 0 0;color:#9aab9f;font-size:11px;">
-          You&rsquo;re receiving this because you started a free trial on ${brand}. No charge has been made yet.
+          You&rsquo;re receiving this because you started a free trial on ${escapeHtml(brand)}. No charge has been made yet.
         </p>
       </div>
     </div>

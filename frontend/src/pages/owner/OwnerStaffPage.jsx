@@ -7,7 +7,7 @@ import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
 import { authFetch, getSessionToken } from '../../utils/session'
 import { saveLocal } from '../../offline/repo'
-import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE } from '../../utils/api'
+import { apiGet, apiPost, apiPostForm, apiPatch, apiDelete, API_BASE, openProtectedFile } from '../../utils/api'
 import { generateUniqueId } from '../../utils/idGenerator'
 import ScanIdModal from '../../components/ScanIdModal'
 import AttendanceConfirmModal from '../../components/AttendanceConfirmModal'
@@ -1285,7 +1285,7 @@ function ViewModal({ staffMember, onClose }) {
                 // Real hires store a GridFS file id (string) once they upload it
                 // during self-setup; demo rows carry a legacy {name} object.
                 const fileUrl = doc && staffMember.mongoEmployeeId
-                  ? `${API_BASE}/api/employees/${staffMember.mongoEmployeeId}/documents/${f.key}/file`
+                  ? `/api/employees/${staffMember.mongoEmployeeId}/documents/${f.key}/file`
                   : null
                 return (
                   <div key={f.key} className="os-doc-card">
@@ -1295,7 +1295,7 @@ function ViewModal({ staffMember, onClose }) {
                       <div className={`os-doc-hint ${doc ? 'uploaded' : ''}`}>
                         {doc
                           ? (fileUrl
-                            ? <a href={fileUrl} target="_blank" rel="noreferrer">✓ View file</a>
+                            ? <a href="#" onClick={(e) => { e.preventDefault(); openProtectedFile(fileUrl) }}>✓ View file</a>
                             : `✓ ${doc.name || 'Uploaded'}`)
                           : 'Not uploaded'}
                       </div>

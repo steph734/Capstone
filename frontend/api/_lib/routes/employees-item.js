@@ -6,6 +6,7 @@ import { getMongo } from '../mongo.js'
 import { User } from '../models/user.js'
 import { Employee } from '../models/employee.js'
 import { sendRejectedEmail } from '../employeeEmails.js'
+import { requireSession } from '../session.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') {
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
     const employee = await Employee.findById(id)
     if (!employee) return res.status(404).json({ error: 'Employee not found.' })
 

@@ -13,6 +13,7 @@ import { User } from '../models/user.js'
 import { Employee } from '../models/employee.js'
 import { Branch } from '../models/branch.js'
 import { sendApplicationReceivedEmail } from '../employeeEmails.js'
+import { requireSession } from '../session.js'
 
 const DOC_KEYS = ['ptr', 'prc', 'diploma', 'id']
 const ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'])
@@ -235,6 +236,8 @@ async function handleCreate(req, res) {
 export default async function handler(req, res) {
   try {
     await getMongo()
+    // Staff records hold IDs, phone numbers and documents: Owner / Super Admin only.
+    if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
     if (req.method === 'GET') return await handleList(req, res)
     if (req.method === 'POST') return await handleCreate(req, res)
     res.setHeader('Allow', 'GET, POST')

@@ -77,3 +77,20 @@ export async function apiPostForm(path, formData) {
 export function checkBackendHealth() {
   return apiGet('/api/health')
 }
+
+// Opens a protected file (an endpoint that needs the sign-in token) in a new tab. A plain <a href> can't send
+// the Authorization header, so fetch it with the token and show it from a temporary blob URL.
+export async function openProtectedFile(path) {
+  const tab = window.open('', '_blank')
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
+    if (!res.ok) throw new Error(`Could not open the file (${res.status}).`)
+    const url = URL.createObjectURL(await res.blob())
+    if (tab) tab.location.href = url
+    else window.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (err) {
+    if (tab) tab.close()
+    alert(err.message || 'Could not open the file.')
+  }
+}

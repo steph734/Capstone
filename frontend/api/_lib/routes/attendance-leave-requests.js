@@ -3,6 +3,7 @@ import { Employee } from '../models/employee.js'
 import { LeaveRequest } from '../models/leaveRequest.js'
 import '../models/branch.js'
 import { getDb } from '../mongo.js'
+import { requireSelfOrRoles } from '../session.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const LEAVE_TYPES = ['Sick Leave', 'Vacation Leave', 'Emergency Leave', 'Other']
@@ -38,6 +39,7 @@ async function handleGet(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email })
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })
@@ -107,6 +109,7 @@ async function handlePost(req, res) {
 
   try {
     await getMongo()
+    if (!(await requireSelfOrRoles(req, res, email))) return
     const employee = await Employee.findOne({ email }).populate('branch_id', 'branch_name')
     if (!employee) {
       return res.status(404).json({ error: 'No staff record is linked to this account yet.' })

@@ -56,7 +56,9 @@ async function uploadAttachments(emailId, files) {
   const supabase = getSupabaseAdmin()
   const out = []
   for (const file of files) {
-    const path = `emails/${emailId}/${randomUUID()}-${file.originalname}`
+    // Strip path characters from the stored file name so an upload can't write outside its own folder.
+    const safeName = String(file.originalname || 'file').replace(/[^\w. -]+/g, '_').replace(/\.{2,}/g, '.').slice(-120)
+    const path = `emails/${emailId}/${randomUUID()}-${safeName}`
     const { error } = await supabase.storage
       .from(ATTACHMENTS_BUCKET)
       .upload(path, file.buffer, { contentType: file.mimetype, upsert: false })

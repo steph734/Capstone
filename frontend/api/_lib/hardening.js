@@ -22,10 +22,11 @@ export function sameSiteOnly(req, res, next) {
 
 // 3. Strip MongoDB operators ("$gt", "$ne" ...) from request bodies, so a JSON body like
 //    { "email": { "$ne": null } } can never act as a database query.
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']) // prototype-pollution keys
 export function stripMongoOperators(value) {
   if (Array.isArray(value)) return value.map(stripMongoOperators)
   if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.fromEntries(Object.entries(value).filter(([k]) => !k.startsWith('$')).map(([k, v]) => [k, stripMongoOperators(v)]))
+    return Object.fromEntries(Object.entries(value).filter(([k]) => !k.startsWith('$') && !BLOCKED_KEYS.has(k)).map(([k, v]) => [k, stripMongoOperators(v)]))
   }
   return value
 }

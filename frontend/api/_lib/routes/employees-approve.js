@@ -8,6 +8,7 @@ import { User } from '../models/user.js'
 import { Employee } from '../models/employee.js'
 import { sendHiredEmail } from '../employeeEmails.js'
 import { INVITE_TTL_MS, generateInviteToken, hashInviteToken } from '../staffInvite.js'
+import { requireSession } from '../session.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'PATCH') {
@@ -19,6 +20,9 @@ export default async function handler(req, res) {
   if (!mongoose.isValidObjectId(id)) {
     return res.status(400).json({ error: 'Invalid employee id.' })
   }
+
+  // Owner / Super Admin only.
+  if (!(await requireSession(req, res, { roles: ['Owner', 'Super Admin'] }))) return
 
   try {
     await getMongo()

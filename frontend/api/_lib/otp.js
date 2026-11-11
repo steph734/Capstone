@@ -5,6 +5,11 @@ import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { sendEmail } from './brevo.js'
 
+// Escapes text before it is placed inside an HTML email, so a name like <a href=...> can't inject markup.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 const BRAND = 'TherapyPro'
 
 export const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
@@ -48,7 +53,7 @@ const COPY = {
 }
 
 function buildOtpHtml({ name, code, purpose }) {
-  const greeting = name ? `Hi ${name},` : 'Hi,'
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   const copy = COPY[purpose] || COPY.signup
   return `<!doctype html>
 <html>

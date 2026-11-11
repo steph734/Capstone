@@ -1,5 +1,10 @@
 import { sendEmail } from './brevo.js'
 
+// Escapes text before it is placed inside an HTML email, so a name like <a href=...> can't inject markup.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 const BRAND = 'BrickPath'
 
 function buildHtml({ name, kind }) {
@@ -15,7 +20,7 @@ function buildHtml({ name, kind }) {
     <div style="max-width:480px;margin:0 auto;padding:32px 16px;">
       <div style="background:#fff;border:1px solid #e8f5f0;border-radius:16px;padding:28px;">
         <h1 style="margin:0 0 12px;font-size:19px;">${heading}</h1>
-        <p style="margin:0 0 4px;font-size:14px;">Hi ${name || 'there'},</p>
+        <p style="margin:0 0 4px;font-size:14px;">Hi ${name ? escapeHtml(name) : 'there'},</p>
         <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">${body}</p>
         <p style="margin:22px 0 0;color:#9aab9f;font-size:11px;">
           You're receiving this because you're listed as active staff at ${BRAND}.

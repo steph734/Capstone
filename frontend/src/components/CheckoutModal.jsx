@@ -477,7 +477,7 @@ function CheckoutBody({
     setPhase('proof')
     const focusContinue = () => setTimeout(() => document.querySelector('[data-proof-continue]')?.focus(), 0)
     if (out.cancelled) { setNotice('Upload cancelled. Your details are still here.'); focusContinue(); return }
-    if (out.timedOut) { setProofError({ message: out.message, retry: true }); focusContinue(); return }
+    if (out.timedOut) { setProofError({ message: out.message, retry: true, timedOut: true }); focusContinue(); return }
     if (out.code === 'HOLD_EXPIRED') { setFailure({ code: 'HOLD_EXPIRED', message: out.message }); setAttemptAt(new Date()); setPhase('failed'); return }
     setProofError({ message: out.message || PAYMENT_MESSAGES.unknown, retry: Boolean(out.retry) || out.code === 'unknown' })
     if (out.code === 'REFERENCE_ALREADY_USED' || out.code === 'INVALID_REFERENCE') setTimeout(() => proofControls.current?.focusReference?.(), 0)
@@ -664,11 +664,16 @@ function CheckoutBody({
           holdBanner={banner} rejectedReason={rejected} controls={proofControls}
           error={proofError.message}
         />
-        {proofError.retry && <div><button type="button" className={`${btnOutline} mt-2`} onClick={submitNow} disabled={!proofOk}>Try again</button></div>}
+        {proofError.retry && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className={btnOutline} onClick={submitNow} disabled={!proofOk}>Try again</button>
+            {proofError.timedOut && <button type="button" className={btnOutline} onClick={() => navigate(`/help?new=1&subject=${encodeURIComponent('Payment proof not sending')}`)}>Contact support</button>}
+          </div>
+        )}
         <div className="mt-6 flex items-center justify-between gap-3">
           <button type="button" className={btnOutline} onClick={() => setPhase('confirm')}>Back</button>
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-bold ${done === 2 ? 'text-pm-green-dark' : 'text-slate-400'}`} aria-hidden="true">{done} of 2 required done</span>
+            <span className={`text-xs font-bold ${done === 2 ? 'text-pm-green-dark' : 'text-amber-600'}`} aria-hidden="true">{done} of 2 required done</span>
             <button type="button" data-proof-continue className={btnPrimary} onClick={() => setShowConfirm(true)} disabled={!proofOk}>Continue<ArrowRightIcon /></button>
           </div>
         </div>

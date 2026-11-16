@@ -29,9 +29,9 @@ const dateLong = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC
 const dateShort = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
 const dateTab = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' })
 export const timeRange = (a) => (a.start_time && a.end_time ? `${fmt12(a.start_time)} – ${fmt12(a.end_time)}` : fmt12(a.start_time))
-const holdText = (d) => (d ? new Date(d).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+export const holdText = (d) => (d ? new Date(d).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
 
-const emailView = (a, extra = {}) => ({
+export const emailView = (a, extra = {}) => ({
   guardianName: a.guardian_name, patient: a.patient_name, therapist: a.therapist_name, therapistRole: a.therapist_role,
   dateShort: dateShort(a.session_date), dateLong: dateLong(a.session_date), timeLabel: timeRange(a), sessionType: a.session_type || a.session_mode || '', clinic: CLINIC, ...extra,
 })

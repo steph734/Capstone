@@ -33,6 +33,14 @@ export default function PaymentProofStep({ method, reference, onReference, file,
     controls.current = { focusReference: () => refInput.current?.focus(), chooseFile: () => inputRef.current?.click() }
   }, [controls])
 
+  // Ctrl+V / paste of a screenshot anywhere in the dialog
+  useEffect(() => {
+    const onPaste = (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/')); if (f) { e.preventDefault(); take(f) } }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const take = async (picked) => {
     if (!picked) return
     const res = await checkReceiptFile(picked)
@@ -70,7 +78,7 @@ export default function PaymentProofStep({ method, reference, onReference, file,
           inputMode="numeric"
           autoComplete="off"
           spellCheck={false}
-          placeholder={method === 'gcash' ? '0000 000 000 000' : 'Reference number'}
+          placeholder={rule.max === rule.min ? `Enter the ${rule.max}-digit reference number` : 'Enter the reference number'}
           value={reference}
           aria-required="true"
           aria-invalid={showError}
@@ -79,7 +87,9 @@ export default function PaymentProofStep({ method, reference, onReference, file,
           onBlur={() => setTouched(true)}
           className="min-h-[48px] w-full border-0 border-solid bg-transparent py-2 font-mono text-base tracking-wide text-slate-900 outline-none placeholder:text-slate-300"
         />
-        {check.ok && <span className="ml-2 flex shrink-0 items-center gap-1 text-xs font-bold text-pm-green-dark"><Check size={13} strokeWidth={3.5} aria-hidden="true" /> {check.count} digits</span>}
+        {check.ok
+          ? <span className="ml-2 flex shrink-0 items-center gap-1 text-xs font-bold text-pm-green-dark"><Check size={13} strokeWidth={3.5} aria-hidden="true" /> {check.count} digits</span>
+          : <span className="ml-2 shrink-0 text-xs font-bold tabular-nums text-slate-400" aria-hidden="true">{check.count} / {rule.max === rule.min ? rule.max : `${rule.min}-${rule.max}`}</span>}
       </div>
       {showError
         ? <p id={`${refId}-err`} role="alert" className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertCircle size={13} aria-hidden="true" /> {check.error}</p>
@@ -113,12 +123,12 @@ export default function PaymentProofStep({ method, reference, onReference, file,
           className={`mt-1.5 flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-solid border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${drag ? 'border-pm-green bg-green-50' : fileError ? 'border-red-300 bg-red-50/40' : 'border-slate-300 bg-slate-50/60 hover:border-slate-400'}`}
         >
           <UploadCloud size={26} className="text-slate-400" aria-hidden="true" />
-          <span className="text-sm font-bold text-slate-700">Choose a screenshot or drag it here</span>
+          <span className="text-sm font-bold text-slate-700">Drag your receipt here or <span className="font-bold text-pm-green-dark underline">browse</span></span>
         </button>
       )}
       {fileError
         ? <p role="alert" className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertCircle size={13} aria-hidden="true" /> {fileError}</p>
-        : <p id="proof-file-help" className="mt-1.5 text-xs text-slate-400">JPG or PNG · up to 5 MB</p>}
+        : <p id="proof-file-help" className="mt-1.5 text-xs text-slate-400">JPG or PNG · up to 5 MB · you can also paste a screenshot</p>}
 
       {error && <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-800"><AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> <span>{error}</span></p>}
 

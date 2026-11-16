@@ -10,8 +10,8 @@ export const HOLD_REMINDER_HOURS = 12
 // Reference number rules per wallet, keyed by the payment method id the API uses.
 // GCash prints a 13-digit "Ref No." (shown as 5456 656 574 544). Maya's format is not fixed, so it accepts 10 to 16 digits.
 export const REFERENCE_RULES = {
-  gcash: { label: 'GCash', min: 13, max: 13, groups: [4, 3, 3, 3], where: 'You can find it on your GCash receipt, under "Ref No."', error: 'Enter the 13-digit reference number from your receipt' },
-  paymaya: { label: 'Maya', min: 10, max: 16, groups: [4, 4, 4, 4], where: 'You can find it on your Maya receipt, under "Reference ID".', error: 'Enter the reference number from your Maya receipt (10 to 16 digits)' },
+  gcash: { label: 'GCash', min: 13, max: 13, groups: [4, 3, 3, 3], where: 'You can find it on your GCash receipt, under "Ref No."', error: 'Reference numbers have 13 digits' },
+  paymaya: { label: 'Maya', min: 10, max: 16, groups: [4, 4, 4, 4], where: 'You can find it on your Maya receipt, under "Reference ID".', error: 'Maya reference numbers have 10 to 16 digits' },
 }
 const ruleFor = (method) => REFERENCE_RULES[method] || REFERENCE_RULES.gcash
 

@@ -416,7 +416,7 @@ describe('reference number rules', () => {
     expect(rules.normalizeReference('5456-656 574.544')).toBe('5456656574544')
     expect(rules.formatReference('5456656574544', 'gcash')).toBe('5456 656 574 544')
     expect(rules.validateReference(REF, 'gcash')).toMatchObject({ ok: true, digits: '5456656574544', last4: '4544' })
-    expect(rules.validateReference('12345', 'gcash')).toMatchObject({ ok: false, code: 'INVALID_REFERENCE', error: 'Enter the 13-digit reference number from your receipt' })
+    expect(rules.validateReference('12345', 'gcash')).toMatchObject({ ok: false, code: 'INVALID_REFERENCE', error: 'Reference numbers have 13 digits' })
     expect(rules.validateReference('', 'gcash')).toMatchObject({ ok: false, code: 'PROOF_REQUIRED' })
     expect(rules.validateReference('1234567890', 'paymaya').ok).toBe(true) // Maya: 10 to 16 digits
     expect(rules.validateReference('123456789', 'paymaya').ok).toBe(false)
@@ -948,5 +948,95 @@ describe('slot times (the "11:00 PM" bug)', () => {
     expect(parseSlot('1:00 - 2:00 PM')).toEqual({ start: '13:00', end: '14:00' })
     expect(parseSlot('4:00 - 5:00 PM')).toEqual({ start: '16:00', end: '17:00' })
     expect(parseSlot('nonsense')).toEqual({ start: '00:00', end: '00:00' })
+  })
+})
+
+/* ───────────────────────── "Your appointment is being processed" email ───────────────────────── */
+
+describe('"being processed" email', () => {
+  const view = { guardianName: 'Rene', patient: 'Miguel Tayao', therapist: 'Edward Briones', therapistRole: 'Occupational Therapist', dateShort: 'Nov 17', dateLong: 'Tuesday, November 17, 2026', timeLabel: '11:00 AM – 12:00 PM', sessionType: 'Cognitive', clinic: 'Main Clinic', paidAt: 'Nov 16, 6:24 PM', payment: '₱300.00 · GCash QR · Ref ending 4544', holdEnd: 'Nov 19, 6:24 PM' }
+
+  it('has the subject, the three-step tracker, the details, the hold box and a link (text snapshot)', async () => {
+    const { buildProcessingEmail } = await import('./reviewEmails.js')
+    const e = buildProcessingEmail(view)
+    expect(e.subject).toBe('Your appointment on Nov 17 is being processed')
+    expect(e.html).toContain('Therapist is reviewing'); expect(e.html).toContain('View my appointment'); expect(e.html).toContain('border:1px solid #f3d284')
+    expect(e.text).toMatchInlineSnapshot(`
+      "Hello Rene,
+
+      We got your payment.
+
+      Your appointment is being processed. Edward Briones will check your payment and accept your appointment. We'll email you again as soon as that happens.
+
+      [done] Payment recorded: Nov 16, 6:24 PM
+      [now]  Therapist is reviewing: usually within 24 hours
+      [next] Appointment accepted: you'll get a confirmation email
+
+      Patient: Miguel Tayao
+      Date: Tuesday, November 17, 2026
+      Time: 11:00 AM – 12:00 PM
+      Therapist: Edward Briones (Occupational Therapist)
+      Session · Clinic: Cognitive · Main Clinic
+      Payment: ₱300.00 · GCash QR · Ref ending 4544
+
+      Your time slot is held for you until Nov 19, 6:24 PM. If your therapist needs a new receipt, we'll let you know.
+
+      View my appointment: https://therapypro.app/appointments
+
+      You are receiving this because you booked an appointment on TherapyPro. This is not yet a confirmation."
+    `)
+  })
+
+  it('escapes user text and never contains a full reference number or a phone number', async () => {
+    const { buildProcessingEmail } = await import('./reviewEmails.js')
+    const e = buildProcessingEmail({ ...view, guardianName: '<script>alert(1)</script>', patient: '<img src=x onerror=1>' })
+    expect(e.html).not.toContain('<script>'); expect(e.html).not.toContain('<img src=x'); expect(e.html).toContain('&lt;script&gt;')
+    expect(JSON.stringify(e)).not.toMatch(/\d{10}/)
+  })
+})
+
+describe('proof route: the email', () => {
+  let server, base, token
+  beforeEach(async () => {
+    const { default: express } = await import('express')
+    const { default: handler } = await import('./routes/payments-item.js')
+    const app = express(); app.use(express.json())
+    app.all('/api/payments/:id/:action', handler)
+    await new Promise((r) => { server = app.listen(0, r) })
+    base = `http://127.0.0.1:${server.address().port}`
+  })
+  afterEach(() => new Promise((r) => server.close(r)))
+
+  async function setup() {
+    const appt = await makeHold(); const t = pay.newToken(); token = t.token; appt.access_token_hash = t.hash
+    store.employees = [{ _id: therapistId, email: 'th@example.com' }]
+    return { attempt: await newAttempt(appt, 'gcash') }
+  }
+  const send = (attempt, key = 'idem-key-0000000001') => {
+    const f = new FormData(); f.append('reference', '5456 656 574 544'); f.append('receipt', new Blob([jpegBytes()]), 'receipt.jpg')
+    return fetch(`${base}/api/payments/${attempt._id}/proof`, { method: 'POST', body: f, headers: { 'Idempotency-Key': key, 'x-booking-token': token } })
+  }
+  const processing = () => mocks.brevo.mock.calls.filter((c) => /is being processed/.test(c[0].subject))
+
+  it('sends exactly ONE "being processed" email, and none again for a retry with the same key', async () => {
+    const { attempt } = await setup()
+    const first = await send(attempt)
+    expect((await first.json())).toMatchObject({ emailQueued: true })
+    expect(processing()).toHaveLength(1)
+    expect(processing()[0][0].html).toContain('Ref ending 4544'); expect(JSON.stringify(processing()[0][0])).not.toContain('5456656574544')
+    const again = await send(attempt)
+    expect(again.status).toBe(200)
+    expect(processing()).toHaveLength(1)
+    expect(store.appointment_emails.filter((e) => e.type === 'processing')).toHaveLength(1)
+  })
+
+  it('a failing email does NOT fail the submission; it is stored as failed and emailQueued is false', async () => {
+    const { attempt } = await setup()
+    mocks.brevo.mockRejectedValue(new Error('provider down'))
+    const res = await send(attempt)
+    expect(res.status).toBe(201)
+    expect(await res.json()).toMatchObject({ paymentStatus: 'proof_submitted', emailQueued: false })
+    expect(store.appointment_emails.find((e) => e.type === 'processing')).toMatchObject({ status: 'failed' })
+    expect(store.payment_attempts[0]).toMatchObject({ status: 'pending_verification', email_status: 'failed' })
   })
 })

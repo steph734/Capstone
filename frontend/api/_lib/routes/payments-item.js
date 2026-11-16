@@ -21,6 +21,8 @@ import { refreshCardAttempt, attemptView, submitQr, friendlyFailure, markFailed,
 import { releaseHold } from '../bookingCore.js'
 import { confirmSent, submitProof, loadReceipt, PROOF_MESSAGES } from '../paymentProof.js'
 import { notifyPatient, notifyTherapistProof } from '../paymentNotifications.js'
+import { buildProcessingEmail, sendTracked } from '../reviewEmails.js'
+import { emailView, holdText } from '../requestReview.js'
 import { MAX_RECEIPT_BYTES } from '../paymentProofRules.js'
 import { decidePayment } from './therapist-payments.js'
 
@@ -76,15 +78,26 @@ export default async function handler(req, res) {
       const out = await submitProof(db, attempt, appointment, { reference: req.body?.reference, file: req.file?.buffer, key, change: req.method === 'PUT', now })
       appointment = await db.collection('appointments').findOne({ _id: appointment._id })
       let receivedByTherapist = Boolean(out.replay) // a replay was already delivered the first time
+      let emailQueued = false
       if (!out.replay) {
         // Best effort: a failed notice never undoes the stored proof.
         const t = await notifyTherapistProof(db, appointment, { changed: out.changed }).catch((e) => { console.error('therapist notice failed:', e.message); return { inApp: false } })
         receivedByTherapist = Boolean(t.inApp)
-        if (!out.changed) await notifyPatient(db, 'proofReceived', appointment).catch((e) => console.error('patient notice failed:', e.message))
+        if (!out.changed) {
+          await notifyPatient(db, 'proofReceived', appointment).catch((e) => console.error('patient notice failed:', e.message))
+          // The "being processed" email: once per submission (a replay with the same key never gets here). A failure is stored, never thrown.
+          const att = out.attempt
+          const methodName = att.method === 'paymaya' ? 'Maya QR' : 'GCash QR'
+          const paidAt = new Date(att.proof_submitted_at || Date.now()).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          const mail = buildProcessingEmail(emailView(appointment, { paidAt, holdEnd: holdText(appointment.hold_expires_at), payment: `₱${Number(att.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} · ${methodName} · Ref ending ${att.reference_last4}` }))
+          const sent = await sendTracked(db, { appointmentId: appointment._id, type: 'processing', to: appointment.contact_email, toName: appointment.guardian_name, email: mail }).catch((e) => { console.error('processing email failed:', e.message); return { status: 'failed' } })
+          emailQueued = sent.status !== 'failed'
+          await db.collection('payment_attempts').updateOne({ _id: attempt._id }, { $set: { email_status: sent.status, updated_at: new Date() } }).catch(() => {})
+        }
       }
       const stored = await db.collection('payment_attempts').findOne({ _id: attempt._id })
       res.setHeader('Cache-Control', 'no-store')
-      return res.status(out.replay ? 200 : 201).json({ ...attemptView(stored, appointment), receivedByTherapist, replay: Boolean(out.replay) })
+      return res.status(out.replay ? 200 : 201).json({ ...attemptView(stored, appointment), receivedByTherapist, emailQueued, replay: Boolean(out.replay) })
     }
 
     // qr-submit (older route, kept so an open page from before the update keeps working)

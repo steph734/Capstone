@@ -81,7 +81,7 @@ export async function notifyPatient(db, kind, appointment, vars = {}) {
   }[kind]?.()
   if (!tpl) return { inApp: false, email: false, sms: false }
   // "verified" already gets the full booking confirmation (email + text) from finalizePaid, so only the in-app note here.
-  const channels = kind === 'verified' ? ['inApp'] : ['inApp', 'email', 'sms']
+  const channels = kind === 'verified' ? ['inApp'] : kind === 'proofReceived' ? ['inApp', 'sms'] : ['inApp', 'email', 'sms'] // proofReceived: the rich "being processed" email is sent by the proof route
   return deliver(db, { email: appointment.contact_email, name: appointment.guardian_name, phone: appointment.contact_number, tpl, link: '/appointments', channels })
 }
 

@@ -63,7 +63,7 @@ describe('reference number (shared with the server)', () => {
   })
   it('GCash needs exactly 13 digits; Maya 10 to 16', () => {
     expect(validateReference('5456 656 574 544', 'gcash')).toMatchObject({ ok: true, count: 13, last4: '4544' })
-    expect(validateReference('5456 656 574 54', 'gcash')).toMatchObject({ ok: false, error: 'Enter the 13-digit reference number from your receipt' })
+    expect(validateReference('5456 656 574 54', 'gcash')).toMatchObject({ ok: false, error: 'Reference numbers have 13 digits' })
     expect(validateReference('', 'gcash').ok).toBe(false)
     expect(validateReference('1234567890', 'paymaya').ok).toBe(true)
     expect(validateReference('12345678901234567', 'paymaya').ok).toBe(false)

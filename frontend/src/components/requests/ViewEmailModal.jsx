@@ -19,7 +19,7 @@ export default function ViewEmailModal({ item, onClose }) {
 
   return (
     <ModalShell labelledBy="vem-title" onClose={onClose} size="md">
-      <h2 id="vem-title" className="m-0 flex items-center gap-2 text-xl font-extrabold"><Mail size={20} aria-hidden="true" /> Email sent to the guardian</h2>
+      <h2 id="vem-title" className="m-0 flex items-center gap-2 text-xl font-extrabold text-[#111827]"><Mail size={20} aria-hidden="true" /> Email sent to the guardian</h2>
       <p className="m-0 mt-1 text-[13px] text-[#5B7469]">{item.patientName} · {item.sessionLabel}</p>
       {error && <p role="alert" className="mt-4 rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{error}</p>}
       {!email && !error && <p className="mt-4 text-sm text-[#5B7469]">Loading…</p>}

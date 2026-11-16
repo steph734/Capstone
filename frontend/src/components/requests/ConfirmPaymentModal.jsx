@@ -19,7 +19,7 @@ export default function ConfirmPaymentModal({ request, onCancel, onConfirm }) {
     <ModalShell labelledBy="cpr-title" describedBy="cpr-sub" onClose={onCancel} busy={busy} size="sm">
       <div className="flex flex-col items-center text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF3DF] text-[#7A4A06]"><Banknote size={26} aria-hidden="true" /></span>
-        <h2 id="cpr-title" className="m-0 mt-3 text-[26px] font-extrabold leading-tight">Confirm payment received?</h2>
+        <h2 id="cpr-title" className="m-0 mt-3 text-[26px] font-extrabold leading-tight text-[#111827]">Confirm payment received?</h2>
         <p id="cpr-sub" className="m-0 mt-1.5 text-sm text-[#5B7469]">Please make sure the money is really in your account before you confirm.</p>
       </div>
 

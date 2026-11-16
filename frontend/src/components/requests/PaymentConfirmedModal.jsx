@@ -21,7 +21,7 @@ export default function PaymentConfirmedModal({ request, onAccept, onDecline, on
 
       <div className="p-5 sm:p-7">
         <p className="m-0 text-center text-[11px] font-extrabold uppercase tracking-wider text-[#5B7469]">Step 2 of 2</p>
-        <h2 id="pcm-title" className="m-0 mt-1 text-center text-[26px] font-extrabold leading-tight">Accept or decline this appointment</h2>
+        <h2 id="pcm-title" className="m-0 mt-1 text-center text-[26px] font-extrabold leading-tight text-[#111827]">Accept or decline this appointment</h2>
 
         <div className="mt-4">
           <SummaryRows rows={[['Patient', request.patientName], ['When', request.whenLabel], ['Where', `${request.clinic} · ${request.sessionType}`]]} />

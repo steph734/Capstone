@@ -32,7 +32,7 @@ export default function PaymentNotReceivedModal({ request, onCancel, onSubmit })
       <div className="flex items-center gap-4">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FFF3DF] text-[#D97706]"><AlertTriangle size={26} aria-hidden="true" /></span>
         <div>
-          <h2 id="pnr-title" className="m-0 text-[26px] font-extrabold leading-tight">Payment not received</h2>
+          <h2 id="pnr-title" className="m-0 text-[26px] font-extrabold leading-tight text-[#111827]">Payment not received</h2>
           <p id="pnr-sub" className="m-0 mt-0.5 text-sm text-[#5B7469]">Tell the guardian what went wrong so they can fix it.</p>
         </div>
       </div>

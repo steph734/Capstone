@@ -13,7 +13,7 @@ export default function ModalShell({ labelledBy, describedBy, onClose, busy = fa
       <div
         ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} aria-describedby={describedBy} aria-busy={busy} tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
-        className={`max-h-[94vh] w-full ${WIDTH[size]} overflow-y-auto rounded-t-3xl bg-white font-[Inter,system-ui,sans-serif] text-[#1E3A31] shadow-2xl outline-none [color-scheme:light] sm:rounded-3xl ${flush ? '' : 'p-5 sm:p-7'}`}
+        className={`max-h-[94vh] w-full ${WIDTH[size]} overflow-y-auto rounded-t-3xl bg-white font-[Inter,system-ui,sans-serif] text-[#1E3A31] shadow-2xl outline-none [color-scheme:light] sm:rounded-3xl [&_*]:border-solid [&_h2]:text-[#111827] [&_h3]:text-[#111827] ${flush ? '' : 'p-5 sm:p-7'}`}
       >
         {children}
       </div>

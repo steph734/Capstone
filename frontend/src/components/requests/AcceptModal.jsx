@@ -23,7 +23,7 @@ export default function AcceptModal({ request, onCancel, onConfirm }) {
     <ModalShell labelledBy="acc-title" describedBy="acc-sub" onClose={onCancel} busy={busy} size="md">
       <div className="flex flex-col items-center text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#EAF8EF] text-[#16A34A]"><CircleCheck size={30} aria-hidden="true" /></span>
-        <h2 id="acc-title" className="m-0 mt-3 text-[26px] font-extrabold leading-tight">Accept this appointment?</h2>
+        <h2 id="acc-title" className="m-0 mt-3 text-[26px] font-extrabold leading-tight text-[#111827]">Accept this appointment?</h2>
         <p id="acc-sub" className="m-0 mt-1.5 text-sm text-[#5B7469]">This confirms the booking and emails the guardian right away.</p>
       </div>
       <div className="mt-5"><SummaryRows rows={rows} /></div>

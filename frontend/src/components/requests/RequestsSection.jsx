@@ -91,8 +91,8 @@ export default function RequestsSection({ therapistName, showToast, onChanged, o
   return (
     <section aria-label="Requests to review" className="mb-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="m-0 text-[22px] font-extrabold text-[#1E3A31]">Requests to review</h2>
-        {requests.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#FFE3A8] bg-[#FFF3DF] px-3 py-1 text-xs font-extrabold text-[#7A4A06]"><Clock size={13} aria-hidden="true" /> {requests.length} need{requests.length === 1 ? 's' : ''} your response</span>}
+        <h2 className="m-0 text-lg font-bold text-[#1E3A31]">Requests to review</h2>
+        {requests.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#FFE3A8] bg-[#FFF3DF] px-2.5 py-0.5 text-[11px] font-bold text-[#7A4A06]"><Clock size={13} aria-hidden="true" /> {requests.length} need{requests.length === 1 ? 's' : ''} your response</span>}
       </div>
 
       {loadError && !data && <p role="alert" className="rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{loadError} <button type="button" onClick={load} className="border-0 bg-transparent p-0 font-extrabold underline">Try again</button></p>}

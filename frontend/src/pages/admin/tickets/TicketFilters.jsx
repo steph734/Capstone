@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CATEGORY_LABEL, PRIORITY_META, SORT_LABEL, STATUS_META } from './ticketConfig'
 
@@ -37,7 +38,7 @@ export default function TicketFilters({ params, counts, onChange, onClear }) {
           ))}
         </div>
         <label className="tk-search">
-          <span aria-hidden="true">🔍</span>
+          <Search size={16} aria-hidden="true" />
           <input type="search" value={q} placeholder="Search subject or TCK-…" aria-label="Search subject or ticket number" onChange={(e) => setQ(e.target.value)} />
         </label>
       </div>

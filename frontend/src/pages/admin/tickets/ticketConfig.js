@@ -4,18 +4,18 @@
 export const DEFAULT_ATTENTION_DAYS = 14
 
 export const STATUS_META = {
-  open: { label: 'Open', icon: '●', tone: 'open' },
-  in_progress: { label: 'In progress', icon: '◐', tone: 'progress' },
-  waiting_on_user: { label: 'Waiting on requester', icon: '⏸', tone: 'waiting' },
-  resolved: { label: 'Resolved', icon: '✓', tone: 'resolved' },
-  closed: { label: 'Closed', icon: '✓', tone: 'resolved' },
+  open: { label: 'Open', icon: 'circle', tone: 'open' },
+  in_progress: { label: 'In progress', icon: 'half', tone: 'progress' },
+  waiting_on_user: { label: 'Waiting on requester', icon: 'pause', tone: 'waiting' },
+  resolved: { label: 'Resolved', icon: 'check', tone: 'resolved' },
+  closed: { label: 'Closed', icon: 'check', tone: 'resolved' },
 }
 export const WORKFLOW_STATUSES = ['open', 'in_progress', 'waiting_on_user']
 export const PRIORITY_META = {
-  urgent: { label: 'Urgent', icon: '▲▲' },
-  high: { label: 'High', icon: '▲' },
+  urgent: { label: 'Urgent', icon: 'up2' },
+  high: { label: 'High', icon: 'up' },
   normal: { label: 'Normal', icon: '' },
-  low: { label: 'Low', icon: '▽' },
+  low: { label: 'Low', icon: 'down' },
 }
 export const CATEGORY_LABEL = { bug: 'Bug / error', billing: 'Billing / payment', account: 'Account / login', question: 'Question', other: 'Other', game_request: 'Game request', branch: 'Branch' }
 export const ROLE_LABEL = { owner: 'Owner', therapist: 'Therapist', guardian: 'Guardian', patient: 'Guardian', super_admin: 'Admin' }

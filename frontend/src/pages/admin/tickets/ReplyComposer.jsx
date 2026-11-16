@@ -1,3 +1,4 @@
+import { ArrowRight, ChevronDown, Lock, Paperclip } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { CANNED_REPLIES, fillCanned, firstNameOf } from './ticketConfig'
 
@@ -54,7 +55,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
 
   const attachBtn = (
     <>
-      <button type="button" className="tk-btn tk-btn-ghost" onClick={() => fileRef.current?.click()}><span aria-hidden="true">📎</span> Attach</button>
+      <button type="button" className="tk-btn tk-btn-ghost" onClick={() => fileRef.current?.click()}><Paperclip size={15} aria-hidden="true" /> Attach</button>
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-label="Attach an image" onChange={(e) => { setFile(e.target.files?.[0] || null); e.target.value = '' }} />
     </>
   )
@@ -64,7 +65,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
       {variant === 'pane' && (
         <div className="tk-composer-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={!internal} className={!internal ? 'on' : ''} onClick={() => setMode('reply')}>Reply to {first}</button>
-          <button type="button" role="tab" aria-selected={internal} className={internal ? 'on' : ''} onClick={() => setMode('note')}><span aria-hidden="true">🔒</span> Internal note</button>
+          <button type="button" role="tab" aria-selected={internal} className={internal ? 'on' : ''} onClick={() => setMode('note')}><Lock size={14} aria-hidden="true" /> Internal note</button>
         </div>
       )}
       <textarea
@@ -76,7 +77,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
         placeholder={internal ? 'Only admins can see this note…' : variant === 'pane' ? 'Write your reply…' : 'Write your reply to the requester…'}
         onChange={(e) => setText(e.target.value)}
       />
-      {file && <p className="tk-file"><span aria-hidden="true">📎</span> {file.name} <button type="button" className="tk-link" onClick={() => setFile(null)} aria-label="Remove attachment">Remove</button></p>}
+      {file && <p className="tk-file"><Paperclip size={13} aria-hidden="true" /> {file.name} <button type="button" className="tk-link" onClick={() => setFile(null)} aria-label="Remove attachment">Remove</button></p>}
       {failed && (
         <p className="tk-error" role="alert">
           {failed.message} <button type="button" className="tk-link" onClick={retry}>Retry</button>
@@ -91,7 +92,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
         {variant === 'page' ? (
           <>
             <div className="tk-menu-wrap">
-              <button type="button" className="tk-btn tk-btn-ghost" aria-haspopup="menu" aria-expanded={cannedOpen} onClick={() => setCannedOpen((o) => !o)}>Canned replies ▾</button>
+              <button type="button" className="tk-btn tk-btn-ghost" aria-haspopup="menu" aria-expanded={cannedOpen} onClick={() => setCannedOpen((o) => !o)}>Canned replies <ChevronDown size={14} aria-hidden="true" /></button>
               {cannedOpen && (
                 <div className="tk-menu" role="menu" onKeyDown={(e) => { if (e.key === 'Escape') setCannedOpen(false) }}>
                   {CANNED_REPLIES.map((c) => <button key={c.id} type="button" role="menuitem" onClick={() => { insert(fillCanned(c.text, first)); setCannedOpen(false) }}>{c.label}</button>)}
@@ -99,7 +100,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
               )}
             </div>
             {attachBtn}
-            <label className="tk-check"><input type="checkbox" checked={internal} onChange={(e) => setMode(e.target.checked ? 'note' : 'reply')} /> <span aria-hidden="true">🔒</span> Internal note</label>
+            <label className="tk-check"><input type="checkbox" checked={internal} onChange={(e) => setMode(e.target.checked ? 'note' : 'reply')} /> <Lock size={14} aria-hidden="true" /> Internal note</label>
           </>
         ) : attachBtn}
         <span className="tk-spacer" />
@@ -107,7 +108,7 @@ export default function ReplyComposer({ requesterName, variant = 'pane', onSend,
           <button type="button" className="tk-btn tk-btn-outline" disabled={sending || !text.trim()} onClick={sendAndResolve}>Send &amp; resolve</button>
         )}
         <button type="button" className="tk-btn tk-btn-primary" disabled={sending || empty} onClick={send}>
-          {sending ? 'Sending…' : internal ? 'Add note' : 'Send reply →'}
+          {sending ? 'Sending…' : internal ? 'Add note' : <>Send reply <ArrowRight size={15} aria-hidden="true" /></>}
         </button>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { Lock, Paperclip } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Avatar, RoleChip } from './TicketChips'
 import { firstNameOf, relativeTime } from './ticketConfig'
@@ -27,10 +28,10 @@ export default function TicketThread({ messages, requesterName, onError }) {
                 <RoleChip role={m.authorRole} />
                 <span>· {m.pending ? 'sending…' : relativeTime(m.createdAt)}</span>
               </div>
-              {m.internal && <p className="tk-internal-flag"><span aria-hidden="true">🔒</span> Internal note · Only admins can see this</p>}
+              {m.internal && <p className="tk-internal-flag"><Lock size={12} aria-hidden="true" /> Internal note · Only admins can see this</p>}
               <div className="tk-bubble">
                 <p>{m.body}</p>
-                {m.attachments.map((a) => <button key={a.index} type="button" className="tk-attach" onClick={() => open(m, a)}><span aria-hidden="true">📎</span> {a.fileName}</button>)}
+                {m.attachments.map((a) => <button key={a.index} type="button" className="tk-attach" onClick={() => open(m, a)}><Paperclip size={13} aria-hidden="true" /> {a.fileName}</button>)}
               </div>
             </div>
           </div>

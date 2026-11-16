@@ -184,3 +184,16 @@
 }
 @media (max-width: 560px) { .tk-kv-2 { grid-template-columns: 1fr; } .tk-sort { margin-left: 0; } .tk-toast-region { left: 16px; right: 16px; bottom: 16px; } }
 @media (prefers-reduced-motion: reduce) { .tk-skel { animation: none; } }
+
+/* icons sit inline with their text */
+.tk-btn svg, .tk-chip svg, .tk-tabs svg, .tk-attach svg, .tk-internal-flag svg, .tk-open-full svg, .tk-check svg, .tk-banner svg, .tk-composer-tabs svg, .tk-search svg { flex-shrink: 0; vertical-align: -2px; }
+.tk-composer-tabs button, .tk-open-full, .tk-internal-flag, .tk-check, .tk-attach { display: inline-flex; align-items: center; gap: 6px; }
+.tk-banner span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* fields stay white with dark text, whatever the app theme is doing */
+.tk-root textarea, .tk-root input[type="search"], .tk-root select, .tk-overlay textarea, .tk-overlay select, .tk-overlay input {
+  background: #ffffff !important; color: #111111 !important; -webkit-text-fill-color: #111111;
+}
+.tk-root textarea::placeholder, .tk-root input::placeholder, .tk-overlay textarea::placeholder { color: #7a8883 !important; -webkit-text-fill-color: #7a8883; opacity: 1; }
+.tk-root h1, .tk-root h2, .tk-root h3 { color: var(--tk-ink); }
+.tk-pane-head h2 { color: #1d3a30; }

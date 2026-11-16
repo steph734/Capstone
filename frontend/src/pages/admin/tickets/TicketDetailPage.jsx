@@ -1,3 +1,4 @@
+import { ArrowLeft, Check, ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AdminPageShell from '../AdminPageShell'
@@ -59,7 +60,7 @@ export default function TicketDetailPage({ user, onLogout }) {
       <div className="tk-card-panel tk-empty">
         <h3>{error || 'Could not load this ticket.'}</h3>
         <button type="button" className="tk-btn tk-btn-outline" onClick={() => reload({ silent: false })}>Retry</button>
-        <button type="button" className="tk-btn tk-btn-ghost" onClick={back}>← Back to tickets</button>
+        <button type="button" className="tk-btn tk-btn-ghost" onClick={back}><ArrowLeft size={15} aria-hidden="true" /> Back to tickets</button>
       </div>
     )
   }
@@ -95,7 +96,7 @@ export default function TicketDetailPage({ user, onLogout }) {
         <div className="tk-topbar-actions">
           {assignedToMe && <span className="tk-chip tk-mine">Assigned to you</span>}
           {ticket.assignedTo && !done && <button type="button" className="tk-btn tk-btn-outline" onClick={() => run(actions.change({ assignedTo: null }))}>Unassign</button>}
-          <button type="button" className="tk-btn tk-btn-soft" onClick={back}>← Back to tickets</button>
+          <button type="button" className="tk-btn tk-btn-soft" onClick={back}><ArrowLeft size={15} aria-hidden="true" /> Back to tickets</button>
         </div>
       </header>
 
@@ -104,7 +105,7 @@ export default function TicketDetailPage({ user, onLogout }) {
           This ticket was updated by someone else. <button type="button" className="tk-link" onClick={async () => { await reload(); actions.clearConflict() }}>Reload to see it</button>
         </div>
       )}
-      {done && <div className="tk-banner tk-banner-done"><span>✓ Resolved{ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''} on {fullDate(ticket.resolvedAt)}. Read-only until reopened.</span></div>}
+      {done && <div className="tk-banner tk-banner-done"><span><Check size={14} aria-hidden="true" /> Resolved{ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''} on {fullDate(ticket.resolvedAt)}. Read-only until reopened.</span></div>}
 
       <div className="tk-detail-grid">
         <div className="tk-col">
@@ -154,7 +155,7 @@ export default function TicketDetailPage({ user, onLogout }) {
                 />
                 <div className="tk-composer-actions">
                   <div className="tk-menu-wrap">
-                    <button type="button" className="tk-btn tk-btn-ghost" aria-haspopup="menu" aria-expanded={cannedClose} onClick={() => setCannedClose((o) => !o)}>Canned closing ▾</button>
+                    <button type="button" className="tk-btn tk-btn-ghost" aria-haspopup="menu" aria-expanded={cannedClose} onClick={() => setCannedClose((o) => !o)}>Canned closing <ChevronDown size={14} aria-hidden="true" /></button>
                     {cannedClose && (
                       <div className="tk-menu" role="menu" onKeyDown={(e) => { if (e.key === 'Escape') setCannedClose(false) }}>
                         {CANNED_CLOSING.map((c) => <button key={c.id} type="button" role="menuitem" onClick={() => { setNotes((n) => (n.trim() ? `${n.trimEnd()}\n${fillCanned(c.text, first)}` : fillCanned(c.text, first))); setCannedClose(false) }}>{c.label}</button>)}

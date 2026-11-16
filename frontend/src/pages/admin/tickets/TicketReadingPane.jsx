@@ -1,3 +1,4 @@
+import { ArrowUpRight, Check, Timer } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AgeChip, CategoryChip, PriorityChip, StatusChip } from './TicketChips'
@@ -36,15 +37,15 @@ export default function TicketReadingPane({ number, now, onToast }) {
         <div>
           <p className="tk-eyebrow">
             {ticket.number} · {TYPE_LABEL[ticket.type] || 'Ticket'}
-            <Link className="tk-open-full" to={`/admin/support-tickets/${ticket.number}`}>Open full ticket ↗</Link>
+            <Link className="tk-open-full" to={`/admin/support-tickets/${ticket.number}`}>Open full ticket <ArrowUpRight size={14} aria-hidden="true" /></Link>
           </p>
           <h2>{ticket.subject}</h2>
           <div className="tk-chips">
             <StatusChip status={ticket.status} /><PriorityChip priority={ticket.priority} /><CategoryChip category={ticket.category} />
-            {isAttention(ticket, attentionDays, now) ? <span className="tk-chip tk-age"><span aria-hidden="true">⏱</span> {Math.floor(ageMs(ticket.createdAt, now) / 86400000)}d old</span> : <AgeChip ms={ageMs(ticket.createdAt, now)} />}
+            {isAttention(ticket, attentionDays, now) ? <span className="tk-chip tk-age"><Timer size={12} aria-hidden="true" /> {Math.floor(ageMs(ticket.createdAt, now) / 86400000)}d old</span> : <AgeChip ms={ageMs(ticket.createdAt, now)} />}
           </div>
         </div>
-        {!done && <button ref={markRef} type="button" className="tk-btn tk-btn-resolve-soft" onClick={() => setResolveFor({ notes: ticket.resolutionDraft || '' })}>✓ Mark resolved</button>}
+        {!done && <button ref={markRef} type="button" className="tk-btn tk-btn-resolve-soft" onClick={() => setResolveFor({ notes: ticket.resolutionDraft || '' })}><Check size={16} aria-hidden="true" /> Mark resolved</button>}
       </header>
 
       {actions.conflict && (
@@ -54,7 +55,7 @@ export default function TicketReadingPane({ number, now, onToast }) {
       )}
       {done && (
         <div className="tk-banner tk-banner-done">
-          <span>✓ Resolved{ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''}. This thread is read-only.</span>
+          <span><Check size={14} aria-hidden="true" /> Resolved{ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''}. This thread is read-only.</span>
           <button type="button" className="tk-btn tk-btn-outline" disabled={actions.busy} onClick={() => actions.reopen().catch(() => {})}>Reopen</button>
         </div>
       )}

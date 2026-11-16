@@ -26,7 +26,7 @@
   outline: none;
   animation: avm-modal-in 0.2s ease;
 }
-.avd-dialog-success { margin-top: 150px; text-align: center; }
+.avd-dialog-success { margin-top: 110px; text-align: center; }
 
 .avd-title { margin: 0 0 8px; font-size: 20px; font-weight: 800; color: #fff; }
 .avd-text { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #9ca3af; }
@@ -77,8 +77,8 @@
 .avd-pao {
   position: absolute;
   left: 50%;
-  top: -190px;
-  height: 250px;
+  top: -150px;
+  height: 190px;
   width: auto;
   transform: translateX(-50%);
   pointer-events: none;
@@ -103,8 +103,8 @@
 @media (max-width: 480px) {
   .avd-backdrop { padding: 12px; }
   .avd-dialog { padding: 20px; }
-  .avd-dialog-success { margin-top: 110px; }
-  .avd-pao { height: 170px; top: -125px; }
+  .avd-dialog-success { margin-top: 85px; }
+  .avd-pao { height: 130px; top: -100px; }
   .avd-footer { flex-direction: column-reverse; }
 }
 

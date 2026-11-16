@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { PRIORITY_META, STATUS_META, WORKFLOW_STATUSES } from './ticketConfig'
 
 // Status / priority / assignee / resolution code and the big Resolve button. Changing the status never
@@ -36,7 +37,7 @@ export default function WorkflowCard({ ticket, admins, codes, code, onCodeChange
           </select>
           {errors?.code && <p className="tk-error" role="alert">{errors.code}</p>}
           {errors?.notes && <p className="tk-error" role="alert">{errors.notes}</p>}
-          <button ref={resolveRef} type="button" className="tk-btn tk-btn-resolve tk-btn-block" onClick={onResolve} disabled={busy}>✓ Resolve ticket</button>
+          <button ref={resolveRef} type="button" className="tk-btn tk-btn-resolve tk-btn-block" onClick={onResolve} disabled={busy}><Check size={17} aria-hidden="true" /> Resolve ticket</button>
         </>
       )}
     </section>

@@ -1,10 +1,10 @@
 // Tests for the online-payment rules (run with:  npx vitest run api/_lib/payments.test.js).
 // MongoDB is an in-memory stand-in, Stripe and the email/SMS senders are mocked: nothing real is touched.
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { ObjectId } from 'mongodb'
 
 const mocks = vi.hoisted(() => ({
-  retrieve: vi.fn(), cancel: vi.fn(), refund: vi.fn(), constructEvent: vi.fn(), email: vi.fn(), sms: vi.fn(), db: null,
+  retrieve: vi.fn(), cancel: vi.fn(), refund: vi.fn(), constructEvent: vi.fn(), email: vi.fn(), sms: vi.fn(), brevo: vi.fn(), semaphore: vi.fn(), statusEmail: vi.fn(), db: null,
 }))
 vi.mock('./stripeClient.js', () => ({
   getStripeClient: () => ({
@@ -13,8 +13,10 @@ vi.mock('./stripeClient.js', () => ({
   }),
 }))
 vi.mock('./mongo.js', () => ({ getDb: async () => mocks.db, getMongo: async () => {} }))
-vi.mock('./appointmentEmail.js', () => ({ sendAppointmentConfirmationEmail: mocks.email }))
+vi.mock('./appointmentEmail.js', () => ({ sendAppointmentConfirmationEmail: mocks.email, sendAppointmentStatusEmail: mocks.statusEmail }))
 vi.mock('./appointmentSms.js', () => ({ sendAppointmentConfirmationSms: mocks.sms }))
+vi.mock('./brevo.js', () => ({ sendEmail: mocks.brevo }))
+vi.mock('./semaphore.js', () => ({ sendSms: mocks.semaphore }))
 
 // ── in-memory MongoDB (just the operations these modules use) ──
 let store
@@ -70,6 +72,9 @@ beforeEach(async () => {
   Object.values(mocks).forEach((m) => typeof m?.mockReset === 'function' && m.mockReset())
   mocks.email.mockResolvedValue({ sent: true })
   mocks.sms.mockResolvedValue({ sent: true })
+  mocks.brevo.mockResolvedValue({ sent: true })
+  mocks.statusEmail.mockResolvedValue({ sent: true })
+  mocks.semaphore.mockResolvedValue({ referenceId: 'r1' })
   core = await import('./bookingCore.js')
   pay = await import('./paymentAttempts.js')
 })
@@ -282,14 +287,15 @@ describe('QR payments (GCash / Maya) are never confirmed automatically', () => {
     expect(store.payments[0]).toMatchObject({ method: 'gcash', status: 'completed' })
     expect(mocks.email).toHaveBeenCalledTimes(1)
   })
-  it('rejecting it releases the slot and books nothing', async () => {
+  it('rejecting it books nothing and keeps the slot held', async () => {
     const appt = await makeHold()
     const attempt = await newAttempt(appt, 'paymaya')
     await pay.submitQr(db, attempt, appt, {})
     const out = await pay.reviewQr(db, attempt._id, false)
     expect(out.ok).toBe(true)
-    expect(store.payment_attempts[0].status).toBe('failed')
-    expect(store.appointments[0]).toMatchObject({ status: 'Cancelled', payment_state: 'failed' })
+    // "Not received": the slot stays held until the hold ends and the patient may resubmit (it is no longer released at once)
+    expect(store.payment_attempts[0].status).toBe('rejected')
+    expect(store.appointments[0]).toMatchObject({ status: 'Pending', payment_state: 'awaiting_payment' })
     expect(store.payments || []).toHaveLength(0)
   })
   it('a payment can only be reviewed once', async () => {
@@ -389,5 +395,558 @@ describe('QR "Payment submitted" screen data', () => {
     expect(store.payment_attempts[0].qr_submitted_at).toBe(sentAt)
     const view = pay.attemptView(store.payment_attempts[0], store.appointments[0])
     expect(new Date(view.booking.holdExpiresAt).getTime()).toBeGreaterThan(Date.now() + 24 * 3600 * 1000) // held longer than the promised review time
+  })
+})
+
+/* ───────────────────────── QR proof: reference number + receipt (new flow) ───────────────────────── */
+
+const rules = await import('./paymentProofRules.js')
+const jpegBytes = ({ withExif = true } = {}) => Buffer.concat([
+  Buffer.from([0xff, 0xd8]),
+  ...(withExif ? [Buffer.from([0xff, 0xe1, 0x00, 0x12]), Buffer.from('Exif\0\0GPS-SECRET')] : []),
+  Buffer.from([0xff, 0xe0, 0x00, 0x04, 0x4a, 0x46]),
+  Buffer.from([0xff, 0xda, 0x00, 0x04, 0x01, 0x02, 0x11, 0x22, 0x33, 0x44, 0xff, 0xd9]),
+])
+const chunk = (type, data = Buffer.alloc(0)) => { const h = Buffer.alloc(8); h.writeUInt32BE(data.length, 0); h.write(type, 4, 'latin1'); return Buffer.concat([h, data, Buffer.alloc(4)]) }
+const pngBytes = () => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', Buffer.alloc(13)), chunk('tEXt', Buffer.from('Author\0someone')), chunk('IDAT', Buffer.from([1, 2, 3])), chunk('IEND')])
+const REF = '5456 656 574 544'
+
+describe('reference number rules', () => {
+  it('strips spaces and non-digits, groups for display, and checks the length per method', () => {
+    expect(rules.normalizeReference('5456-656 574.544')).toBe('5456656574544')
+    expect(rules.formatReference('5456656574544', 'gcash')).toBe('5456 656 574 544')
+    expect(rules.validateReference(REF, 'gcash')).toMatchObject({ ok: true, digits: '5456656574544', last4: '4544' })
+    expect(rules.validateReference('12345', 'gcash')).toMatchObject({ ok: false, code: 'INVALID_REFERENCE', error: 'Enter the 13-digit reference number from your receipt' })
+    expect(rules.validateReference('', 'gcash')).toMatchObject({ ok: false, code: 'PROOF_REQUIRED' })
+    expect(rules.validateReference('1234567890', 'paymaya').ok).toBe(true) // Maya: 10 to 16 digits
+    expect(rules.validateReference('123456789', 'paymaya').ok).toBe(false)
+  })
+})
+
+describe('receipt files', () => {
+  it('is checked by its bytes, not by the name or MIME type the browser sends', async () => {
+    const { prepareReceipt } = await import('./receiptFile.js')
+    expect(() => prepareReceipt(Buffer.from('<?php echo 1; ?> not an image at all'))).toThrow(expect.objectContaining({ code: 'INVALID_FILE_TYPE' }))
+    expect(() => prepareReceipt(Buffer.from('GIF89a......'))).toThrow(expect.objectContaining({ code: 'INVALID_FILE_TYPE' }))
+    expect(prepareReceipt(jpegBytes()).type).toBe('jpg')
+    expect(prepareReceipt(pngBytes()).type).toBe('png')
+  })
+  it('refuses files over 5 MB and empty uploads', async () => {
+    const { prepareReceipt } = await import('./receiptFile.js')
+    expect(() => prepareReceipt(Buffer.alloc(5 * 1024 * 1024 + 1, 0xff))).toThrow(expect.objectContaining({ code: 'FILE_TOO_LARGE' }))
+    expect(() => prepareReceipt(Buffer.alloc(0))).toThrow(expect.objectContaining({ code: 'PROOF_REQUIRED' }))
+  })
+  it('removes EXIF and text metadata but keeps the picture data', async () => {
+    const { prepareReceipt } = await import('./receiptFile.js')
+    const j = prepareReceipt(jpegBytes()).buffer
+    expect(j.toString('latin1')).not.toContain('GPS-SECRET')
+    expect(j.includes(Buffer.from([0x11, 0x22, 0x33, 0x44]))).toBe(true)
+    const png = prepareReceipt(pngBytes()).buffer
+    expect(png.toString('latin1')).not.toContain('someone')
+    expect(png.toString('latin1')).toContain('IDAT')
+  })
+})
+
+describe('submitting payment proof', () => {
+  const proof = async (appt, attempt, over = {}) => (await import('./paymentProof.js')).submitProof(db, attempt, appt, { reference: REF, file: jpegBytes(), key: 'proof-key-0000000001', ...over })
+  const fresh = (appt) => store.appointments.find((a) => String(a._id) === String(appt._id))
+
+  it('records the proof for the therapist, holds the slot for 72 hours, and does NOT book anything', async () => {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    expect(attempt.status).toBe('created') // a QR payment is not "sent" before the proof exists
+    const out = await proof(appt, attempt)
+    expect(out.attempt.status).toBe('pending_verification')
+    expect(store.payment_attempts[0]).toMatchObject({ reference_digits: '5456656574544', reference_last4: '4544', status: 'pending_verification' })
+    expect(store.payment_receipts).toHaveLength(1)
+    expect(fresh(appt).payment_state).toBe('pending_verification') // not "paid": still a held slot
+    expect(store.payments || []).toHaveLength(0)
+    const hours = (new Date(fresh(appt).hold_expires_at).getTime() - Date.now()) / 3600000
+    expect(hours).toBeGreaterThan(71.9)
+    expect(hours).toBeLessThan(72.1)
+    expect(rules.paymentStatusOf(store.payment_attempts[0])).toBe('proof_submitted')
+  })
+
+  it('needs BOTH a valid reference and a receipt', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    await expect(proof(appt, attempt, { file: null })).rejects.toMatchObject({ code: 'PROOF_REQUIRED' })
+    await expect(proof(appt, attempt, { reference: '' })).rejects.toMatchObject({ code: 'PROOF_REQUIRED' })
+    await expect(proof(appt, attempt, { reference: '123' })).rejects.toMatchObject({ code: 'INVALID_REFERENCE' })
+    await expect(proof(appt, attempt, { file: Buffer.from('not an image at all') })).rejects.toMatchObject({ code: 'INVALID_FILE_TYPE' })
+    expect(store.payment_receipts || []).toHaveLength(0)
+    expect(store.payment_attempts[0].status).toBe('created')
+  })
+
+  it('is idempotent: the same key (double click, retry) never makes a second record', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    const first = await proof(appt, attempt)
+    const second = await proof(appt, first.attempt)
+    expect(second.replay).toBe(true)
+    expect(store.payment_receipts).toHaveLength(1)
+  })
+
+  it('refuses a reference number that was already used, and flags the earlier payment', async () => {
+    const a1 = await makeHold(); const t1 = await newAttempt(a1, 'gcash'); await proof(a1, t1)
+    const a2 = { ...a1, _id: new ObjectId() }; store.appointments.push(a2)
+    const t2 = await newAttempt(a2, 'gcash')
+    await expect(proof(a2, t2, { key: 'proof-key-0000000002' })).rejects.toMatchObject({ code: 'REFERENCE_ALREADY_USED', status: 409 })
+    expect(store.payment_attempts.find((x) => String(x._id) === String(t1._id)).reference_reuse_flag).toBe(true)
+  })
+
+  it('a second submit needs "change proof"; a change replaces the proof; a verified payment cannot be changed', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    const first = await proof(appt, attempt)
+    await expect(proof(appt, first.attempt, { key: 'proof-key-0000000003' })).rejects.toMatchObject({ code: 'ALREADY_SUBMITTED' })
+    const changed = await proof(fresh(appt), first.attempt, { key: 'proof-key-0000000003', reference: '1111 222 333 444', change: true })
+    expect(changed.changed).toBe(true)
+    expect(store.payment_attempts[0]).toMatchObject({ reference_last4: '3444', proof_changed: true })
+    await pay.reviewQr(db, attempt._id, true, { by: 'th@example.com' })
+    await expect(proof(fresh(appt), store.payment_attempts[0], { key: 'proof-key-0000000004', change: true })).rejects.toMatchObject({ code: 'PAYMENT_ALREADY_VERIFIED' })
+  })
+
+  it('the appointment is booked ONLY when the therapist verifies', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    await proof(appt, attempt)
+    expect(fresh(appt).payment_state).not.toBe('paid')
+    const out = await pay.reviewQr(db, attempt._id, true, { by: 'th@example.com' })
+    expect(out.ok).toBe(true)
+    expect(fresh(appt).payment_state).toBe('paid')
+    expect(store.payment_attempts[0]).toMatchObject({ status: 'succeeded', verified_by: 'th@example.com' })
+    expect(rules.paymentStatusOf(store.payment_attempts[0])).toBe('verified')
+  })
+
+  it('"not received": the slot stays held with the reason, and the patient can resubmit', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    await proof(appt, attempt)
+    await pay.reviewQr(db, attempt._id, false, { reason: 'Wrong amount', by: 'th@example.com' })
+    expect(store.payment_attempts[0]).toMatchObject({ status: 'rejected', rejected_reason: 'Wrong amount' })
+    expect(pay.attemptView(store.payment_attempts[0], fresh(appt))).toMatchObject({ paymentStatus: 'rejected', rejectedReason: 'Wrong amount' })
+    expect(fresh(appt).status).toBe('Pending')
+    const again = await proof(fresh(appt), store.payment_attempts[0], { key: 'proof-key-0000000005', reference: '9999 888 777 666' })
+    expect(again.attempt.status).toBe('pending_verification')
+  })
+
+  it('a proof sent after the hold ended is refused and the slot is released', async () => {
+    const appt = await makeHold({ expired: true }); const attempt = await newAttempt(appt, 'gcash')
+    await expect(proof(appt, attempt)).rejects.toMatchObject({ code: 'HOLD_EXPIRED' })
+    expect(fresh(appt)).toMatchObject({ status: 'Cancelled', payment_state: 'expired' })
+  })
+
+  it('expired holds release the slot and mark the QR payment expired', async () => {
+    const appt = await makeHold({ expired: true }); await newAttempt(appt, 'gcash')
+    await core.expireStaleHolds(db)
+    expect(store.payment_attempts[0].status).toBe('expired')
+    expect(rules.paymentStatusOf(store.payment_attempts[0])).toBe('expired')
+    expect(fresh(appt).payment_state).toBe('expired')
+  })
+
+  it('the receipt is stored privately with a random name and the browser view never contains the file', async () => {
+    const appt = await makeHold(); const attempt = await newAttempt(appt, 'gcash')
+    await proof(appt, attempt)
+    expect(store.payment_receipts[0].public_id).toMatch(/^[a-f0-9]{32}$/)
+    const view = JSON.stringify(pay.attemptView(store.payment_attempts[0], fresh(appt)))
+    expect(view).not.toContain('data:image')
+    expect(JSON.parse(view)).toMatchObject({ paymentStatus: 'proof_submitted', referenceLast4: '4544', hasReceipt: true })
+  })
+})
+
+describe('notifications never change the result', () => {
+  it('a failing text or email is swallowed, and the in-app notice is still created', async () => {
+    mocks.semaphore.mockRejectedValue(new Error('SMS provider down'))
+    mocks.brevo.mockRejectedValue(new Error('email provider down'))
+    const { notifyPatient, notifyTherapistProof } = await import('./paymentNotifications.js')
+    const appt = await makeHold()
+    store.employees = [{ _id: therapistId, email: 'th@example.com' }]
+    const out = await notifyPatient(db, 'proofReceived', appt)
+    expect(out).toMatchObject({ inApp: true, email: false, sms: false })
+    expect((await notifyTherapistProof(db, appt)).inApp).toBe(true)
+    expect(store.notifications.map((n) => n.recipient_email)).toEqual(expect.arrayContaining(['g@example.com', 'th@example.com']))
+  })
+  it('messages never contain a full reference number', async () => {
+    const { TEMPLATES } = await import('./paymentNotifications.js')
+    const text = JSON.stringify([TEMPLATES.therapistNewProof({ patient: 'Eli', when: 'Tue' }), TEMPLATES.patientRejected({ reason: 'x', holdEnd: 'y' })])
+    expect(text).not.toMatch(/\d{10}/)
+  })
+})
+
+/* ───────────────────────── the proof + receipt endpoints over real HTTP (multipart) ───────────────────────── */
+
+describe('POST /api/payments/:id/proof and GET /api/payments/:id/receipt', () => {
+  let server, base, token
+  beforeEach(async () => {
+    const { default: express } = await import('express')
+    const { default: handler } = await import('./routes/payments-item.js')
+    const app = express()
+    app.use(express.json())
+    app.all('/api/payments/:id/:action', handler)
+    app.all('/api/payments/:id', handler)
+    await new Promise((r) => { server = app.listen(0, r) })
+    base = `http://127.0.0.1:${server.address().port}`
+  })
+  afterEach(() => new Promise((r) => server.close(r)))
+
+  async function setup() {
+    const appt = await makeHold()
+    const t = pay.newToken(); token = t.token
+    appt.access_token_hash = t.hash
+    store.employees = [{ _id: therapistId, email: 'th@example.com', first_name: 'Edward' }]
+    const attempt = await newAttempt(appt, 'gcash')
+    return { appt, attempt }
+  }
+  const form = (reference, bytes, name = 'receipt.jpg') => {
+    const f = new FormData()
+    if (reference !== null) f.append('reference', reference)
+    if (bytes) f.append('receipt', new Blob([bytes]), name)
+    return f
+  }
+  const post = (attempt, f, { key = 'idem-key-0000000001', tok = token } = {}) => fetch(`${base}/api/payments/${attempt._id}/proof`, {
+    method: 'POST', body: f, headers: { ...(key ? { 'Idempotency-Key': key } : {}), ...(tok ? { 'x-booking-token': tok } : {}) },
+  })
+
+  it('stores the proof, tells the therapist, and answers with the summary for the success modal', async () => {
+    const { attempt } = await setup()
+    const res = await post(attempt, form('5456 656 574 544', jpegBytes()))
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body).toMatchObject({ paymentStatus: 'proof_submitted', referenceLast4: '4544', hasReceipt: true, receivedByTherapist: true, amount: 300 })
+    expect(JSON.stringify(body)).not.toContain('access_token_hash')
+    expect(store.notifications.some((n) => n.recipient_email === 'th@example.com' && /New payment received from Eli/.test(n.body))).toBe(true)
+    expect(store.payments || []).toHaveLength(0) // recorded, not paid
+  })
+
+  it('a double click or retry with the same Idempotency-Key never creates a second record', async () => {
+    const { attempt } = await setup()
+    const [a, b] = await Promise.all([post(attempt, form(REF, jpegBytes())), (async () => { await new Promise((r) => setTimeout(r, 20)); return post(attempt, form(REF, jpegBytes())) })()])
+    expect([a.status, b.status].sort()).toEqual(expect.arrayContaining([201]))
+    const again = await post(attempt, form(REF, jpegBytes()))
+    expect(again.status).toBe(200)
+    expect((await again.json()).replay).toBe(true)
+    expect(store.payment_receipts).toHaveLength(1)
+  })
+
+  it('answers with the documented error codes', async () => {
+    const { attempt } = await setup()
+    expect((await post(attempt, form(REF, jpegBytes()), { key: null })).status).toBe(400)
+    const noFile = await post(attempt, form(REF, null)); expect(await noFile.json()).toMatchObject({ code: 'PROOF_REQUIRED' })
+    const badRef = await post(attempt, form('123', jpegBytes())); expect(await badRef.json()).toMatchObject({ code: 'INVALID_REFERENCE' })
+    const fake = await post(attempt, form(REF, Buffer.from('<script>alert(1)</script> not an image'), 'receipt.png'))
+    expect(fake.status).toBe(400); expect(await fake.json()).toMatchObject({ code: 'INVALID_FILE_TYPE' })
+    const big = await post(attempt, form(REF, Buffer.alloc(5 * 1024 * 1024 + 10, 0xff)))
+    expect(big.status).toBe(413); expect(await big.json()).toMatchObject({ code: 'FILE_TOO_LARGE' })
+    expect(store.payment_receipts || []).toHaveLength(0)
+  })
+
+  it('someone without the booking token cannot send or read anything', async () => {
+    const { attempt } = await setup()
+    expect((await post(attempt, form(REF, jpegBytes()), { tok: 'wrong-token' })).status).toBe(404)
+    expect((await post(attempt, form(REF, jpegBytes()), { tok: '' })).status).toBe(404)
+    await post(attempt, form(REF, jpegBytes()))
+    const noAuth = await fetch(`${base}/api/payments/${attempt._id}/receipt`)
+    expect(noAuth.status).not.toBe(200)
+    const wrong = await fetch(`${base}/api/payments/${attempt._id}/receipt`, { headers: { 'x-booking-token': 'wrong-token' } })
+    expect(wrong.status).not.toBe(200)
+  })
+
+  it('streams the receipt only to the patient token, privately and without sniffing', async () => {
+    const { attempt } = await setup()
+    await post(attempt, form(REF, jpegBytes()))
+    const res = await fetch(`${base}/api/payments/${attempt._id}/receipt`, { headers: { 'x-booking-token': token } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/jpeg')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(res.headers.get('content-disposition')).toMatch(/inline; filename="receipt\.jpg"/)
+    expect(res.headers.get('cache-control')).toMatch(/private/)
+    const bytes = Buffer.from(await res.arrayBuffer())
+    expect(bytes.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]))
+    expect(bytes.toString('latin1')).not.toContain('GPS-SECRET') // EXIF was stripped before it was stored
+  })
+
+  it('"confirm sent" (step 2) is recorded once and the status endpoint reports it', async () => {
+    const { attempt } = await setup()
+    const c = await fetch(`${base}/api/payments/${attempt._id}/confirm-sent`, { method: 'POST', headers: { 'x-booking-token': token, 'Content-Type': 'application/json' }, body: '{}' })
+    expect(c.status).toBe(200)
+    const s = await (await fetch(`${base}/api/payments/${attempt._id}`, { headers: { 'x-booking-token': token } })).json()
+    expect(s).toMatchObject({ paymentStatus: 'awaiting_payment', method: 'gcash' })
+    expect(s.sentConfirmedAt).toBeTruthy()
+  })
+})
+
+/* ───────────────────────── therapist request review: verify / not received / accept / decline ───────────────────────── */
+
+describe('request review', () => {
+  let rr
+  beforeEach(async () => { rr = await import('./requestReview.js') })
+  const me = { _id: therapistId, email: 'th@example.com' }
+  const BY = 'th@example.com'
+  const fast = { by: BY, backoffMs: 1 }
+  const checks = { amountSeen: true, referenceMatches: true }
+  const fresh = (a) => store.appointments.find((x) => String(x._id) === String(a._id))
+  const sentSubjects = () => mocks.brevo.mock.calls.map((c) => c[0].subject)
+
+  // An online booking whose proof the guardian already sent (waiting for the therapist's check).
+  async function withProof() {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    const { submitProof } = await import('./paymentProof.js')
+    await submitProof(db, attempt, appt, { reference: REF, file: jpegBytes(), key: 'review-key-000000001' })
+    return { appt: fresh(appt), attempt }
+  }
+  async function verified() {
+    const { appt, attempt } = await withProof()
+    await rr.verifyPayment(db, appt, { checks, by: BY })
+    return { appt: fresh(appt), attempt }
+  }
+
+  it('only the assigned therapist can open an appointment (403 NOT_YOUR_APPOINTMENT)', async () => {
+    const { appt } = await withProof()
+    await expect(rr.loadOwned(db, { _id: new ObjectId() }, appt._id)).rejects.toMatchObject({ status: 403, code: 'NOT_YOUR_APPOINTMENT' })
+    await expect(rr.loadOwned(db, me, new ObjectId())).rejects.toMatchObject({ status: 403 })
+    expect((await rr.loadOwned(db, me, appt._id))._id).toEqual(appt._id)
+  })
+
+  describe('verify payment', () => {
+    it('needs BOTH checks, verifies once, and sends NO confirmation yet (the therapist still has to accept)', async () => {
+      const { appt } = await withProof()
+      await expect(rr.verifyPayment(db, appt, { checks: { amountSeen: true }, by: BY })).rejects.toMatchObject({ code: 'CHECKS_REQUIRED', status: 422 })
+      const out = await rr.verifyPayment(db, appt, { checks, by: BY })
+      expect(out).toMatchObject({ already: false, paymentStatus: 'verified' })
+      expect(fresh(appt).payment_state).toBe('paid')
+      expect(fresh(appt).status).toBe('Pending') // not accepted yet
+      expect(store.payment_attempts[0]).toMatchObject({ status: 'succeeded', verified_by: BY })
+      expect(mocks.email).not.toHaveBeenCalled(); expect(mocks.sms).not.toHaveBeenCalled(); expect(mocks.statusEmail).not.toHaveBeenCalled()
+      expect((await rr.verifyPayment(db, fresh(appt), { checks, by: BY })).already).toBe(true) // idempotent
+      expect(store.payments).toHaveLength(1)
+    })
+  })
+
+  describe('accept', () => {
+    it('is blocked until the payment is verified, even if the screen is bypassed', async () => {
+      const { appt } = await withProof()
+      await expect(rr.acceptAppointment(db, appt, { by: BY })).rejects.toMatchObject({ status: 409, code: 'PAYMENT_NOT_VERIFIED' })
+      expect(fresh(appt).status).toBe('Pending')
+      expect(mocks.statusEmail).not.toHaveBeenCalled()
+    })
+    it('after verification it confirms the booking and sends the EXISTING confirmation email', async () => {
+      const { appt } = await verified()
+      const out = await rr.acceptAppointment(db, appt, { by: BY })
+      expect(out).toMatchObject({ status: 'Confirmed', warning: null })
+      expect(fresh(appt)).toMatchObject({ status: 'Confirmed', decision: 'accepted', decided_by: BY })
+      expect(mocks.statusEmail).toHaveBeenCalledTimes(1)
+      expect(mocks.statusEmail.mock.calls[0][0]).toMatchObject({ accepted: true, email: 'g@example.com' })
+    })
+    it('a double click or a second tab gets ALREADY_DECIDED and sends nothing twice', async () => {
+      const { appt } = await verified()
+      await rr.acceptAppointment(db, appt, { by: BY })
+      await expect(rr.acceptAppointment(db, appt, { by: BY })).rejects.toMatchObject({ status: 409, code: 'ALREADY_DECIDED' })
+      await expect(rr.declineAppointment(db, appt, { reason: 'not_available' }, fast)).rejects.toMatchObject({ code: 'ALREADY_DECIDED' })
+      expect(mocks.statusEmail).toHaveBeenCalledTimes(1)
+      expect(mocks.brevo).not.toHaveBeenCalled()
+    })
+    it('a cash booking (no online payment) can be accepted straight away', async () => {
+      const appt = await makeHold({ state: undefined }); appt.payment_method = 'Cash'; delete appt.payment_state
+      const out = await rr.acceptAppointment(db, appt, { by: BY })
+      expect(out.status).toBe('Confirmed')
+    })
+  })
+
+  describe('decline', () => {
+    it('needs a reason, and "Other" needs a message (server side, whatever the screen did)', async () => {
+      const { appt } = await verified()
+      await expect(rr.declineAppointment(db, appt, {}, fast)).rejects.toMatchObject({ status: 422, code: 'REASON_REQUIRED' })
+      await expect(rr.declineAppointment(db, appt, { reason: 'bogus' }, fast)).rejects.toMatchObject({ code: 'REASON_REQUIRED' })
+      await expect(rr.declineAppointment(db, appt, { reason: 'other', message: '   ' }, fast)).rejects.toMatchObject({ status: 422, code: 'MESSAGE_REQUIRED_FOR_OTHER' })
+      expect(fresh(appt).status).toBe('Pending')
+    })
+    it('declines, releases the slot and sends the decline email with the reason and message', async () => {
+      const { appt } = await verified()
+      const out = await rr.declineAppointment(db, appt, { reason: 'not_available', message: "Sorry, I'm away that day." }, fast)
+      expect(out).toMatchObject({ status: 'Cancelled', warning: null })
+      expect(fresh(appt)).toMatchObject({ status: 'Cancelled', decision: 'declined', decline_reason: 'not_available', declined_by: BY, payment_state: 'paid' })
+      expect(sentSubjects()).toEqual(['Your appointment request on Nov 8 was declined'])
+      const html = mocks.brevo.mock.calls[0][0].html
+      expect(html).toContain("I&#39;m not available at this time"); expect(html).toContain('away that day')
+      const lock = store.slot_holds.find((l) => String(l.appointment_id) === String(appt._id))
+      expect(lock.released).toBe(true)
+    })
+    it('cannot decline while the online payment is still waiting for a check', async () => {
+      const { appt } = await withProof()
+      await expect(rr.declineAppointment(db, appt, { reason: 'not_available' }, fast)).rejects.toMatchObject({ status: 409, code: 'PAYMENT_NOT_VERIFIED' })
+    })
+    it('a failed email never rolls the decline back; it is stored as "failed" and can be resent', async () => {
+      const { appt } = await verified()
+      mocks.brevo.mockRejectedValue(new Error('provider down'))
+      const out = await rr.declineAppointment(db, appt, { reason: 'not_available' }, fast)
+      expect(out.warning).toMatchObject({ code: 'EMAIL_FAILED' })
+      expect(fresh(appt).status).toBe('Cancelled')
+      expect(store.appointment_emails[0]).toMatchObject({ type: 'decline', status: 'failed', attempts: 3 })
+      mocks.brevo.mockResolvedValue({ sent: true })
+      const again = await rr.resendEmail(db, fresh(appt), store.appointment_emails[0]._id, { backoffMs: 1 })
+      expect(again.status).toBe('sent')
+      expect((await rr.listEmails(db, fresh(appt)))[0]).toMatchObject({ type: 'decline', status: 'sent' })
+    })
+  })
+
+  describe('payment not received', () => {
+    it('validates the reason, the note for "other", and the next action', async () => {
+      const { appt } = await withProof()
+      const go = (input) => rr.rejectPayment(db, appt, input, fast)
+      await expect(go({ nextAction: 'request_new_proof' })).rejects.toMatchObject({ code: 'REASON_REQUIRED' })
+      await expect(go({ reason: 'other', nextAction: 'request_new_proof' })).rejects.toMatchObject({ status: 422, code: 'NOTE_REQUIRED_FOR_OTHER' })
+      await expect(go({ reason: 'amount_wrong', nextAction: 'delete_everything' })).rejects.toMatchObject({ status: 422, code: 'INVALID_NEXT_ACTION' })
+      expect(store.payment_attempts[0].status).toBe('pending_verification')
+    })
+    it('"Ask for new proof" keeps the appointment held, does NOT extend the hold, and sends the resubmit email', async () => {
+      const { appt } = await withProof()
+      const holdBefore = new Date(fresh(appt).hold_expires_at).getTime()
+      const out = await rr.rejectPayment(db, appt, { reason: 'amount_wrong', note: 'Only ₱250 arrived', nextAction: 'request_new_proof' }, fast)
+      expect(out).toMatchObject({ nextAction: 'request_new_proof', status: 'Pending', warning: null })
+      expect(fresh(appt)).toMatchObject({ status: 'Pending', payment_state: 'awaiting_payment', review_state: 'needs_proof' })
+      expect(new Date(fresh(appt).hold_expires_at).getTime()).toBe(holdBefore)
+      expect(store.payment_attempts[0]).toMatchObject({ status: 'rejected', reject_reason: 'amount_wrong', reject_note: 'Only ₱250 arrived' })
+      expect(sentSubjects()).toEqual(["We couldn't confirm your payment for Nov 8"])
+      expect(mocks.brevo.mock.calls[0][0].html).toContain('The amount is wrong')
+      // the guardian can send new proof, and it returns to "waiting for your check"
+      const { submitProof } = await import('./paymentProof.js')
+      await submitProof(db, fresh(appt), fresh(appt), { reference: '9999 888 777 666', file: jpegBytes(), key: 'review-key-000000002' }).catch(() => {})
+    })
+    it('is blocked on the server once the hold has expired (only "decline" is possible)', async () => {
+      const { appt } = await withProof()
+      store.appointments[0].hold_expires_at = new Date(Date.now() - 1000)
+      await expect(rr.rejectPayment(db, fresh(appt), { reason: 'amount_missing', nextAction: 'request_new_proof' }, fast)).rejects.toMatchObject({ status: 409, code: 'HOLD_EXPIRED' })
+      const ok = await rr.rejectPayment(db, fresh(appt), { reason: 'amount_missing', nextAction: 'decline_request' }, fast)
+      expect(ok.status).toBe('Cancelled')
+    })
+    it('"Decline this request" declines with reason payment_unverified, releases the slot and sends the decline email', async () => {
+      const { appt } = await withProof()
+      const out = await rr.rejectPayment(db, appt, { reason: 'reference_not_found', note: 'Nothing under that number', nextAction: 'decline_request' }, fast)
+      expect(out).toMatchObject({ nextAction: 'decline_request', status: 'Cancelled' })
+      expect(fresh(appt)).toMatchObject({ status: 'Cancelled', decision: 'declined', decline_reason: 'payment_unverified' })
+      expect(fresh(appt).decline_message).toMatch(/Nothing under that number/)
+      expect(store.payment_attempts[0].status).toBe('rejected')
+      expect(sentSubjects()).toEqual(['Your appointment request on Nov 8 was declined'])
+      expect(mocks.brevo.mock.calls[0][0].html).toContain("Payment couldn&#39;t be verified")
+      expect(store.slot_holds.find((l) => String(l.appointment_id) === String(appt._id)).released).toBe(true)
+    })
+    it('cannot be decided twice', async () => {
+      const { appt } = await withProof()
+      await rr.rejectPayment(db, appt, { reason: 'amount_missing', nextAction: 'request_new_proof' }, fast)
+      await expect(rr.rejectPayment(db, fresh(appt), { reason: 'amount_missing', nextAction: 'request_new_proof' }, fast)).rejects.toMatchObject({ code: 'ALREADY_DECIDED' })
+      expect(mocks.brevo).toHaveBeenCalledTimes(1)
+    })
+    it('a failed email does not undo it', async () => {
+      const { appt } = await withProof()
+      mocks.brevo.mockRejectedValue(new Error('down'))
+      const out = await rr.rejectPayment(db, appt, { reason: 'amount_missing', nextAction: 'request_new_proof' }, fast)
+      expect(out.warning.code).toBe('EMAIL_FAILED')
+      expect(store.payment_attempts[0].status).toBe('rejected')
+    })
+  })
+
+  describe('the list the page shows', () => {
+    it('puts each request in the right phase', async () => {
+      const { appt } = await withProof()
+      let list = await rr.listRequests(db, me)
+      expect(list.requests).toHaveLength(1)
+      expect(list.requests[0]).toMatchObject({ phase: 'check_payment', timeLabel: '10:00 AM – 11:00 AM'.slice(0, 0) + list.requests[0].timeLabel, payment: { state: 'proof_submitted', referenceLast4: '4544' } })
+      await rr.rejectPayment(db, fresh(appt), { reason: 'amount_wrong', nextAction: 'request_new_proof' }, fast)
+      list = await rr.listRequests(db, me)
+      expect(list.requests[0]).toMatchObject({ phase: 'waiting_proof', payment: { state: 'rejected', rejectReason: 'amount_wrong' } })
+    })
+    it('a verified request is ready to decide, then moves to "recently handled" with its email status', async () => {
+      const { appt } = await verified()
+      let list = await rr.listRequests(db, me)
+      expect(list.requests[0]).toMatchObject({ phase: 'decide', payment: { state: 'verified' } })
+      await rr.acceptAppointment(db, appt, { by: BY })
+      list = await rr.listRequests(db, me)
+      expect(list.requests).toHaveLength(0)
+      expect(list.recent[0]).toMatchObject({ outcome: 'accepted', email: { type: 'accept', status: 'sent' } })
+    })
+    it('never leaks another therapist\'s requests', async () => {
+      await withProof()
+      expect((await rr.listRequests(db, { _id: new ObjectId() })).requests).toHaveLength(0)
+    })
+  })
+})
+
+describe('request emails', () => {
+  const view = { guardianName: 'Rene', patient: 'Miguel Tayao', therapist: 'Edward Briones', therapistRole: 'Occupational Therapist', dateShort: 'Nov 17', dateLong: 'Tuesday, November 17, 2026', timeLabel: '11:00 AM – 12:00 PM', sessionType: 'Cognitive', clinic: 'Main Clinic' }
+
+  it('decline email: subject, details, reason box and a booking link (text snapshot)', async () => {
+    const { buildDeclineEmail } = await import('./reviewEmails.js')
+    const e = buildDeclineEmail({ ...view, reason: 'not_available', message: "Sorry, I'm away that day.", paymentSent: true })
+    expect(e.subject).toBe('Your appointment request on Nov 17 was declined')
+    expect(e.html).toContain('REASON FOR DECLINING'); expect(e.html).toContain('Book another appointment'); expect(e.html).toContain('border:1px solid #f3b4b4')
+    expect(e.text).toMatchInlineSnapshot(`
+      "Hello Rene,
+
+      We're sorry. Edward Briones can't take this appointment request.
+
+      Patient: Miguel Tayao
+      Date: Tuesday, November 17, 2026
+      Time: 11:00 AM – 12:00 PM
+      Therapist: Edward Briones (Occupational Therapist)
+      Session · Clinic: Cognitive · Main Clinic
+
+      REASON FOR DECLINING: I'm not available at this time
+      "Sorry, I'm away that day."
+
+      What you can do next:
+      - Book another time with the same therapist, or choose a different therapist.
+      - The clinic will contact you about returning the payment you sent.
+
+      Book another appointment: https://therapypro.app/appointments"
+    `)
+  })
+
+  it('resubmit email: subject, amber "what went wrong" box, hold time and a resubmit link (text snapshot)', async () => {
+    const { buildResubmitEmail } = await import('./reviewEmails.js')
+    const e = buildResubmitEmail({ ...view, problem: 'amount_wrong', note: 'Only ₱250 arrived', holdEnd: 'Nov 19, 11:53 AM' })
+    expect(e.subject).toBe("We couldn't confirm your payment for Nov 17")
+    expect(e.html).toContain('WHAT WENT WRONG'); expect(e.html).toContain('Resubmit payment proof'); expect(e.html).toContain('border:1px solid #f3d284')
+    expect(e.text).toMatchInlineSnapshot(`
+      "Hello Rene,
+
+      Edward Briones couldn't confirm the payment you sent for this appointment request.
+
+      Patient: Miguel Tayao
+      Date: Tuesday, November 17, 2026
+      Time: 11:00 AM – 12:00 PM
+      Therapist: Edward Briones (Occupational Therapist)
+      Session · Clinic: Cognitive · Main Clinic
+
+      WHAT WENT WRONG: The amount is wrong
+      "Only ₱250 arrived"
+
+      Your time slot is held for you until Nov 19, 11:53 AM. Please send a new receipt and reference number before then or the request will be cancelled.
+
+      Resubmit payment proof: https://therapypro.app/appointments/book"
+    `)
+  })
+
+  it('escapes everything the therapist (or guardian) typed before it goes into the HTML', async () => {
+    const { buildDeclineEmail, buildResubmitEmail } = await import('./reviewEmails.js')
+    const evil = '<script>alert(1)</script><img src=x onerror=alert(2)>'
+    for (const e of [buildDeclineEmail({ ...view, guardianName: evil, reason: 'other', message: evil }), buildResubmitEmail({ ...view, problem: 'other', note: evil, holdEnd: 'x' })]) {
+      expect(e.html).not.toContain('<script>'); expect(e.html).not.toContain('<img src=x')
+      expect(e.html).toContain('&lt;script&gt;')
+    }
+  })
+
+  it('contains no phone number, reference number or internal id', async () => {
+    const { buildDeclineEmail, buildResubmitEmail } = await import('./reviewEmails.js')
+    const all = JSON.stringify([buildDeclineEmail({ ...view, reason: 'not_available', paymentSent: true }), buildResubmitEmail({ ...view, problem: 'amount_wrong', holdEnd: 'x' })])
+    expect(all).not.toMatch(/\d{10}/); expect(all).not.toMatch(/[a-f0-9]{24}/)
+  })
+})
+
+describe('slot times (the "11:00 PM" bug)', () => {
+  it('reads the label\'s single AM/PM as belonging to the END time', async () => {
+    const { parseSlot } = await import('./bookingCore.js')
+    expect(parseSlot('11:00 - 12:00 PM')).toEqual({ start: '11:00', end: '12:00' }) // was saved as 23:00
+    expect(parseSlot('10:00 - 11:00 AM')).toEqual({ start: '10:00', end: '11:00' })
+    expect(parseSlot('12:00 - 1:00 PM')).toEqual({ start: '12:00', end: '13:00' })
+    expect(parseSlot('1:00 - 2:00 PM')).toEqual({ start: '13:00', end: '14:00' })
+    expect(parseSlot('4:00 - 5:00 PM')).toEqual({ start: '16:00', end: '17:00' })
+    expect(parseSlot('nonsense')).toEqual({ start: '00:00', end: '00:00' })
   })
 })

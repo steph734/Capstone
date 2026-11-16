@@ -3,6 +3,7 @@
 // Allowed for Vercel's cron runner, or with "Authorization: Bearer <CRON_SECRET>" when CRON_SECRET is set.
 import { getDb } from '../mongo.js'
 import { expireStaleHolds } from '../bookingCore.js'
+import { sendHoldReminders } from '../paymentNotifications.js'
 
 export default async function handler(req, res) {
   const secret = String(process.env.CRON_SECRET || '').trim()
@@ -10,8 +11,10 @@ export default async function handler(req, res) {
   const bearerOk = secret && req.headers.authorization === `Bearer ${secret}`
   if (!fromVercelCron && !bearerOk) return res.status(401).json({ error: 'Not allowed.' })
   try {
-    const released = await expireStaleHolds(await getDb())
-    return res.status(200).json({ released })
+    const db = await getDb()
+    const released = await expireStaleHolds(db)
+    const reminded = await sendHoldReminders(db).catch((e) => { console.error('hold reminders failed:', e.message); return 0 })
+    return res.status(200).json({ released, reminded })
   } catch (err) {
     console.error('bookings/expire-holds error:', err)
     return res.status(500).json({ error: 'Could not release holds.' })

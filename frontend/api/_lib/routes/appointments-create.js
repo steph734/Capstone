@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { getDb } from '../mongo.js'
 import { insertPaymentWithRef } from '../paymentRef.js'
+import { ensureIndexes } from '../paymentAttempts.js'
 import { createBookingRecords, activeSlotFilter, markAvailability, expireStaleHolds, str } from '../bookingCore.js'
 
 // POST /api/appointments/create: a pay-at-clinic (cash) booking.
@@ -35,14 +36,22 @@ export default async function handler(req, res) {
     const now = new Date()
     await expireStaleHolds(db, now).catch(() => {})
 
-    const { appointmentId, patientId, appointmentDoc } = await createBookingRecords(db, body)
+    // Safe to send twice: the same idempotencyKey (a retry after a dropped connection, a double click) returns the booking already made.
+    const key = /^[w-]{16,80}$/.test(String(body.idempotencyKey || '')) ? String(body.idempotencyKey) : null
+    if (key) {
+      await ensureIndexes(db)
+      const existing = await db.collection('appointments').findOne({ booking_key: key })
+      if (existing) return res.status(200).json({ success: true, replay: true, appointmentId: existing._id, patientId: existing.patient_id, paymentRecorded: Boolean(existing.payment_id), paymentError: null, paymentRef: null, amount: existing.total_due ?? null, method: 'cash' })
+    }
+
+    const { appointmentId, patientId, appointmentDoc } = await createBookingRecords(db, body, key ? { booking_key: key } : {})
 
     // The slot must still be free (a held or booked slot blocks it).
     if (appointmentDoc.employee_id && appointmentDoc.start_time) {
       const clash = await db.collection('appointments').findOne(activeSlotFilter(appointmentDoc.employee_id, appointmentDoc.session_date, appointmentDoc.start_time, now, appointmentId))
       if (clash) {
         await db.collection('appointments').updateOne({ _id: appointmentId }, { $set: { status: 'Cancelled', cancelled_reason: 'Time slot was already taken', updated_at: new Date() } })
-        return res.status(409).json({ error: 'That time slot was just taken. Please pick another time.', code: 'SLOT_TAKEN' })
+        return res.status(409).json({ error: 'That time slot was just taken. Please pick another time.', code: 'SLOT_NO_LONGER_AVAILABLE' })
       }
     }
 

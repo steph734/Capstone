@@ -48,15 +48,15 @@ export default async function handler(req, res) {
     // 1. Is the slot free? (a paid/held booking blocks it; an expired hold does not)
     const probe = createProbe(body)
     const taken = () => db.collection('appointments').findOne(activeSlotFilter(probe.employeeId, probe.sessionDate, probe.start, now))
-    if (await taken()) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_TAKEN' })
+    if (await taken()) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_NO_LONGER_AVAILABLE' })
 
     // 2. Lock it (atomic: only one patient can win), then check once more.
     const appointmentId = new ObjectId()
     const key = slotKey(probe.employeeId, probe.sessionDate, probe.start)
-    if (!(await acquireSlotLock(db, key, appointmentId, HOLD_MS, now))) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_TAKEN' })
+    if (!(await acquireSlotLock(db, key, appointmentId, HOLD_MS, now))) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_NO_LONGER_AVAILABLE' })
     if (await taken()) {
       await releaseSlotLock(db, key, appointmentId)
-      return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_TAKEN' })
+      return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_NO_LONGER_AVAILABLE' })
     }
 
     // 3. Create the patient + the held appointment.

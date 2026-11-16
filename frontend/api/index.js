@@ -20,6 +20,8 @@ import bookingsItem from './_lib/routes/bookings-item.js'
 import bookingsExpire from './_lib/routes/bookings-expire.js'
 import paymentsItem from './_lib/routes/payments-item.js'
 import paymentsAwaiting from './_lib/routes/payments-awaiting.js'
+import therapistPayments from './_lib/routes/therapist-payments.js'
+import * as review from './_lib/routes/appointments-review.js'
 import stripeWebhook from './_lib/routes/stripe-webhook.js'
 
 import createPaymentIntent from './_lib/routes/create-payment-intent.js'
@@ -195,6 +197,15 @@ app.all('/api/bookings/expire-holds', bookingsExpire)
 app.all('/api/bookings/:id/:action', bookingsItem)
 app.all('/api/payments/awaiting-verification', paymentsAwaiting)
 app.all('/api/payments/:id/:action', paymentsItem)
+app.all('/api/payments/:id', paymentsItem)
+app.all('/api/therapist/requests', review.requests)
+app.all('/api/appointments/:id/payment/:action', review.payment)
+app.all('/api/appointments/:id/accept', review.accept)
+app.all('/api/appointments/:id/decline', review.decline)
+app.all('/api/appointments/:id/emails', review.emails)
+app.all('/api/appointments/:id/emails/:action', review.emails)
+app.all('/api/therapist/payments', therapistPayments)
+app.all('/api/therapist/payments/:id/:action', therapistPayments)
 
 app.all('/api/create-payment-intent', createPaymentIntent)
 app.all('/api/create-setup-intent', createSetupIntent)

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { Clock, Check as CheckLucide, X as XLucide } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PatientSidebar from '../components/PatientSidebar'
 import CheckoutModal from '../components/CheckoutModal'
 import { SESSION_MODES } from '../data/sessionModes'
 import { logActivity } from '../utils/auditLog'
-import { loadSaved } from '../utils/bookingPayments'
+import { loadSaved, newKey } from '../utils/bookingPayments'
+import { bookingOutcome, noticeNote } from '../utils/bookingOutcome'
+import PaymentMethodStep from '../components/payments/PaymentMethodStep'
 import './BookAppointmentPage.css'
 
 /* ─── Icons ─── */
@@ -19,7 +22,6 @@ const InfoIcon    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="
 const ArrowRight  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
 const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
 const ChevronIcon = ({ open }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9"/></svg>
-const CheckLgIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
 const UploadIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
 const CameraIcon  = ({ size = 15 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 const TrashSmIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6h14z"/><path d="M10 11v6M14 11v6"/></svg>
@@ -252,218 +254,114 @@ export default function BookAppointmentPage({ user }) {
 
   /* Confirmation email status: null | 'sending' | 'sent' | 'error' */
   const [emailStatus, setEmailStatus] = useState(null)
-  const [emailError, setEmailError]   = useState('')
 
   /* Confirmation SMS status: null | 'sending' | 'sent' | 'error' */
   const [smsStatus, setSmsStatus] = useState(null)
-  const [smsError, setSmsError]   = useState('')
 
-  /* MongoDB save status: null | 'saving' | 'saved' | 'error' */
-  const [saveStatus, setSaveStatus] = useState(null)
-  const [saveError, setSaveError]   = useState('')
-
-  /* Payment-record status (separate from the appointment save above):
-     null | 'recorded' | 'error' */
-  const [paymentRecordStatus, setPaymentRecordStatus] = useState(null)
-  const [paymentRecordError, setPaymentRecordError]   = useState('')
-  // TherapyPro's own 8-digit reference, returned by /api/appointments/create
-  // once the payment is actually recorded — see api/_lib/paymentRef.js.
+  /* The pay-at-clinic (cash) booking is saved from here. Online payments are NOT: the checkout already booked or recorded them
+     on the server, so this page only shows what the server said. */
+  const [cashSave, setCashSave] = useState({ status: 'saving', error: '' }) // 'saving' | 'saved' | 'error'
+  // TherapyPro's own 8-digit reference, returned by /api/appointments/create once the payment row is written.
   const [paymentRef, setPaymentRef] = useState(null)
   const [refCopied, setRefCopied] = useState(false)
-
-  /* Record the booking in the audit log + email a confirmation once the
-     confirmation step is reached. Runs exactly once. */
+  // One key per booking: a retry (or a double click) can never create a second appointment.
+  const cashKey = useRef(newKey())
   const loggedBookingRef = useRef(false)
-  useEffect(() => {
-    if (step !== 3 || loggedBookingRef.current) return
-    loggedBookingRef.current = true
+  const noticesSent = useRef(false)
 
-    // Online payment: the server already created, verified and confirmed this booking (and sent the email/text).
-    // Creating it again from here is what used to allow free or duplicate bookings, so we only show the result.
-    if (onlinePayment?.appointmentId) {
-      setSaveStatus('saved')
-      setPaymentRecordStatus('recorded')
-      setPaymentRef(onlinePayment.referenceNo || null)
-      logActivity({
-        role: 'Patient', user: user?.name || 'Patient', email: user?.email || '—', actionIcon: '📅', action: 'Appointment',
-        description: `Booked ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`,
-        entity: `Appointment · ${bookingDateLabel}`, status: 'Success',
+  const saveCashBooking = async () => {
+    setCashSave({ status: 'saving', error: '' })
+    try {
+      const r = await fetch('/api/appointments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idempotencyKey: cashKey.current,
+          patient: {
+            firstName: form1.firstName, lastName: form1.lastName, nickname: form1.nickname, gender: form1.gender, birthdate: form1.birthdate,
+            address: form1.address, condition: form1.condition, guardianFirst: form1.guardianFirst, guardianLast: form1.guardianLast,
+            relationship: form1.relationship, contactNumber: form1.contactNumber, email: form1.email,
+          },
+          therapist: { id: therapistObj?.id || '', name: therapistObj?.name || '', role: therapistObj?.role || '' },
+          session: { mode: sessionMode, timeSlot: pickedTime || '', year: preselectedYear, month: preselectedMonth, day: preselectedDate },
+          payment: { method: payMethod, sessionFee: SESSION_FEE, serviceCharge: SERVICE_CHARGE, total: TOTAL_DUE, amountReceived: payMethod === 'cash' ? cashReceived : undefined },
+          bookedBy: { id: user?.id, email: user?.email },
+          photo: photo?.dataUrl || null,
+        }),
       })
-      return
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        const msg = body.code === 'SLOT_NO_LONGER_AVAILABLE' ? 'That time slot was just taken. Please go back and pick another time.'
+          : body.error || (r.status === 404 ? 'API not reachable — run the app with `vercel dev`.' : 'Please try again.')
+        console.warn('Appointment was not saved:', msg)
+        setCashSave({ status: 'error', error: msg })
+        return null
+      }
+      setPaymentRef(body.paymentRef || null)
+      setCashSave({ status: 'saved', error: '' })
+      return body
+    } catch (e) {
+      console.warn('Appointment save request failed:', e)
+      setCashSave({ status: 'error', error: 'We could not reach the server. Check your connection and try again.' })
+      return null
     }
+  }
 
-    // Save the appointment (and a patient record) to MongoDB via the serverless
-    // function. Non-blocking — the success screen shows regardless; the outcome
-    // is surfaced on the confirmation card.
-    setSaveStatus('saving')
-    fetch('/api/appointments/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        patient: {
-          firstName: form1.firstName,
-          lastName: form1.lastName,
-          nickname: form1.nickname,
-          gender: form1.gender,
-          birthdate: form1.birthdate,
-          address: form1.address,
-          condition: form1.condition,
-          guardianFirst: form1.guardianFirst,
-          guardianLast: form1.guardianLast,
-          relationship: form1.relationship,
-          contactNumber: form1.contactNumber,
-          email: form1.email,
-        },
-        therapist: { id: therapistObj?.id || '', name: therapistObj?.name || '', role: therapistObj?.role || '' },
-        session: {
-          mode: sessionMode,
-          timeSlot: pickedTime || '',
-          year: preselectedYear,
-          month: preselectedMonth,
-          day: preselectedDate,
-        },
-        payment: {
-          method: payMethod,
-          // For 'stripe', the checkout modal lets the payer pick card vs. a QR
-          // wallet (GCash/Maya) — onlinePayment.method carries which one, e.g.
-          // "Card" or "GCash QR", so the payments collection can record the
-          // real method instead of a generic "Stripe".
-          onlineMethod: onlinePayment?.method || undefined,
-          sessionFee: SESSION_FEE,
-          serviceCharge: SERVICE_CHARGE,
-          total: TOTAL_DUE,
-          amountReceived: payMethod === 'cash' ? cashReceived : undefined,
-        },
-        bookedBy: { id: user?.id, email: user?.email },
-        photo: photo?.dataUrl || null,
-      }),
-    })
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}))
-        if (!r.ok) {
-          const msg = body.error || (r.status === 404
-            ? 'API not reachable — run the app with `vercel dev`.'
-            : `HTTP ${r.status}`)
-          console.warn('Appointment was not saved to MongoDB:', msg)
-          setSaveStatus('error')
-          setSaveError(msg)
-          setPaymentRecordStatus('error')
-          setPaymentRecordError('The appointment itself was not saved.')
-          return
-        }
-        setSaveStatus('saved')
-        if (body.paymentRecorded) {
-          setPaymentRecordStatus('recorded')
-          setPaymentRef(body.paymentRef || null)
-        } else {
-          setPaymentRecordStatus('error')
-          setPaymentRecordError(body.paymentError || 'Could not record the payment.')
-        }
-
-        // Email the confirmation using exactly what the server just
-        // persisted (amount, method, reference) — never a value recomputed
-        // client-side, which is how the receipt and the email used to be
-        // able to disagree with each other.
-        const to = form1.email.trim()
-        if (to) {
-          setEmailStatus('sending')
-          fetch('/api/send-appointment-confirmation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: to,
-              accountName: user?.name || '',
-              guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(),
-              patient: fullName,
-              condition: form1.condition,
-              therapist: therapistObj?.name || '',
-              therapistRole: therapistObj?.role || '',
-              sessionMode: sessionModeObj?.label || '',
-              date: bookingDateLabel,
-              time: pickedTime || '',
-              payment: METHOD_LABEL[body.method] || PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '',
-              paymentRef: body.paymentRef || '',
-              total: body.amount ?? TOTAL_DUE,
-              ...(payMethod === 'cash' && cashReceived > 0
-                ? { amountReceived: cashReceived, amountChange: cashChange }
-                : {}),
-            }),
-          })
-            .then(async (er) => {
-              const ebody = await er.json().catch(() => ({}))
-              if (!er.ok) {
-                const msg =
-                  ebody.error ||
-                  (er.status === 404
-                    ? 'Email service not reachable — run the app with `vercel dev`.'
-                    : `HTTP ${er.status}`)
-                console.warn('Appointment confirmation email was not sent:', msg)
-                setEmailStatus('error')
-                setEmailError(msg)
-              } else {
-                setEmailStatus('sent')
-              }
-            })
-            .catch((e) => {
-              console.warn('Appointment confirmation email request failed:', e)
-              setEmailStatus('error')
-              setEmailError(e.message || 'Request failed')
-            })
-        }
-      })
-      .catch((e) => {
-        console.warn('Appointment save request failed:', e)
-        setSaveStatus('error')
-        setSaveError(e.message || 'Request failed')
-        setPaymentRecordStatus('error')
-        setPaymentRecordError('The appointment itself was not saved.')
-      })
-
-    logActivity({
-      role: 'Patient',
-      user: user?.name || 'Patient',
-      email: user?.email || '—',
-      actionIcon: '📅',
-      action: 'Appointment',
-      description: `Booked ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`,
-      entity: `Appointment · ${bookingDateLabel}`,
-      status: 'Success',
-    })
-
+  /* Confirmation email + text. Sent ONLY for a booking that really was saved, and a failure only ever shows as a small note:
+     it never changes the booking result. */
+  const sendCashNotices = (body) => {
+    if (noticesSent.current) return
+    noticesSent.current = true
+    const to = form1.email.trim()
+    if (to) {
+      setEmailStatus('sending')
+      fetch('/api/send-appointment-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: to, accountName: user?.name || '', guardianName: `${form1.guardianFirst} ${form1.guardianLast}`.trim(), patient: fullName,
+          condition: form1.condition, therapist: therapistObj?.name || '', therapistRole: therapistObj?.role || '', sessionMode: sessionModeObj?.label || '',
+          date: bookingDateLabel, time: pickedTime || '', payment: METHOD_LABEL[body.method] || 'Cash', paymentRef: body.paymentRef || '', total: body.amount ?? TOTAL_DUE,
+          ...(cashReceived > 0 ? { amountReceived: cashReceived, amountChange: cashChange } : {}),
+        }),
+      }).then((er) => setEmailStatus(er.ok ? 'sent' : 'error')).catch(() => setEmailStatus('error'))
+    }
     const phone = form1.contactNumber.trim()
     if (phone) {
       setSmsStatus('sending')
       fetch('/api/send-appointment-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone,
-          patient: fullName,
-          therapist: therapistObj?.name || '',
-          date: bookingDateLabel,
-          time: pickedTime || '',
-        }),
-      })
-        .then(async (r) => {
-          const body = await r.json().catch(() => ({}))
-          if (!r.ok) {
-            const msg = body.error || (r.status === 404
-              ? 'SMS service not reachable — run the app with `vercel dev`.'
-              : `HTTP ${r.status}`)
-            console.warn('Appointment confirmation SMS was not sent:', msg)
-            setSmsStatus('error')
-            setSmsError(msg)
-          } else {
-            setSmsStatus('sent')
-          }
-        })
-        .catch((e) => {
-          console.warn('Appointment confirmation SMS request failed:', e)
-          setSmsStatus('error')
-          setSmsError(e.message || 'Request failed')
-        })
+        body: JSON.stringify({ phone, patient: fullName, therapist: therapistObj?.name || '', date: bookingDateLabel, time: pickedTime || '' }),
+      }).then((r) => setSmsStatus(r.ok ? 'sent' : 'error')).catch(() => setSmsStatus('error'))
     }
+  }
+
+  const retryCashBooking = async () => { const body = await saveCashBooking(); if (body) sendCashNotices(body) }
+
+  /* Runs once when the confirmation step is reached. */
+  useEffect(() => {
+    if (step !== 3 || loggedBookingRef.current) return
+    loggedBookingRef.current = true
+    const log = (description) => logActivity({
+      role: 'Patient', user: user?.name || 'Patient', email: user?.email || '—', actionIcon: '📅', action: 'Appointment',
+      description, entity: `Appointment · ${bookingDateLabel}`, status: 'Success',
+    })
+    // Online payment: the server already holds / booked this appointment (and sent the notices). Creating it again from here is
+    // what used to allow free or duplicate bookings, so we only show the result.
+    if (onlinePayment?.paymentStatus) {
+      log(`${onlinePayment.paymentStatus === 'verified' ? 'Booked' : 'Paid online, waiting for verification:'} ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`)
+      return
+    }
+    saveCashBooking().then((body) => {
+      if (!body) return
+      log(`Booked ${sessionModeObj?.label || 'a session'} with ${therapistObj?.name || 'a therapist'} for ${fullName}`)
+      sendCashNotices(body)
+    })
   }, [step]) // eslint-disable-line
+
+  const outcome = bookingOutcome({ payMethod, online: onlinePayment, cash: cashSave, therapist: therapistObj?.name || '', amountLabel: `₱${TOTAL_DUE.toFixed(2)}` })
+  const noticeText = noticeNote(outcome.kind, { emailStatus, smsStatus })
 
   return (
     <div className="book-layout">
@@ -763,22 +661,7 @@ export default function BookAppointmentPage({ user }) {
               </div>
 
               {/* ── Payment (combined into the summary step) ── */}
-              <h3 className="book-section-title" style={{ marginTop: '22px' }}>
-                Select Payment Method <span className="req">*</span>
-              </h3>
-              {errors3.method && <div className="step-error">{errors3.method}</div>}
-              <div className="payment-methods">
-                {PAYMENT_METHODS.map(pm => (
-                  <button key={pm.id}
-                    className={`pay-option ${payMethod === pm.id ? 'selected' : ''}`}
-                    onClick={() => { setPayMethod(pm.id); setErrors3({}) }}
-                  >
-                    <span className={`pay-check ${payMethod === pm.id ? 'visible' : ''}`}><CheckIcon /></span>
-                    <span className="pay-label">{pm.label}</span>
-                    <span className="pay-desc">{pm.desc}</span>
-                  </button>
-                ))}
-              </div>
+              <PaymentMethodStep methods={PAYMENT_METHODS} value={payMethod} error={errors3.method} onChange={(id) => { setPayMethod(id); setErrors3({}) }} />
 
               {/* ── Cash payment details (shown when Cash is selected) ── */}
               {payMethod === 'cash' && (
@@ -831,108 +714,83 @@ export default function BookAppointmentPage({ user }) {
             </>
           )}
 
-          {/* ══ STEP 3: Confirmation ══ */}
+          {/* ══ STEP 3: Confirmation ══
+              Everything below comes from ONE outcome (see src/utils/bookingOutcome.js), so a success message can never sit next to a failure. */}
           {step === 3 && (
             <>
               <div className="confirm-check-wrap">
-                <div className="confirm-check-circle"><CheckLgIcon /></div>
+                <div className="confirm-check-circle" style={outcome.kind === 'failed' ? { background: '#dc2626' } : outcome.kind === 'awaiting_therapist' ? { background: '#d97706' } : undefined}>
+                  {outcome.kind === 'failed' ? <XLucide size={32} strokeWidth={2.5} aria-hidden="true" />
+                    : outcome.kind === 'awaiting_therapist' ? <Clock size={32} strokeWidth={2.5} aria-hidden="true" />
+                    : outcome.kind === 'saving' ? <Clock size={32} strokeWidth={2.5} aria-hidden="true" />
+                    : <CheckLucide size={32} strokeWidth={2.5} aria-hidden="true" />}
+                </div>
               </div>
-              <h2 className="book-heading" style={{ textAlign: 'center' }}>Appointment Booked!</h2>
-              <p className="confirm-sub">Your appointment has been successfully scheduled. We'll send a reminder before your session.</p>
+              <h2 className="book-heading" style={{ textAlign: 'center' }} role="status">{outcome.heading}</h2>
+              <p className="confirm-sub">{outcome.message}</p>
 
-              {emailStatus === 'sending' && (
-                <p className="confirm-email-note">Sending a confirmation to {form1.email}…</p>
-              )}
-              {emailStatus === 'sent' && (
-                <p className="confirm-email-note ok">✓ Confirmation email sent to {form1.email}</p>
-              )}
-              {emailStatus === 'error' && (
-                <p className="confirm-email-note err">
-                  We couldn't email the confirmation to {form1.email}, but your booking is saved.
-                </p>
+              {outcome.kind === 'failed' && (
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', margin: '14px 0' }}>
+                  {payMethod === 'cash' && cashSave.status === 'error' && cashSave.error && !/slot was just taken/.test(cashSave.error) && (
+                    <button type="button" className="book-continue-btn" onClick={retryCashBooking}>Try again</button>
+                  )}
+                  <button type="button" className="book-cancel-btn" onClick={() => navigate('/appointments')}>Pick another time</button>
+                </div>
               )}
 
-              {smsStatus === 'sending' && (
-                <p className="confirm-email-note">Texting a confirmation to {form1.contactNumber}…</p>
-              )}
-              {smsStatus === 'sent' && (
-                <p className="confirm-email-note ok">✓ Confirmation text sent to {form1.contactNumber}</p>
-              )}
-              {smsStatus === 'error' && (
-                <p className="confirm-email-note err">
-                  We couldn't text a confirmation, but your booking is confirmed.
-                </p>
-              )}
-
-              {saveStatus === 'saving' && (
-                <p className="confirm-email-note">Saving your appointment…</p>
-              )}
-              {saveStatus === 'saved' && (
-                <p className="confirm-email-note ok">✓ Appointment saved to our records</p>
-              )}
-              {saveStatus === 'error' && (
-                <p className="confirm-email-note err">
-                  Couldn't save the appointment to the database. {saveError}
-                </p>
-              )}
-
-              {paymentRecordStatus === 'recorded' && (
+              {(outcome.kind === 'booked' || outcome.kind === 'awaiting_therapist') && (
                 <>
-                  <p className="confirm-email-note ok">✓ Payment successfully recorded</p>
-                  {paymentRef && (
+                  {emailStatus === 'sent' && <p className="confirm-email-note ok">✓ Confirmation email sent to {form1.email}</p>}
+                  {smsStatus === 'sent' && <p className="confirm-email-note ok">✓ Confirmation text sent to {form1.contactNumber}</p>}
+                  {noticeText && <p className="confirm-email-note">{noticeText}</p>}
+                  {outcome.kind === 'booked' && payMethod === 'cash' && paymentRef && (
                     <p className="confirm-email-note" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       Reference no.{' '}
                       <span style={{ fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 700 }}>{paymentRef}</span>
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(paymentRef).then(() => {
-                            setRefCopied(true)
-                            setTimeout(() => setRefCopied(false), 1500)
-                          })
-                        }}
+                        onClick={() => { navigator.clipboard?.writeText(paymentRef).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500) }) }}
                         style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '2px 8px', fontSize: 12, background: '#fff', cursor: 'pointer' }}
                       >
                         {refCopied ? 'Copied!' : 'Copy'}
                       </button>
                     </p>
                   )}
+
+                  <div className="summary-block">
+                    <div className="summary-block-title">Appointment Summary</div>
+                    {photo && (
+                      <div className="summary-photo-row">
+                        <img src={photo.previewUrl} alt={fullName} className="summary-photo-thumb" />
+                      </div>
+                    )}
+                    <div className="summary-row"><span>Patient</span><strong>{fullName}</strong></div>
+                    <div className="summary-row"><span>Condition</span><strong>{form1.condition}</strong></div>
+                    <div className="summary-row"><span>Therapist</span><strong>{therapistObj?.name || '—'}</strong></div>
+                    <div className="summary-row"><span>Session Mode</span><strong>{sessionModeObj?.label || '—'}</strong></div>
+                    <div className="summary-row"><span>Date</span><strong>{bookingDateLabel}</strong></div>
+                    <div className="summary-row"><span>Time</span><strong>{pickedTime || '—'}</strong></div>
+                    <div className="summary-row"><span>Payment</span><strong>{PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '—'}</strong></div>
+                    {payMethod === 'cash' ? (
+                      <>
+                        <div className="summary-row total-row"><span>Total</span><strong>₱{TOTAL_DUE.toFixed(2)}</strong></div>
+                        {cashReceived > 0 && (
+                          <>
+                            <div className="summary-row"><span>Amount Received</span><strong>₱{cashReceived.toFixed(2)}</strong></div>
+                            <div className="summary-row"><span>Amount Change</span><strong>₱{cashChange.toFixed(2)}</strong></div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="summary-row total-row"><span>Session fee</span><strong>₱{SESSION_FEE.toFixed(2)}</strong></div>
+                        <div className="summary-row"><span>Payment Status</span><strong>{onlinePayment?.paymentStatus === 'verified' ? `Paid online · ${onlinePayment.method}` : `Pending verification · ${onlinePayment?.method || 'QR'}${onlinePayment?.referenceLast4 ? ` · Ref ending ${onlinePayment.referenceLast4}` : ''}`}</strong></div>
+                        <div className="summary-row"><span>{onlinePayment?.paymentStatus === 'verified' ? 'Paid On' : 'Recorded On'}</span><strong>{onlinePayment?.dateLabel}</strong></div>
+                      </>
+                    )}
+                  </div>
                 </>
               )}
-              {paymentRecordStatus === 'error' && (
-                <p className="confirm-email-note err">
-                  Payment failed to record. {paymentRecordError}
-                </p>
-              )}
-
-              <div className="summary-block">
-                <div className="summary-block-title">Appointment Summary</div>
-                {photo && (
-                  <div className="summary-photo-row">
-                    <img src={photo.previewUrl} alt={fullName} className="summary-photo-thumb" />
-                  </div>
-                )}
-                <div className="summary-row"><span>Patient</span><strong>{fullName}</strong></div>
-                <div className="summary-row"><span>Condition</span><strong>{form1.condition}</strong></div>
-                <div className="summary-row"><span>Therapist</span><strong>{therapistObj?.name || '—'}</strong></div>
-                <div className="summary-row"><span>Session Mode</span><strong>{sessionModeObj?.label || '—'}</strong></div>
-                <div className="summary-row"><span>Date</span><strong>{bookingDateLabel}</strong></div>
-                <div className="summary-row"><span>Time</span><strong>{pickedTime || '—'}</strong></div>
-                <div className="summary-row"><span>Payment</span><strong>{PAYMENT_METHODS.find(p => p.id === payMethod)?.label || '—'}</strong></div>
-                <div className="summary-row total-row"><span>Total</span><strong>₱{TOTAL_DUE.toFixed(2)}</strong></div>
-                {payMethod === 'cash' && cashReceived > 0 && (
-                  <>
-                    <div className="summary-row"><span>Amount Received</span><strong>₱{cashReceived.toFixed(2)}</strong></div>
-                    <div className="summary-row"><span>Amount Change</span><strong>₱{cashChange.toFixed(2)}</strong></div>
-                  </>
-                )}
-                {onlinePayment && (
-                  <>
-                    <div className="summary-row"><span>Payment Status</span><strong>Paid online · {onlinePayment.method}</strong></div>
-                    <div className="summary-row"><span>Paid On</span><strong>{onlinePayment.dateLabel}</strong></div>
-                  </>
-                )}
-              </div>
 
               <button className="book-done-btn" onClick={() => navigate('/appointments')}>
                 Back to Appointments
@@ -948,7 +806,7 @@ export default function BookAppointmentPage({ user }) {
               {step === 1 ? 'CANCEL' : 'BACK'}
             </button>
             <button className="book-continue-btn" onClick={handleNext}>
-              {step === 2 ? 'CONFIRM BOOKING' : 'CONTINUE'}
+              {step === 2 ? (payMethod === 'stripe' ? 'CONTINUE TO PAYMENT' : 'CONFIRM BOOKING') : 'CONTINUE'}
               <ArrowRight />
             </button>
           </div>

@@ -14,6 +14,8 @@ import { ONLINE_AMOUNT_PESOS, ONLINE_AMOUNT_CENTAVOS, CURRENCY, HOLD_MS, QR_REVI
 import { slotKey, releaseHold, releaseSlotLock, extendSlotLock, acquireSlotLock, activeSlotFilter, markAvailability } from './bookingCore.js'
 import { sendAppointmentConfirmationEmail } from './appointmentEmail.js'
 import { sendAppointmentConfirmationSms } from './appointmentSms.js'
+import { markRejected } from './paymentProof.js'
+import { paymentStatusOf, PAYMENT_HOLD_HOURS } from './paymentProofRules.js'
 
 /* ───────────────────────── friendly messages ───────────────────────── */
 
@@ -91,6 +93,9 @@ async function ensureIndexes(db) {
   indexReady = true
   await db.collection('payment_attempts').createIndex({ idempotency_key: 1 }, { unique: true }).catch(() => {})
   await db.collection('payment_attempts').createIndex({ provider_ref: 1 }, { sparse: true }).catch(() => {})
+  await db.collection('payment_attempts').createIndex({ reference_digits: 1 }, { sparse: true }).catch(() => {}) // duplicate-reference check
+  await db.collection('payment_receipts').createIndex({ attempt_id: 1 }).catch(() => {})
+  await db.collection('payment_audit').createIndex({ attempt_id: 1, at: 1 }).catch(() => {})
   await db.collection('appointments').createIndex({ booking_key: 1 }, { unique: true, partialFilterExpression: { booking_key: { $type: 'string' } } }).catch(() => {})
 }
 export { ensureIndexes }
@@ -111,7 +116,7 @@ export async function createAttempt(db, { appointment, method, idempotencyKey, p
     amount: ONLINE_AMOUNT_PESOS,
     amount_centavos: ONLINE_AMOUNT_CENTAVOS,
     currency: CURRENCY,
-    status: method === 'card' ? 'created' : 'pending_verification',
+    status: 'created', // QR payments wait for the patient's proof (submitProof) before the therapist sees them
     provider_ref: null, failure_code: null, failure_message: null,
     payer: { name: String(payer.name || '').slice(0, 120), email: String(payer.email || '').slice(0, 160), phone: String(payer.phone || '').slice(0, 30) },
     created_at: now, updated_at: now,
@@ -177,7 +182,7 @@ const METHOD_LABEL = { card: 'Card', gcash: 'GCash QR', paymaya: 'Maya QR' }
 const APPT_PAYMENT_METHOD = { card: 'Stripe', gcash: 'GCash QR', paymaya: null } // the appointments schema has no "Maya" value
 const longDate = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
-export async function finalizePaid(db, attemptId, { via, pi = null, reference = null } = {}) {
+export async function finalizePaid(db, attemptId, { via, pi = null, reference = null, notify = true } = {}) {
   const now = new Date()
   // The one-time switch: only the caller that flips status to "succeeded" does the rest. A second caller
   // (webhook + polling at the same time, a retry, a double click) finds it already done and changes nothing.
@@ -239,7 +244,8 @@ export async function finalizePaid(db, attemptId, { via, pi = null, reference = 
   if (appointment.employee_id) await releaseSlotLock(db, slotKey(appointment.employee_id, appointment.session_date, appointment.start_time), appointment._id)
   await markAvailability(db, { ...appointment }, true)
 
-  await notifyBooked(appointment, { ...current, payment_ref: paymentRef })
+  // notify=false: the therapist still has to accept the booking, and the confirmation email goes out on accept.
+  if (notify) await notifyBooked(appointment, { ...current, payment_ref: paymentRef })
   return { attempt: await db.collection('payment_attempts').findOne({ _id: attemptId }), already: false }
 }
 
@@ -305,25 +311,26 @@ export async function submitQr(db, attempt, appointment, { reference = '', scree
 }
 
 // The therapist's decision on a QR payment.
-export async function reviewQr(db, attemptId, approve) {
+export async function reviewQr(db, attemptId, approve, { reason = '', by = null, notify = true } = {}) {
   const attempt = await db.collection('payment_attempts').findOne({ _id: attemptId })
   if (!attempt || attempt.status !== 'pending_verification') return { ok: false, error: 'This payment is not waiting for verification.' }
   if (approve) {
-    const out = await finalizePaid(db, attemptId, { via: 'qr_verified' })
-    return { ok: true, attempt: out.attempt }
+    const out = await finalizePaid(db, attemptId, { via: 'qr_verified', notify })
+    const now = new Date()
+    await db.collection('payment_attempts').updateOne({ _id: attemptId }, { $set: { verified_at: now, verified_by: by, updated_at: now } })
+    return { ok: true, attempt: { ...out.attempt, verified_at: now, verified_by: by } }
   }
-  const failure = friendlyFailure('verification_rejected')
-  await markFailed(db, attempt, failure)
+  // "Not received": the slot stays held until its hold ends, and the patient can send the proof again.
   const appointment = await db.collection('appointments').findOne({ _id: attempt.appointment_id })
-  if (appointment) await releaseHold(db, appointment, 'failed')
-  return { ok: true, attempt: { ...attempt, status: 'failed' } }
+  if (!appointment) return { ok: false, error: 'This booking no longer exists.' }
+  return { ok: true, attempt: await markRejected(db, attempt, appointment, { reason, by }) }
 }
 
 /* ───────────────────────── what the browser sees ───────────────────────── */
 
 export function attemptView(attempt, appointment) {
   const t = attempt.confirmed_at || attempt.updated_at
-  const status = attempt.status === 'created' ? 'awaiting' : attempt.status
+  const status = attempt.status === 'created' ? 'awaiting' : attempt.status === 'rejected' ? 'rejected' : attempt.status
   return {
     attemptId: String(attempt._id),
     status, // awaiting | processing | requires_action | succeeded | failed | expired | pending_verification
@@ -345,6 +352,18 @@ export function attemptView(attempt, appointment) {
     detailsSent: Boolean(attempt.qr_details_sent), // the patient added a reference number and/or screenshot
     hasScreenshot: Boolean(attempt.qr_screenshot),
     reference: attempt.method !== 'card' ? attempt.provider_ref || null : null,
+    // proof (QR): the status name the screens use, and only what the patient needs (the file itself is never in this view)
+    paymentStatus: paymentStatusOf(attempt),
+    referenceLast4: attempt.reference_last4 || null,
+    referenceDisplay: attempt.reference_display || null,
+    hasReceipt: Boolean(attempt.receipt_id),
+    receiptName: attempt.receipt_id ? 'receipt' + (attempt.receipt_type ? '.' + attempt.receipt_type : '') : null,
+    receiptSize: attempt.receipt_size || null,
+    sentConfirmedAt: attempt.sent_confirmed_at || null,
+    proofSubmittedAt: attempt.proof_submitted_at || null,
+    rejectedReason: attempt.status === 'rejected' ? attempt.rejected_reason || null : null,
+    canChangeProof: attempt.status === 'pending_verification',
+    holdHours: PAYMENT_HOLD_HOURS,
     booking: appointment ? {
       appointmentId: String(appointment._id), therapist: appointment.therapist_name, therapistRole: appointment.therapist_role,
       date: appointment.session_date, timeLabel: appointment.time_slot_label, paymentState: appointment.payment_state || null,

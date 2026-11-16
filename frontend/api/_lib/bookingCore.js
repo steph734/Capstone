@@ -38,18 +38,24 @@ const MODE_MAP = {
   behavioral: { session_mode: 'In-Person', session_type: 'Behavioral' },
 }
 
-// "10:00 - 11:00 AM" / "1:00 - 2:00 PM"  ->  { start: "10:00", end: "11:00" }
+// "10:00 - 11:00 AM" / "1:00 - 2:00 PM" / "11:00 - 12:00 PM"  ->  { start: "10:00", end: "11:00" }
+// The label has ONE AM/PM, written after the END time. The start takes the same one unless that would put it after the end
+// ("11:00 - 12:00 PM" starts at 11 AM, not 11 PM). The old code gave the start the end's AM/PM, so that slot was saved as 23:00.
 export function parseSlot(label) {
   const m = String(label || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i)
   if (!m) return { start: '00:00', end: '00:00' }
   const mer = m[5].toUpperCase()
-  const to24 = (h, mm) => {
+  const to24 = (h, mm, meridian) => {
     let hh = parseInt(h, 10)
-    if (mer === 'PM' && hh !== 12) hh += 12
-    if (mer === 'AM' && hh === 12) hh = 0
-    return `${String(hh).padStart(2, '0')}:${mm}`
+    if (meridian === 'PM' && hh !== 12) hh += 12
+    if (meridian === 'AM' && hh === 12) hh = 0
+    return hh * 60 + parseInt(mm, 10)
   }
-  return { start: to24(m[1], m[2]), end: to24(m[3], m[4]) }
+  const end = to24(m[3], m[4], mer)
+  let start = to24(m[1], m[2], mer)
+  if (start >= end) start = to24(m[1], m[2], mer === 'PM' ? 'AM' : 'PM') // the start is in the other half of the day
+  const hhmm = (n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+  return { start: hhmm(start), end: hhmm(end) }
 }
 
 const PAYMENT_MAP = { cash: 'Cash', stripe: 'Stripe', gcash: 'GCash QR' }
@@ -241,7 +247,7 @@ export async function expireStaleHolds(db, now = new Date()) {
   const stale = await db.collection('appointments').find({ payment_state: { $in: ['awaiting_payment', 'pending_verification'] }, hold_expires_at: { $lte: now } }).toArray()
   for (const appt of stale) {
     await releaseHold(db, appt, 'expired')
-    await db.collection('payment_attempts').updateMany({ appointment_id: appt._id, status: { $in: ['created', 'processing', 'requires_action', 'pending_verification'] } }, { $set: { status: 'expired', failure_code: 'timeout', updated_at: now } })
+    await db.collection('payment_attempts').updateMany({ appointment_id: appt._id, status: { $in: ['created', 'processing', 'requires_action', 'pending_verification', 'rejected'] } }, { $set: { status: 'expired', failure_code: 'timeout', updated_at: now } })
   }
   return stale.length
 }

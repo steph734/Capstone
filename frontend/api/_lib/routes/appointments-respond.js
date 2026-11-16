@@ -17,7 +17,14 @@ function fmt12(t) {
   return `${h12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
+// RETIRED. This route had no login check (anyone who knew an appointment id could accept or decline it) and sent no decline reason.
+// The Appointments page now uses the session-checked endpoints in appointments-review.js:
+//   POST /api/appointments/:id/accept   and   POST /api/appointments/:id/decline
 export default async function handler(req, res) {
+  return res.status(410).json({ error: 'This endpoint was replaced. Use /api/appointments/:id/accept or /decline.', code: 'GONE' })
+}
+
+export async function legacyRespond(req, res) {
   if (req.method !== 'PATCH') {
     res.setHeader('Allow', 'PATCH')
     return res.status(405).json({ error: 'Method not allowed' })

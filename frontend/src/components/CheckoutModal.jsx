@@ -1,23 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
+import { CalendarDays } from 'lucide-react'
 import { getStripe } from '../utils/stripe'
 import { friendlyPaymentError, PAYMENT_MESSAGES } from '../utils/paymentMessages'
 import {
-  newKey, loadSaved, save, clearSaved, startBooking, createAttempt, getBookingState, cancelBooking, getStatus, submitQrDetails, TERMINAL,
+  newKey, loadSaved, save, clearSaved, startBooking, createAttempt, getBookingState, cancelBooking, getStatus, submitQrDetails, confirmSent, submitProof, TERMINAL,
 } from '../utils/bookingPayments'
 import { downloadReceipt, manilaDateTime } from '../utils/receiptPdf'
+import { prepareForUpload } from '../utils/receiptImage'
+import { formatReference, validateReference } from '../../api/_lib/paymentProofRules'
 import PendingVerification from './PendingVerification'
+import PaymentProofStep, { proofProgress } from './payments/PaymentProofStep'
+import ConfirmPaymentDetailsModal from './payments/ConfirmPaymentDetailsModal'
+import SendingPaymentModal from './payments/SendingPaymentModal'
+import usePaymentSubmit, { useLeaveGuard } from './payments/usePaymentSubmit'
+import { buildSteps } from './payments/sendingSteps'
+import { HANDOVER_MS } from './payments/sendingConfig'
+import PaymentRecordedModal, { hoursLeft } from './payments/PaymentRecordedModal'
+import useDialogA11y from './payments/useDialogA11y'
 
 // The checkout modal. The LEFT column (amount, what you are paying for, total) is the same in every state.
 // The RIGHT column is one state machine:
 //
-//   select_method -> confirm -> processing -> success
-//                                          \-> failed  (change method / try again)
-//                                          \-> pending_verification  (QR payments wait for the therapist)
+//   CARD   select_method -> confirm -> processing -> success | failed
+//   QR     select_method -> confirm -> proof -> (confirm dialog) -> sending -> recorded
+//                  "Pay"       "Confirm payment"   "Reference & receipt"      (the server stored the proof)
 //
-// Nothing here decides that a payment worked. The browser asks the SERVER (which asks Stripe, or waits for the
-// therapist to verify a GCash/Maya payment). See src/utils/bookingPayments.js and api/_lib/routes/bookings-*.js.
+// Nothing here decides that a payment worked. Cards: the SERVER asks Stripe. QR (GCash / Maya): the booked therapist
+// verifies it by hand. "recorded" only means "your proof was stored and sent to the therapist", never "paid".
+// See src/utils/bookingPayments.js and api/_lib/routes/bookings-*.js, payments-item.js.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const peso = (centavos) => '₱ ' + (Number(centavos || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -32,13 +45,14 @@ const QR_PROVIDERS = [
 ]
 
 const SLOW_AFTER_MS = 30 * 1000
+const clinicTime = (d) => (d ? new Date(d).toLocaleString('en-US', { timeZone: 'Asia/Manila', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+const slotDateLabel = (d) => (d ? new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }) : '')
 
 /* ─────────────────────────  icons  ───────────────────────── */
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' }
 const CheckIcon = ({ size = 26, w = 3 }) => (<svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={w} {...svg} aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>)
 const XIcon = ({ size = 26 }) => (<svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="3" {...svg} aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>)
-const ClockIcon = ({ size = 30 }) => (<svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="2.5" {...svg} aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>)
 const AlertIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" {...svg} aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>)
 const ArrowRightIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2.5" {...svg} aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>)
 const CardIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" {...svg} aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /><line x1="6" y1="15" x2="10" y2="15" /></svg>)
@@ -103,6 +117,25 @@ function OrderSummary({ total, merchantName, lineItems }) {
   )
 }
 
+// "Pay -> Confirm payment -> Reference & receipt". Finished steps show a check; the current one is bold with aria-current.
+function StepHeader({ labels, current }) {
+  return (
+    <ol className="m-0 mb-4 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 pr-12" aria-label="Payment steps">
+      {labels.map((l, i) => {
+        const done = i < current
+        const active = i === current
+        return (
+          <li key={l} className="flex min-w-0 items-center gap-2" aria-current={active ? 'step' : undefined}>
+            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${done || active ? 'bg-pm-green text-white' : 'border border-slate-300 text-slate-400'}`}>{done ? <CheckIcon size={12} w={4} /> : i + 1}</span>
+            <span className={`text-xs ${active ? 'font-bold text-slate-800' : done ? 'font-semibold text-pm-green-dark' : 'font-semibold text-slate-400'}`}>{l}{done && <span className="sr-only"> (done)</span>}</span>
+            {i < labels.length - 1 && <span className={`h-px w-5 shrink-0 sm:w-10 ${done ? 'bg-pm-green' : 'bg-slate-200'}`} aria-hidden="true" />}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 const btnBase = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 disabled:cursor-not-allowed disabled:opacity-40'
 const btnOutline = `${btnBase} border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 active:scale-[.98]`
 const btnPrimary = `${btnBase} bg-pm-green text-white shadow-sm shadow-pm-green/30 hover:bg-pm-green-dark hover:shadow-md active:scale-[.98]`
@@ -141,6 +174,7 @@ function CheckoutBody({
   const [pmComplete, setPmComplete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [selectError, setSelectError] = useState('')
+  const [confirmError, setConfirmError] = useState('')
   const [booking, setBooking] = useState(resumeSaved?.bookingId ? { id: resumeSaved.bookingId, token: resumeSaved.token } : null)
   const [result, setResult] = useState(null) // the server's view of the latest attempt
   const [failure, setFailure] = useState(null) // { code, message }
@@ -150,10 +184,25 @@ function CheckoutBody({
   const [count, setCount] = useState(redirectSeconds)
   const [countActive, setCountActive] = useState(true)
 
+  // QR proof (step 3)
+  const [reference, setReference] = useState('')
+  const [receipt, setReceipt] = useState(null) // File, kept in memory only: nothing is uploaded until "Yes, submit payment"
+  const [proofError, setProofError] = useState({ message: '', retry: false })
+  const [changeMode, setChangeMode] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const submitter = usePaymentSubmit() // owns the proof request: real progress, retries, abort, slow detection
+  const [finished, setFinished] = useState(false) // the server confirmed; the modal ticks everything, then hands over
+  const [notice, setNotice] = useState('') // a short toast on step 3
+  const attemptedKey = useRef('') // an idempotency key that was already sent once: a retry asks the server first
+  const [slotInfo, setSlotInfo] = useState(null) // { date, timeLabel, holdExpiresAt } from the server
+
   const alive = useRef(true)
   const holdKey = useRef(resumeSaved?.holdKey || newKey())
   const attemptKey = useRef(newKey())
   const methodRef = useRef(resumeSaved?.method || 'card')
+  const qrAttempt = useRef(resumeSaved?.attemptId && resumeSaved?.method && resumeSaved.method !== 'card' ? { id: resumeSaved.attemptId, method: resumeSaved.method } : null)
+  const proofKey = useRef({ sig: '', key: '' })
+  const proofControls = useRef(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
   const qrP = QR_PROVIDERS.find((p) => p.id === qrProvider)
@@ -161,18 +210,29 @@ function CheckoutBody({
   const methodLabel = result?.methodLabel && phase !== 'select_method' && phase !== 'confirm' ? result.methodLabel : isQr ? `${qrP.label} QR` : pm?.label || 'Card'
   const providerName = isQr || methodRef.current !== 'card' ? (methodRef.current === 'paymaya' ? 'Maya' : 'GCash') : 'Stripe'
   const cardAvailable = Boolean(stripe && elements)
+  const therapistName = (therapistLabel || '').split(' · ')[0] || 'your therapist'
+  const amountPesos = total / 100
+  const qrMethod = isQr ? qrP.apiMethod : methodRef.current // gcash | paymaya (for the proof rules)
+  const modeLabel = (lineItems?.[0]?.name || '').match(/\(([^)]+)\)/)?.[1] || ''
 
-  // Page leaves are discouraged only while a payment is being checked.
+  // Page leaves are discouraged only while a payment is being checked or sent.
   useEffect(() => {
-    setBlocking(phase === 'processing')
+    const busyNow = phase === 'processing' || phase === 'sending'
+    setBlocking(busyNow)
     if (phase !== 'processing') return undefined
     const warn = (e) => { e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [phase, setBlocking])
+  useLeaveGuard(phase === 'sending')
+  useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(t) }, [notice])
 
   // Focus moves to the new state's heading.
-  useEffect(() => { headingRef.current?.focus() }, [phase, headingRef])
+  useEffect(() => {
+    if (phase === 'recorded' || phase === 'sending') return
+    const el = headingRef.current || document.querySelector('[data-step-heading]')
+    el?.focus()
+  }, [phase, headingRef])
 
   // "This is taking longer than usual" after 30 s of processing.
   useEffect(() => {
@@ -209,22 +269,33 @@ function CheckoutBody({
     return null
   }, [])
 
+  const rememberSlot = useCallback((view) => {
+    if (view?.booking) setSlotInfo({ date: view.booking.date, timeLabel: view.booking.timeLabel, holdExpiresAt: view.booking.holdExpiresAt })
+  }, [])
+
   const finish = useCallback((s) => {
     if (!alive.current || !s) return
     setResult(s)
+    rememberSlot(s)
     if (s.status === 'succeeded') {
       clearSaved()
       setPhase('success')
-      onSuccess?.({ method: s.methodLabel, dateLabel: manilaDateTime(s.paidAt), referenceNo: s.referenceNo, appointmentId: s.booking?.appointmentId, amount: s.amount })
+      onSuccess?.({ paymentStatus: 'verified', method: s.methodLabel, dateLabel: manilaDateTime(s.paidAt), referenceNo: s.referenceNo, appointmentId: s.booking?.appointmentId, amount: s.amount, therapist: s.booking?.therapist })
     } else if (s.status === 'pending_verification') {
-      save({ attemptId: s.attemptId, method: methodRef.current })
+      if (s.hasReceipt) { setPhase('recorded'); return } // the new flow: proof was stored
+      save({ attemptId: s.attemptId, method: methodRef.current }) // an older attempt without proof: the old details screen
       setPhase('pending_verification')
+    } else if (s.status === 'rejected') {
+      methodRef.current = s.method || methodRef.current
+      qrAttempt.current = { id: s.attemptId, method: s.method }
+      setChannel('qr'); setQrProvider(s.method === 'paymaya' ? 'maya' : 'gcash')
+      setPhase('proof') // "Payment not received": resubmit while the hold lasts
     } else {
       setFailure(s.failure || friendlyPaymentError('unknown'))
       setAttemptAt(new Date())
       setPhase('failed')
     }
-  }, [onSuccess])
+  }, [onSuccess, rememberSlot])
 
   // Opened again after a refresh: ask the server where this booking and its payment are, and continue from there.
   useEffect(() => {
@@ -235,14 +306,20 @@ function CheckoutBody({
         const st = await getBookingState(resumeSaved.bookingId, resumeSaved.token)
         if (stop || !alive.current) return
         const a = st.attempt
-        if (!a || a.status === 'awaiting' && !st.holdExpiresAt) { setPhase('select_method'); return }
+        if (!a) { setPhase('select_method'); return }
         methodRef.current = a.method || methodRef.current
-        if (a.method !== 'card') { setChannel('qr'); setQrProvider(a.method === 'paymaya' ? 'maya' : 'gcash') }
+        if (a.method !== 'card') {
+          setChannel('qr'); setQrProvider(a.method === 'paymaya' ? 'maya' : 'gcash')
+          qrAttempt.current = { id: a.attemptId, method: a.method }
+          rememberSlot(a)
+          if (a.paymentStatus === 'awaiting_payment' && !TERMINAL.includes(a.status)) { setPhase(a.sentConfirmedAt ? 'proof' : 'confirm'); setQrConfirmed(Boolean(a.sentConfirmedAt)); return }
+        }
+        if (a.status === 'awaiting' && !st.holdExpiresAt) { setPhase('select_method'); return }
         if (a.status === 'awaiting') { setPhase('select_method'); return }
-        if (TERMINAL.includes(a.status)) { finish(a); return }
+        if (TERMINAL.includes(a.status)) { finish({ ...a, receivedByTherapist: true }); return }
         setPhase('processing')
         finish(await poll(a.attemptId, resumeSaved.token))
-      } catch (err) {
+      } catch {
         if (stop) return
         clearSaved(); setBooking(null); setPhase('select_method')
         setSelectError('We could not find your earlier checkout, so please start again.')
@@ -252,10 +329,39 @@ function CheckoutBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Make sure the slot is held and a QR payment attempt exists for the chosen wallet. The SERVER sets the hold length.
+  const holdAndStartQr = async () => {
+    let b = booking
+    if (!b) {
+      const started = await startBooking(bookingBody, holdKey.current)
+      const token = started.accessToken || loadSaved()?.token
+      if (!token) throw Object.assign(new Error(PAYMENT_MESSAGES.unknown), { code: 'unknown' })
+      b = { id: started.bookingId, token }
+      setBooking(b)
+      save({ bookingId: b.id, token, holdKey: holdKey.current, sessionLabel, therapistLabel, patientName, merchantName, lineItems, total })
+    }
+    const method = qrP.apiMethod
+    if (!qrAttempt.current || qrAttempt.current.method !== method) {
+      const attempt = await createAttempt(b.id, b.token, { method, idempotencyKey: newKey(), payer })
+      qrAttempt.current = { id: attempt.attemptId, method }
+      rememberSlot(attempt)
+      save({ attemptId: attempt.attemptId, method })
+    }
+    methodRef.current = method
+    return b
+  }
+
   /* ── select_method -> confirm ── */
   const goToConfirm = async () => {
     setSelectError('')
-    if (isQr) { methodRef.current = qrP.apiMethod; setPhase('confirm'); return }
+    if (isQr) {
+      setBusy(true)
+      try { await holdAndStartQr(); setPhase('confirm') } catch (err) {
+        if (!alive.current) return
+        if (err.code === 'SLOT_NO_LONGER_AVAILABLE' || err.code === 'SLOT_TAKEN') { setFailure({ code: 'slot_taken', message: err.message }); setAttemptAt(new Date()); setPhase('failed') } else setSelectError(err.message || PAYMENT_MESSAGES.unknown)
+      } finally { if (alive.current) setBusy(false) }
+      return
+    }
     if (!cardAvailable) { setSelectError(PAYMENT_MESSAGES.unavailable); return }
     setBusy(true)
     try {
@@ -275,10 +381,10 @@ function CheckoutBody({
     } finally { setBusy(false) }
   }
 
-  /* ── confirm -> processing -> success | failed | pending_verification ── */
+  /* ── CARD: confirm -> processing -> success | failed ── */
   const runPayment = async () => {
     setFailure(null); setResult(null); setProgress('checking'); setPhase('processing'); setAttemptAt(new Date())
-    const method = methodRef.current
+    const method = 'card'
     try {
       // 1. Hold the time slot BEFORE any money moves. (Same key = same booking, never two.)
       let b = booking
@@ -293,8 +399,6 @@ function CheckoutBody({
       // 2. Start the payment attempt (the server decides the amount).
       const attempt = await createAttempt(b.id, b.token, { method, idempotencyKey: attemptKey.current, payer })
       save({ attemptId: attempt.attemptId, method })
-
-      if (method !== 'card') { finish(attempt); return } // QR: now waiting for the therapist
 
       // 3. Card: pay with Stripe (this also runs 3D Secure when the bank asks for it).
       if (attempt.clientSecret) {
@@ -321,18 +425,85 @@ function CheckoutBody({
     }
   }
 
-  /* ── leaving ── (closing from select / confirm / failed gives the held slot back: see handleClose in the shell) */
+  /* ── QR: confirm ("I sent exactly ...") -> proof ── */
+  const confirmQr = async () => {
+    setConfirmError('')
+    if (!qrAttempt.current || !booking) { setConfirmError('We could not find your payment. Please go back and try again.'); return }
+    setBusy(true)
+    try {
+      await confirmSent(qrAttempt.current.id, booking.token)
+      setPhase('proof')
+    } catch (err) {
+      if (!alive.current) return
+      if (err.code === 'HOLD_EXPIRED') { setFailure({ code: 'HOLD_EXPIRED', message: err.message }); setPhase('failed') } else setConfirmError(err.message || PAYMENT_MESSAGES.unknown)
+    } finally { if (alive.current) setBusy(false) }
+  }
+
+  /* ── QR: proof -> (confirm dialog) -> sending -> recorded ── */
+  const proofOk = validateReference(reference, qrMethod).ok && Boolean(receipt)
+  const submitNow = async () => {
+    setShowConfirm(false)
+    setProofError({ message: '', retry: false }); setNotice('')
+    if (!qrAttempt.current || !booking || !receipt) return
+    // One key per set of inputs: a retry of the SAME details can never make a second record; edited details get a new key.
+    const sig = `${validateReference(reference, qrMethod).digits}|${receipt.name}|${receipt.size}|${changeMode}`
+    if (proofKey.current.sig !== sig) proofKey.current = { sig, key: newKey() }
+    const key = proofKey.current.key
+    const checkFirst = attemptedKey.current === key // sent before (cancelled / failed): ask the server before sending again
+    attemptedKey.current = key
+    const attemptId = qrAttempt.current.id
+    const token = booking.token
+    setFinished(false)
+    setPhase('sending')
+    const out = await submitter.run({
+      fileSize: receipt.size, checkFirst,
+      submit: async ({ signal, onProgress }) => submitProof(attemptId, token, { reference, file: await prepareForUpload(receipt), key, change: changeMode, signal, onProgress }),
+      checkStatus: () => getStatus(attemptId, token),
+    })
+    if (!alive.current) return
+
+    if (out.ok) {
+      const view = { ...out.view, receivedByTherapist: out.alreadyRecorded ? true : Boolean(out.view?.receivedByTherapist) }
+      setFinished(true) // ring to 100 %, every step ticked
+      const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      await sleep(reduced ? 0 : HANDOVER_MS)
+      if (!alive.current) return
+      setResult(view); rememberSlot(view); setChangeMode(false); setFinished(false); setPhase('recorded')
+      onSuccess?.({ paymentStatus: 'proof_submitted', method: view.methodLabel, dateLabel: manilaDateTime(view.proofSubmittedAt), referenceNo: null, appointmentId: view.booking?.appointmentId, amount: view.amount, therapist: view.booking?.therapist, referenceLast4: view.referenceLast4 })
+      return
+    }
+
+    // Not recorded: back to step 3 with everything kept.
+    setPhase('proof')
+    const focusContinue = () => setTimeout(() => document.querySelector('[data-proof-continue]')?.focus(), 0)
+    if (out.cancelled) { setNotice('Upload cancelled. Your details are still here.'); focusContinue(); return }
+    if (out.timedOut) { setProofError({ message: out.message, retry: true }); focusContinue(); return }
+    if (out.code === 'HOLD_EXPIRED') { setFailure({ code: 'HOLD_EXPIRED', message: out.message }); setAttemptAt(new Date()); setPhase('failed'); return }
+    setProofError({ message: out.message || PAYMENT_MESSAGES.unknown, retry: Boolean(out.retry) || out.code === 'unknown' })
+    if (out.code === 'REFERENCE_ALREADY_USED' || out.code === 'INVALID_REFERENCE') setTimeout(() => proofControls.current?.focusReference?.(), 0)
+    else focusContinue()
+  }
+
+  // Changing proof after it was recorded (while the therapist has not verified it yet).
+  const startChangeProof = () => {
+    if (result?.reference) setReference(formatReference(result.reference, qrMethod))
+    setReceipt(null); setChangeMode(true); setProofError({ message: '', retry: false }); setPhase('proof')
+  }
+
+  /* ── leaving ── (see handleClose in the shell) */
   const closeWithRelease = () => onClose()
   const closeFinished = () => { clearSaved(); onRedirect?.() }
 
   // Tell the shell which state we are in, so its close button / Esc / backdrop do the right thing.
-  useEffect(() => { onPhase?.(phase) }, [phase, onPhase])
+  const holdUntil = slotInfo?.holdExpiresAt || null
+  const hasQrHold = Boolean(booking && qrAttempt.current)
+  useEffect(() => { onPhase?.(phase, { hasQrHold, holdUntil }) }, [phase, hasQrHold, holdUntil, onPhase])
 
-  /* ── QR: optional reference / screenshot after submitting (the form lives in PendingVerification.jsx) ── */
-  const sendQrDetails = async ({ reference, screenshot }) => {
+  /* ── QR: optional reference / screenshot of an OLDER attempt (the form lives in PendingVerification.jsx) ── */
+  const sendQrDetails = async ({ reference: ref, screenshot }) => {
     if (!result?.attemptId || !booking) throw new Error('We could not find your payment. Please refresh and try again.')
-    const view = await submitQrDetails(result.attemptId, booking.token, { reference, screenshot })
-    setResult(view) // the server's view now says the details were sent ("Checking your details")
+    const view = await submitQrDetails(result.attemptId, booking.token, { reference: ref, screenshot })
+    setResult(view)
   }
 
   const rows = useMemo(() => ({
@@ -343,8 +514,11 @@ function CheckoutBody({
   const heading = (text, color = 'text-slate-800') => (
     <h2 ref={headingRef} tabIndex={-1} className={`text-2xl font-bold outline-none ${color}`}>{text}</h2>
   )
+  const stepLabels = isQr || (phase !== 'select_method' && phase !== 'confirm' && methodRef.current !== 'card')
+    ? ['Pay', 'Confirm payment', 'Reference & receipt'] : ['Pay', 'Confirm payment']
+  const stepIndex = { select_method: 0, confirm: 1, proof: 2 }[phase]
 
-  /* ───────── PROCESSING ───────── */
+  /* ───────── PROCESSING (card) ───────── */
   if (phase === 'processing') {
     const steps = [
       { title: 'Payment details received', sub: `${methodLabel} · ${peso(total)}`, state: 'done' },
@@ -371,7 +545,23 @@ function CheckoutBody({
     )
   }
 
-  /* ───────── SUCCESS ───────── */
+  /* ───────── SENDING + RECORDED (QR): their own windows, over the page. The checkout dialog is hidden by the shell. ───────── */
+  if (phase === 'sending' || phase === 'recorded') {
+    return createPortal(
+      phase === 'sending' ? (
+        <SendingPaymentModal
+          state={submitter.state.mode} startedAt={submitter.state.startedAt} uploadPercent={submitter.state.uploadPercent} finished={finished}
+          steps={buildSteps(submitter.state, { methodLabel, amount: amountPesos, fileName: receipt?.name, therapist: therapistName, notified: finished ? Boolean(submitter.state.status === 'done') : true })}
+          therapist={therapistName} onKeepWaiting={() => {}} onCancel={submitter.cancel}
+        />
+      ) : (
+        result && <PaymentRecordedModal view={{ ...result, sessionType: modeLabel }} onDone={closeFinished} onChangeProof={startChangeProof} />
+      ),
+      document.body,
+    )
+  }
+
+  /* ───────── SUCCESS (card) ───────── */
   if (phase === 'success' && result) {
     return (
       <div className="flex flex-col items-center text-center" onClickCapture={() => setCountActive(false)}>
@@ -395,7 +585,7 @@ function CheckoutBody({
     )
   }
 
-  /* ───────── PENDING VERIFICATION (GCash / Maya) ───────── */
+  /* ───────── PENDING VERIFICATION (older QR attempts that have no proof yet) ───────── */
   if (phase === 'pending_verification') {
     return (
       <PendingVerification
@@ -412,7 +602,7 @@ function CheckoutBody({
 
   /* ───────── FAILED ───────── */
   if (phase === 'failed') {
-    const slotLost = failure?.code === 'slot_taken' || failure?.code === 'SLOT_TAKEN'
+    const slotLost = ['slot_taken', 'SLOT_TAKEN', 'SLOT_NO_LONGER_AVAILABLE', 'HOLD_EXPIRED'].includes(failure?.code)
     const retryable = !slotLost && Boolean(booking || loadSaved()?.bookingId)
     const supportMessage = `Payment attempt ${result?.attemptId || ''} for ${peso(total)} (${methodLabel}) on ${manilaDateTime(attemptAt)} was not confirmed. Money left my account.`
     const goSupport = (e) => {
@@ -422,8 +612,8 @@ function CheckoutBody({
     return (
       <div className="flex flex-col items-center text-center">
         <span className="mb-3 mt-1 flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white"><XIcon size={32} /></span>
-        {heading('Payment unsuccessful', 'text-red-700')}
-        <p role="status" className="mt-1 text-sm text-slate-600">We couldn&apos;t confirm your payment, so your session is not booked yet.</p>
+        {heading(slotLost ? 'That time is no longer available' : 'Payment unsuccessful', 'text-red-700')}
+        <p role="status" className="mt-1 text-sm text-slate-600">{slotLost ? 'Your session was not booked.' : "We couldn't confirm your payment, so your session is not booked yet."}</p>
         <div className="mt-4 w-full rounded-xl border border-red-200 bg-red-50 p-4 text-left">
           <div className="text-xs font-bold text-red-800">What happened</div>
           <p className="mt-1 text-sm text-red-900">{failure?.message || PAYMENT_MESSAGES.unknown}</p>
@@ -437,7 +627,7 @@ function CheckoutBody({
               <button type="button" className={btnOutline} onClick={() => { attemptKey.current = newKey(); setPm(null); setPmComplete(false); setQrConfirmed(false); setSelectError(''); setPhase('select_method') }}>Change payment method</button>
               <button
                 type="button" className={btnPrimary}
-                onClick={() => { attemptKey.current = newKey(); (methodRef.current === 'card' && !pm) ? setPhase('select_method') : runPayment() }}
+                onClick={() => { attemptKey.current = newKey(); if (methodRef.current === 'card' && pm) runPayment(); else { setQrConfirmed(false); setPhase('select_method') } }}
                 disabled={!retryable && !booking}
               >Try again</button>
             </>
@@ -450,11 +640,60 @@ function CheckoutBody({
     )
   }
 
+  /* ───────── PROOF (QR step 3) ───────── */
+  if (phase === 'proof') {
+    const done = proofProgress(qrMethod, reference, receipt)
+    const left = hoursLeft(holdUntil)
+    const rejected = result?.paymentStatus === 'rejected' ? (result.rejectedReason || '') : undefined
+    const banner = slotInfo && (
+      <div className="mt-4 flex items-center gap-3 rounded-xl bg-green-50 px-3 py-2.5">
+        <CalendarDays size={20} className="shrink-0 text-red-500" aria-hidden="true" />
+        <span className="block min-w-0 flex-1 text-left">
+          <span className="block text-sm font-bold text-slate-800">Your time slot is reserved</span>
+          <span className="block truncate text-xs text-slate-500">{slotDateLabel(slotInfo.date)} · {slotInfo.timeLabel}</span>
+        </span>
+        {holdUntil && <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-pm-green-dark" title={`Until ${clinicTime(holdUntil)}`}>Held {left} hrs</span>}
+      </div>
+    )
+    return (
+      <div className="flex flex-col">
+        <StepHeader labels={stepLabels} current={2} />
+        <PaymentProofStep
+          method={qrMethod} reference={reference} onReference={(v) => { setReference(v); setProofError({ message: '', retry: false }) }}
+          file={receipt} onFile={(f) => { setReceipt(f); setProofError({ message: '', retry: false }) }}
+          holdBanner={banner} rejectedReason={rejected} controls={proofControls}
+          error={proofError.message}
+        />
+        {proofError.retry && <div><button type="button" className={`${btnOutline} mt-2`} onClick={submitNow} disabled={!proofOk}>Try again</button></div>}
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button type="button" className={btnOutline} onClick={() => setPhase('confirm')}>Back</button>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-bold ${done === 2 ? 'text-pm-green-dark' : 'text-slate-400'}`} aria-hidden="true">{done} of 2 required done</span>
+            <button type="button" data-proof-continue className={btnPrimary} onClick={() => setShowConfirm(true)} disabled={!proofOk}>Continue<ArrowRightIcon /></button>
+          </div>
+        </div>
+        {notice && createPortal(<div role="status" aria-live="polite" className="fixed bottom-6 left-1/2 z-[1300] -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">{notice}</div>, document.body)}
+        {showConfirm && createPortal(
+          <ConfirmPaymentDetailsModal
+            methodLabel={methodLabel} amount={amountPesos} therapist={therapistName}
+            referenceDisplay={formatReference(reference, qrMethod)} file={receipt}
+            onBack={() => setShowConfirm(false)}
+            onEdit={() => { setShowConfirm(false); setTimeout(() => proofControls.current?.focusReference?.(), 0) }}
+            onChange={() => { setShowConfirm(false); proofControls.current?.chooseFile?.() }}
+            onSubmit={submitNow}
+          />,
+          document.body,
+        )}
+      </div>
+    )
+  }
+
   /* ───────── CONFIRM ───────── */
   if (phase === 'confirm') {
     const needTick = isQr
     return (
       <div className="flex flex-col">
+        <StepHeader labels={stepLabels} current={stepIndex} />
         {heading('Confirm your payment')}
         <p className="mt-1 text-sm text-slate-500">Please check the details before we record your payment and book your session.</p>
         <div className="mt-4"><DetailList rows={rows.confirm} /></div>
@@ -466,9 +705,10 @@ function CheckoutBody({
           </div>
         )}
         <p className="mt-3 text-xs text-slate-400">By confirming you agree to the Terms and Privacy Policy.</p>
+        {confirmError && <p role="alert" className="mt-2 text-sm text-red-600">{confirmError}</p>}
         <div className="mt-6 flex items-center justify-between gap-3">
           <button type="button" className={btnOutline} onClick={() => setPhase('select_method')}>Back</button>
-          <button type="button" className={btnPrimary} onClick={runPayment} disabled={needTick && !qrConfirmed}>Yes, confirm payment</button>
+          <button type="button" className={btnPrimary} onClick={isQr ? confirmQr : runPayment} disabled={busy || (needTick && !qrConfirmed)}>{busy ? 'Saving…' : 'Yes, confirm payment'}</button>
         </div>
       </div>
     )
@@ -477,6 +717,7 @@ function CheckoutBody({
   /* ───────── SELECT METHOD ───────── */
   return (
     <div className="flex flex-col">
+      <StepHeader labels={stepLabels} current={0} />
       <div className="mb-4 flex items-center gap-2">
         <h2 ref={headingRef} tabIndex={-1} className="text-base font-semibold text-slate-700 outline-none">Choose your payment method</h2>
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Secure</span>
@@ -514,7 +755,7 @@ function CheckoutBody({
             ))}
           </div>
           <img src={qrP.src} alt={`${qrP.label} QR code`} className="w-full max-w-[260px] rounded-lg border border-slate-200 bg-white object-contain" />
-          <div className="text-center text-xs leading-tight text-slate-500">Open your {qrP.label} app, scan this code, and send exactly <span className="font-semibold">{peso(total)}</span>. Your booking is confirmed after the therapist verifies your payment.</div>
+          <div className="text-center text-xs leading-tight text-slate-500">Open your {qrP.label} app, scan this code, and send exactly <span className="font-semibold">{peso(total)}</span>.</div>
         </div>
       ) : cardAvailable ? (
         <PaymentElement
@@ -530,10 +771,29 @@ function CheckoutBody({
       <div className="mt-6 flex items-center justify-between gap-3">
         <button type="button" className={btnOutline} onClick={closeWithRelease} disabled={busy}>Back</button>
         <button type="button" className={btnPrimary} onClick={goToConfirm} disabled={busy || (!isQr && !pmComplete)}>
-          {busy ? 'Checking…' : 'Continue'}{!busy && <ArrowRightIcon />}
+          {busy ? (isQr ? 'Holding your slot…' : 'Checking…') : 'Continue'}{!busy && <ArrowRightIcon />}
         </button>
       </div>
     </div>
+  )
+}
+
+/* ─────────────────────────  "Leave payment?"  ───────────────────────── */
+
+function LeaveDialog({ until, onStay, onLeave }) {
+  const ref = useDialogA11y({ onEscape: onStay })
+  return createPortal(
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-900/60 p-4" onMouseDown={onStay}>
+      <div ref={ref} role="alertdialog" aria-modal="true" aria-labelledby="lp-title" aria-describedby="lp-desc" tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-[400px] rounded-2xl bg-white p-6 text-slate-800 shadow-2xl outline-none [color-scheme:light]">
+        <h2 id="lp-title" className="m-0 text-xl font-extrabold">Leave payment?</h2>
+        <p id="lp-desc" className="mt-2 text-sm text-slate-600">{until ? `Your time slot stays reserved until ${clinicTime(until)}.` : 'Your time slot stays reserved for now.'} You can come back and finish your payment before then.</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" data-autofocus onClick={onStay} className={btnPrimary}>Stay</button>
+          <button type="button" onClick={onLeave} className={btnOutline}>Leave</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -560,25 +820,30 @@ export default function CheckoutModal({
   const total = amountCentavos ?? computedTotal
   const [blocking, setBlocking] = useState(false)
   const [phase, setPhase] = useState('select_method')
+  const [info, setInfo] = useState({ hasQrHold: false, holdUntil: null })
+  const [leaveAsk, setLeaveAsk] = useState(false)
   const [instance, setInstance] = useState(0)
   const dialogRef = useRef(null)
   const headingRef = useRef(null)
   const resumeSaved = useMemo(() => (open && resume ? loadSaved() : null), [open, resume]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (open) setInstance((n) => n + 1) }, [open]) // a fresh state machine every time it opens
+  const onPhase = useCallback((p, i) => { setPhase(p); setInfo((old) => (old.hasQrHold === i.hasQrHold && old.holdUntil === i.holdUntil ? old : i)) }, [])
 
   // One place decides what "close" means in each state:
-  //   processing            nothing (the window stays until the payment is checked)
-  //   success / waiting     go to the appointment (the booking is already made)
-  //   select / confirm / failed   give the held time slot back, then close
+  //   processing / sending      nothing (the window stays until the server answered)
+  //   success / recorded        go to the appointment (the booking / payment is already recorded)
+  //   QR with a held slot       ask "Leave payment?"; leaving keeps the slot reserved so the patient can come back
+  //   otherwise                 give the held time slot back, then close
   const handleClose = useCallback(async () => {
-    if (phase === 'processing') return
-    if (phase === 'success' || phase === 'pending_verification') { clearSaved(); onRedirect?.(); return }
+    if (phase === 'processing' || phase === 'sending') return
+    if (phase === 'success' || phase === 'pending_verification' || phase === 'recorded') { clearSaved(); onRedirect?.(); return }
+    if (info.hasQrHold && ['select_method', 'confirm', 'proof'].includes(phase)) { setLeaveAsk(true); return }
     const s = loadSaved()
     if (s?.bookingId && s?.token) await cancelBooking(s.bookingId, s.token).catch(() => {})
     clearSaved()
     onClose?.()
-  }, [phase, onClose, onRedirect])
+  }, [phase, info, onClose, onRedirect])
 
   // Background does not scroll while the modal is open.
   useEffect(() => {
@@ -588,7 +853,7 @@ export default function CheckoutModal({
     return () => { document.body.style.overflow = prev }
   }, [open])
 
-  // Esc closes (except while processing); Tab stays inside the window.
+  // Esc closes (except while processing); Tab stays inside the window. Dialogs on top of this one stop Esc before it gets here.
   useEffect(() => {
     if (!open) return undefined
     const onKey = (e) => {
@@ -624,11 +889,13 @@ export default function CheckoutModal({
   const bodyProps = {
     total: labels.total, bookingBody, payer, sessionLabel: labels.sessionLabel, therapistLabel: labels.therapistLabel, patientName: labels.patientName,
     merchantName: labels.merchantName, lineItems: labels.lineItems, resumeSaved: saved, redirectSeconds, onSuccess, onRedirect, onPickAnotherTime,
-    onClose: handleClose, onPhase: setPhase, setBlocking, headingRef,
+    onClose: handleClose, onPhase, setBlocking, headingRef,
   }
+  // While the proof is being sent, and after it was recorded, the page shows ONLY those windows (the checkout stays mounted, hidden, so nothing is lost).
+  const hideDialog = phase === 'sending' || phase === 'recorded'
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 p-4" onMouseDown={() => { if (!blocking) handleClose() }}>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 p-4" style={hideDialog ? { display: 'none' } : undefined} onMouseDown={() => { if (!blocking) handleClose() }}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -657,6 +924,7 @@ export default function CheckoutModal({
           </div>
         </div>
       </div>
+      {leaveAsk && <LeaveDialog until={info.holdUntil} onStay={() => setLeaveAsk(false)} onLeave={() => { setLeaveAsk(false); onClose?.() }} />}
     </div>
   )
 }

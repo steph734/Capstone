@@ -1,3 +1,5 @@
+import { PAYMENT_HOLD_MS } from './paymentProofRules.js'
+
 // What an online booking payment costs. The SERVER decides the amount; the browser's number is never used
 // to charge or to record a payment (before this, a client could ask for any price).
 //
@@ -14,7 +16,7 @@ export const HOLD_MS = 15 * 60 * 1000
 // "usually within X hours" (the server sends it to the checkout screen). The slot is held three times that long, so a
 // slow verification does not lose the patient's slot.
 export const QR_REVIEW_HOURS = 24
-export const QR_REVIEW_HOLD_MS = QR_REVIEW_HOURS * 3 * 60 * 60 * 1000
+export const QR_REVIEW_HOLD_MS = PAYMENT_HOLD_MS // PAYMENT_HOLD_HOURS (72) is set in paymentProofRules.js: one setting for "Held 72 hrs"
 
 // An online booking only counts as a real appointment once its payment is verified. Until then (held, waiting for a
 // therapist to verify a QR payment) and after it fell through (expired, failed, cancelled) it must not show up as a

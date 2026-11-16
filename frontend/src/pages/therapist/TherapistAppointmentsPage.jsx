@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CircleCheck, Ban } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { logActivity } from '../../utils/auditLog'
@@ -8,7 +8,8 @@ import { apiGet, apiPatch } from '../../utils/api'
 import RecommendSessionModal from '../../components/RecommendSessionModal'
 import { manilaDateKey } from '../../utils/manilaTime'
 import { saveLocal } from '../../offline/repo'
-import PaymentVerificationPanel from '../../components/PaymentVerificationPanel'
+import RequestsSection from '../../components/requests/RequestsSection'
+import Collapsible from '../../components/requests/Collapsible'
 import './TherapistAppointmentsPage.css'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -41,9 +42,6 @@ function groupLabel(iso) {
 function groupHeader(iso) {
   const label = groupLabel(iso)
   return label === 'Today' ? 'TODAY' : `${label.toUpperCase()} · ${fmtShort(iso).toUpperCase()}`
-}
-function typeClass(t) {
-  return ({Initial:'tapp-type-initial','Follow-up':'tapp-type-followup',Assessment:'tapp-type-assessment',Group:'tapp-type-group'})[t]||'tapp-type-followup'
 }
 function statusClass(s) {
   return ({Confirmed:'tapp-status-confirmed',Pending:'tapp-status-pending',Cancelled:'tapp-status-cancelled',Completed:'tapp-status-completed',Archived:'tapp-status-archived'})[s]||''
@@ -80,15 +78,10 @@ function avatarColorFor(id) {
 /* ── Icons ────────────────────────────────────────────────── */
 const PlusIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
 const SearchIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-const CalIcon     = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="tapp-card-meta-icon"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
-const ClockIcon   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="tapp-card-meta-icon"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
 const EyeIcon       = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
 const PencilIcon    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 const ArchiveIcon   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
 const UnarchiveIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 6.5l5.5 5.5H14v2h-4v-2H6.5L12 6.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
-const ClinicIcon  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="tapp-card-meta-icon"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14h-2v-3H8v-2h3V9h2v3h3v2h-3v3z"/></svg>
-const CheckIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-const XIcon       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
 const DotsIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 const RefreshIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L14 11h7V4l-3.35 2.35z"/></svg>
 const CheckCircleIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
@@ -136,14 +129,30 @@ function FullCalendar({ appointments, selectedDate, onSelectDate }) {
   }).length
 
   return (
-    <div className="tapp-cal-card">
-      {/* Header */}
-      <div className="tapp-cal-header">
-        <div className="tapp-cal-heading">
-          <h3 className="tapp-cal-title">Session Calendar</h3>
-          <p className="tapp-cal-sub">Tap a day to view appointments</p>
-        </div>
-      </div>
+    <Collapsible
+      defaultOpen={false}
+      className="tapp-cal-card"
+      renderHeader={({ toggleProps, open }) => (
+        <button {...toggleProps} className="tapp-cal-header" style={{ width: '100%', border: 0, background: 'none', textAlign: 'left', cursor: 'pointer', gap: 16, flexWrap: 'wrap' }}>
+          <span className="tapp-cal-heading" style={{ flex: '1 1 220px' }}>
+            <span className="tapp-cal-title" style={{ display: 'block' }}>Session Calendar</span>
+            <span className="tapp-cal-sub" style={{ display: 'block' }}>{MONTHS[month]} {year} · tap a day to view appointments</span>
+          </span>
+          <span className="tapp-cal-legend" style={{ display: 'flex', gap: 14 }}>
+            <span className="tapp-legend-item"><span className="tapp-legend-dot tapp-dot-few" /> Available</span>
+            <span className="tapp-legend-item"><span className="tapp-legend-dot tapp-dot-mid" /> Booked</span>
+            <span className="tapp-legend-item"><span className="tapp-legend-dot tapp-dot-many" /> Closed</span>
+          </span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{monthTotal} session{monthTotal !== 1 ? 's' : ''}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontWeight: 800, color: '#2E5E4E', fontSize: 14 }}>
+            {open ? 'Hide calendar' : 'Show calendar'}
+            <span style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid #D6E3DC', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+              <ChevronDown size={16} aria-hidden="true" style={{ transition: 'transform .3s', transform: open ? 'rotate(180deg)' : 'none' }} />
+            </span>
+          </span>
+        </button>
+      )}
+    >
 
       {/* Centered month navigation */}
       <div className="tapp-cal-nav-center">
@@ -201,7 +210,7 @@ function FullCalendar({ appointments, selectedDate, onSelectDate }) {
           {MONTHS[month]} total: {monthTotal} session{monthTotal !== 1 ? 's' : ''}
         </span>
       </div>
-    </div>
+    </Collapsible>
   )
 }
 
@@ -369,36 +378,6 @@ function RestoreConfirmModal({ appt, patient, appointments, onConfirm, onRebook,
             </div>
           </>
         )}
-      </div>
-    </div>
-  )
-}
-
-/* ── Accept/Decline Confirm Modal ──────────────────────────── */
-function RespondConfirmModal({ req, action, busy, onConfirm, onClose }) {
-  const accept = action === 'accept'
-  return (
-    <div className="tapp-overlay" onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="tapp-confirm-modal">
-        <div className={`tapp-confirm-icon ${accept ? 'is-accept' : 'is-decline'}`}>{accept ? <CircleCheck size={30} aria-hidden="true" /> : <Ban size={30} aria-hidden="true" />}</div>
-        <h3 className="tapp-confirm-title">{accept ? 'Accept this request?' : 'Decline this request?'}</h3>
-        <p className="tapp-confirm-msg">
-          {accept ? (
-            <>This will confirm <strong>{req.name}</strong>'s appointment on{' '}
-              <strong>{fmtDate(req.date)}</strong> at <strong>{fmt12(req.start)}</strong>, and
-              email the guardian that it was accepted.</>
-          ) : (
-            <>This will decline <strong>{req.name}</strong>'s appointment on{' '}
-              <strong>{fmtDate(req.date)}</strong> at <strong>{fmt12(req.start)}</strong>, free the
-              time slot, and email the guardian that it was declined.</>
-          )}
-        </p>
-        <div className="tapp-confirm-actions">
-          <button className="tapp-confirm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className={`tapp-confirm-ok ${accept ? 'is-accept' : 'is-decline'}`} onClick={onConfirm} disabled={busy}>
-            {busy ? 'Please wait…' : accept ? 'Accept' : 'Decline'}
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -586,35 +565,6 @@ function FormModal({ initial, onClose, onSave, appointments = [] }) {
   )
 }
 
-/* ── Pending request card ──────────────────────────────────── */
-function RequestCard({ req, onAccept, onDecline }) {
-  return (
-    <div className="tapp2-req-card">
-      <div className="tapp2-req-top">
-        <Avatar name={req.name} id={req.id} />
-        <div className="tapp2-req-info">
-          <span className="tapp2-req-name">{req.name}</span>
-          <span className="tapp2-req-sub">{req.age} · {req.condition}</span>
-        </div>
-        <div className="tapp2-req-actions">
-          <span className="tapp2-req-requested">Requested {req.requestedAt}</span>
-          <div className="tapp2-req-btns">
-            <button className="tapp2-btn-accept" onClick={() => onAccept(req)}><CheckIcon /> Accept</button>
-            <button className="tapp2-btn-decline" onClick={() => onDecline(req)}><XIcon /> Decline</button>
-          </div>
-        </div>
-      </div>
-      <div className="tapp2-req-meta">
-        <span><CalIcon /> {fmtDateShort(req.date)}</span>
-        <span><ClockIcon /> {fmt12(req.start)} – {fmt12(req.end)}</span>
-        <span><ClinicIcon /> {req.location}</span>
-      </div>
-      <span className={`tapp-type-badge ${typeClass(req.evalType)}`}>{req.evalType}</span>
-      <p className="tapp2-req-note">{req.note}</p>
-    </div>
-  )
-}
-
 /* ── Appointment row (with kebab menu) ────────────────────── */
 function AppointmentRow({ appt, name, isToday, viewMode, canRecommend, onView, onEdit, onArchive, onRestoreClick, onStart, onComplete, onRecommend, onViewNotes }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -719,8 +669,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [confirmRestoreAppt,setConfirmRestoreAppt]= useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
   const [toast,        setToast]        = useState('')
-  const [respondTarget, setRespondTarget] = useState(null) // { req, action: 'accept' | 'decline' }
-  const [respondBusy,   setRespondBusy]   = useState(false)
+  const [reloadTick,   setReloadTick]   = useState(0) // bumped when a payment is verified, so the list shows the booking without a page reload
+  const [requestCount, setRequestCount] = useState(0) // requests waiting for this therapist (from RequestsSection)
   const navigate = useNavigate()
   // Mark as completed
   const [completeTarget, setCompleteTarget] = useState(null)
@@ -744,7 +694,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       setLoadError('Your account isn’t linked to a staff record yet.')
       return
     }
-    setLoading(true)
+    if (reloadTick === 0) setLoading(true)
     fetch(`/api/appointments/therapist-list?email=${encodeURIComponent(user.email)}`)
       .then(async (r) => {
         const body = await r.json().catch(() => ({}))
@@ -754,7 +704,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load appointments.') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [user?.email])
+  }, [user?.email, reloadTick])
 
   useEffect(() => {
     let cancelled = false
@@ -772,7 +722,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const todayCount = appointments.filter(a => a.date === today && a.status !== 'Archived').length
   const schedCount = appointments.filter(a => a.status === 'Confirmed' || a.status === 'Pending').length
   const doneCount  = appointments.filter(a => a.status === 'Completed').length
-  const pendCount  = appointments.filter(a => a.status === 'Pending').length
   const archCount  = appointments.filter(a => a.status === 'Archived').length
 
   const filtered = useMemo(() => {
@@ -796,26 +745,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800) }
   const patient   = (a)   => ({ name: a.patientName || 'Unknown', condition: a.condition || '' })
-
-  // Real bookings arrive as status 'Pending' until someone acts on them —
-  // this is what used to be a separate static demo list.
-  const incomingRequests = useMemo(() => appointments
-    .filter(a => a.status === 'Pending' && !a.isArchived)
-    .map(a => ({
-      id: a.id,
-      name: a.patientName || 'Unknown',
-      condition: a.condition || 'No condition on file',
-      age: a.age != null ? `${a.age} years old` : '—',
-      evalType: a.type,
-      date: a.date,
-      start: a.time,
-      end: a.endTime,
-      location: 'Main Clinic',
-      requestedAt: a.createdAt
-        ? new Date(a.createdAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
-        : '—',
-      note: a.guardianName ? `Guardian note: ${a.guardianName}` : 'No additional notes provided.',
-    })), [appointments])
 
   const logAppt = (actionIcon, description, appt, status = 'Success') => {
     logActivity({
@@ -912,39 +841,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
     if (appt) logAppt('♻️', `Restored appointment for ${patient(appt).name}`, appt)
   }
 
-  // Accept/Decline open a confirmation modal first; the actual PATCH only
-  // fires once the therapist confirms there (see confirmRespond below).
-  const handleAcceptRequest = (req) => setRespondTarget({ req, action: 'accept' })
-  const handleDeclineRequest = (req) => setRespondTarget({ req, action: 'decline' })
-
-  const confirmRespond = async () => {
-    if (!respondTarget) return
-    const { req, action } = respondTarget
-    setRespondBusy(true)
-    try {
-      const res = await fetch(`/api/appointments/${req.id}/respond`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || 'Could not update the appointment.')
-
-      const nextStatus = action === 'accept' ? 'Confirmed' : 'Cancelled'
-      setAppointments(p => p.map(a => (a.id === req.id ? { ...a, status: nextStatus, cancelledReason: action === 'decline' ? 'Declined by therapist' : a.cancelledReason } : a)))
-      showToast(
-        action === 'accept'
-          ? `Accepted ${req.name}'s request${body.emailSent ? ' — guardian notified by email.' : '.'}`
-          : `Declined ${req.name}'s request${body.emailSent ? ' — guardian notified by email.' : '.'}`
-      )
-      logAppt(action === 'accept' ? '✅' : '🚫', `${action === 'accept' ? 'Accepted' : 'Declined'} appointment request for ${req.name}`, { id: req.id })
-      setRespondTarget(null)
-    } catch (err) {
-      showToast(err.message || 'Something went wrong.')
-    } finally {
-      setRespondBusy(false)
-    }
-  }
   const handleStartSession = (name) => showToast(`Starting session with ${name}…`)
 
   return (
@@ -956,8 +852,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
       icon="🗓️"
       menuItems={getTherapistMenuItems(betaTier)}
     >
-      {/* GCash / Maya payments waiting for this therapist to verify */}
-      <PaymentVerificationPanel />
       {loading ? (
         <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your appointments…</p>
       ) : loadError ? (
@@ -988,8 +882,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           <div className="tapp-stat">
             <div className="tapp-stat-icon tapp-stat-amber">⏳</div>
             <div className="tapp-stat-body">
-              <span className="tapp-stat-num">{pendCount}</span>
-              <span className="tapp-stat-lbl">Pending</span>
+              <span className="tapp-stat-num">{requestCount}</span>
+              <span className="tapp-stat-lbl">Needs response</span>
             </div>
           </div>
           <div className="tapp-stat">
@@ -1015,18 +909,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onSelectDate={setSelectedDate}
         />
 
-        {/* Incoming appointment requests — every real booking still Pending */}
-        {incomingRequests.length > 0 && (
-          <section className="tapp2-requests">
-            <div className="tapp2-requests-banner">
-              <ClockIcon />
-              <span>{incomingRequests.length} request{incomingRequests.length !== 1 ? 's' : ''} need{incomingRequests.length === 1 ? 's' : ''} your response</span>
-            </div>
-            {incomingRequests.map(req => (
-              <RequestCard key={req.id} req={req} onAccept={handleAcceptRequest} onDecline={handleDeclineRequest} />
-            ))}
-          </section>
-        )}
+        {/* Requests to review: payment check, then accept or decline (see components/requests) */}
+        <RequestsSection therapistName={user?.name || ''} showToast={showToast} onCount={setRequestCount} onChanged={() => setReloadTick((t) => t + 1)} />
 
         {/* Header */}
         <div className="tapp2-header">
@@ -1181,15 +1065,6 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
           onConfirm={id => { handleUnarchive(id); setConfirmRestoreAppt(null) }}
           onRebook={a => { setEditAppt(a); setConfirmRestoreAppt(null) }}
           onClose={() => setConfirmRestoreAppt(null)}
-        />
-      )}
-      {respondTarget && (
-        <RespondConfirmModal
-          req={respondTarget.req}
-          action={respondTarget.action}
-          busy={respondBusy}
-          onConfirm={confirmRespond}
-          onClose={() => !respondBusy && setRespondTarget(null)}
         />
       )}
       {toast    && <div className="tapp-toast">{toast}</div>}

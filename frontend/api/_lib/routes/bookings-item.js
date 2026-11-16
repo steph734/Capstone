@@ -9,10 +9,11 @@
 import { getDb } from '../mongo.js'
 import { tooManyRequests } from '../rateLimit.js'
 import { loadBooking } from '../bookingAccess.js'
-import { createAttempt, ensurePaymentIntent, refreshCardAttempt, submitQr, attemptView, PAYMENT_MESSAGES, friendlyFailure } from '../paymentAttempts.js'
+import { createAttempt, ensurePaymentIntent, refreshCardAttempt, attemptView, PAYMENT_MESSAGES, friendlyFailure } from '../paymentAttempts.js'
 import { activeSlotFilter, acquireSlotLock, extendSlotLock, releaseHold, markAvailability, slotKey } from '../bookingCore.js'
 import { getStripeClient } from '../stripeClient.js'
 import { HOLD_MS } from '../pricing.js'
+import { extendQrHold } from '../paymentProof.js'
 
 const KEY_RE = /^[\w-]{16,80}$/
 const METHODS = ['card', 'gcash', 'paymaya']
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
     if (!known) {
       if (appointment.payment_state === 'pending_verification') return res.status(409).json({ error: 'Your payment is already waiting for verification.', code: 'ALREADY_SUBMITTED' })
       // The time slot must still be ours (held, or free again). If someone else took it, say so.
-      if (!(await reopenHold(db, appointment, now))) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_TAKEN' })
+      if (!(await reopenHold(db, appointment, now))) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_NO_LONGER_AVAILABLE' })
     }
 
     const fresh = await db.collection('appointments').findOne({ _id: appointment._id })
@@ -101,8 +102,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // QR: record that the patient says they paid; the booked therapist verifies it.
-    if (created.status !== 'pending_verification' || fresh.payment_state !== 'pending_verification') await submitQr(db, created, fresh, {})
+    // QR: the slot is now held for the long QR period. Nothing is sent to the therapist yet: that only happens when the patient
+    // submits the reference number and receipt (POST /api/payments/:id/proof).
+    if (created.status === 'created' && fresh.payment_state === 'awaiting_payment') await extendQrHold(db, fresh, now)
     const after = await db.collection('appointments').findOne({ _id: appointment._id })
     return res.status(201).json(attemptView(await db.collection('payment_attempts').findOne({ _id: created._id }), after))
   } catch (err) {

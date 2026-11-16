@@ -49,5 +49,43 @@ export const cancelBooking = (bookingId, token) => call(`/api/bookings/${booking
 export const getStatus = (attemptId, token) => call(`/api/payments/${attemptId}/status`, { token })
 export const submitQrDetails = (attemptId, token, payload) => call(`/api/payments/${attemptId}/qr-submit`, { method: 'POST', token, body: payload })
 
+export const confirmSent = (attemptId, token) => call(`/api/payments/${attemptId}/confirm-sent`, { method: 'POST', token, body: {} })
+
+// Sends the reference number + receipt as ONE multipart request (POST, or PUT to change a proof that is not verified yet).
+// XMLHttpRequest, because fetch cannot report upload progress. The same Idempotency-Key never makes a second record, so
+// a retry or "cancel and try again" is safe. onProgress receives 0..1. Pass an AbortSignal to cancel.
+export function submitProof(attemptId, token, { reference, file, key, change = false, onProgress, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const fail = (message, code, status) => reject(Object.assign(new Error(message), { code, status }))
+    xhr.open(change ? 'PUT' : 'POST', `/api/payments/${attemptId}/proof`)
+    xhr.setRequestHeader('x-booking-token', token)
+    xhr.setRequestHeader('Idempotency-Key', key)
+    xhr.upload.onprogress = (e) => { if (onProgress) onProgress(e.lengthComputable && e.total ? e.loaded / e.total : null) } // null = the browser cannot report progress
+    xhr.onerror = () => fail(friendlyPaymentError(new TypeError('Failed to fetch')).message, 'network')
+    xhr.ontimeout = () => fail(friendlyPaymentError(new TypeError('Failed to fetch')).message, 'network')
+    xhr.onabort = () => fail('Cancelled.', 'aborted')
+    xhr.onload = () => {
+      let data = {}
+      try { data = JSON.parse(xhr.responseText || '{}') } catch { /* not json */ }
+      if (xhr.status >= 200 && xhr.status < 300) { resolve(data); return }
+      fail(data.error || friendlyPaymentError(xhr.status === 404 ? 'unavailable' : 'unknown').message, data.code || 'unknown', xhr.status)
+    }
+    if (signal) { if (signal.aborted) { fail('Cancelled.', 'aborted'); return } signal.addEventListener('abort', () => xhr.abort(), { once: true }) }
+    const form = new FormData()
+    form.append('reference', reference)
+    form.append('receipt', file, file.name || 'receipt')
+    xhr.send(form)
+  })
+}
+
+// The receipt is never a public URL: it is fetched with the booking token (patient) or the session (therapist, added by installAuthFetch)
+// and shown from a temporary blob URL.
+export async function getReceiptBlob(url, token) {
+  const res = await fetch(url, { headers: token ? { 'x-booking-token': token } : {} })
+  if (!res.ok) throw new Error('Could not load the receipt.')
+  return res.blob()
+}
+
 // The statuses after which polling stops.
-export const TERMINAL = ['succeeded', 'failed', 'expired', 'pending_verification']
+export const TERMINAL = ['succeeded', 'failed', 'expired', 'pending_verification', 'rejected']

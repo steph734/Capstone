@@ -16,23 +16,25 @@ export function baseAvailability(year, month) {
   return map
 }
 
-/* Every day in the month that already has a live appointment in MongoDB,
-   keyed the same way as baseAvailability ("YYYY-M-D"). */
-export async function fetchBookedDates(year, month) {
-  const res = await fetch(`/api/appointments/availability?year=${year}&month=${month}`)
+/* The month's bookings straight from the appointments collection: { booked, full }, each a list of "YYYY-M-D" keys.
+   With a therapist, only THEIR bookings count, and "full" lists the days where they opened slots and none are left. */
+export async function fetchBookedDates(year, month, employeeId = null) {
+  const q = new URLSearchParams({ year: String(year), month: String(month), ...(employeeId ? { employeeId } : {}) })
+  const res = await fetch(`/api/appointments/availability?${q}`)
   if (!res.ok) throw new Error('Could not load appointment availability.')
   const data = await res.json()
-  return Array.isArray(data.booked) ? data.booked : []
+  return { booked: Array.isArray(data.booked) ? data.booked : [], full: Array.isArray(data.full) ? data.full : [] }
 }
 
-/* Full availability for a month: the fixed base map with every date that has
-   a MongoDB appointment forced to "booked". Every other day stays
-   "available" — MongoDB's appointments collection is the only source of
-   truth, so this never drifts out of sync with what's actually booked. */
-export function buildAvailability(year, month, serverBooked = []) {
+/* Full availability for a month: the fixed base map with every date that has a MongoDB appointment forced to "booked", and every
+   date with no slot left for the chosen therapist forced to "closed" (red, cannot be picked). Every other day stays "available". */
+export function buildAvailability(year, month, serverBooked = [], serverFull = []) {
   const map = baseAvailability(year, month)
   for (const key of serverBooked) {
     if (key in map) map[key] = 'booked'
+  }
+  for (const key of serverFull) {
+    if (key in map) map[key] = 'closed'
   }
   return map
 }

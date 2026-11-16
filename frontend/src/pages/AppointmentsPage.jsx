@@ -76,36 +76,6 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [viewMonth, setViewMonth]       = useState(today.getMonth())
   const [viewYear, setViewYear]         = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState(today.getDate())
-  /* Dates booked in MongoDB for the month in view. Re-fetched every time the
-     month changes so the calendar always reflects the real appointments
-     table rather than a client-side guess. */
-  const [serverBooked, setServerBooked] = useState([])
-  const [availabilityError, setAvailabilityError] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    setAvailabilityError(false)
-    fetchBookedDates(viewYear, viewMonth)
-      .then(booked => { if (!cancelled) setServerBooked(booked) })
-      .catch((err) => {
-        if (cancelled) return
-        // Swallowing this used to mean a broken /api/appointments/availability
-        // call was indistinguishable from "no appointments this month" — every
-        // day just rendered available. Surface it instead so a real outage is
-        // visible rather than silently mimicking an empty calendar.
-        console.error('Could not load booked dates:', err)
-        setServerBooked([])
-        setAvailabilityError(true)
-      })
-    return () => { cancelled = true }
-  }, [viewYear, viewMonth])
-
-  /* Fixed clinic calendar for the month in view: every day starts
-     "available" and only flips to "booked" when it has a matching
-     appointment in MongoDB (or a booking this browser just made). */
-  const availability = useMemo(
-    () => buildAvailability(viewYear, viewMonth, serverBooked),
-    [viewYear, viewMonth, serverBooked]
-  )
   const [showConfirm, setShowConfirm]   = useState(false)
 
   /* ── Therapist roster, straight from the employees collection ── */
@@ -128,6 +98,33 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
   const [selectedTherapist, setSelectedTherapist] = useState(null)
   const [sessionMode, setSessionMode]             = useState('in-person')
   const [pickedTime, setPickedTime]               = useState(null)
+
+  /* Days booked in MongoDB for the month in view, for the chosen therapist (or anyone when none is chosen yet). Re-fetched when
+     the month or the therapist changes, so the calendar always reflects the real appointments table. */
+  const [serverBooked, setServerBooked] = useState([])
+  const [serverFull, setServerFull] = useState([])
+  const [availabilityError, setAvailabilityError] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setAvailabilityError(false)
+    fetchBookedDates(viewYear, viewMonth, selectedTherapist)
+      .then(({ booked, full }) => { if (!cancelled) { setServerBooked(booked); setServerFull(full) } })
+      .catch((err) => {
+        if (cancelled) return
+        // A broken availability call must not look like "nothing is booked": say so instead.
+        console.error('Could not load booked dates:', err)
+        setServerBooked([]); setServerFull([])
+        setAvailabilityError(true)
+      })
+    return () => { cancelled = true }
+  }, [viewYear, viewMonth, selectedTherapist])
+
+  /* Every day starts "available"; it turns "booked" when the appointments table has a live booking that day, and "closed"
+     when the chosen therapist has no slot left. */
+  const availability = useMemo(
+    () => buildAvailability(viewYear, viewMonth, serverBooked, serverFull),
+    [viewYear, viewMonth, serverBooked, serverFull]
+  )
 
   // A previously picked time slot may not apply once the selected date
   // changes, so clear it (the therapist choice can carry over).
@@ -433,7 +430,7 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
               <p className="schedule-hint">Some appointments are already booked on this date — pick an available therapist and time slot below.</p>
             )}
             {!selectedIsPast && selectedStatus === 'closed' && (
-              <p className="schedule-hint">The clinic is closed on this date.</p>
+              <p className="schedule-hint">No slots are left on this date for this therapist. Please pick another day.</p>
             )}
 
             {/* ── Confirm Toast ── */}

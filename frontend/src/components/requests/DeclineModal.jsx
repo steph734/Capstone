@@ -27,8 +27,8 @@ export default function DeclineModal({ request, therapist, onCancel, onConfirm }
 
   return (
     <ModalShell labelledBy="dec-title" onClose={onCancel} busy={busy} size="lg">
-      <div className="flex items-center gap-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFECEC] text-[#DC2626]"><Ban size={20} aria-hidden="true" /></span>
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFECEC] text-[#DC2626]"><Ban size={18} aria-hidden="true" /></span>
         <div className="min-w-0">
           <h2 id="dec-title" className="m-0 text-lg font-bold leading-tight text-[#111827]">Decline this appointment?</h2>
           <p className="m-0 mt-0.5 text-[13px] text-[#5B7469]">{request.patientName} · {request.whenLabel.replace(/^(\w+, \w+ \d+), \d{4}/, '$1')}</p>
@@ -66,11 +66,11 @@ export default function DeclineModal({ request, therapist, onCancel, onConfirm }
       </div>
 
       {paid && <p className="m-0 mt-2 rounded-lg bg-[#FFF3DF] px-3 py-2 text-xs font-medium text-[#7A4A06]">The payment of {peso(request.payment.amount)} was received. Remember to return it to the guardian.</p>}
-      {error && <p role="alert" className="m-0 mt-3 rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{error}</p>}
+      {error && <p role="alert" className="m-0 mt-2 rounded-lg bg-[#FFF1F1] px-3 py-2 text-xs font-semibold text-[#B42318]">{error}</p>}
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[42px] rounded-xl border border-solid border-[#D6E3DC] bg-white text-sm font-semibold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:opacity-50">Cancel</button>
-        <button type="button" onClick={go} disabled={busy || !check.ok} className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#DC2626] text-sm font-semibold text-white hover:bg-[#B91C1C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]/50 disabled:cursor-not-allowed disabled:opacity-40">
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[40px] rounded-xl border border-solid border-[#D6E3DC] bg-white text-[13px] font-semibold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:opacity-50">Cancel</button>
+        <button type="button" onClick={go} disabled={busy || !check.ok} className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-[#DC2626] text-[13px] font-semibold text-white hover:bg-[#B91C1C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]/50 disabled:cursor-not-allowed disabled:opacity-40">
           {busy ? <><Spin /> Sending…</> : 'Decline & send email'}
         </button>
       </div>

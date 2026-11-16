@@ -759,7 +759,7 @@ function CheckoutBody({
         </div>
       ) : cardAvailable ? (
         <PaymentElement
-          options={{ layout: 'tabs', fields: { billingDetails: { name: 'never', email: 'never', phone: 'never', address: 'never' } } }}
+          options={{ layout: 'tabs', wallets: { applePay: 'never', googlePay: 'never' }, fields: { billingDetails: { name: 'never', email: 'never', phone: 'never', address: 'never' } } }}
           onChange={(e) => { setPmComplete(e.complete); setSelectError('') }}
         />
       ) : (
@@ -825,7 +825,14 @@ export default function CheckoutModal({
   const [instance, setInstance] = useState(0)
   const dialogRef = useRef(null)
   const headingRef = useRef(null)
-  const resumeSaved = useMemo(() => (open && resume ? loadSaved() : null), [open, resume]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Resume a saved checkout when the page asked for it, OR when it is for this very slot (a patient who left the checkout and pressed
+  // "Continue to payment" again must not be blocked by their own held slot).
+  const resumeSaved = useMemo(() => {
+    if (!open) return null
+    const saved = loadSaved()
+    if (!saved?.bookingId) return resume ? saved : null
+    return resume || (saved.sessionLabel === sessionLabel && saved.therapistLabel === therapistLabel) ? saved : null
+  }, [open, resume]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (open) setInstance((n) => n + 1) }, [open]) // a fresh state machine every time it opens
   const onPhase = useCallback((p, i) => { setPhase(p); setInfo((old) => (old.hasQrHold === i.hasQrHold && old.holdUntil === i.holdUntil ? old : i)) }, [])

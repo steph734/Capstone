@@ -34,7 +34,7 @@ export default function RadioGroup({ labelledBy, describedBy, value, onChange, o
             tabIndex={i === tabbable ? 0 : -1} onClick={() => onChange(o.value)} onKeyDown={(e) => onKeyDown(e, i)}
             className={variant === 'cards'
               ? `rounded-xl border-2 border-solid p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'border-[#16A34A] bg-[#F1FAF4]' : 'border-[#E3EDE8] bg-white hover:border-[#C9DAD2]'}`
-              : `flex min-h-[38px] w-full items-center gap-2.5 rounded-lg border border-solid px-3 text-left text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 ${on ? accent.row : 'border-transparent bg-transparent hover:bg-[#F6FAF8]'}`}
+              : `flex min-h-[34px] w-full items-center gap-2.5 rounded-lg border border-solid px-2.5 text-left text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 ${on ? accent.row : 'border-transparent bg-transparent hover:bg-[#F6FAF8]'}`}
           >
             {variant === 'cards' ? (
               <>

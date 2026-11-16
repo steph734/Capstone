@@ -545,8 +545,8 @@ export default function BookAppointmentPage({ user }) {
                       ref={birthdateRef}
                       type="date"
                       value={form1.birthdate}
-                      onClick={e => e.currentTarget.showPicker?.()}
-                      onFocus={e => e.currentTarget.showPicker?.()}
+                      onClick={e => { try { e.currentTarget.showPicker?.() } catch { /* the browser only opens it from a real click */ } }}
+                      onFocus={e => { try { e.currentTarget.showPicker?.() } catch { /* focus without a click is not allowed to open it */ } }}
                       onChange={e => setF1('birthdate', e.target.value)}
                       max={new Date().toISOString().split('T')[0]}
                       className={errors1.birthdate ? 'err' : ''}

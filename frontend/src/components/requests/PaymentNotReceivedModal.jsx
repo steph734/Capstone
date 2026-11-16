@@ -29,15 +29,15 @@ export default function PaymentNotReceivedModal({ request, onCancel, onSubmit })
 
   return (
     <ModalShell labelledBy="pnr-title" describedBy="pnr-sub" onClose={onCancel} busy={busy} size="md">
-      <div className="flex items-center gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FFF3DF] text-[#D97706]"><AlertTriangle size={26} aria-hidden="true" /></span>
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFF3DF] text-[#D97706]"><AlertTriangle size={20} aria-hidden="true" /></span>
         <div>
-          <h2 id="pnr-title" className="m-0 text-[26px] font-extrabold leading-tight text-[#111827]">Payment not received</h2>
-          <p id="pnr-sub" className="m-0 mt-0.5 text-sm text-[#5B7469]">Tell the guardian what went wrong so they can fix it.</p>
+          <h2 id="pnr-title" className="m-0 text-lg font-bold leading-tight text-[#111827]">Payment not received</h2>
+          <p id="pnr-sub" className="m-0 mt-0.5 text-[13px] text-[#5B7469]">Tell the guardian what went wrong so they can fix it.</p>
         </div>
       </div>
 
-      <p id="pnr-what" className="m-0 mt-5 text-[11px] font-extrabold uppercase tracking-wider text-[#5B7469]">What went wrong?</p>
+      <p id="pnr-what" className="m-0 mt-4 text-[11px] font-bold uppercase tracking-wider text-[#5B7469]">What went wrong?</p>
       <div className="mt-1.5">
         <RadioGroup labelledBy="pnr-what" value={reason} onChange={setReason} options={PROBLEM_REASONS.map((r) => ({ value: r.code, label: r.label }))} />
       </div>
@@ -47,11 +47,11 @@ export default function PaymentNotReceivedModal({ request, onCancel, onSubmit })
         id="pnr-note" type="text" value={note} maxLength={NOTE_MAX} onChange={(e) => setNote(e.target.value)}
         placeholder={reason === 'other' ? 'Add a note for the guardian (required)' : 'Add a note for the guardian (optional)'}
         aria-invalid={Boolean(noteError)} aria-describedby={noteError ? 'pnr-note-err' : undefined}
-        className={`mt-3 min-h-[46px] w-full rounded-xl border border-solid bg-white px-3.5 text-[15px] text-[#1E3A31] placeholder:text-[#8AA095] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/40 ${noteError ? 'border-[#DC2626]' : 'border-[#D6E3DC]'}`}
+        className={`mt-2 min-h-[40px] w-full rounded-lg border border-solid bg-white px-3 text-[13px] text-[#1E3A31] placeholder:text-[#8AA095] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/40 ${noteError ? 'border-[#DC2626]' : 'border-[#D6E3DC]'}`}
       />
       {noteError && <p id="pnr-note-err" role="alert" className="m-0 mt-1 text-xs font-bold text-[#B42318]">{noteError}</p>}
 
-      <p id="pnr-next" className="m-0 mt-5 text-[11px] font-extrabold uppercase tracking-wider text-[#5B7469]">What should happen next?</p>
+      <p id="pnr-next" className="m-0 mt-4 text-[11px] font-bold uppercase tracking-wider text-[#5B7469]">What should happen next?</p>
       <div className="mt-1.5">
         <RadioGroup
           labelledBy="pnr-next" variant="cards" value={next} onChange={setNext} describedBy={holdExpired ? 'pnr-expired' : undefined}
@@ -61,13 +61,13 @@ export default function PaymentNotReceivedModal({ request, onCancel, onSubmit })
           ]}
         />
       </div>
-      {holdExpired && <p id="pnr-expired" className="m-0 mt-2 text-xs font-semibold text-[#7A4A06]">The hold has expired, so you can only decline.</p>}
+      {holdExpired && <p id="pnr-expired" className="m-0 mt-1.5 text-xs font-medium text-[#7A4A06]">The hold has expired, so you can only decline.</p>}
 
       {error && <p role="alert" className="m-0 mt-3 rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{error}</p>}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.3fr]">
-        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[50px] rounded-xl bg-[#DC2626] text-[15px] font-bold text-white hover:bg-[#B91C1C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]/50 disabled:opacity-60">Cancel</button>
-        <button type="button" onClick={go} disabled={busy} className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-[#2F5FD0] text-[15px] font-bold text-white hover:bg-[#244DB0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F5FD0]/50 disabled:opacity-70">
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
+        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[42px] rounded-xl bg-[#DC2626] text-[13px] font-semibold text-white hover:bg-[#B91C1C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]/50 disabled:opacity-60">Cancel</button>
+        <button type="button" onClick={go} disabled={busy} className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#2F5FD0] text-[13px] font-semibold text-white hover:bg-[#244DB0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F5FD0]/50 disabled:opacity-70">
           {busy ? <><Spin /> Sending…</> : decline ? 'Decline & send' : 'Mark not received & send'}
         </button>
       </div>

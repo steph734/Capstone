@@ -62,6 +62,7 @@ import OwnerGamifiedPatientStatsPage from './pages/owner/OwnerGamifiedPatientSta
 import OwnerGamePreviewPage from './pages/owner/OwnerGamePreviewPage'
 import GameBuilderPage from './pages/admin/GameBuilderPage'
 import SupportTicketsPage from './pages/admin/SupportTicketsPage'
+import TicketDetailPage from './pages/admin/tickets/TicketDetailPage'
 import SupportFaqsPage from './pages/admin/SupportFaqsPage'
 import SupportHelpPage from './pages/SupportHelpPage'
 import PaoBot from './components/PaoBot/PaoBot'
@@ -987,6 +988,21 @@ function App() {
             isAuthenticated ? (
               currentUser?.role === 'Super Admin' ? (
                 <SupportTicketsPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/admin/support-tickets/:ticketId"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <TicketDetailPage user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to={getHomePath(currentUser?.role)} replace />
               )

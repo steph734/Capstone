@@ -68,7 +68,7 @@ export const adminMenuItems = [
     icon: <LifeBuoy size={24} aria-hidden="true" />,
     path: '/admin/support-tickets',
     children: [
-      { id: 'st-tickets', label: 'Tickets', icon: <Ticket size={16} aria-hidden="true" />, path: '/admin/support-tickets' },
+      { id: 'st-tickets', label: 'Tickets', icon: <Ticket size={16} aria-hidden="true" />, path: '/admin/support-tickets', matchPrefix: true },
       { id: 'st-faqs', label: 'FAQs', icon: <HelpCircle size={16} aria-hidden="true" />, path: '/admin/support-faqs' },
     ],
   },

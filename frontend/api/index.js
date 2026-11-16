@@ -73,6 +73,7 @@ import attendanceAvailability from './_lib/routes/attendance-availability.js'
 import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 import attendanceRemind from './_lib/routes/attendance-remind.js'
+import therapistAvailability from './_lib/routes/therapist-availability.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
 import notesPatientList from './_lib/routes/notes-patient-list.js'
 import notesCreate from './_lib/routes/notes-create.js'
@@ -111,6 +112,7 @@ import notifications from './_lib/routes/notifications.js'
 import faq from './_lib/routes/faq.js'
 import support from './_lib/routes/support.js'
 import adminSupport from './_lib/routes/admin-support.js'
+import { withUpload as adminTickets } from './_lib/routes/admin-tickets.js'
 import adminFaqs from './_lib/routes/admin-faqs.js'
 import adminGames from './_lib/routes/admin-games.js'
 import adminOutfits from './_lib/routes/admin-outfits.js'
@@ -251,6 +253,9 @@ app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/attendance/remind', attendanceRemind)
+app.all('/api/therapist/availability', therapistAvailability)
+app.all('/api/therapist/availability/:date', therapistAvailability)
+app.all('/api/therapist/availability/:date/undo', therapistAvailability)
 app.all('/api/clinic/plan', clinicPlan)
 app.all('/api/therapists/available', noteShares.therapistsAvailable)
 app.all('/api/note-shares/shared-with-me', noteShares.sharedWithMe)
@@ -299,6 +304,13 @@ app.all('/api/support/tickets/:id/messages', support)
 app.all('/api/support/tickets/:id', support)
 app.all('/api/support/tickets', support)
 app.all('/api/support/attachments/:messageId/:index', support)
+app.all('/api/admin/tickets/stats', adminTickets)
+app.all('/api/admin/tickets/:id/replies', adminTickets)
+app.all('/api/admin/tickets/:id/resolution-notes', adminTickets)
+app.all('/api/admin/tickets/:id/resolve', adminTickets)
+app.all('/api/admin/tickets/:id/reopen', adminTickets)
+app.all('/api/admin/tickets/:id', adminTickets)
+app.all('/api/admin/tickets', adminTickets)
 app.all('/api/admin/support/stats', adminSupport)
 app.all('/api/admin/support/attachments/:messageId/:index', adminSupport)
 app.all('/api/admin/support/tickets/:id/messages', adminSupport)

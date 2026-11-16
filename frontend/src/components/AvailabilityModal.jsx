@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { AVAILABILITY_SLOTS, clinicHour } from '../utils/availabilitySlots'
+import { ConfirmAvailabilityModal } from './AvailabilityDialogs'
 import './AvailabilityModal.css'
 
 function CheckCircleIcon({ size = 22, className }) {
@@ -19,20 +21,9 @@ function InfoIcon() {
   )
 }
 
-// Same-day slot grid a patient can book into (see BookAppointmentPage.jsx) —
-// kept in one place here since it's the therapist's own picker. `start`/`end`
-// are 24-hour 'HH:mm' in Philippine time, matching the `slots[].start/end`
-// shape stored in the `therapist_availability` collection.
-export const AVAILABILITY_SLOTS = [
-  { label: '8:00 - 9:00 AM',   start: '08:00', end: '09:00', endHour: 9 },
-  { label: '9:00 - 10:00 AM',  start: '09:00', end: '10:00', endHour: 10 },
-  { label: '10:00 - 11:00 AM', start: '10:00', end: '11:00', endHour: 11 },
-  { label: '11:00 - 12:00 PM', start: '11:00', end: '12:00', endHour: 12 },
-  { label: '1:00 - 2:00 PM',   start: '13:00', end: '14:00', endHour: 14 },
-  { label: '2:00 - 3:00 PM',   start: '14:00', end: '15:00', endHour: 15 },
-  { label: '3:00 - 4:00 PM',   start: '15:00', end: '16:00', endHour: 16 },
-  { label: '4:00 - 5:00 PM',   start: '16:00', end: '17:00', endHour: 17 },
-]
+// The slot grid lives in utils/availabilitySlots.js so the API shares it; re-exported
+// here because other screens import it from this component.
+export { AVAILABILITY_SLOTS }
 
 // Shown right after a therapist's own Attendance page notices they've timed
 // in and haven't answered for today yet. onConfirm hands back the full slot
@@ -49,26 +40,63 @@ export const AVAILABILITY_SLOTS = [
 // always shown selected and can't be unchecked — the backend preserves them
 // regardless of what gets submitted, but locking them here too means the
 // therapist never sees their own edit silently drop a real appointment.
-function AvailabilityModal({ firstName, dateLabel, now, isToday = true, initialSlots, bookedStarts, onSkip, onConfirm }) {
+function AvailabilityModal({ firstName, dateLabel, dateKey, now, isToday = true, initialSlots, bookedStarts, onSkip, onConfirm }) {
+  const hourNow = clinicHour(now)
   const bookedSet = useMemo(() => new Set(bookedStarts || []), [bookedStarts])
 
   const [selected, setSelected] = useState(() => {
     const base = initialSlots
       ? new Set(AVAILABILITY_SLOTS.filter((s) => initialSlots.includes(s.start)).map((s) => s.label))
       : isToday
-        ? new Set(AVAILABILITY_SLOTS.filter((s) => now.getHours() < s.endHour).map((s) => s.label))
+        ? new Set(AVAILABILITY_SLOTS.filter((s) => hourNow < s.endHour).map((s) => s.label))
         : new Set()
     AVAILABILITY_SLOTS.forEach((s) => { if (bookedSet.has(s.start)) base.add(s.label) })
     return base
   })
 
   const isBooked = (slot) => bookedSet.has(slot.start)
-  const isPast = (slot) => isToday && now.getHours() >= slot.endHour
+  const isPast = (slot) => isToday && hourNow >= slot.endHour
   const isLocked = (slot) => isBooked(slot) || isPast(slot)
   const hasPast = isToday && AVAILABILITY_SLOTS.some(isPast)
 
+  // Confirm step: nothing is saved until the therapist says "Yes, confirm".
+  const [confirming, setConfirming] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [pickError, setPickError] = useState('')
+  const confirmBtnRef = useRef(null)
+  // One id per distinct selection, so a retry after a network error is idempotent.
+  const requestIdRef = useRef(null)
+
+  const selectedSlots = AVAILABILITY_SLOTS.filter((s) => selected.has(s.label))
+
+  const openConfirm = () => {
+    if (selectedSlots.length === 0) {
+      setPickError('Select at least one slot, or use Request leave.')
+      return
+    }
+    setPickError('')
+    setSaveError('')
+    if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID()
+    setConfirming(true)
+  }
+
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onConfirm(selectedSlots, requestIdRef.current)
+    } catch (err) {
+      setSaveError(err?.message || 'Could not save your availability. Please try again.')
+      setSaving(false)
+    }
+  }
+
   const toggle = (slot) => {
     if (isLocked(slot)) return
+    requestIdRef.current = null
+    setPickError('')
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(slot.label)) next.delete(slot.label)
@@ -132,17 +160,36 @@ function AvailabilityModal({ firstName, dateLabel, now, isToday = true, initialS
           </div>
         )}
 
+        {pickError && (
+          <div className="avm-inline-error" role="alert">
+            <InfoIcon />
+            <span>{pickError}</span>
+          </div>
+        )}
+
         <div className="avm-footer">
           <button type="button" className="avm-btn-skip" onClick={onSkip}>Skip for now</button>
           <button
             type="button"
             className="avm-btn-confirm"
-            onClick={() => onConfirm(AVAILABILITY_SLOTS.filter((s) => selected.has(s.label)))}
+            ref={confirmBtnRef}
+            onClick={openConfirm}
           >
             Confirm Availability
           </button>
         </div>
       </div>
+      {confirming && (
+        <ConfirmAvailabilityModal
+          dateKey={dateKey}
+          starts={selectedSlots.map((x) => x.start)}
+          saving={saving}
+          error={saveError}
+          returnFocusRef={confirmBtnRef}
+          onCancel={() => { setConfirming(false); setSaveError('') }}
+          onConfirm={save}
+        />
+      )}
     </div>
   )
 }

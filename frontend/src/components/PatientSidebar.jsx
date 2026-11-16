@@ -274,7 +274,7 @@ export default function PatientSidebar({
                     {item.children.map(child => (
                       <button
                         key={child.id}
-                        className={`nav-subitem ${location.pathname === child.path ? 'active' : ''}`}
+                        className={`nav-subitem ${location.pathname === child.path || (child.matchPrefix && location.pathname.startsWith(child.path + '/')) ? 'active' : ''}`}
                         onClick={() => handleNavigation(child.path)}
                       >
                         {child.icon && <span className="nav-subitem-icon">{child.icon}</span>}

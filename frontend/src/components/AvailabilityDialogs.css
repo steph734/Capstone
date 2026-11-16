@@ -1,0 +1,114 @@
+/* Confirm + success dialogs for the availability picker. Reuses the dark look of
+   AvailabilityModal.css (.avm-*) and stacks above it. */
+.avd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 210;
+  animation: avm-bg-in 0.15s ease;
+}
+.avd-backdrop-success { z-index: 220; }
+
+.avd-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: #16181d;
+  border: 1px solid #2a2d34;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  padding: 24px;
+  color: #f3f4f6;
+  outline: none;
+  animation: avm-modal-in 0.2s ease;
+}
+.avd-dialog-success { margin-top: 150px; text-align: center; }
+
+.avd-title { margin: 0 0 8px; font-size: 20px; font-weight: 800; color: #fff; }
+.avd-text { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #9ca3af; }
+
+.avd-title-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
+.avd-title-row .avd-title { margin: 0; }
+.avd-badge {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #22c55e; color: #06210f;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+.avd-summary {
+  text-align: left;
+  background: #0f1d47;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+.avd-summary-date { margin: 0 0 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; color: #a5b4d8; }
+.avd-summary-range { margin: 0; font-size: 17px; font-weight: 800; color: #fff; }
+.avd-summary-range + .avd-summary-range { margin-top: 2px; }
+.avd-summary-count { margin: 4px 0 0; font-size: 11.5px; color: #a5b4d8; }
+
+.avd-error {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: -6px 0 14px; padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px; color: #fca5a5; font-size: 12.5px; line-height: 1.45; text-align: left;
+}
+
+.avd-footer { display: flex; gap: 10px; }
+.avd-footer .avm-btn-skip, .avd-footer .avm-btn-confirm { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.avd-footer button:disabled { opacity: 0.6; cursor: not-allowed; }
+.avd-footer button:focus-visible { outline: 2px solid #86efac; outline-offset: 2px; }
+.avd-done { width: 100%; flex: none; }
+
+.avd-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(6, 33, 15, 0.3); border-top-color: #06210f;
+  animation: avd-spin 0.7s linear infinite;
+}
+@keyframes avd-spin { to { transform: rotate(360deg); } }
+
+/* Pao stands on the modal's top edge. */
+.avd-pao {
+  position: absolute;
+  left: 50%;
+  top: -190px;
+  height: 250px;
+  width: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  animation: avd-pao-bounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes avd-pao-bounce {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.9); }
+  60%  { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1.02); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Inline picker message ("Select at least one slot…"). */
+.avm-inline-error {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-bottom: 14px; padding: 10px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 10px; color: #fcd34d; font-size: 12.5px; line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .avd-backdrop { padding: 12px; }
+  .avd-dialog { padding: 20px; }
+  .avd-dialog-success { margin-top: 110px; }
+  .avd-pao { height: 170px; top: -125px; }
+  .avd-footer { flex-direction: column-reverse; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avd-backdrop, .avd-dialog, .avd-pao { animation: none; }
+  .avd-spinner { animation-duration: 1.6s; }
+}

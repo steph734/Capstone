@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { manilaDateKey, formatManilaTime, formatManilaDate, manilaMinutesOfDay } from '../../utils/manilaTime'
-import AvailabilityModal, { AVAILABILITY_SLOTS } from '../../components/AvailabilityModal'
+import AvailabilityModal from '../../components/AvailabilityModal'
+import { AvailabilitySuccessModal } from '../../components/AvailabilityDialogs'
+import { AVAILABILITY_SLOTS, clinicHour } from '../../utils/availabilitySlots'
 import LeaveRequestModal from '../../components/LeaveRequestModal'
 import '../admin/AdminPages.css'
 import './TherapistAttendancePage.css'
@@ -27,6 +29,19 @@ async function apiPost(path, body) {
   if (!res.ok) throw new Error(data.error || `POST ${path} failed: ${res.status}`)
   return data
 }
+
+async function apiPut(path, body) {
+  const res = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Could not save your availability.'), { code: data.code })
+  return data
+}
+
+const lastDayOfMonth = (year, month) => new Date(year, month + 1, 0).getDate()
 
 // No shift schedule exists in the data model yet, so "late" has no official
 // definition — 9:00 AM is a simple, visible stand-in cutoff used only for the
@@ -108,6 +123,15 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   // "Planned" dots.
   const [monthAvailability, setMonthAvailability] = useState(new Map())
 
+  // Success modal after a save, the Undo toast, and the "just changed" highlight.
+  const [successInfo, setSuccessInfo] = useState(null) // { date, starts }
+  const [toast, setToast] = useState(null) // { message, detail, undo? }
+  const [flashDate, setFlashDate] = useState(null)
+  const [lastSaved, setLastSaved] = useState(null) // { date, at }
+  const pendingToastRef = useRef(null)
+  const toastTimerRef = useRef(null)
+  const flashTimerRef = useRef(null)
+
   const [leaveRequests, setLeaveRequests] = useState([])
   const [showLeaveModal, setShowLeaveModal] = useState(false)
 
@@ -182,32 +206,112 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   // Whichever date the Availability panel is showing right now.
   const viewDate = availabilityViewDate || todayKey
 
-  useEffect(() => {
-    if (!user?.email) return
-    let cancelled = false
-    setViewedAvailabilityLoading(true)
-    apiGet(`/api/attendance/availability?email=${encodeURIComponent(user.email)}&date=${viewDate}`)
-      .then((data) => { if (!cancelled) setViewedAvailability({ status: data.status, slots: data.slots }) })
-      .catch(() => { if (!cancelled) setViewedAvailability({ status: null, slots: null }) })
-      .finally(() => { if (!cancelled) setViewedAvailabilityLoading(false) })
-    return () => { cancelled = true }
-  }, [user?.email, viewDate])
-
   const monthPrefix = `${viewedMonth.year}-${pad2(viewedMonth.month + 1)}`
 
-  useEffect(() => {
+  // Reads come from GET /api/therapist/availability (the signed-in therapist
+  // only). `silent` revalidations don't flash the "Loading…" state.
+  const loadViewed = useCallback(async ({ silent = false } = {}) => {
     if (!user?.email) return
-    let cancelled = false
-    apiGet(`/api/attendance/availability-month?email=${encodeURIComponent(user.email)}&month=${monthPrefix}`)
-      .then((data) => {
-        if (cancelled) return
-        const map = new Map()
-        for (const r of data.records || []) map.set(r.date, { status: r.status, slots: r.slots })
-        setMonthAvailability(map)
-      })
-      .catch(() => { if (!cancelled) setMonthAvailability(new Map()) })
-    return () => { cancelled = true }
-  }, [user?.email, monthPrefix])
+    if (!silent) setViewedAvailabilityLoading(true)
+    try {
+      const data = await apiGet(`/api/therapist/availability?from=${viewDate}&to=${viewDate}`)
+      const rec = (data.records || []).find((r) => r.date === viewDate)
+      setViewedAvailability(rec ? { status: rec.status, slots: rec.slots, updatedAt: rec.updatedAt } : { status: null, slots: null })
+    } catch {
+      if (!silent) setViewedAvailability({ status: null, slots: null })
+    } finally {
+      if (!silent) setViewedAvailabilityLoading(false)
+    }
+  }, [user?.email, viewDate])
+
+  const loadMonth = useCallback(async () => {
+    if (!user?.email) return
+    try {
+      const last = lastDayOfMonth(viewedMonth.year, viewedMonth.month)
+      const data = await apiGet(`/api/therapist/availability?from=${monthPrefix}-01&to=${monthPrefix}-${pad2(last)}`)
+      const map = new Map()
+      for (const r of data.records || []) map.set(r.date, { status: r.status, slots: r.slots })
+      setMonthAvailability(map)
+    } catch { /* keep what we have */ }
+  }, [user?.email, viewedMonth, monthPrefix])
+
+  useEffect(() => { loadViewed() }, [loadViewed])
+  useEffect(() => { loadMonth() }, [loadMonth])
+
+  // Two tabs open? Whatever changed in the other one shows up as soon as this one regains focus.
+  useEffect(() => {
+    const revalidate = () => { if (document.visibilityState !== 'hidden') { loadViewed({ silent: true }); loadMonth() } }
+    window.addEventListener('focus', revalidate)
+    document.addEventListener('visibilitychange', revalidate)
+    return () => {
+      window.removeEventListener('focus', revalidate)
+      document.removeEventListener('visibilitychange', revalidate)
+    }
+  }, [loadViewed, loadMonth])
+
+  useEffect(() => () => { clearTimeout(toastTimerRef.current); clearTimeout(flashTimerRef.current) }, [])
+
+  // Put a server answer into every place that shows that date, then flash the card.
+  const applyAvailability = (data, { flash = true } = {}) => {
+    const entry = data.slots ? { status: data.status, slots: data.slots, updatedAt: data.updatedAt } : { status: null, slots: null }
+    if (data.date === viewDate) setViewedAvailability(entry)
+    setMonthAvailability((prev) => {
+      const next = new Map(prev)
+      if (data.slots) next.set(data.date, { status: data.status, slots: data.slots })
+      else next.delete(data.date)
+      return next
+    })
+    if (flash) {
+      setLastSaved({ date: data.date, at: Date.now() })
+      setFlashDate(data.date)
+      clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = setTimeout(() => setFlashDate(null), 2000)
+    }
+  }
+
+  const showToast = (next, ms = 10000) => {
+    clearTimeout(toastTimerRef.current)
+    setToast(next)
+    toastTimerRef.current = setTimeout(() => setToast(null), ms)
+  }
+
+  // "Yes, confirm": PUT the whole day, update the page from the answer, then
+  // revalidate in the background. Throws so the confirm dialog can show the error.
+  const saveAvailability = async (slotObjs, requestId) => {
+    const date = availabilityModalDate || viewDate
+    const starts = slotObjs.map((x) => x.start)
+    const data = await apiPut(`/api/therapist/availability/${date}`, { slots: starts, requestId })
+    applyAvailability(data)
+    setAvailabilityModalDate(null)
+    const open = (data.slots || []).filter((x) => x.status === 'available' || x.status === 'booked').map((x) => x.start)
+    setSuccessInfo({ date, starts: open })
+    pendingToastRef.current = {
+      message: 'Availability saved',
+      detail: `${open.length} slot${open.length === 1 ? ' is' : 's are'} now open for patients${date === todayKey ? ' today' : ''}.`,
+      undo: { date, previous: data.previous },
+    }
+    loadViewed({ silent: true })
+    loadMonth()
+  }
+
+  const closeSuccess = () => {
+    setSuccessInfo(null)
+    if (pendingToastRef.current) { showToast(pendingToastRef.current); pendingToastRef.current = null }
+  }
+
+  const undoAvailability = async (date) => {
+    setToast(null)
+    clearTimeout(toastTimerRef.current)
+    try {
+      const data = await apiPost(`/api/therapist/availability/${date}/undo`, { requestId: crypto.randomUUID() })
+      applyAvailability(data)
+      showToast({ message: 'Availability restored', detail: '' }, 4000)
+      loadViewed({ silent: true })
+      loadMonth()
+    } catch (err) {
+      showToast({ message: "Couldn't undo", detail: err.message, error: true }, 6000)
+    }
+  }
 
   const answerAvailability = ({ status, slots }) => {
     const date = availabilityModalDate || viewDate
@@ -326,11 +430,22 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
   )
 
   const isViewingToday = viewDate === todayKey
-  const calendarSubtitle = selectedRecord
+  const openStarts = new Set(plannedSlots.map((x) => x.start))
+  const bookedSet = new Set(bookedStarts)
+  const hourNow = clinicHour(now)
+  const justUpdated = lastSaved?.date === viewDate && now - lastSaved.at < 60000
+  const slotCountLabel = (n) => `${n} slot${n === 1 ? '' : 's'}`
+  const openCountFor = (key) => {
+    const rec = key === viewDate ? viewedAvailability : monthAvailability.get(key)
+    const n = (rec?.slots || []).filter((x) => x.status === 'available' || x.status === 'booked').length
+    return n > 0 ? ` · ${slotCountLabel(n)} open` : ''
+  }
+  const calendarSubtitle = (selectedRecord
     ? `${formatDate(selectedRecord.date)} — In ${formatTime(selectedRecord.timeIn)} · Out ${formatTime(selectedRecord.timeOut)}`
     : selectedDate
       ? `${formatDate(selectedDate)} — no check-in recorded`
-      : `${formatDate(todayKey)} — ${todayRecord?.timeIn ? 'checked in' : 'no check-in recorded'}`
+      : `${formatDate(todayKey)} — ${todayRecord?.timeIn ? 'checked in' : 'no check-in recorded'}`)
+    + openCountFor(selectedDate || todayKey)
 
   return (
     <>
@@ -391,10 +506,18 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
             </div>
           </div>
 
-          <div className="admin-panel ta-availability-panel">
+          <div className={`admin-panel ta-availability-panel ${flashDate === viewDate ? 'ta-avail-flash' : ''}`} aria-live="polite">
             <div className="admin-panel-header">
               <div>
-                <h3>{isViewingToday ? "Today's availability" : `Availability · ${formatDate(viewDate)}`}</h3>
+                <h3>
+                  {isViewingToday ? `Today's availability · ${formatDate(viewDate)}` : `Availability · ${formatDate(viewDate)}`}
+                  {justUpdated && plannedSlots.length > 0 && <span className="ta-avail-updated">✓ Updated just now</span>}
+                </h3>
+                {plannedSlots.length > 0 && (
+                  <p className="ta-avail-summary">
+                    {slotCountLabel(plannedSlots.length)} open · {plannedSlots.length} hour{plannedSlots.length === 1 ? '' : 's'} · visible to patients booking {isViewingToday ? 'same-day' : 'upcoming'} sessions
+                  </p>
+                )}
                 {!isViewingToday && (
                   <button type="button" className="ta-back-today" onClick={backToToday}>← Back to today</button>
                 )}
@@ -412,21 +535,40 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
             {viewedAvailabilityLoading ? (
               <p className="ta-avail-empty-note">Loading…</p>
             ) : plannedSlots.length > 0 ? (
-              <div className="ta-avail-pills">
-                {plannedSlots.map((s) => {
-                  const def = AVAILABILITY_SLOTS.find((a) => a.start === s.start)
-                  const booked = s.status === 'booked'
-                  return (
-                    <span key={s.start} className={`ta-avail-pill ${booked ? 'ta-avail-pill-booked' : ''}`}>
-                      {def?.label || `${s.start} – ${s.end}`}{booked ? ' · Booked' : ''}
-                    </span>
-                  )
-                })}
-              </div>
+              <>
+                <div className="ta-avail-timeline" aria-hidden="true">
+                  {AVAILABILITY_SLOTS.map((def) => {
+                    const open = openStarts.has(def.start)
+                    const past = isViewingToday && hourNow >= def.endHour
+                    return <span key={def.start} className={`ta-avail-seg ${open ? (past ? 'ta-avail-seg-past-open' : 'ta-avail-seg-open') : ''}`} />
+                  })}
+                </div>
+                <div className="ta-avail-axis" aria-hidden="true"><span>8 AM</span><span>12 PM</span><span>5 PM</span></div>
+                <div className="ta-avail-chips">
+                  {AVAILABILITY_SLOTS.map((def) => {
+                    const open = openStarts.has(def.start)
+                    const booked = bookedSet.has(def.start)
+                    const past = isViewingToday && hourNow >= def.endHour
+                    const cls = booked ? 'ta-avail-chip-booked' : open ? (past ? 'ta-avail-chip-past' : 'ta-avail-chip-open') : past ? 'ta-avail-chip-past' : 'ta-avail-chip-closed'
+                    return (
+                      <span key={def.start} className={`ta-avail-chip ${cls}`}>
+                        {open && !booked && !past && <span aria-hidden="true">✓ </span>}
+                        {def.label.replace(' - ', ' – ')}
+                        {booked ? ' · Booked' : past ? ' · past' : !open ? ' · not open' : ''}
+                      </span>
+                    )
+                  })}
+                </div>
+                <div className="ta-avail-legend">
+                  <span><i className="ta-avail-dot ta-avail-dot-open" /> Open to patients</span>
+                  <span><i className="ta-avail-dot ta-avail-dot-closed" /> Not open / past</span>
+                  <span className="ta-avail-legend-note">Edit anytime — changes appear instantly</span>
+                </div>
+              </>
             ) : (
               <p className="ta-avail-empty-note">
                 {isViewingToday
-                  ? "You're not marked available for same-day bookings today."
+                  ? "You haven't marked your availability yet. Patients can't book same-day sessions with you."
                   : "You haven't planned this day yet."}
               </p>
             )}
@@ -586,6 +728,7 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
     {availabilityModalDate && (
       <AvailabilityModal
         firstName={(employee?.name || '').split(' ')[0] || 'there'}
+        dateKey={availabilityModalDate}
         dateLabel={availabilityModalDate === todayKey ? formatManilaDate(now).toUpperCase() : formatDate(availabilityModalDate)}
         now={now}
         isToday={availabilityModalDate === todayKey}
@@ -596,8 +739,23 @@ export default function TherapistAttendancePage({ user, onLogout, betaTier }) {
         }
         bookedStarts={availabilityModalDate === viewDate ? bookedStarts : undefined}
         onSkip={() => answerAvailability({ status: 'skipped', slots: [] })}
-        onConfirm={(slots) => answerAvailability({ status: 'confirmed', slots })}
+        onConfirm={saveAvailability}
       />
+    )}
+    {successInfo && (
+      <AvailabilitySuccessModal dateKey={successInfo.date} starts={successInfo.starts} onDone={closeSuccess} />
+    )}
+    {toast && (
+      <div className={`ta-toast ${toast.error ? 'ta-toast-error' : ''}`} role="status">
+        <span className="ta-toast-icon" aria-hidden="true">{toast.error ? '!' : '✓'}</span>
+        <div className="ta-toast-body">
+          <strong>{toast.message}</strong>
+          {toast.detail && <span>{toast.detail}</span>}
+        </div>
+        {toast.undo && (
+          <button type="button" className="ta-toast-undo" onClick={() => undoAvailability(toast.undo.date)}>Undo</button>
+        )}
+      </div>
     )}
     {showLeaveModal && (
       <LeaveRequestModal

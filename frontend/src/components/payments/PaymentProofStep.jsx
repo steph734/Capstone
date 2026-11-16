@@ -62,7 +62,7 @@ export default function PaymentProofStep({ method, reference, onReference, file,
       {holdBanner}
 
       <label htmlFor={refId} className="mt-4 text-sm font-bold text-slate-800">{rule.label} reference number <span className="text-red-600" aria-hidden="true">*</span></label>
-      <div className={`relative mt-1.5 flex items-center rounded-xl border-2 bg-white px-3 transition-colors ${showError ? 'border-red-400' : check.ok ? 'border-pm-green' : 'border-slate-200 focus-within:border-slate-400'}`}>
+      <div className={`relative mt-1.5 flex items-center rounded-xl border-2 border-solid bg-white px-3 transition-colors ${showError ? 'border-red-400' : check.ok ? 'border-pm-green' : 'border-slate-200 focus-within:border-slate-400'}`}>
         <input
           id={refId}
           ref={refInput}
@@ -77,7 +77,7 @@ export default function PaymentProofStep({ method, reference, onReference, file,
           aria-describedby={describedBy}
           onChange={(e) => onReference(formatReference(normalizeReference(e.target.value).slice(0, rule.max), method))}
           onBlur={() => setTouched(true)}
-          className="min-h-[48px] w-full border-0 bg-transparent py-2 font-mono text-base tracking-wide text-slate-900 outline-none placeholder:text-slate-300"
+          className="min-h-[48px] w-full border-0 border-solid bg-transparent py-2 font-mono text-base tracking-wide text-slate-900 outline-none placeholder:text-slate-300"
         />
         {check.ok && <span className="ml-2 flex shrink-0 items-center gap-1 text-xs font-bold text-pm-green-dark"><Check size={13} strokeWidth={3.5} aria-hidden="true" /> {check.count} digits</span>}
       </div>
@@ -91,14 +91,14 @@ export default function PaymentProofStep({ method, reference, onReference, file,
         onChange={(e) => { take(e.target.files?.[0]); e.target.value = '' }}
       />
       {file ? (
-        <div className="mt-1.5 flex items-center gap-3 rounded-xl border-2 border-pm-green/60 bg-green-50/50 p-3">
-          {preview ? <img src={preview} alt="Preview of your receipt" className="h-[88px] w-[68px] shrink-0 rounded-lg border border-slate-200 bg-white object-cover" /> : <FileImage size={40} className="text-slate-400" aria-hidden="true" />}
+        <div className="mt-1.5 flex items-center gap-3 rounded-xl border-2 border-solid border-pm-green/60 bg-green-50/50 p-3">
+          {preview ? <img src={preview} alt="Preview of your receipt" className="h-[88px] w-[68px] shrink-0 rounded-lg border border-solid border-slate-200 bg-white object-cover" /> : <FileImage size={40} className="text-slate-400" aria-hidden="true" />}
           <div className="min-w-0 flex-1">
             <p className="m-0 truncate text-sm font-bold text-slate-800" title={file.name}>{file.name}</p>
             <p className="m-0 mt-0.5 flex items-center gap-1 text-xs text-slate-500">{formatBytes(file.size)} · ready to send <Check size={12} strokeWidth={3.5} className="text-pm-green-dark" aria-hidden="true" /></p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" onClick={() => inputRef.current?.click()} className="min-h-[36px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">Replace</button>
-              <button type="button" onClick={() => { onFile(null); setFileError('') }} className="min-h-[36px] rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300">Remove</button>
+              <button type="button" onClick={() => inputRef.current?.click()} className="min-h-[36px] rounded-lg border border-solid border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">Replace</button>
+              <button type="button" onClick={() => { onFile(null); setFileError('') }} className="min-h-[36px] rounded-lg border border-solid border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300">Remove</button>
             </div>
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function PaymentProofStep({ method, reference, onReference, file,
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); take(e.dataTransfer.files?.[0]) }}
           aria-describedby="proof-file-help"
-          className={`mt-1.5 flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${drag ? 'border-pm-green bg-green-50' : fileError ? 'border-red-300 bg-red-50/40' : 'border-slate-300 bg-slate-50/60 hover:border-slate-400'}`}
+          className={`mt-1.5 flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-solid border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${drag ? 'border-pm-green bg-green-50' : fileError ? 'border-red-300 bg-red-50/40' : 'border-slate-300 bg-slate-50/60 hover:border-slate-400'}`}
         >
           <UploadCloud size={26} className="text-slate-400" aria-hidden="true" />
           <span className="text-sm font-bold text-slate-700">Choose a screenshot or drag it here</span>

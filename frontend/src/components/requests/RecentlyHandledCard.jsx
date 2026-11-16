@@ -7,14 +7,14 @@ const stamp = (d) => (d ? new Date(d).toLocaleString('en-US', { timeZone: 'Asia/
 export default function RecentlyHandledCard({ items, resendingId, onViewEmail, onResend }) {
   if (!items.length) return null
   return (
-    <section aria-label="Recently handled" className="mb-6 rounded-3xl border border-[#E3EDE8] bg-white p-4 shadow-sm sm:p-5">
+    <section aria-label="Recently handled" className="mb-6 rounded-3xl border border-solid border-[#E3EDE8] bg-white p-4 shadow-sm sm:p-5">
       <h3 className="m-0 mb-3 text-lg font-extrabold text-[#1E3A31]">Recently handled</h3>
       <ul className="m-0 list-none space-y-3 p-0">
         {items.map((it) => {
           const accepted = it.outcome === 'accepted'
           const failed = it.email?.status === 'failed'
           return (
-            <li key={it.id} className="rounded-2xl border border-[#EEF4F1] p-3.5">
+            <li key={it.id} className="rounded-2xl border border-solid border-[#EEF4F1] p-3.5">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-[180px] flex-1">
                   <p className="m-0 text-[15px] font-extrabold text-[#1E3A31]">{it.patientName}</p>
@@ -35,11 +35,11 @@ export default function RecentlyHandledCard({ items, resendingId, onViewEmail, o
                 {it.email && (
                   <span className="ml-auto flex items-center gap-3">
                     {failed && (
-                      <button type="button" disabled={resendingId === it.email.id} onClick={() => onResend(it)} className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-[13px] font-extrabold text-[#B45309] underline disabled:opacity-60">
+                      <button type="button" disabled={resendingId === it.email.id} onClick={() => onResend(it)} className="inline-flex items-center gap-1 border-0 border-solid bg-transparent p-0 text-[13px] font-extrabold text-[#B45309] underline disabled:opacity-60">
                         <RotateCw size={12} className={resendingId === it.email.id ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" /> {resendingId === it.email.id ? 'Sending…' : 'Resend email'}
                       </button>
                     )}
-                    <button type="button" onClick={() => onViewEmail(it)} className="border-0 bg-transparent p-0 text-[13px] font-extrabold text-[#2E5E4E] underline">View email</button>
+                    <button type="button" onClick={() => onViewEmail(it)} className="border-0 border-solid bg-transparent p-0 text-[13px] font-extrabold text-[#2E5E4E] underline">View email</button>
                   </span>
                 )}
               </div>

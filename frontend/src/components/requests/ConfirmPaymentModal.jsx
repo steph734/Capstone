@@ -45,7 +45,7 @@ export default function ConfirmPaymentModal({ request, onCancel, onConfirm }) {
       {error && <p role="alert" className="m-0 mt-3 rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{error}</p>}
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[48px] rounded-xl border border-[#D6E3DC] bg-white text-[15px] font-bold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:opacity-50">Cancel</button>
+        <button type="button" onClick={onCancel} disabled={busy} className="min-h-[48px] rounded-xl border border-solid border-[#D6E3DC] bg-white text-[15px] font-bold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:opacity-50">Cancel</button>
         <button type="button" data-autofocus onClick={go} disabled={busy} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#16A34A] text-[15px] font-bold text-white hover:bg-[#15803D] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50 disabled:opacity-70">
           {busy ? <><Spin /> Saving…</> : <><Check size={16} strokeWidth={3} aria-hidden="true" /> Yes, payment received</>}
         </button>

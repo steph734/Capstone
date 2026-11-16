@@ -17,13 +17,13 @@ function Thumb({ url, onOpen }) {
     getReceiptBlob(url).then((b) => { if (live) { made = URL.createObjectURL(b); setSrc(made) } else { /* unmounted */ } }).catch(() => { if (live) setFailed(true) })
     return () => { live = false; if (made) URL.revokeObjectURL(made) }
   }, [url])
-  if (failed || !url) return <span className="flex h-[88px] w-[68px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-300" title="No receipt"><ImageOff size={22} aria-hidden="true" /></span>
+  if (failed || !url) return <span className="flex h-[88px] w-[68px] items-center justify-center rounded-lg border border-solid border-slate-200 bg-slate-50 text-slate-300" title="No receipt"><ImageOff size={22} aria-hidden="true" /></span>
   return (
     <div className="flex flex-col items-start gap-1">
-      <button type="button" disabled={!src} onClick={() => onOpen(src)} aria-label="View receipt full size" className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/50">
+      <button type="button" disabled={!src} onClick={() => onOpen(src)} aria-label="View receipt full size" className="overflow-hidden rounded-lg border border-solid border-slate-200 bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/50">
         {src ? <img src={src} alt="Receipt thumbnail" className="h-[88px] w-[68px] object-cover" /> : <span className="block h-[88px] w-[68px] animate-pulse bg-slate-100 motion-reduce:animate-none" />}
       </button>
-      <button type="button" disabled={!src} onClick={() => onOpen(src)} className="border-0 bg-transparent p-0 text-xs font-bold text-pm-green-dark underline disabled:opacity-50">View receipt full size</button>
+      <button type="button" disabled={!src} onClick={() => onOpen(src)} className="border-0 border-solid bg-transparent p-0 text-xs font-bold text-pm-green-dark underline disabled:opacity-50">View receipt full size</button>
     </div>
   )
 }
@@ -35,7 +35,7 @@ export default function PaymentsToVerifyCard({ row, busy, onVerify, onReject, on
     navigator.clipboard?.writeText(row.reference || '').then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {})
   }
   return (
-    <article aria-label={`Payment from ${row.patient || 'patient'}`} className="mb-3 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-amber-200 bg-white p-4">
+    <article aria-label={`Payment from ${row.patient || 'patient'}`} className="mb-3 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-solid border-amber-200 bg-white p-4">
       <div className="min-w-[230px] flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <strong className="text-[15px] text-slate-900">{row.patient || 'Patient'}</strong>
@@ -50,7 +50,7 @@ export default function PaymentsToVerifyCard({ row, busy, onVerify, onReject, on
           <span className="text-slate-500">Reference</span>
           <span className="font-mono font-bold tracking-wide">{row.referenceDisplay || 'not given'}</span>
           {row.reference && (
-            <button type="button" onClick={copy} className="inline-flex min-h-[28px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">
+            <button type="button" onClick={copy} className="inline-flex min-h-[28px] items-center gap-1 rounded-md border border-solid border-slate-200 bg-white px-2 text-xs font-bold text-slate-600 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">
               {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />} {copied ? 'Copied' : 'Copy'}
             </button>
           )}
@@ -62,7 +62,7 @@ export default function PaymentsToVerifyCard({ row, busy, onVerify, onReject, on
 
       <div className="flex flex-col gap-2 sm:w-[150px]">
         <button type="button" disabled={busy} onClick={() => onVerify(row)} className="min-h-[44px] rounded-xl bg-green-600 px-4 text-sm font-bold text-white hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 disabled:opacity-50">Mark as paid</button>
-        <button type="button" disabled={busy} onClick={() => onReject(row)} className="min-h-[44px] rounded-xl border border-red-200 bg-white px-4 text-sm font-bold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:opacity-50">Not received</button>
+        <button type="button" disabled={busy} onClick={() => onReject(row)} className="min-h-[44px] rounded-xl border border-solid border-red-200 bg-white px-4 text-sm font-bold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:opacity-50">Not received</button>
       </div>
     </article>
   )

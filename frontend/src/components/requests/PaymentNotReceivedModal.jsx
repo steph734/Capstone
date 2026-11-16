@@ -47,7 +47,7 @@ export default function PaymentNotReceivedModal({ request, onCancel, onSubmit })
         id="pnr-note" type="text" value={note} maxLength={NOTE_MAX} onChange={(e) => setNote(e.target.value)}
         placeholder={reason === 'other' ? 'Add a note for the guardian (required)' : 'Add a note for the guardian (optional)'}
         aria-invalid={Boolean(noteError)} aria-describedby={noteError ? 'pnr-note-err' : undefined}
-        className={`mt-3 min-h-[46px] w-full rounded-xl border bg-white px-3.5 text-[15px] text-[#1E3A31] placeholder:text-[#8AA095] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/40 ${noteError ? 'border-[#DC2626]' : 'border-[#D6E3DC]'}`}
+        className={`mt-3 min-h-[46px] w-full rounded-xl border border-solid bg-white px-3.5 text-[15px] text-[#1E3A31] placeholder:text-[#8AA095] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/40 ${noteError ? 'border-[#DC2626]' : 'border-[#D6E3DC]'}`}
       />
       {noteError && <p id="pnr-note-err" role="alert" className="m-0 mt-1 text-xs font-bold text-[#B42318]">{noteError}</p>}
 

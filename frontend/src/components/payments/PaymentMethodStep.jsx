@@ -34,7 +34,7 @@ export default function PaymentMethodStep({ methods, value, onChange, error }) {
       </div>
 
       {value === 'stripe' && (
-        <section aria-label="What happens next, online payment" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-left">
+        <section aria-label="What happens next, online payment" className="mt-4 rounded-2xl border border-solid border-emerald-200 bg-emerald-50/60 p-4 text-left">
           <h4 className="m-0 text-[11px] font-bold uppercase tracking-wider text-emerald-800">What happens next · online payment</h4>
           <ol className="m-0 mt-3 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {ONLINE_STEPS.map((s, i) => (

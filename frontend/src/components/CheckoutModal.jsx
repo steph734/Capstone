@@ -73,7 +73,7 @@ function Checkbox({ checked, onChange, children, className = '' }) {
       <span
         role="checkbox" aria-checked={checked} tabIndex={0} onClick={() => onChange(!checked)}
         onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onChange(!checked) } }}
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${checked ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'}`}
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-solid transition-colors ${checked ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'}`}
       >
         {checked && <CheckIcon size={12} w={4} />}
       </span>
@@ -97,7 +97,7 @@ function OrderSummary({ total, merchantName, lineItems }) {
       </div>
       {/* On phones the summary collapses to the amount and what it is for. */}
       <div className="hidden text-sm md:block">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 border-b border-slate-200 pb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 border-b border-solid border-slate-200 pb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           <span>Item name</span><span className="text-right">Qty</span><span className="text-right">Price</span>
         </div>
         {lineItems.map((li, i) => (
@@ -108,7 +108,7 @@ function OrderSummary({ total, merchantName, lineItems }) {
           </div>
         ))}
       </div>
-      <div className="mt-auto hidden items-center justify-between border-t border-slate-200 pt-3 md:flex">
+      <div className="mt-auto hidden items-center justify-between border-t border-solid border-slate-200 pt-3 md:flex">
         <span className="text-sm font-semibold text-slate-500">Total:</span>
         <span className="text-base font-bold text-slate-800">{peso(total)}</span>
       </div>
@@ -137,12 +137,12 @@ function StepHeader({ labels, current }) {
 }
 
 const btnBase = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 disabled:cursor-not-allowed disabled:opacity-40'
-const btnOutline = `${btnBase} border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 active:scale-[.98]`
+const btnOutline = `${btnBase} border border-solid border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 active:scale-[.98]`
 const btnPrimary = `${btnBase} bg-pm-green text-white shadow-sm shadow-pm-green/30 hover:bg-pm-green-dark hover:shadow-md active:scale-[.98]`
 
 function DetailList({ rows }) {
   return (
-    <dl className="rounded-xl border border-slate-200 px-4 text-sm">
+    <dl className="rounded-xl border border-solid border-slate-200 px-4 text-sm">
       {rows.map(([label, value], i) => (
         <div key={label} className={`flex justify-between gap-4 py-3 ${i ? 'border-t border-slate-100' : ''}`}>
           <dt className="text-slate-500">{label}</dt>
@@ -530,7 +530,7 @@ function CheckoutBody({
         <div className="mb-3 mt-2"><Spinner size={64} track="#dcfce7" /></div>
         {heading('Processing your payment…')}
         <p className="mt-1 text-sm text-slate-500">{slow ? "This is taking longer than usual. We'll keep checking…" : 'This usually takes less than a minute.'}</p>
-        <ul className="mt-5 w-full space-y-3 rounded-xl border border-slate-200 p-4 text-left">
+        <ul className="mt-5 w-full space-y-3 rounded-xl border border-solid border-slate-200 p-4 text-left">
           {steps.map((s) => (
             <li key={s.title} className="flex items-start gap-3">
               <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${s.state === 'done' ? 'bg-pm-green text-white' : s.state === 'active' ? 'border-2 border-pm-green/40' : 'border-2 border-dashed border-slate-300'}`}>
@@ -614,7 +614,7 @@ function CheckoutBody({
         <span className="mb-3 mt-1 flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white"><XIcon size={32} /></span>
         {heading(slotLost ? 'That time is no longer available' : 'Payment unsuccessful', 'text-red-700')}
         <p role="status" className="mt-1 text-sm text-slate-600">{slotLost ? 'Your session was not booked.' : "We couldn't confirm your payment, so your session is not booked yet."}</p>
-        <div className="mt-4 w-full rounded-xl border border-red-200 bg-red-50 p-4 text-left">
+        <div className="mt-4 w-full rounded-xl border border-solid border-red-200 bg-red-50 p-4 text-left">
           <div className="text-xs font-bold text-red-800">What happened</div>
           <p className="mt-1 text-sm text-red-900">{failure?.message || PAYMENT_MESSAGES.unknown}</p>
         </div>
@@ -698,7 +698,7 @@ function CheckoutBody({
         <p className="mt-1 text-sm text-slate-500">Please check the details before we record your payment and book your session.</p>
         <div className="mt-4"><DetailList rows={rows.confirm} /></div>
         {needTick && (
-          <div className={`mt-4 rounded-xl border-2 px-3 ${qrConfirmed ? 'border-pm-green bg-green-50' : 'border-slate-200'}`}>
+          <div className={`mt-4 rounded-xl border-2 border-solid px-3 ${qrConfirmed ? 'border-pm-green bg-green-50' : 'border-slate-200'}`}>
             <Checkbox checked={qrConfirmed} onChange={setQrConfirmed}>
               <span className="font-semibold">I sent exactly {peso(total)} using the {qrP.label} QR code</span>
             </Checkbox>
@@ -732,8 +732,8 @@ function CheckoutBody({
           const active = channel === id
           return (
             <button key={id} type="button" role="tab" aria-selected={active} onClick={() => { setChannel(id); setSelectError('') }}
-              className={`group relative flex min-h-[44px] flex-col gap-2 rounded-xl border p-3 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${active ? 'border-pm-green bg-pm-green/5 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
-              <span className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border ${active ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'}`}>{active && <CheckIcon size={9} w={4} />}</span>
+              className={`group relative flex min-h-[44px] flex-col gap-2 rounded-xl border border-solid p-3 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40 ${active ? 'border-pm-green bg-pm-green/5 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+              <span className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border border-solid ${active ? 'border-pm-green bg-pm-green text-white' : 'border-slate-300 bg-white'}`}>{active && <CheckIcon size={9} w={4} />}</span>
               <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-pm-green text-white' : 'bg-slate-100 text-slate-500'}`}><Icon /></span>
               <span className="block text-sm font-semibold text-slate-800">{label}</span>
               <span className="block text-[11px] leading-tight text-slate-500">{desc}</span>
@@ -743,7 +743,7 @@ function CheckoutBody({
       </div>
 
       {isQr ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-solid border-slate-200 bg-slate-50/60 p-4">
           <div className="text-center">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Scan to pay</div>
             <div className="mt-0.5 text-lg font-bold text-pm-green">{peso(total)}</div>
@@ -754,7 +754,7 @@ function CheckoutBody({
                 className={`min-h-[44px] rounded-full px-4 text-sm font-semibold transition ${qrProvider === p.id ? 'bg-pm-green text-white' : 'border border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>{p.label}</button>
             ))}
           </div>
-          <img src={qrP.src} alt={`${qrP.label} QR code`} className="w-full max-w-[260px] rounded-lg border border-slate-200 bg-white object-contain" />
+          <img src={qrP.src} alt={`${qrP.label} QR code`} className="w-full max-w-[260px] rounded-lg border border-solid border-slate-200 bg-white object-contain" />
           <div className="text-center text-xs leading-tight text-slate-500">Open your {qrP.label} app, scan this code, and send exactly <span className="font-semibold">{peso(total)}</span>.</div>
         </div>
       ) : cardAvailable ? (
@@ -908,7 +908,7 @@ export default function CheckoutModal({
         {/* No close button while a payment is being checked. */}
         {!blocking && (
           <button type="button" onClick={handleClose} aria-label="Close"
-            className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-lg leading-none text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">×</button>
+            className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-solid border-slate-200 bg-white text-lg leading-none text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/40">×</button>
         )}
         <div className="flex w-full flex-col overflow-y-auto md:flex-row">
           <OrderSummary total={labels.total} merchantName={labels.merchantName} lineItems={labels.lineItems} />

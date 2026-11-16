@@ -92,10 +92,10 @@ export default function RequestsSection({ therapistName, showToast, onChanged, o
     <section aria-label="Requests to review" className="mb-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h2 className="m-0 text-lg font-bold text-[#1E3A31]">Requests to review</h2>
-        {requests.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#FFE3A8] bg-[#FFF3DF] px-2.5 py-0.5 text-[11px] font-bold text-[#7A4A06]"><Clock size={13} aria-hidden="true" /> {requests.length} need{requests.length === 1 ? 's' : ''} your response</span>}
+        {requests.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-solid border-[#FFE3A8] bg-[#FFF3DF] px-2.5 py-0.5 text-[11px] font-bold text-[#7A4A06]"><Clock size={13} aria-hidden="true" /> {requests.length} need{requests.length === 1 ? 's' : ''} your response</span>}
       </div>
 
-      {loadError && !data && <p role="alert" className="rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{loadError} <button type="button" onClick={load} className="border-0 bg-transparent p-0 font-extrabold underline">Try again</button></p>}
+      {loadError && !data && <p role="alert" className="rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{loadError} <button type="button" onClick={load} className="border-0 border-solid bg-transparent p-0 font-extrabold underline">Try again</button></p>}
 
       {requests.map((r) => (
         <RequestReviewCard
@@ -108,7 +108,7 @@ export default function RequestsSection({ therapistName, showToast, onChanged, o
       ))}
 
       {data && requests.length === 0 && (
-        <div className="mb-4 flex flex-col items-center rounded-3xl border border-[#E3EDE8] bg-white px-4 py-8 text-center shadow-sm">
+        <div className="mb-4 flex flex-col items-center rounded-3xl border border-solid border-[#E3EDE8] bg-white px-4 py-8 text-center shadow-sm">
           <img src="/pao/pao-game-poses/pao-game-thumbsup.png" alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} className="h-24 w-auto" />
           <h3 className="m-0 mt-2 text-xl font-extrabold text-[#1E3A31]">All caught up!</h3>
           <p className="m-0 mt-1 text-sm text-[#5B7469]">No requests need your response right now.</p>

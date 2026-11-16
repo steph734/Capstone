@@ -24,14 +24,14 @@ export default function ViewEmailModal({ item, onClose }) {
       {error && <p role="alert" className="mt-4 rounded-xl bg-[#FFF1F1] px-3 py-2.5 text-sm font-semibold text-[#B42318]">{error}</p>}
       {!email && !error && <p className="mt-4 text-sm text-[#5B7469]">Loading…</p>}
       {email && (
-        <div className="mt-4 rounded-2xl border border-[#E3EDE8] bg-[#F7FAF8] p-4">
+        <div className="mt-4 rounded-2xl border border-solid border-[#E3EDE8] bg-[#F7FAF8] p-4">
           <p className="m-0 text-xs text-[#5B7469]">{email.status === 'sent' ? `Sent ${stamp(email.sentAt)}` : email.status === 'failed' ? 'Not sent' : 'Waiting to be sent'}</p>
           <p className="m-0 mt-1 text-[15px] font-extrabold">{email.subject}</p>
           <pre className="m-0 mt-3 whitespace-pre-wrap break-words font-[Inter,system-ui,sans-serif] text-[13px] leading-relaxed text-[#1E3A31]">{email.text}</pre>
         </div>
       )}
       <div className="mt-5 flex justify-end">
-        <button type="button" data-autofocus onClick={onClose} className="min-h-[44px] rounded-xl border border-[#D6E3DC] bg-white px-6 text-sm font-bold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50">Close</button>
+        <button type="button" data-autofocus onClick={onClose} className="min-h-[44px] rounded-xl border border-solid border-[#D6E3DC] bg-white px-6 text-sm font-bold hover:bg-[#F6FAF8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/50">Close</button>
       </div>
     </ModalShell>
   )

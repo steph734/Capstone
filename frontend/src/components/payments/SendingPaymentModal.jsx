@@ -34,8 +34,8 @@ function StepTime({ step, startedAt, frozen }) {
 
 function StepIcon({ step }) {
   if (step.status === 'done') return <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white"><Check size={13} strokeWidth={4} aria-hidden="true" /></span>
-  if (step.status === 'active') return <span className={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${step.amber ? 'border-amber-200' : 'border-green-200'}`}><span className={`h-3 w-3 animate-spin rounded-full border-2 border-transparent motion-reduce:animate-none ${step.amber ? 'border-t-amber-500' : 'border-t-green-500'}`} aria-hidden="true" /></span>
-  return <span className="flex h-6 w-6 rounded-full border-2 border-dashed border-slate-300" />
+  if (step.status === 'active') return <span className={`flex h-6 w-6 items-center justify-center rounded-full border-2 border-solid ${step.amber ? 'border-amber-200' : 'border-green-200'}`}><span className={`h-3 w-3 animate-spin rounded-full border-2 border-solid border-transparent motion-reduce:animate-none ${step.amber ? 'border-t-amber-500' : 'border-t-green-500'}`} aria-hidden="true" /></span>
+  return <span className="flex h-6 w-6 rounded-full border-2 border-solid border-dashed border-slate-300" />
 }
 
 // The modal shown while the proof request runs. It is controlled: everything on screen comes from the real submit state.
@@ -120,12 +120,12 @@ export default function SendingPaymentModal({ state = 'normal', startedAt, elaps
 
         {slow ? (
           <>
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900">
+            <div className="mt-4 rounded-xl border border-solid border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900">
               <p className="m-0 flex items-center gap-1.5 text-[13px] font-extrabold"><AlertTriangle size={14} aria-hidden="true" /> Your connection looks slow.</p>
               <p className="m-0 mt-1">Your details are safe and your time slot is still reserved. Please keep this window open. If it keeps stalling, you can cancel and try again without paying twice.</p>
             </div>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <button type="button" onClick={onCancel} className="min-h-[46px] flex-1 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/50">Cancel &amp; try again</button>
+              <button type="button" onClick={onCancel} className="min-h-[46px] flex-1 rounded-xl border border-solid border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/50">Cancel &amp; try again</button>
               <button type="button" ref={keepRef} data-autofocus onClick={() => { onKeepWaiting?.(); ref.current?.focus() }} className="min-h-[46px] flex-1 rounded-xl bg-pm-green text-sm font-bold text-white shadow-sm hover:bg-pm-green-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-pm-green/50">Keep waiting</button>
             </div>
           </>

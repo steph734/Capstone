@@ -133,7 +133,30 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [datePreset, setDatePreset] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [viewing, setViewing] = useState(null)
+
+  const applyPreset = (p) => {
+    setDatePreset(p)
+    if (p === 'all' || p === 'custom') {
+      if (p === 'all') { setDateFrom(''); setDateTo('') }
+      return
+    }
+    const today = new Date()
+    const ymd = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+    const shift = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return d }
+    if (p === 'today') { setDateFrom(ymd(today)); setDateTo(ymd(today)) }
+    else if (p === 'next7') { setDateFrom(ymd(today)); setDateTo(ymd(shift(7))) }
+    else if (p === 'last7') { setDateFrom(ymd(shift(-7))); setDateTo(ymd(today)) }
+    else if (p === 'last30') { setDateFrom(ymd(shift(-30))); setDateTo(ymd(today)) }
+    else if (p === 'month') {
+      const [y, m] = ymd(today).split('-').map(Number)
+      setDateFrom(`${y}-${String(m).padStart(2, '0')}-01`)
+      setDateTo(`${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`)
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -151,7 +174,9 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
     const matchSearch = a.patient.toLowerCase().includes(q) || a.therapist.toLowerCase().includes(q) || a.service.toLowerCase().includes(q) || a.guardian.toLowerCase().includes(q)
     const matchBranch = branchFilter === 'All' || a.branch === branchFilter
     const matchStatus = statusFilter === 'All' || a.status === statusFilter
-    return matchSearch && matchBranch && matchStatus
+    const apptDay = a.date ? new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) : ''
+    const matchDate = (!dateFrom || (apptDay && apptDay >= dateFrom)) && (!dateTo || (apptDay && apptDay <= dateTo))
+    return matchSearch && matchBranch && matchStatus && matchDate
   })
 
   const counts = {
@@ -211,6 +236,22 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
           <option value="All">All Branches</option>
           {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
+        <select className="oa-branch-select" value={datePreset} onChange={(e) => applyPreset(e.target.value)} aria-label="Date range">
+          <option value="all">All Dates</option>
+          <option value="today">Today</option>
+          <option value="next7">Next 7 Days</option>
+          <option value="last7">Last 7 Days</option>
+          <option value="last30">Last 30 Days</option>
+          <option value="month">This Month</option>
+          <option value="custom">Custom Range</option>
+        </select>
+        {datePreset === 'custom' && (
+          <div className="oa-date-range">
+            <input type="date" className="oa-branch-select" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label="From date" />
+            <span>to</span>
+            <input type="date" className="oa-branch-select" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label="To date" />
+          </div>
+        )}
         <div className="oa-filter-tabs">
           {['All', ...STATUSES].map((s) => (
             <button key={s} className={`oa-filter-tab ${statusFilter === s ? 'active' : ''}`} onClick={() => setStatusFilter(s)}>

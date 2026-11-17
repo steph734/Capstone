@@ -1165,6 +1165,17 @@ function ApplicantModal({ applicant, onClose, onApprove, onReject }) {
 /* ── View Staff Modal ──────────────────────────────────────── */
 const VIEW_TABS = ['Personal Info', 'Documents']
 
+// Display-only masking for tables: "T-123456" -> "T-••••56" (keeps prefix + last 2 chars).
+function maskEmployeeId(id) {
+  if (!id) return '—'
+  const s = String(id)
+  const m = s.match(/^([A-Za-z]+-)?(.+)$/)
+  const prefix = m[1] || ''
+  const body = m[2]
+  if (body.length <= 3) return s
+  return `${prefix}${'•'.repeat(body.length - 2)}${body.slice(-2)}`
+}
+
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -1648,7 +1659,8 @@ function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
   }
 
   const stepValid = [
-    form.name.trim() && form.email.trim(),
+    form.name.trim() && form.email.trim() && form.phone.length === 11
+      && (!form.emergencyPhone || form.emergencyPhone.length === 11),
     !!form.specialty && form.prcNumber.trim() && String(form.experience).trim() && !!form.licenseExpiry
       && !!branchId,
     allFilesChosen,
@@ -1810,8 +1822,18 @@ function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
                   <select value={form.phoneCode} onChange={(e) => set('phoneCode', e.target.value)}>
                     {COUNTRY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <input placeholder="912 345 6789" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={11}
+                    placeholder="09123456789"
+                    value={form.phone}
+                    onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  />
                 </div>
+                {form.phone && form.phone.length !== 11 && (
+                  <small style={{ color: '#d14343' }}>Phone number must be exactly 11 digits.</small>
+                )}
               </div>
               <div className="os-form-row">
                 <div className="os-form-group">
@@ -1843,8 +1865,18 @@ function AddStaffModal({ onClose, onAdd, onSuccess, existingIds = [] }) {
                     <select value={form.emergencyCode} onChange={(e) => set('emergencyCode', e.target.value)}>
                       {COUNTRY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <input placeholder="912 345 6789" value={form.emergencyPhone} onChange={(e) => set('emergencyPhone', e.target.value)} />
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="09123456789"
+                      value={form.emergencyPhone}
+                      onChange={(e) => set('emergencyPhone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    />
                   </div>
+                  {form.emergencyPhone && form.emergencyPhone.length !== 11 && (
+                    <small style={{ color: '#d14343' }}>Phone number must be exactly 11 digits.</small>
+                  )}
                 </div>
               </div>
             </div>
@@ -2541,7 +2573,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                 ) : pageRows.map((s) => {
                   return (
                     <tr key={s.id}>
-                      <td data-label="Employee ID">{s.employeeId || '—'}</td>
+                      <td data-label="Employee ID">{maskEmployeeId(s.employeeId)}</td>
                       <td data-label="Full Name">
                         <div className="os-table-person">
                           <div className="os-avatar-wrap">
@@ -2613,7 +2645,8 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Staff</th>
+                  <th>Employee ID</th>
+                  <th>Employee</th>
                   <th>Specialty</th>
                   <th>Branch</th>
                   <th>Rate</th>
@@ -2626,12 +2659,13 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
               </thead>
               <tbody>
                 {pageRows.length === 0 ? (
-                  <tr><td colSpan={9}><p className="os-empty">No staff match your search.</p></td></tr>
+                  <tr><td colSpan={10}><p className="os-empty">No employees match your search.</p></td></tr>
                 ) : pageRows.map((s) => {
                   const rate = attendanceRate(s.attendance)
                   return (
                     <tr key={s.id}>
-                      <td data-label="Staff">
+                      <td data-label="Employee ID">{maskEmployeeId(s.employeeId)}</td>
+                      <td data-label="Employee">
                         <div className="os-table-person">
                           <div className="os-avatar-wrap">
                             <img src={s.avatar} alt={s.name} className="os-avatar" />

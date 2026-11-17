@@ -115,6 +115,16 @@
   flex-shrink: 0;
 }
 
+.oa-date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3d5a50;
+  flex-shrink: 0;
+}
+
 .oa-filter-tabs {
   display: flex;
   gap: 4px;
@@ -426,6 +436,8 @@
   }
   .oa-search-wrap { min-width: unset; }
   .oa-branch-select { width: 100%; }
+  .oa-date-range { width: 100%; }
+  .oa-date-range .oa-branch-select { flex: 1; min-width: 0; }
   .oa-filter-tabs { width: 100%; }
 
   .oa-detail-grid { grid-template-columns: 1fr; }

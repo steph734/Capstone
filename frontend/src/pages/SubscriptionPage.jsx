@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import useClinicPlan from '../hooks/useClinicPlan'
+import usePlanTiers from '../hooks/usePlanTiers'
 import './SubscriptionPage.css'
 
 // SVG Icons
@@ -43,6 +44,7 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
   // The Owner pays for the plan, so a patient sees the clinic's current tier (from the server), not always Free.
   const { tier: clinicTier } = useClinicPlan()
   const activeTierId = clinicTier || 'free'
+  const apiTiers = usePlanTiers(activeTierId) // Live plans from the database; Hidden ones are not shown
 
   const subscriptionTiersRaw = [
     {
@@ -102,7 +104,7 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
     }
   ]
 
-  const subscriptionTiers = subscriptionTiersRaw.map((tier) => ({ ...tier, current: tier.id === activeTierId }))
+  const subscriptionTiers = (apiTiers || subscriptionTiersRaw).map((tier) => ({ ...tier, current: tier.id === activeTierId }))
 
   const betaFeatures = {
     silver: [

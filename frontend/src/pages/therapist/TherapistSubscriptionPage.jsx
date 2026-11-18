@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
 import useClinicPlan from '../../hooks/useClinicPlan'
+import usePlanTiers from '../../hooks/usePlanTiers'
 import '../SubscriptionPage.css'
 
 function MenuIcon() {
@@ -43,6 +44,7 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
   const { tier: clinicTier } = useClinicPlan()
   const localTierId = isTrialExpired ? 'free' : (activePlan || 'free')
   const activeTierId = clinicTier && clinicTier !== 'free' ? clinicTier : localTierId
+  const apiTiers = usePlanTiers(activeTierId) // Live plans from the database; Hidden ones are not shown
 
   const subscriptionTiersRaw = [
     {
@@ -96,7 +98,7 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
     }
   ]
 
-  const subscriptionTiers = subscriptionTiersRaw.map((tier) => ({
+  const subscriptionTiers = (apiTiers || subscriptionTiersRaw).map((tier) => ({
     ...tier,
     current: tier.id === activeTierId,
   }))

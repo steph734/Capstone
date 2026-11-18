@@ -5,7 +5,7 @@ import PatientSidebar from '../../components/PatientSidebar'
 import OwnerPaymentPage from './OwnerPaymentPage'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
-import { authFetch, getSessionToken } from '../../utils/session'
+import usePlanTiers from '../../hooks/usePlanTiers'
 import '../SubscriptionPage.css'
 
 // "Possible" next billing date = one calendar month after a given date.
@@ -25,24 +25,6 @@ function formatLongDate(date) {
 function planLabelFor(tier) {
   const name = tier.name.split(': ')[1] || tier.name
   return name.charAt(0) + name.slice(1).toLowerCase()
-}
-
-// A plan from GET /api/plans -> the tier shape this page and the checkout use.
-const CARD_COLOR = { free: 'blue', silver: 'silver', gold: 'gold' }
-function tierFromPlan(p) {
-  const base = String(p.name || '').replace(/ plan$/i, '').toUpperCase()
-  return {
-    id: p.slug,
-    name: `THERAPYPRO: ${base}`,
-    price: p.priceMonthly === 0 ? 'FREE' : `₱${p.priceMonthly}`,
-    period: p.priceMonthly === 0 ? '/ forever' : '/month',
-    color: CARD_COLOR[p.slug] || 'silver',
-    monthlyPrice: p.priceMonthly,
-    yearlyPrice: p.priceYearly ?? 0,
-    trialDays: p.trialDays,
-    features: p.features,
-    current: false,
-  }
 }
 
 function MenuIcon() {
@@ -149,20 +131,12 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [trialNoticeDismissed, setTrialNoticeDismissed] = useState(false)
   const [reminderEmail, setReminderEmail] = useState(null) // null | 'sent' | 'error'
-  const [apiTiers, setApiTiers] = useState(null) // plans from the database; null until loaded (or if the request fails)
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
 
   // Plans come from the database (Super Admin > Subscription). Hidden plans are not offered, but the plan this Owner is
   // already on is always included so it still shows as their current plan.
-  useEffect(() => {
-    if (!getSessionToken()) return undefined
-    let alive = true
-    authFetch('/api/plans', { query: { include: activePlan || '' } })
-      .then((d) => { if (alive && Array.isArray(d.plans) && d.plans.length) setApiTiers(d.plans.map(tierFromPlan)) })
-      .catch(() => { /* keep the built-in tiers below */ })
-    return () => { alive = false }
-  }, [activePlan])
+  const apiTiers = usePlanTiers(activePlan || '')
 
   // Re-evaluate the trial clock each minute so the "ending soon" notice appears
   // and the plan lapses without needing a page reload.

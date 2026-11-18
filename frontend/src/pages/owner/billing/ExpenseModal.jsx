@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Field, Section, Chips, Toggle, ErrorBanner, VendorSelect } from './FinanceUi'
+import { ConfirmDialog, SuccessDialog, SummaryRows } from './FinanceDialogs'
 import { call, upload, peso2, parsePesos, lineAmount, fmtDay, dueText, errMsg, roundHalfAway } from './financeApi'
 import { today, diffDays } from '../reports/reportRange'
 
@@ -123,6 +124,8 @@ export default function ExpenseModal({ branches, clinic, staff, onClose, onSaved
   const [dirty, setDirty] = useState(false)
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const [confirm, setConfirm] = useState(false) // 'are you sure?' step before anything is saved
+  const [done, setDone] = useState(null) // success step: { expense, failedFiles }
   const [serverErr, setServerErr] = useState({})
   const [banner, setBanner] = useState('')
   const [busy, setBusy] = useState(false)
@@ -192,20 +195,27 @@ export default function ExpenseModal({ branches, clinic, staff, onClose, onSaved
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ f, savedAt: Date.now() })); setBanner(''); setDirty(false); setDraft({ f }); onSaved({ draftSaved: true }) } catch { setBanner('Could not save the draft in this browser.') }
   }
 
-  const submit = async (e) => {
+  // Step 1: validate, then ask for confirmation. Nothing is saved until the owner confirms.
+  const requestSave = (e) => {
     e?.preventDefault()
     setSubmitted(true)
     if (Object.keys(local).length) { setBanner('Please fix the highlighted fields.'); document.querySelector('.fin-field.has-error input, .fin-field.has-error select')?.focus(); return }
+    setBanner(''); setConfirm(true)
+  }
+
+  // Step 2: save for real; on success show the success dialog (Done hands back to the page).
+  const doSave = async () => {
     setBusy(true); setBanner('')
     try {
       const { expense } = await call('expenses', { method: 'POST', body: toPayload(f, calc)})
       const failed = []
       for (const file of files) { try { await upload(`expenses/${expense.id}/attachments`, file) } catch (ex) { failed.push(`${file.name}: ${ex.message}`) } }
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
-      onSaved({ expense, failedFiles: failed })
+      setConfirm(false); setDone({ expense, failedFiles: failed })
     } catch (ex) {
+      setConfirm(false) // back to the form with everything the user typed
       setServerErr(ex.fields || {})
-      setBanner(errMsg(ex)) // the user's input is kept
+      setBanner(errMsg(ex))
     } finally { setBusy(false) }
   }
 
@@ -239,6 +249,7 @@ export default function ExpenseModal({ branches, clinic, staff, onClose, onSaved
   const refPrefix = u === 'Internet' ? 'INT' : u === 'Rent' ? 'RENT' : t === 'Supplies' ? 'SUP' : t === 'Other' ? 'EXP' : 'BILL'
 
   return (
+    <>
     <Modal
       title="Add expense" titleSuffix={TYPE_LABEL[t]} subtitle={SUBTITLE[t]} onClose={onClose} dirty={dirty}
       topbar={<Chips label="EXPENSE TYPE" value={t} onChange={(v) => requestSwitch({ type: v, util: 'Electricity' })} options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))} />}
@@ -248,11 +259,11 @@ export default function ExpenseModal({ branches, clinic, staff, onClose, onSaved
           <div className="fin-foot-total"><span>{t === 'Supplies' ? 'PURCHASE TOTAL' : 'BILL TOTAL'}</span><strong>{peso2(calc.total)}</strong></div>
           <button type="button" className="fin-btn" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="fin-btn fin-btn-outline" onClick={saveDraft} disabled={busy}>Save draft</button>
-          <button type="submit" form="expense-form" className="fin-btn fin-btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save expense'}</button>
+          <button type="submit" form="expense-form" className="fin-btn fin-btn-primary fin-btn-cta" disabled={busy}>{busy ? 'Saving…' : 'Save expense'}</button>
         </>
       )}
     >
-      <form id="expense-form" onSubmit={submit} noValidate className="fin-form">
+      <form id="expense-form" onSubmit={requestSave} noValidate className="fin-form">
         <ErrorBanner>{banner}</ErrorBanner>
         {draft && !dirty && (
           <div className="fin-note" role="status">
@@ -412,6 +423,23 @@ export default function ExpenseModal({ branches, clinic, staff, onClose, onSaved
         </Section>
       </form>
     </Modal>
+    {confirm && (
+      <ConfirmDialog title="Save this expense?" subtitle="Please check the details before saving." confirmLabel="Yes, save expense" busy={busy} onCancel={() => setConfirm(false)} onConfirm={doSave}>
+        <SummaryRows rows={[
+          ['Type', TYPE_LABEL[t] + (u ? ' · ' + u : '')], ['Vendor', f.vendor_name], ['Branch', branch?.branch_name],
+          ['Bill date', f.bill_date ? fmtDay(f.bill_date) : null], f.due_date ? ['Due', fmtDay(f.due_date)] : null,
+          ['Status', f.payment_status === 'Paid' ? 'Paid · ' + f.payment_method : 'Unpaid'], files.length ? ['Files', files.length + ' attached'] : null,
+          ['Total', peso2(calc.total)],
+        ]} />
+      </ConfirmDialog>
+    )}
+    {done && (
+      <SuccessDialog title="Expense saved" subtitle={done.expense.vendor_name} tone={done.failedFiles?.length ? 'warn' : 'ok'} onDone={() => onSaved(done)}>
+        <SummaryRows rows={[['Reference', done.expense.reference_no], ['Total', peso2(done.expense.total_amount)], ['Status', done.expense.status]]} />
+        {done.failedFiles?.length > 0 && <p className="fin-note warn">The expense was saved, but some files could not be uploaded: {done.failedFiles.join('; ')}</p>}
+      </SuccessDialog>
+    )}
+    </>
   )
 }
 

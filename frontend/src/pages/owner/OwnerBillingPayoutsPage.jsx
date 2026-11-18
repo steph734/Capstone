@@ -1,34 +1,72 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
-import { NewInvoiceButton, BILLING_SUBTITLE, peso, fmtDate } from './OwnerBillingShared'
-import { BillingTabs } from './billing/FinanceUi'
+import { NewInvoiceButton, BILLING_SUBTITLE } from './OwnerBillingShared'
+import { BillingTabs, Skeleton, useToast } from './billing/FinanceUi'
+import { call } from './billing/financeApi'
+import { SetAmountModal, ConfirmResetModal, HistoryRow } from './billing/DemoWalletUi'
+import useDemoWallet, { money, DEMO_START_BALANCE } from '../../hooks/useDemoWallet'
 import './billing/OwnerFinance.css'
 import './OwnerBillingPage.css'
+import './billing/DemoWallet.css'
 
-const SCHEDULES = [
-  { id: 'weekly', label: 'every week' },
-  { id: 'biweekly', label: 'every 2 weeks' },
-  { id: 'monthly', label: 'every month' },
-]
-
-const PAYOUT_HISTORY = [
-  { id: 'p1', date: '2026-08-29', amount: 12980 },
-  { id: 'p2', date: '2026-08-15', amount: 14210 },
-  { id: 'p3', date: '2026-08-01', amount: 11730 },
-]
+const PAGE = 20
 
 export default function OwnerBillingPayoutsPage({ user, onLogout, betaTier }) {
-  const [schedule, setSchedule] = useState('biweekly')
-  const [editingSchedule, setEditingSchedule] = useState(false)
-  const [toast, setToast] = useState('')
+  const wallet = useDemoWallet()
+  const [toastEl, toast] = useToast()
+  const [history, setHistory] = useState({ rows: [], next: null, status: 'loading', error: '' })
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [modal, setModal] = useState(null) // null | 'set' | 'reset'
+  const [resetting, setResetting] = useState(false)
+  const reqId = useRef(0)
 
-  const flash = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(''), 2400)
+  const loadFirst = useCallback(async () => {
+    const id = ++reqId.current
+    setHistory((h) => ({ ...h, status: h.rows.length ? 'ready' : 'loading', error: '' }))
+    try {
+      const d = await call('demo-wallet/transactions', { query: { limit: PAGE } })
+      if (id === reqId.current) setHistory({ rows: d.transactions, next: d.next_before, status: 'ready', error: '' })
+    } catch (err) {
+      if (id === reqId.current) setHistory((h) => ({ ...h, status: 'error', error: err.message || 'Could not load the wallet history.' }))
+    }
+  }, [])
+
+  // Reload whenever the shared wallet changes (set amount / reset / a payment made elsewhere).
+  useEffect(() => { loadFirst() }, [loadFirst, wallet.revision])
+
+  const loadMore = async () => {
+    if (!history.next || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const d = await call('demo-wallet/transactions', { query: { limit: PAGE, before: history.next } })
+      setHistory((h) => ({ ...h, rows: [...h.rows, ...d.transactions], next: d.next_before }))
+    } catch (err) {
+      toast(err.message || 'Could not load more.', 'err')
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
-  const scheduleLabel = SCHEDULES.find((s) => s.id === schedule)?.label
+  const onSaved = (balance) => {
+    wallet.setBalance(balance) // updates the hero and, through `revision`, reloads the history (new row on top)
+    setModal(null)
+    toast(`Demo wallet set to ${money(balance)}`)
+  }
+
+  const doReset = async () => {
+    setResetting(true)
+    try {
+      const d = await call('demo-wallet/reset', { method: 'POST' })
+      wallet.setBalance(d.balance)
+      setModal(null)
+      toast(`Demo wallet reset to ${money(d.balance)}`)
+    } catch (err) {
+      toast(err.message || 'Could not reset the demo wallet.', 'err')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   return (
     <OwnerPageShell
@@ -41,77 +79,63 @@ export default function OwnerBillingPayoutsPage({ user, onLogout, betaTier }) {
       headerActions={<NewInvoiceButton />}
     >
       <BillingTabs />
-      {toast && <div className="sb-toast">{toast}</div>}
+      {toastEl}
 
-      <div className="pay-hero">
+      <div className="dw-hero">
         <div>
-          <p className="pay-hero-label">Next payout</p>
-          <p className="pay-hero-amount">{peso(15240)}</p>
-          <p className="pay-hero-meta">
-            Arriving {fmtDate('2026-09-12')} · {scheduleLabel}
-          </p>
+          <p className="dw-hero-label">Demo wallet balance</p>
+          <p className="dw-hero-amount" aria-live="polite">{wallet.ready ? money(wallet.balance) : '—'}</p>
+          <p className="dw-hero-meta">Stripe Test Mode · spent on subscriptions via Card or GCash</p>
         </div>
-        <button
-          type="button"
-          className="pay-hero-btn"
-          onClick={() => setEditingSchedule((v) => !v)}
-        >
-          Change Schedule
-        </button>
+        <div className="dw-hero-actions">
+          <div className="dw-hero-btns">
+            <button type="button" className="dw-btn outline" onClick={() => setModal('set')} disabled={!wallet.ready}>✎ Set Amount</button>
+            <button type="button" className="dw-btn yellow" onClick={() => setModal('reset')} disabled={!wallet.ready || resetting}>↺ Reset Demo Funds</button>
+          </div>
+          <p className="dw-hero-note">Reset returns to {money(DEMO_START_BALANCE)} · Set Amount picks any value</p>
+        </div>
       </div>
 
-      {editingSchedule && (
-        <section className="sba-card" style={{ marginBottom: 20 }}>
-          <h3 className="sba-card-title" style={{ marginBottom: 12 }}>Payout Schedule</h3>
-          <div className="sba-filter-group">
-            {SCHEDULES.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`sba-chip ${schedule === s.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSchedule(s.id)
-                  setEditingSchedule(false)
-                  flash(`Payouts now run ${s.label}`)
-                }}
-              >
-                {s.label[0].toUpperCase() + s.label.slice(1)}
-              </button>
-            ))}
-          </div>
-        </section>
+      {wallet.error && !wallet.ready && (
+        <div className="dw-error" role="alert" style={{ marginBottom: 16 }}>
+          {wallet.error}
+          <button type="button" className="inv-btn ghost" onClick={wallet.refresh}>Retry</button>
+        </div>
       )}
 
       <section className="sba-card">
-        <h3 className="sba-card-title">Payout Account</h3>
-        <p className="sba-card-sub">Where your clinic&apos;s revenue gets deposited</p>
-
-        <div className="pay-account">
-          <span className="pay-account-icon" aria-hidden="true">🏦</span>
-          <div className="pay-account-main">
-            <div className="pay-account-name">BDO Savings •••• 4821</div>
-            <div className="pay-account-sub">Primary payout account</div>
+        <h3 className="sba-card-title">Demo Funding</h3>
+        <p className="sba-card-sub">Where your demo money is spent</p>
+        <div className="dw-funding">
+          <span className="dw-funding-icon" aria-hidden="true">🧪</span>
+          <div className="dw-funding-main">
+            <div className="dw-funding-name">Stripe Test Mode · Card 4242 · GCash (test)</div>
+            <div className="dw-funding-sub">Demo wallet balance is deducted after each successful test payment</div>
           </div>
-          <button
-            type="button"
-            className="inv-btn ghost"
-            onClick={() => flash('Manage payout account — coming soon')}
-          >
-            Manage
-          </button>
+          <span className="dw-pill test">● Test mode</span>
         </div>
 
-        <h3 className="sba-card-title" style={{ marginTop: 24 }}>Payout History</h3>
-        <div className="pay-history">
-          {PAYOUT_HISTORY.map((p) => (
-            <div key={p.id} className="pay-history-row">
-              <span className="inv-muted">{fmtDate(p.date)}</span>
-              <span className="inv-amount">{peso(p.amount)}</span>
-              <span className="sba-status paid">Paid out</span>
-            </div>
-          ))}
-        </div>
+        <h3 className="dw-history-title">Demo Wallet History</h3>
+        {history.status === 'loading' && <Skeleton rows={3} />}
+        {history.status === 'error' && (
+          <div className="dw-error" role="alert">
+            {history.error}
+            <button type="button" className="inv-btn ghost" onClick={loadFirst}>Retry</button>
+          </div>
+        )}
+        {history.status === 'ready' && history.rows.length === 0 && <p className="dw-empty">No demo wallet activity yet</p>}
+        {history.rows.length > 0 && history.status !== 'loading' && (
+          <div>
+            {history.rows.map((t) => <HistoryRow key={t._id} t={t} />)}
+            {history.next && (
+              <button type="button" className="dw-btn light dw-more" onClick={loadMore} disabled={loadingMore}>{loadingMore ? 'Loading…' : 'Load more'}</button>
+            )}
+          </div>
+        )}
       </section>
+
+      {modal === 'set' && wallet.ready && <SetAmountModal balance={wallet.balance} onClose={() => setModal(null)} onSaved={onSaved} />}
+      {modal === 'reset' && <ConfirmResetModal busy={resetting} onCancel={() => setModal(null)} onConfirm={doReset} />}
     </OwnerPageShell>
   )
 }

@@ -166,12 +166,12 @@
 .fin-btn.fin-btn-primary,
 .fin-backdrop .fin-btn.fin-btn-primary,
 .admin-header-right .fin-btn.fin-btn-primary {
-  background: #7fd1a1 !important;
-  border: 1px solid #5bb883 !important;
-  color: #000 !important;
+  background: #2f5446 !important;
+  border: 1px solid #2f5446 !important;
+  color: #fff !important;
   opacity: 1;
 }
-.fin-btn.fin-btn-primary:hover:not(:disabled) { background: #6cc593 !important; border-color: #4aa874 !important; }
+.fin-btn.fin-btn-primary:hover:not(:disabled) { background: #264439 !important; border-color: #264439 !important; }
 .fin-btn.fin-btn-primary:disabled { opacity: 0.55; }
 
 /* Branch-aware clinic details card */
@@ -218,3 +218,21 @@
 .fin-notset { color: #b42318; font-weight: 800; }
 .fin-notin-msg { margin: 0; color: #b42318; font-size: 13px; font-weight: 800; }
 .fin-roFoot { margin: 6px 0 0; }
+
+/* "+ New invoice" / "+ Add expense": dark green, bold white uppercase text, rounded (like the Select Plan button) */
+.fin-btn.fin-btn-cta { min-height: 50px; padding: 0 26px; border-radius: 14px; font-size: 15px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Modal titles stay black (the page theme was washing them out) */
+.fin-modal-head h2, .fin-modal-head h2 .fin-title-suffix { color: #000 !important; -webkit-text-fill-color: #000; }
+.fin-modal-head h2 .fin-title-suffix { font-weight: 600; opacity: .75; }
+
+/* Confirmation / success dialogs */
+.fin-summary { margin: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.fin-summary > div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 14px; }
+.fin-summary > div:first-child { border-top: none; }
+.fin-summary dt { color: var(--muted); font-weight: 700; } .fin-summary dd { margin: 0; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
+.fin-success { display: flex; gap: 16px; align-items: flex-start; }
+.fin-success .fin-form { flex: 1; min-width: 0; }
+.fin-successicon { flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; background: #dcf2e4; color: #0f5f33; }
+.fin-successicon.warn { background: #fff1d6; color: #7a4a00; }
+@media (max-width: 720px) { .fin-success { flex-direction: column; } }

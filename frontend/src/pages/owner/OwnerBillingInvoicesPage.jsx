@@ -112,10 +112,9 @@ export default function OwnerBillingInvoicesPage({ user, onLogout, betaTier }) {
     <OwnerPageShell
       user={user} onLogout={onLogout} title="Sales / Billing" subtitle="Everything about money in one place — revenue, invoices, payouts, and how you get paid."
       menuItems={getOwnerMenuItems(betaTier)}
-      headerActions={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'new' })}>+ New invoice</button>}
     >
       <div className="fin-page">
-        <BillingTabs action={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'new' })}>+ New invoice</button>} />
+        <BillingTabs action={<button type="button" className="fin-btn fin-btn-primary fin-btn-cta" onClick={() => setModal({ kind: 'new' })}>+ New invoice</button>} />
         <p className="fin-lead">Invoices you send to patients and guardians. Clinic costs such as bills and supplies are under Expenses.</p>
 
         <div className={`fin-kpis ${loading && summary ? 'is-loading' : ''}`}>

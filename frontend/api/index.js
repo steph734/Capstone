@@ -154,6 +154,7 @@ import {
 import {
   clinicRoute, invoicesCollection, invoicesSummary, invoicePatients, invoiceItem, invoiceSend, invoiceRemind, invoiceMarkPaid, invoiceVoid, invoicePdf, patientBillableSessions,
 } from './_lib/routes/owner-invoices.js'
+import * as demoWallet from './_lib/routes/owner-demo-wallet.js'
 import ownerReportsSummary from './_lib/routes/owner-reports-summary.js'
 import ownerReportsExport from './_lib/routes/owner-reports-export.js'
 import notesVoiceLog from './_lib/routes/notes-voice-log.js'
@@ -443,6 +444,17 @@ app.all('/api/owner/invoices/:id/pdf', invoicePdf)
 app.all('/api/owner/invoices/:id', invoiceItem)
 app.all('/api/owner/invoices', invoicesCollection)
 app.all('/api/owner/patients/:id/billable-sessions', patientBillableSessions)
+// Owner demo wallet + paying for the subscription from it (Owner only; see _lib/demoWallet.js)
+app.all('/api/owner/demo-wallet/transactions', demoWallet.transactionsRoute)
+app.all('/api/owner/demo-wallet/set-amount', demoWallet.setAmountRoute)
+app.all('/api/owner/demo-wallet/reset', demoWallet.resetRoute)
+app.all('/api/owner/demo-wallet', demoWallet.walletRoute)
+app.all('/api/owner/subscription/status', demoWallet.subscriptionStatusRoute)
+app.all('/api/owner/subscription/checkout', demoWallet.checkoutRoute)
+app.all('/api/owner/subscription/payment-status', demoWallet.paymentStatusRoute)
+app.all('/api/owner/subscription/gcash-demo', demoWallet.gcashDemoRoute)
+app.all('/api/owner/subscription/downgrade', demoWallet.downgradeRoute)
+app.all('/api/cron/demo-wallet-renewals', demoWallet.renewalsCron) // daily cron, locked behind CRON_SECRET
 app.all('/api/owner/reports/summary', ownerReportsSummary)
 app.all('/api/owner/reports/:module/export', ownerReportsExport)
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)

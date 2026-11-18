@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Modal, Field, Section, Chips, Toggle, ErrorBanner } from './FinanceUi'
+import { ConfirmDialog, SuccessDialog, SummaryRows } from './FinanceDialogs'
 import { call, newKey, peso2, parsePesos, pesosText, lineAmount, fmtDay, errMsg } from './financeApi'
 import { today, addDays } from '../reports/reportRange'
 
@@ -64,6 +65,8 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
   const [results, setResults] = useState([])
   const [pOpen, setPOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [confirm, setConfirm] = useState(null) // 'draft' | 'send': the confirmation step before anything is saved
+  const [done, setDone] = useState(null) // success step: { result, mode }
   const keys = useRef({})
   // The header (TIN, email, website...) belongs to the PATIENT'S BRANCH, so it is loaded when a patient is chosen.
   const [info, setInfo] = useState(clinic)
@@ -124,9 +127,15 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
     discount_amount: calc.discount, tax_amount: calc.tax, payment_instructions: f.instructions, terms: f.termsText, notes: f.notes, ...(send ? { send: true } : {}),
   })
 
-  const submit = async (mode) => {
+  // Step 1: validate, then ask for confirmation. Nothing is saved until the owner confirms.
+  const submit = (mode) => {
     setSubmitted(mode)
     if (Object.keys(check(f, calc, mode === 'send')).length) { setBanner('Please fix the highlighted fields.'); return }
+    setBanner(''); setConfirm(mode)
+  }
+
+  // Step 2: save (and email) for real; on success show the success dialog.
+  const doSave = async (mode) => {
     setBusy(mode); setBanner('')
     try {
       let result
@@ -137,8 +146,9 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
         keys.current[mode] ||= newKey() // same key for a retry of the same attempt: a double submit returns the original invoice
         result = await call('invoices', { method: 'POST', body: payload(mode === 'send'), headers: { 'Idempotency-Key': keys.current[mode] } })
       }
-      onSaved(result, mode)
+      setConfirm(null); setDone({ result, mode })
     } catch (ex) {
+      setConfirm(null) // back to the form with everything the user typed
       const fields = {}
       for (const [k, v] of Object.entries(ex.fields || {})) fields[k.startsWith('line_items') ? 'lines' : k === 'billing_contact.email' ? 'bc_email' : k === 'billing_contact.name' ? 'bc_name' : k] = v
       setServerErr(fields)
@@ -151,6 +161,7 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
   const noTin = !!branchId && !pf.business_tin // the chosen patient's branch cannot issue invoices yet
 
   return (
+    <>
     <Modal
       title={editing ? `Edit draft ${invoice.invoice_no}` : 'New invoice'} subtitle="Clinic details are filled in from your settings." onClose={onClose} dirty={dirty}
       topbar={<Chips label="TYPE" value={f.invoice_type} onChange={switchType} options={[{ value: 'Session', label: 'Session invoice' }, { value: 'Custom', label: 'Custom' }]} />}
@@ -163,7 +174,7 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
           <div className="fin-foot-total"><span>TOTAL AMOUNT DUE</span><strong>{peso2(calc.total)}</strong></div>
           <button type="button" className="fin-btn" onClick={onClose} disabled={!!busy}>Cancel</button>
           <button type="button" className="fin-btn fin-btn-outline" onClick={() => submit('draft')} disabled={!!busy}>{busy === 'draft' ? 'Saving…' : 'Save draft'}</button>
-          <button type="button" className="fin-btn fin-btn-primary" onClick={() => submit('send')} disabled={!!busy}>{busy === 'send' ? 'Sending…' : 'Create & send'}</button>
+          <button type="button" className="fin-btn fin-btn-primary fin-btn-cta" onClick={() => submit('send')} disabled={!!busy}>{busy === 'send' ? 'Sending…' : 'Create & send'}</button>
         </>
       )}
     >
@@ -253,6 +264,27 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
         </Section>
       </form>
     </Modal>
+    {confirm && (
+      <ConfirmDialog title={confirm === 'send' ? 'Create and send this invoice?' : 'Save this invoice as a draft?'} subtitle={confirm === 'send' ? 'It will be saved as Pending and emailed to the billing contact.' : 'A draft is not sent. You can edit it and send it later.'}
+        confirmLabel={confirm === 'send' ? 'Yes, create & send' : 'Yes, save draft'} busy={!!busy} onCancel={() => setConfirm(null)} onConfirm={() => doSave(confirm)}>
+        <SummaryRows rows={[
+          ['Type', f.invoice_type === 'Session' ? 'Session invoice' : 'Custom'], ['Patient', f.patient?.name], ['Bill to', f.bc.name + (f.guardian ? ' (guardian)' : '')],
+          confirm === 'send' ? ['Email to', f.bc.email] : null, ['Lines', String(calc.lines.length)], ['Due', calc.due ? fmtDay(calc.due) + ' (' + termLabel + ')' : null],
+          ['Total', peso2(calc.total)],
+        ]} />
+      </ConfirmDialog>
+    )}
+    {done && (() => {
+      const inv = done.result.invoice
+      const failedEmail = done.mode === 'send' && done.result.emailed === false
+      return (
+        <SuccessDialog title={done.mode === 'draft' ? 'Draft saved' : failedEmail ? 'Invoice saved, not sent' : 'Invoice created and sent'} subtitle={inv.invoice_no} tone={failedEmail ? 'warn' : 'ok'} onDone={() => onSaved(done.result, done.mode)}>
+          <SummaryRows rows={[['Invoice', inv.invoice_no], ['Patient', inv.patient_name], ['Total', peso2(inv.total_amount)], ['Due', fmtDay(inv.due_date)], done.mode === 'send' && !failedEmail ? ['Sent to', inv.sent_to] : null]} />
+          {failedEmail && <p className="fin-note warn">The invoice is saved as Pending, but the email could not be delivered. Open it from the list and choose Retry.</p>}
+        </SuccessDialog>
+      )
+    })()}
+    </>
   )
 }
 

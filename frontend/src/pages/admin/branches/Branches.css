@@ -291,3 +291,13 @@
 .br-tin-missing { display: flex; align-items: center; gap: 7px; margin: 2px 0 8px; padding: 8px 12px; border-radius: 10px; background: #fff3d6; border: 1px solid #f1d28a; color: #6b4300; font-size: 13px; font-weight: 700; }
 .br-tin-missing button { border: none; background: none; padding: 0; font: inherit; font-weight: 800; color: #6b4300; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .br-tin-missing button:focus-visible { outline: 2px solid #6b4300; outline-offset: 2px; border-radius: 4px; }
+
+/* Form fields in Add / Edit branch: white background, black text (the time pickers were rendering dark) */
+.br-modal input, .br-modal select, .br-modal textarea { color-scheme: light; }
+.br-times input, .br-input input, .br-input select, .br-textarea {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000;
+}
+.br-times input::-webkit-calendar-picker-indicator { filter: none; opacity: .75; cursor: pointer; }
+.br-input input::placeholder, .br-textarea::placeholder { color: #6b7c75; -webkit-text-fill-color: #6b7c75; }

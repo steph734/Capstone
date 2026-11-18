@@ -94,3 +94,33 @@ export function ExpenseViewModal({ x, branchName, onClose, onPay, onVoid, onNext
     </Modal>
   )
 }
+
+/* Confirm before something is created. Cancel returns to the form with every value kept. */
+export function ConfirmDialog({ title, subtitle, confirmLabel, busy = false, onCancel, onConfirm, children }) {
+  return (
+    <Modal title={title} subtitle={subtitle} wide={false} onClose={onCancel}
+      footer={<>
+        <button type="button" className="fin-btn" onClick={onCancel} disabled={busy} data-autofocus>Go back</button>
+        <button type="button" className="fin-btn fin-btn-primary fin-btn-cta" onClick={onConfirm} disabled={busy}>{busy ? 'Saving…' : confirmLabel}</button>
+      </>}>
+      <div className="fin-form">{children}</div>
+    </Modal>
+  )
+}
+
+/* Shown after the record is really saved. Closing it (Done, Esc, backdrop) hands control back to the page. */
+export function SuccessDialog({ title, subtitle, tone = 'ok', onDone, children }) {
+  return (
+    <Modal title={title} subtitle={subtitle} wide={false} onClose={onDone}
+      footer={<button type="button" className="fin-btn fin-btn-primary fin-btn-cta" onClick={onDone} data-autofocus>Done</button>}>
+      <div className="fin-success" role="status">
+        <span className={`fin-successicon ${tone}`} aria-hidden="true">{tone === 'ok' ? '✓' : '!'}</span>
+        <div className="fin-form">{children}</div>
+      </div>
+    </Modal>
+  )
+}
+
+export const SummaryRows = ({ rows }) => (
+  <dl className="fin-summary">{rows.filter(Boolean).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+)

@@ -47,6 +47,7 @@ const PUBLIC = [
   /^\/api\/payments\//, // payment attempts: own token / therapist checks inside
   /^\/api\/attendance\/remind$/, // cron secret
   /^\/api\/expenses\/remind$/, // cron secret (daily expense due-date reminders)
+  /^\/api\/cron\/demo-wallet-renewals$/, // cron secret (demo wallet subscription renewals)
   /^\/api\/branches$/, // branch names for the sign-up form
   /^\/api\/games\/(list|by-name)$/, // public game catalog
   // Loaded by <img src>, which cannot send an Authorization header. The ids are unguessable.
@@ -91,6 +92,7 @@ const LIMITS = [
   { re: /^\/api\/(create-payment-intent|create-setup-intent|create-subscription)$/, name: 'pay', max: 30, windowMs: 15 * MIN },
   { re: /^\/api\/owner\/reports\/[^/]+\/export$/, name: 'report-export', max: 30, windowMs: 15 * MIN },
   { re: /^\/api\/owner\/invoices\/[^/]+\/(send|remind)$/, name: 'invoice-mail', max: 40, windowMs: 60 * MIN },
+  { re: /^\/api\/owner\/subscription\/(checkout|gcash-demo)$/, name: 'demo-pay', max: 30, windowMs: 15 * MIN },
 ]
 
 const lower = (v) => String(v || '').trim().toLowerCase()

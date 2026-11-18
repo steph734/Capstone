@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
-import StripeSubscribeForm from '../../components/StripeSubscribeForm'
+import DemoWalletCheckout, { WalletOrderPanel } from '../../components/payments/DemoWalletCheckout'
 import './OwnerPaymentPage.css'
-
-const STRIPE_BILLING_PERIODS = new Set(['monthly', 'yearly'])
 
 // Dialling code prefilled into the phone field when a country/region is picked.
 const COUNTRY_DIAL_CODES = {
@@ -55,14 +53,6 @@ function InfoIcon() {
   )
 }
 
-function CheckIcon() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  )
-}
-
 export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack, betaTier, activePlan, onPlanActivate }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState('monthly')
@@ -77,11 +67,8 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
     businessTax: false,
     taxId: ''
   })
-  const [paymentStatus, setPaymentStatus] = useState(null) // null | 'success'
+  const [paymentMethod, setPaymentMethod] = useState('Card') // 'Card' | 'GCash' (both are paid from the demo wallet)
   const [emailStatus, setEmailStatus] = useState('idle') // idle | verifying | verified
-  // Receipt-email outcome, surfaced on the success screen so a mail failure
-  // isn't silent: null | { status: 'sending' | 'sent' | 'error', to, error }
-  const [receiptResult, setReceiptResult] = useState(null)
 
   const currentUser = user || { 
     name: 'Owner', 
@@ -142,10 +129,10 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
     })
   }
 
-  const stripeReady = STRIPE_BILLING_PERIODS.has(billingPeriod)
+  // The wallet deducts this many centavos. The server recomputes the price from the plan; this is only for display.
+  const priceCentavos = Math.round(price * 100)
 
   const handleSubscribeSuccess = () => {
-    setPaymentStatus('success')
     // Mark this tier as the active paid plan — unlocks sidebar features and
     // flips the tier card to "Active Plan" once we're back on the tiers page.
     if (onPlanActivate) onPlanActivate(tier.id)
@@ -340,23 +327,22 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                     </label>
                   </div>
 
-                  <h3 className="section-title">Card details</h3>
-                  {stripeReady ? (
-                    <StripeSubscribeForm
-                      tierId={tier.id}
-                      billingPeriod={billingPeriod}
-                      submitLabel={`Subscribe — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
-                      billingEmail={paymentData.email || currentUser.email}
-                      billingName={paymentData.fullName || currentUser.name}
-                      billingPhone={paymentData.phone}
-                      onSuccess={handleSubscribeSuccess}
-                      onReceiptResult={setReceiptResult}
-                    />
-                  ) : (
-                    <p className="field-description">
-                      This billing period isn't set up yet — please choose Monthly or Yearly to subscribe right now.
-                    </p>
-                  )}
+                  <h3 className="section-title">Payment method</h3>
+                  <div className="dw-method-row" role="radiogroup" aria-label="Payment method">
+                    {['Card', 'GCash'].map((m) => (
+                      <button key={m} type="button" role="radio" aria-checked={paymentMethod === m} className={`dw-method ${paymentMethod === m ? 'on' : ''}`} onClick={() => setPaymentMethod(m)}>{m}</button>
+                    ))}
+                  </div>
+                  <DemoWalletCheckout
+                    key={`${tier.id}-${billingPeriod}-${paymentMethod}`}
+                    tierId={tier.id}
+                    billingPeriod={billingPeriod}
+                    price={priceCentavos}
+                    method={paymentMethod}
+                    submitLabel={`Subscribe — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
+                    onPaid={handleSubscribeSuccess}
+                    onBack={handleGoBack}
+                  />
               </div>
             </div>
 
@@ -378,10 +364,12 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                 </div>
               </div>
 
+              <WalletOrderPanel price={priceCentavos} />
+
               <div className="renewal-info">
                 <InfoIcon />
                 <span>
-                  Charged and auto-renewed by Stripe every {isMonthly ? 'month' : 'year'} at
+                  Paid from your demo wallet (Stripe test mode) and renewed every {isMonthly ? 'month' : 'year'} at
                   {' '}₱{price}.00 — no additional tax is added.
                 </span>
               </div>
@@ -390,45 +378,6 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
         </div>
       </div>
 
-      {paymentStatus === 'success' && (
-        <div
-          className="payment-success-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="payment-success-title"
-        >
-          <div className="payment-success-modal">
-            <div className="payment-success-icon">
-              <CheckIcon />
-            </div>
-            <h2 id="payment-success-title" className="payment-success-title">
-              Payment successful
-            </h2>
-            <p className="payment-success-text">
-              Your {tier.name.split(': ')[1]} plan (₱{price}.00/{isMonthly ? 'month' : 'year'}) is
-              now active and recorded with Stripe.
-            </p>
-            {receiptResult && (
-              <p
-                className="payment-success-text"
-                style={{
-                  fontSize: '13px',
-                  marginTop: '-8px',
-                  color: receiptResult.status === 'error' ? '#dc2626' : '#6b7c75',
-                }}
-              >
-                {receiptResult.status === 'sending' && `Sending your receipt to ${receiptResult.to}…`}
-                {receiptResult.status === 'sent' && `📧 Receipt sent to ${receiptResult.to}`}
-                {receiptResult.status === 'error' &&
-                  `⚠️ Receipt email failed: ${receiptResult.error}`}
-              </p>
-            )}
-            <button type="button" className="submit-button" onClick={handleGoBack}>
-              Back to subscription tiers
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -9,6 +9,7 @@
 // signature is checked against the exact bytes Stripe sent.
 import { getDb } from '../mongo.js'
 import { getStripeClient } from '../stripeClient.js'
+import { handleDemoWalletEvent } from './owner-demo-wallet.js'
 import { finalizePaid, markFailed, friendlyFailure } from '../paymentAttempts.js'
 
 export default async function handler(req, res) {
@@ -30,6 +31,12 @@ export default async function handler(req, res) {
     const pi = event.data?.object
     if (!pi?.id || !String(event.type).startsWith('payment_intent.')) return res.status(200).json({ received: true })
     const db = await getDb()
+    // Owner demo-wallet subscription payments (created by /api/owner/subscription/checkout) are settled here.
+    if (pi.metadata?.demo_wallet === '1') {
+      // A malformed demo event can never succeed on retry, so acknowledge it instead of making Stripe resend it.
+      await handleDemoWalletEvent(db, event).catch((err) => { if (err?.name === 'WalletError' || err?.constructor?.name === 'WalletError') console.error('demo wallet webhook ignored:', err.message); else throw err })
+      return res.status(200).json({ received: true })
+    }
     const attempt = await db.collection('payment_attempts').findOne({ provider_ref: pi.id })
     if (!attempt) return res.status(200).json({ received: true, ignored: true }) // not a booking payment (e.g. a subscription)
 

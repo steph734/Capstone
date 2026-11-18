@@ -6,6 +6,7 @@ import {
   SUBMIT_STATUSES, validateBranchInput, resolveOwner, loadOwners, loadBranchStats,
   serializeBranch, branchNameTaken, auditBranch,
 } from '../adminBranches.js'
+import { tinProblem, billingChanges, readableValidatorError, BILLING_API_KEYS } from '../branchBilling.js'
 
 // GET  /api/admin/branches -> every branch with derived stats, for the Super Admin page.
 // POST /api/admin/branches -> creates a branch (or a draft). Super Admin only.
@@ -47,7 +48,11 @@ export default async function handler(req, res) {
     if (!draft && status === 'Active' && !owner.owner_id && !owner.owner_invite_email) {
       fields.owner = 'An active branch needs an owner. Pick or invite one in step 2.'
     }
-    if (Object.keys(fields).length) return res.status(400).json({ error: 'Please fix the highlighted fields.', fields })
+    if (Object.keys(fields).length) return res.status(422).json({ error: 'Please fix the highlighted fields.', code: 'VALIDATION_ERROR', fields })
+
+    // The TIN is only REQUIRED to create a branch straight into Active; it must always be unique.
+    const tinIssue = await tinProblem(ctx.db, { tin: value.tin, needTin: !draft && status === 'Active' })
+    if (tinIssue) return res.status(tinIssue.status).json(tinIssue.body)
 
     const now = new Date()
     const branch = await Branch.create({
@@ -62,6 +67,9 @@ export default async function handler(req, res) {
 
     await auditBranch(ctx, draft ? 'branch_draft_saved' : 'branch_created', branch,
       `${draft ? 'Saved draft of' : 'Created'} branch "${branch.branch_name}" (${status}).`, { status })
+    for (const c of billingChanges({}, branch.toObject())) {
+      await auditBranch(ctx, 'branch_billing_changed', branch, `Set ${c.field} of branch "${branch.branch_name}".`, c)
+    }
 
     if (owner.owner_invite_email && !draft) {
       const text = `You have been named the owner of ${branch.branch_name} on TherapyPro. A Super Admin will contact you with your sign-in details.`
@@ -77,6 +85,8 @@ export default async function handler(req, res) {
     const owners = await loadOwners(ctx.db, [lean.owner_id])
     return res.status(201).json({ branch: serializeBranch(lean, { stats: null, owner: owners.get(String(lean.owner_id)) }) })
   } catch (err) {
+    if (err?.code === 121) return res.status(422).json({ error: readableValidatorError(err), code: 'VALIDATION_ERROR' })
+    if (err?.code === 11000 && /tin/.test(String(err.message))) return res.status(409).json({ error: 'This TIN is already used by another branch.', code: 'DUPLICATE_TIN', fields: { tin: 'This TIN is already used by another branch.' } })
     console.error('admin branches error:', err)
     return res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not complete that request.' })
   }

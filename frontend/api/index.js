@@ -75,6 +75,7 @@ import attendanceAvailability from './_lib/routes/attendance-availability.js'
 import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 import attendanceRemind from './_lib/routes/attendance-remind.js'
+import ownerBillingBranches from './_lib/routes/owner-billing-branches.js'
 import expensesRemind from './_lib/routes/expenses-remind.js'
 import therapistAvailability from './_lib/routes/therapist-availability.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
@@ -430,6 +431,8 @@ app.all('/api/owner/expenses/:id', expenseItem)
 app.all('/api/owner/expenses', expensesCollection)
 app.all('/api/owner/vendors', vendorsRoute)
 app.all('/api/owner/clinic', clinicRoute)
+app.all('/api/owner/billing/branches/:id', ownerBillingBranches)
+app.all('/api/owner/billing/branches', ownerBillingBranches)
 app.all('/api/owner/invoices/summary', invoicesSummary)
 app.all('/api/owner/invoices/patients', invoicePatients)
 app.all('/api/owner/invoices/:id/send', invoiceSend)

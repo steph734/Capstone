@@ -4,6 +4,10 @@ import {
 } from 'lucide-react'
 import { authFetch } from '../../../utils/session'
 import { DAYS, PROVINCES, SERVICES, defaultHours, isEmail, isPhPhone } from './branchConstants'
+import TaxBillingSection from './TaxBillingSection'
+import {
+  billingErrors, billingFromBranch, payloadBilling, tinChangeNeedsConfirm, tinRequired,
+} from './billingFields'
 
 const STEPS = ['Branch details', 'Owner', 'Services & hours']
 
@@ -23,6 +27,7 @@ function formFromBranch(b) {
     phone: b?.phone || '',
     email: b?.email || '',
     capacity: b?.capacity ?? '',
+    ...billingFromBranch(b),
     status: b && (b.status === 'Active' || b.status === 'Under review') ? b.status : 'Under review',
     ownerMode: b?.owner?.pending ? 'invite' : 'existing',
     ownerId: b?.owner?.id || '',
@@ -32,9 +37,10 @@ function formFromBranch(b) {
   }
 }
 
-function validateStep(step, f, { takenNames, isDraftOrNew }) {
+function validateStep(step, f, { takenNames, isDraftOrNew, needTin }) {
   const e = {}
   if (step === 0) {
+    Object.assign(e, billingErrors(f, { needTin }))
     const name = f.name.trim()
     if (!name) e.name = 'Branch name is required.'
     else if (takenNames.has(name.toLowerCase())) e.name = 'A branch with this name already exists.'
@@ -86,12 +92,16 @@ function IconInput({ icon: Icon, error, ...props }) {
   )
 }
 
-export default function AddBranchModal({ branch, owners, existingBranches, onClose, onSaved }) {
+export default function AddBranchModal({ branch, owners, existingBranches, onClose, onSaved, initialSection }) {
   const editing = Boolean(branch)
   const isDraftOrNew = !editing || branch.status === 'Draft'
   const initial = useMemo(() => formFromBranch(branch), [branch])
   const initialJson = useMemo(() => JSON.stringify(initial), [initial])
   const [form, setForm] = useState(initial)
+  const [confirmTin, setConfirmTin] = useState(false)
+  const billingRef = useRef(null)
+  // The TIN is required to set a branch Active; the red state shows as soon as Active is chosen with no TIN.
+  const needTin = tinRequired({ editing, branch, status: form.status })
   const [step, setStep] = useState(0)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -127,7 +137,10 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  useEffect(() => { dialogRef.current?.focus() }, [])
+  useEffect(() => {
+    // "Add TIN" on a branch card opens this form on the Tax & billing section.
+    if (initialSection === 'billing') { billingRef.current?.scrollIntoView?.({ block: 'center' }); document.getElementById('br-tin')?.focus() } else dialogRef.current?.focus()
+  }, [initialSection])
 
   const payload = (draft) => ({
     name: form.name.trim(),
@@ -137,6 +150,7 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
     phone: form.phone.trim(),
     email: form.email.trim(),
     capacity: form.capacity === '' ? null : Number(form.capacity),
+    ...payloadBilling(form), // blank values are omitted / unset by the server, never stored as ""
     status: form.status,
     services: form.services,
     hours: form.hours,
@@ -166,7 +180,7 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
   }
 
   const goNext = () => {
-    const e = validateStep(step, form, { takenNames, isDraftOrNew })
+    const e = validateStep(step, form, { takenNames, isDraftOrNew, needTin })
     setErrors(e)
     if (Object.keys(e).length) return
     setStep((s) => s + 1)
@@ -174,10 +188,12 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
 
   const submit = () => {
     const all = {}
-    for (let s = 0; s < STEPS.length; s += 1) Object.assign(all, validateStep(s, form, { takenNames, isDraftOrNew }))
+    for (let s = 0; s < STEPS.length; s += 1) Object.assign(all, validateStep(s, form, { takenNames, isDraftOrNew, needTin }))
     setErrors(all)
     const keys = Object.keys(all)
     if (keys.length) { setStep(Math.min(...keys.map(stepOfField))); return }
+    // Changing the TIN of an Active branch only affects NEW invoices: confirm first.
+    if (tinChangeNeedsConfirm({ editing, branch, tin: form.tin })) { setConfirmTin(true); return }
     send(false)
   }
 
@@ -253,6 +269,8 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
                   <IconInput icon={Mail} id="br-email" type="email" value={form.email} error={errors.email} onChange={(e) => set('email', e.target.value)} placeholder="iloilo@therapypro.ph" />
                 </Field>
               </div>
+              <TaxBillingSection form={form} errors={errors} set={set} needTin={needTin} sectionRef={billingRef} />
+
               <div className="br-grid-2">
                 <Field label="Therapist capacity" htmlFor="br-capacity" error={errors.capacity} hint="Assigned therapists are counted automatically.">
                   <IconInput icon={Stethoscope} id="br-capacity" type="number" min="1" max="500" value={form.capacity} error={errors.capacity} onChange={(e) => set('capacity', e.target.value)} placeholder="10" />
@@ -360,6 +378,19 @@ export default function AddBranchModal({ branch, owners, existingBranches, onClo
             </button>
           )}
         </footer>
+
+        {confirmTin && (
+          <div className="br-confirm-layer" role="alertdialog" aria-labelledby="br-tin-title">
+            <div className="br-confirm">
+              <h3 id="br-tin-title">Change this branch&apos;s TIN?</h3>
+              <p>Invoices already sent keep the old TIN. Only new invoices use the new one.</p>
+              <div className="br-confirm-actions">
+                <button type="button" className="br-btn btn-line" onClick={() => setConfirmTin(false)} autoFocus>Keep the old TIN</button>
+                <button type="button" className="br-btn primary" onClick={() => { setConfirmTin(false); send(false) }}>Change TIN</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {confirmDiscard && (
           <div className="br-confirm-layer" role="alertdialog" aria-labelledby="br-discard-title">

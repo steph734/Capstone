@@ -123,7 +123,7 @@ describe('expense validation', () => {
 describe('invoice validation', () => {
   const patientId = new ObjectId()
   const apptId = new ObjectId()
-  const found = { patients: { _id: patientId, first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' }, branchs: { _id: new ObjectId() }, appointments: { _id: apptId } }
+  const found = { patients: { _id: patientId, first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' }, branchs: { _id: new ObjectId(), tin: '456-657-670-00001', branch_name: 'Davao Main Branch', contact_number: '0917 123 4567', address: '1 Main St' }, appointments: { _id: apptId } }
   const base = () => ({ branch_id: oid(), patient_id: String(patientId), invoice_type: 'Custom', billing_contact: { name: 'Guardian', email: 'g@example.com', is_guardian: true }, issue_date: '2026-11-18', payment_terms: 'Net 7', line_items: [{ description: 'Therapy package', quantity: 1, unit_price: 450000 }], discount_amount: 50000, tax_amount: 0 })
   it('recomputes totals and derives the due date from the terms', async () => {
     const f = await buildInvoice(stubDb(found), base())
@@ -145,6 +145,15 @@ describe('invoice validation', () => {
     expect((await errs(buildInvoice(stubDb(found), { ...base(), line_items: [{ description: 'x', unit_price: 1, appointment_id: String(apptId) }] }))).extra.fields['line_items.0.appointment_id']).toBeTruthy()
     const s = await buildInvoice(stubDb(found), { ...base(), invoice_type: 'Session', line_items: [{ description: 'Speech Therapy', unit_price: 150000, appointment_id: String(apptId), service_date: '2026-11-10' }] })
     expect(s.billed_appointment_ids).toHaveLength(1)
+  })
+  it('BRANCH_TIN_MISSING: a branch with no TIN cannot issue an invoice; the header and terms come from the branch', async () => {
+    const noTin = { ...found, branchs: { _id: new ObjectId(), branch_name: 'Cebu' } }
+    const e = await errs(buildInvoice(stubDb(noTin), base()))
+    expect(e.code).toBe('BRANCH_TIN_MISSING'); expect(e.status).toBe(422)
+    const withTin = { ...found, branchs: { _id: new ObjectId(), branch_name: 'Davao Main Branch', tin: '456-657-670-00001', billing_email: 'b@x.ph', website: 'www.x.ph', payment_instructions: 'Pay at the desk', default_invoice_terms: 'Net 7 terms' } }
+    const f = await buildInvoice(stubDb(withTin), { ...base(), payment_instructions: undefined, terms: undefined })
+    expect(f.clinic_snapshot).toMatchObject({ tin: '456-657-670-00001', billing_email: 'b@x.ph', website: 'www.x.ph', branch_name: 'Davao Main Branch' })
+    expect(f.payment_instructions).toBe('Pay at the desk'); expect(f.terms).toBe('Net 7 terms')
   })
   it('never stores a diagnosis field', async () => {
     expect((await errs(buildInvoice(stubDb(found), { ...base(), diagnosis: 'Q90.9' }))).extra.fields.diagnosis).toBe('Unknown field.')

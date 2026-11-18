@@ -11,7 +11,7 @@ const TABS = [
   { label: 'Payouts', path: '/owner/billing/payouts' },
   { label: 'How you get paid', path: '/owner/billing/settings' },
 ]
-export function BillingTabs() {
+export function BillingTabs({ action }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
   return (
@@ -19,6 +19,7 @@ export function BillingTabs() {
       {TABS.map((t) => (
         <button key={t.path} type="button" className={`fin-tab ${pathname === t.path ? 'active' : ''}`} aria-current={pathname === t.path ? 'page' : undefined} onClick={() => nav(t.path)}>{t.label}</button>
       ))}
+      {action && <div className="fin-tabaction">{action}</div>}
     </nav>
   )
 }

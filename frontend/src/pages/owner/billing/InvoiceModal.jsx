@@ -10,15 +10,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const blank = (clinic) => ({
   invoice_type: 'Session', patient: null, guardian: false, bc: { name: '', phone: '', email: '', address: '' },
   lines: [], from: addDays(today(), -30), to: today(), issue_date: today(), terms: 'Net 7', due_date: '', discount: '', tax: '',
-  notes: '', instructions: clinic?.payment_instructions || '',
+  notes: '', instructions: clinic?.payment_instructions || '', termsText: clinic?.default_terms || '',
 })
 const fromInvoice = (inv) => ({
   invoice_type: inv.invoice_type,
-  patient: { id: inv.patient_id, name: inv.patient_name, record_no: inv.patient_record_no, contact: null, guardian: null },
+  patient: { id: inv.patient_id, branch_id: inv.branch_id, name: inv.patient_name, record_no: inv.patient_record_no, contact: null, guardian: null },
   guardian: !!inv.billing_contact?.is_guardian, bc: { name: inv.billing_contact?.name || '', phone: inv.billing_contact?.phone || '', email: inv.billing_contact?.email || '', address: inv.billing_contact?.address || '' },
   lines: inv.line_items.map((l) => ({ service_date: l.service_date || '', description: l.description, qty: String(l.quantity), unit: pesosText(l.unit_price), appointment_id: l.appointment_id || null })),
   from: addDays(today(), -30), to: today(), issue_date: inv.issue_date, terms: inv.payment_terms, due_date: inv.due_date, discount: pesosText(inv.discount_amount), tax: pesosText(inv.tax_amount),
-  notes: inv.notes || '', instructions: inv.payment_instructions || '',
+  notes: inv.notes || '', instructions: inv.payment_instructions || '', termsText: inv.terms || '',
 })
 
 function compute(f) {
@@ -65,6 +65,20 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
   const [pOpen, setPOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const keys = useRef({})
+  // The header (TIN, email, website...) belongs to the PATIENT'S BRANCH, so it is loaded when a patient is chosen.
+  const [info, setInfo] = useState(clinic)
+  const textEdited = useRef(!!invoice) // once the user edits terms / instructions, branch changes no longer overwrite them
+  const branchId = f.patient?.branch_id || null
+  useEffect(() => {
+    if (!branchId) return undefined
+    let live = true
+    call('clinic', { query: { branch_id: branchId } }).then((d) => {
+      if (!live) return
+      setInfo(d.clinic)
+      if (!textEdited.current) setF((p) => ({ ...p, instructions: d.clinic.payment_instructions || '', termsText: d.clinic.default_terms || '' }))
+    }).catch(() => {})
+    return () => { live = false }
+  }, [branchId])
   const calc = useMemo(() => compute(f), [f])
   const errs = useMemo(() => ({ ...check(f, calc, submitted === 'send'), ...serverErr }), [f, calc, submitted, serverErr])
   const show = (k) => (submitted || serverErr[k] ? errs[k] : undefined)
@@ -107,7 +121,7 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
     patient_id: f.patient.id, invoice_type: f.invoice_type, billing_contact: { name: f.bc.name.trim(), phone: f.bc.phone.trim(), email: f.bc.email.trim(), address: f.bc.address.trim(), is_guardian: f.guardian },
     issue_date: f.issue_date, payment_terms: f.terms, ...(f.terms === 'Custom' ? { due_date: f.due_date } : {}),
     line_items: calc.lines.map((l) => ({ ...(l.service_date ? { service_date: l.service_date } : {}), description: l.description.trim(), quantity: l.qtyN, unit_price: l.unitC, ...(l.appointment_id ? { appointment_id: l.appointment_id } : {}) })),
-    discount_amount: calc.discount, tax_amount: calc.tax, payment_instructions: f.instructions, notes: f.notes, ...(send ? { send: true } : {}),
+    discount_amount: calc.discount, tax_amount: calc.tax, payment_instructions: f.instructions, terms: f.termsText, notes: f.notes, ...(send ? { send: true } : {}),
   })
 
   const submit = async (mode) => {
@@ -133,7 +147,8 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
   }
 
   const termLabel = f.terms === 'Custom' ? 'Custom' : f.terms
-  const pf = clinic || {}
+  const pf = info || {}
+  const noTin = !!branchId && !pf.business_tin // the chosen patient's branch cannot issue invoices yet
 
   return (
     <Modal
@@ -160,7 +175,7 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
             <div className="fin-logo" aria-hidden="true">{(pf.clinic_name || 'T').slice(0, 1)}</div>
             <div className="fin-grid2">
               <Field label="Clinic name"><input disabled value={pf.clinic_name || ''} /></Field>
-              <Field label="Business / tax ID (TIN)"><input disabled value={pf.business_tin || ''} placeholder="Not set" /></Field>
+              <Field label="Business / tax ID (TIN)" error={noTin ? 'This branch has no TIN yet. Ask the Super Admin to add it.' : undefined}>{(id, eid) => <input id={id} disabled aria-describedby={eid} value={pf.business_tin || ''} placeholder="Not set" />}</Field>
               <Field label="Address"><input disabled value={pf.address || ''} placeholder="Set on the branch" /></Field>
               <Field label="Phone"><input disabled value={pf.phone || ''} placeholder="Not set" /></Field>
               <Field label="Email"><input disabled value={pf.email || ''} placeholder="Not set" /></Field>
@@ -232,7 +247,8 @@ export default function InvoiceModal({ clinic, invoice, onClose, onSaved }) {
             <Field label="Discount" error={show('discount')}>{(id, eid) => <input id={id} inputMode="decimal" placeholder="₱0" aria-describedby={eid} value={f.discount} onChange={(e) => set({ discount: e.target.value.replace(/[^\d.]/g, '') })} />}</Field>
             <Field label="Tax">{(id) => <input id={id} inputMode="decimal" placeholder="₱0" value={f.tax} onChange={(e) => set({ tax: e.target.value.replace(/[^\d.]/g, '') })} />}</Field>
           </div>
-          <Field label="Payment instructions">{(id) => <textarea id={id} rows={2} maxLength={500} value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} />}</Field>
+          <Field label="Payment instructions" hint="Starts from this branch's instructions. You can change it for this invoice.">{(id) => <textarea id={id} rows={2} maxLength={1000} value={f.instructions} onChange={(e) => { textEdited.current = true; set({ instructions: e.target.value }) }} />}</Field>
+          <Field label="Invoice terms" hint="Starts from this branch's default terms. You can change it for this invoice.">{(id) => <textarea id={id} rows={2} maxLength={2000} value={f.termsText} onChange={(e) => { textEdited.current = true; set({ termsText: e.target.value }) }} />}</Field>
           <Field label="Notes">{(id) => <textarea id={id} rows={2} maxLength={1000} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />}</Field>
         </Section>
       </form>

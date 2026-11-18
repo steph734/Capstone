@@ -4,6 +4,7 @@
 // audit-trail write every create/edit/archive/review goes through.
 import { ObjectId } from 'mongodb'
 import { audit } from './noteAccess.js'
+import { validateBilling, billingView } from './branchBilling.js'
 
 export const SERVICES = ['Speech', 'Occupational', 'Physical', 'Cognitive', 'Behavioral']
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
@@ -49,8 +50,11 @@ function cleanHours(input) {
 
 // Validates the editable branch fields. `draft` only requires a name, so an
 // admin can save half-finished work at any step. Returns { fields, value }.
+const ALLOWED_KEYS = ['name', 'city', 'province', 'street', 'phone', 'email', 'capacity', 'status', 'services', 'hours', 'owner', 'draft', 'action', 'reason', 'tin', 'billingEmail', 'website', 'paymentInstructions', 'defaultInvoiceTerms']
+
 export function validateBranchInput(body, { draft }) {
   const fields = {}
+  for (const k of Object.keys(body || {})) if (!ALLOWED_KEYS.includes(k)) fields[k] = 'Unknown field.'
   const v = {
     branch_name: str(body.name),
     city: str(body.city),
@@ -61,6 +65,11 @@ export function validateBranchInput(body, { draft }) {
     services: Array.isArray(body.services) ? [...new Set(body.services.map(str))].filter((s) => SERVICES.includes(s)) : [],
     hours: cleanHours(body.hours),
   }
+  // `address` is REQUIRED by the live collection validator: keep it in step with street / city / province.
+  v.address = [v.street, v.city, v.province].filter(Boolean).join(', ')
+  const billing = validateBilling(body)
+  Object.assign(fields, billing.fields)
+  Object.assign(v, billing.value) // blank -> undefined (omitted on insert, unset on update)
   const capRaw = body.capacity
   v.therapist_capacity = capRaw === '' || capRaw == null ? null : Number(capRaw)
 
@@ -164,6 +173,7 @@ export function serializeBranch(b, { stats, owner }) {
     phone: b.contact_number || '',
     email: b.email || '',
     capacity: b.therapist_capacity ?? null,
+    ...billingView(b),
     services: b.services || [],
     hours: b.hours || null,
     therapists: s.therapists,

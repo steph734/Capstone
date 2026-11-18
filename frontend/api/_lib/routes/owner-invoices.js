@@ -1,9 +1,9 @@
 // Owner Invoices API (patient invoices, money in). Owner / Super Admin only. Rules live in api/_lib/invoicesCore.js.
 import { financeRoute, created } from '../financeRoute.js'
-import { validationError, rejectUnknown, str, toOid, COL, financeAudit } from '../finance.js'
+import { FinanceError, validationError, toOid } from '../finance.js'
 import {
   createInvoice, listInvoices, invoiceSummary, getInvoice, serializeInvoice, updateInvoice, sendInvoice, remindInvoice, markInvoicePaid, voidInvoice,
-  searchPatients, billableSessions, clinicInfo,
+  searchPatients, billableSessions, clinicInfo, invoiceClinic,
 } from '../invoicesCore.js'
 import { buildInvoicePdf } from '../invoicePdf.js'
 
@@ -44,7 +44,7 @@ export const invoiceVoid = financeRoute('owner invoice void', { POST: async (ctx
 export const invoicePdf = financeRoute('owner invoice pdf', {
   GET: async (ctx, req, res) => {
     const inv = await getInvoice(ctx.db, req.params.id)
-    const pdf = Buffer.from(buildInvoicePdf(inv, await clinicInfo(ctx.db, inv.branch_id)))
+    const pdf = Buffer.from(buildInvoicePdf(inv, await invoiceClinic(ctx.db, inv)))
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${inv.invoice_no}.pdf"`)
     res.setHeader('Cache-Control', 'private, no-store')
@@ -56,21 +56,9 @@ export const invoicePdf = financeRoute('owner invoice pdf', {
 export const patientBillableSessions = financeRoute('owner billable sessions', { GET: async (ctx, req) => ({ sessions: await billableSessions(ctx.db, req.params.id, req.query || {}) }) })
 
 // GET /api/owner/clinic?branch_id=  ->  clinic details for invoice headers (clinic_settings + the branch's address/phone)
-// PUT /api/owner/clinic             ->  edit clinic_settings (name, TIN, email, website, payment instructions, default terms)
-const CLINIC_FIELDS = { clinic_name: 120, business_tin: 40, email: 120, website: 120, payment_instructions: 500, default_terms: 500 }
+// Read only. The Owner cannot write clinic or branch details; the old clinic-wide PUT is now a 403 FORBIDDEN.
+// (The clinic NAME lives in clinic_settings._id 'clinic'; the TIN and the other details are on each branch.)
 export const clinicRoute = financeRoute('owner clinic', {
   GET: async (ctx, req) => ({ clinic: await clinicInfo(ctx.db, req.query?.branch_id ? toOid(req.query.branch_id, 'branch_id') : null) }),
-  PUT: async (ctx, req) => {
-    const b = body(req)
-    const errors = {}
-    rejectUnknown(b, Object.keys(CLINIC_FIELDS), errors)
-    const set = {}
-    for (const [k, max] of Object.entries(CLINIC_FIELDS)) if (k in b) set[k] = str(b[k], max)
-    if ('clinic_name' in set && !set.clinic_name) errors.clinic_name = 'Required.'
-    if (set.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(set.email)) errors.email = 'Enter a valid email address.'
-    if (Object.keys(errors).length) throw validationError(errors)
-    await ctx.db.collection(COL.clinic).updateOne({ _id: 'clinic' }, { $set: { ...set, updated_at: new Date() }, $setOnInsert: { created_at: new Date() } }, { upsert: true })
-    await financeAudit(ctx.db, ctx, { action: 'clinic.update', entity: 'clinic', entityId: 'clinic' })
-    return { clinic: await clinicInfo(ctx.db, null) }
-  },
+  PUT: async () => { throw new FinanceError('FORBIDDEN', 'These details are managed by the Super Admin under Branches.', 403) },
 })

@@ -32,16 +32,29 @@ export async function withTxn(db, fn) {
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const patientName = (p) => [p.first_name, p.middle_name, p.last_name].filter(Boolean).join(' ')
 
+// Invoice header details. The TIN, billing email, website, payment instructions and default terms come from THIS BRANCH
+// (the branchs document); only the clinic name is clinic-wide. There is deliberately no fallback to the old clinic-level
+// TIN: a branch without one cannot issue invoices (BRANCH_TIN_MISSING).
 export async function clinicInfo(db, branchId) {
   const [clinic, branch] = await Promise.all([
-    db.collection(COL.clinic).findOne({ _id: 'clinic' }),
+    db.collection(COL.clinic).findOne({ _id: 'clinic' }, { projection: { clinic_name: 1 } }),
     branchId ? db.collection(COL.branches).findOne({ _id: branchId }) : null,
   ])
   return {
-    clinic_name: clinic?.clinic_name || 'TherapyPro', business_tin: clinic?.business_tin || '', email: clinic?.email || '', website: clinic?.website || '', logo_url: clinic?.logo_url || '',
-    payment_instructions: clinic?.payment_instructions || '', default_terms: clinic?.default_terms || '',
+    clinic_name: clinic?.clinic_name || 'TherapyPro', business_tin: branch?.tin || '', email: branch?.billing_email || '', website: branch?.website || '', logo_url: '',
+    payment_instructions: branch?.payment_instructions || '', default_terms: branch?.default_invoice_terms || '',
     branch_name: branch?.branch_name || '', address: branch?.address || '', phone: branch?.contact_number || '',
   }
+}
+
+// What is frozen onto an invoice when it is created, so editing the branch later never changes an old invoice.
+export const snapshotOf = (c) => ({ clinic_name: c.clinic_name, tin: c.business_tin, billing_email: c.email, website: c.website, branch_name: c.branch_name, address: c.address, phone: c.phone, snapshot_at: new Date() })
+export const TIN_MISSING = () => new FinanceError('BRANCH_TIN_MISSING', 'This branch has no TIN yet. Ask the Super Admin to add it.', 422)
+// The header an invoice is shown with: its own snapshot when it has one (older invoices fall back to the live branch).
+export async function invoiceClinic(db, inv) {
+  const s = inv.clinic_snapshot
+  if (!s) return clinicInfo(db, inv.branch_id)
+  return { clinic_name: s.clinic_name, business_tin: s.tin, email: s.billing_email, website: s.website, branch_name: s.branch_name, address: s.address, phone: s.phone, payment_instructions: inv.payment_instructions || '', default_terms: inv.terms || '' }
 }
 
 // Validates and prices one invoice. Every line amount, subtotal, total and the due date are recomputed here; a
@@ -134,13 +147,15 @@ export async function buildInvoice(db, body, { now = new Date() } = {}) {
   if (Object.keys(e).length) throw validationError(e)
 
   const clinic = await clinicInfo(db, branchId)
+  if (!clinic.business_tin) throw TIN_MISSING()
   return {
+    clinic_snapshot: snapshotOf(clinic),
     branch_id: branchId, patient_id: patient._id, patient_name: patientName(patient), patient_record_no: patient.PatientID || null,
     billing_contact: contact, invoice_type: body.invoice_type, issue_date: dayToDate(issueDay), due_date: dayToDate(dueDay), payment_terms: terms,
     // Omitted (never an empty array) when there are no sessions: an empty array is indexed as null and would collide.
     line_items: lines, ...(sessionIds.length ? { billed_appointment_ids: sessionIds } : {}),
     subtotal: mny(subtotal), discount_amount: mny(discount), tax_amount: mny(tax), total_amount: mny(total), amount_paid: 0, balance_due: mny(total),
-    payment_instructions: str(body.payment_instructions, 500) || clinic.payment_instructions || '', notes: str(body.notes, 1000), terms: str(body.terms, 500) || clinic.default_terms || '',
+    payment_instructions: str(body.payment_instructions, 1000) || clinic.payment_instructions || '', notes: str(body.notes, 1000), terms: str(body.terms, 2000) || clinic.default_terms || '',
   }
 }
 
@@ -296,7 +311,7 @@ function emailHtml(inv, clinic, reminder) {
 }
 
 async function deliver(db, inv, { reminder = false } = {}) {
-  const clinic = await clinicInfo(db, inv.branch_id)
+  const clinic = await invoiceClinic(db, inv)
   const pdf = buildInvoicePdf(inv, clinic)
   await sendEmail({
     to: inv.billing_contact.email, toName: inv.billing_contact.name,
@@ -313,7 +328,11 @@ export async function sendInvoice(db, ctx, id, { deliverFn = deliver } = {}) {
   if (!inv.billing_contact?.email) throw validationError({ 'billing_contact.email': 'An email address is required to send the invoice.' })
   if (Number(inv.total_amount) <= 0) throw validationError({ total_amount: 'The total must be above ₱0 to send.' })
   if (inv.status === 'Draft') {
-    const r = await db.collection(COL.invoices).updateOne({ _id: inv._id, status: 'Draft' }, { $set: { status: 'Pending', updated_at: new Date() } })
+    const live = await clinicInfo(db, inv.branch_id)
+    if (!live.business_tin) throw TIN_MISSING()
+    const snapshot = snapshotOf(live)
+    const r = await db.collection(COL.invoices).updateOne({ _id: inv._id, status: 'Draft' }, { $set: { status: 'Pending', clinic_snapshot: snapshot, updated_at: new Date() } })
+    inv.clinic_snapshot = snapshot
     if (!r.matchedCount) throw new FinanceError('INVOICE_NOT_PAYABLE', 'This invoice changed. Reload and try again.', 409)
     inv.status = 'Pending'
   }
@@ -405,8 +424,15 @@ export async function searchPatients(db, q) {
   if (q.q) { const rx = new RegExp(escapeRegex(str(q.q, 60)), 'i'); f.$or = [{ first_name: rx }, { last_name: rx }, { PatientID: rx }] }
   const list = await db.collection(COL.patients).find(f).sort({ last_name: 1, first_name: 1 }).limit(30).toArray()
   const yrs = (b) => (b ? Math.floor((Date.now() - new Date(b).getTime()) / 31557600000) : null)
+  // the patient's branch = the branch of the therapist on their most recent booking
+  const ids = list.map((p) => p._id)
+  const appts = ids.length ? await db.collection(COL.appointments).find({ patient_id: { $in: ids }, employee_id: { $ne: null } }, { projection: { patient_id: 1, employee_id: 1 } }).sort({ session_date: -1 }).limit(600).toArray() : []
+  const emps = appts.length ? await db.collection(COL.employees).find({ _id: { $in: [...new Set(appts.map((x) => String(x.employee_id)))].map((i) => new ObjectId(i)) } }, { projection: { branch_id: 1 } }).toArray() : []
+  const branchOfEmp = new Map(emps.map((e) => [String(e._id), e.branch_id ? String(e.branch_id) : null]))
+  const branchOfPatient = new Map()
+  for (const x of appts) if (!branchOfPatient.has(String(x.patient_id))) branchOfPatient.set(String(x.patient_id), branchOfEmp.get(String(x.employee_id)) || null)
   return list.map((p) => ({
-    id: String(p._id), name: patientName(p), record_no: p.PatientID || null, age: yrs(p.birthdate),
+    id: String(p._id), branch_id: branchOfPatient.get(String(p._id)) || null, name: patientName(p), record_no: p.PatientID || null, age: yrs(p.birthdate),
     // Only what is needed to bill: the patient's own contact, or the guardian's.
     contact: { name: patientName(p), phone: p.contact_number || '', email: p.email || '', address: p.address || '' },
     guardian: p.guardian_first_name ? { name: [p.guardian_first_name, p.guardian_last_name].filter(Boolean).join(' '), phone: p.guardian_contact_number || '', email: p.guardian_email || '', address: p.address || '' } : null,

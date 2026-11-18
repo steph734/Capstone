@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Archive, ArchiveRestore, Building2, CircleCheck, Clock, ChevronDown, ClipboardCheck, Eye, EllipsisVertical,
-  LayoutGrid, List, Map as MapIcon, MapPin, Pencil, Phone, Plus, Search, Stethoscope, TriangleAlert, X, Info,
+  LayoutGrid, List, Map as MapIcon, MapPin, Pencil, Phone, Plus, Receipt, Search, Stethoscope, TriangleAlert, X, Info,
 } from 'lucide-react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
@@ -65,7 +65,7 @@ function Owner({ b }) {
   )
 }
 
-function BranchCard({ b, menuOpen, onMenu, onView, onEdit, onArchive, onRestore, onReview }) {
+export function BranchCard({ b, menuOpen, onMenu, onView, onEdit, onArchive, onRestore, onReview }) {
   const review = b.status === 'Under review'
   const archived = b.status === 'Archived'
   const tone = STATUS_META[b.status]?.tone || 'gray'
@@ -93,6 +93,16 @@ function BranchCard({ b, menuOpen, onMenu, onView, onEdit, onArchive, onRestore,
         <h3>{b.name}</h3>
         <p className="br-line"><MapPin size={14} aria-hidden="true" /> {b.address || 'No address yet'}</p>
         <p className="br-line"><Phone size={14} aria-hidden="true" /> {b.phone || 'No contact number'}</p>
+        {b.tin ? (
+          <p className="br-line br-tin"><Receipt size={14} aria-hidden="true" /> <span>TIN {b.tin}</span></p>
+        ) : !archived && (
+          <div className="br-tin-missing" role="status">
+            <TriangleAlert size={14} aria-hidden="true" />
+            <span>No TIN yet</span>
+            <span aria-hidden="true">·</span>
+            <button type="button" onClick={() => onEdit(b, 'billing')} aria-label={'Add a TIN for ' + b.name}>Add TIN</button>
+          </div>
+        )}
 
         <div className="br-metrics">
           <div><strong>{b.therapists}</strong><span>therapists</span></div>
@@ -202,6 +212,8 @@ function ViewDialog({ b, onClose }) {
         <dl className="br-detail">
           <div><dt>Address</dt><dd>{b.address || '—'}</dd></div>
           <div><dt>Contact</dt><dd>{b.phone || '—'}</dd></div>
+          <div><dt>TIN</dt><dd>{b.tin || 'Not set'}</dd></div>
+          {b.billingEmail && <div><dt>Billing email</dt><dd>{b.billingEmail}</dd></div>}
           <div><dt>Email</dt><dd>{b.email || '—'}</dd></div>
           <div><dt>Owner</dt><dd>{b.owner ? `${b.owner.name || b.owner.email}${b.owner.pending ? ' (invited)' : ''}` : 'Not assigned'}</dd></div>
           <div><dt>Therapists</dt><dd>{b.therapists}{b.capacity ? ` of ${b.capacity} slots` : ''}</dd></div>
@@ -387,7 +399,7 @@ export default function BranchesPage({ user, onLogout }) {
     return rows.sort(by[sort])
   }, [branches, tab, region, q, sort])
 
-  const open = (type, branch) => { setMenuId(null); setDialog({ type, branch }) }
+  const open = (type, branch, section) => { setMenuId(null); setDialog({ type, branch, section }) }
   const close = useCallback(() => setDialog(null), [])
 
   const onSaved = (saved, kind) => {
@@ -404,7 +416,7 @@ export default function BranchesPage({ user, onLogout }) {
 
   const handlers = {
     onView: (b) => open('view', b),
-    onEdit: (b) => open('form', b),
+    onEdit: (b, section) => open('form', b, section),
     onArchive: (b) => open('archive', b),
     onRestore: (b) => open('restore', b),
     onReview: (b) => open('review', b),
@@ -492,7 +504,7 @@ export default function BranchesPage({ user, onLogout }) {
       </div>
 
       {dialog?.type === 'form' && (
-        <AddBranchModal branch={dialog.branch} owners={owners} existingBranches={branches} onClose={close} onSaved={onSaved} />
+        <AddBranchModal branch={dialog.branch} initialSection={dialog.section} owners={owners} existingBranches={branches} onClose={close} onSaved={onSaved} />
       )}
       {dialog?.type === 'view' && <ViewDialog b={dialog.branch} onClose={close} />}
       {dialog?.type === 'review' && <ReviewDialog b={dialog.branch} onClose={close} onDone={onActionDone} run={runAction} />}

@@ -92,7 +92,7 @@ describe('Add expense modal renders each layout', () => {
 describe('New invoice', () => {
   const patient = { _id: new ObjectId(), first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' }
   const appt = new ObjectId()
-  const found = { patients: patient, branchs: { _id: new ObjectId() }, appointments: { _id: appt } }
+  const found = { patients: patient, branchs: { _id: new ObjectId(), tin: '456-657-670-00001', branch_name: 'Davao Main Branch' }, appointments: { _id: appt } }
   const base = () => ({ ...blankInvoice({ payment_instructions: 'Pay at the front desk' }), patient: { id: String(patient._id), name: 'Miguel Tayao', record_no: 'PT-0187' }, bc: { name: 'Guardian Name', phone: '0963 539 7681', email: 'guardian@example.com', address: 'Blk 4' }, issue_date: '2026-11-18' })
   it('Session invoice: imported sessions are accepted by the server and totals match', async () => {
     const f = { ...base(), invoice_type: 'Session', guardian: true, discount: '500', lines: [{ service_date: '2026-11-02', description: 'Speech Therapy - Edward', qty: '1', unit: '1500', appointment_id: String(appt) }, { service_date: '2026-11-09', description: 'Speech Therapy - Edward', qty: '1', unit: '1500', appointment_id: String(new ObjectId()) }] }

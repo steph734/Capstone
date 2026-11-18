@@ -96,3 +96,51 @@ FINANCE_INTEGRATION=1 npx vitest run api/_lib/finance.integration.test.js       
 The integration suite creates a throwaway database `therapypro_test_<timestamp>` on the cluster in `MONGO_URI`, copies the
 **live** validators of `expenses`, `vendors` and `payments` into it, runs concurrency, transaction/rollback, validator and
 reminder tests, and drops it at the end. The real `therapypro` database is only read.
+
+## Per-branch TIN and invoice details
+
+Each branch has its own TIN and invoice details, stored on the existing `branchs` collection (no longer in `clinic_settings`):
+`tin`, `billing_email`, `website`, `payment_instructions`, `default_invoice_terms`. All are optional; the live validator's patterns
+and limits are mirrored on the client and the server. Only the clinic **name** stays clinic-wide.
+
+* **Super Admin, Branches page.** Add / Edit branch has a *Tax & billing* section (the TIN auto-formats as 000-000-000-00000). The TIN
+  is required only to set a branch **Active** (422 `TIN_REQUIRED_FOR_ACTIVE`), is unique across branches (409 `DUPLICATE_TIN`, naming
+  the branch), and an Active branch that has one cannot lose it. Older Active branches without a TIN stay editable; their cards show an
+  amber "No TIN yet · Add TIN". Changing an Active branch's TIN asks for confirmation. Blank optional fields are omitted on insert and
+  unset on update, never saved as `""`. MongoDB validator errors (code 121) come back as 422 `VALIDATION_ERROR`.
+* **Audit.** Every change to a billing field writes who / when / branch / field / old / new to `audit_logs` (mirrored to `auditlogs`).
+* **Owner, How you get paid → Clinic details on invoices: VIEW ONLY.** Pick one of *your* branches (`branchs.owner_id` = your user id;
+  the Super Admin sees all); the picker shows each branch's TIN or an amber "No TIN yet". Values are read-only text with a lock (no
+  inputs, no Save button). Every write method on `/api/owner/billing/branches` (and the old `PUT /api/owner/clinic`) is a 403
+  `FORBIDDEN`; another owner's branch is a 404. The clinic name is `clinic_settings._id 'clinic'`.`clinic_name` (clinic-wide); there is
+  currently no screen where anyone edits it.
+* **Invoices.** The header, payment instructions and default terms come from the invoice's branch (the patient's branch) and are copied
+  onto the invoice as `clinic_snapshot`, so later branch edits never change an old invoice. A branch with no TIN cannot create or send an
+  invoice (422 `BRANCH_TIN_MISSING`).
+
+| Endpoint | |
+|---|---|
+| `GET /api/admin/branches`, `GET /api/admin/branches/:id` | include `tin, billingEmail, website, paymentInstructions, defaultInvoiceTerms` |
+| `POST /api/admin/branches`, `PATCH /api/admin/branches/:id` | accept the same five fields (Super Admin only; unknown fields rejected) |
+| `GET /api/owner/billing/branches`, `GET /api/owner/billing/branches/:id` | the Owner's branches (read only; any write is 403) |
+
+### One-time database steps (not run for you)
+
+```
+node scripts/branch-tin-migration.mjs                        # DRY RUN: lists branches without a TIN, shows the old clinic TIN, prints the commands
+node scripts/branch-tin-migration.mjs --apply-status-enum    # collMod: adds Draft + Declined to branchs.status (Save as draft / Decline need it)
+node scripts/branch-tin-migration.mjs --apply-index          # unique partial index on tin
+node scripts/branch-tin-migration.mjs --assign-owner=<userId> --apply   # sets owner_id on branches that have none
+```
+
+Unique TIN index (mongosh), only created when you run it:
+
+```
+db.branchs.createIndex({ tin: 1 }, { unique: true, name: 'uniq_branch_tin', partialFilterExpression: { tin: { $exists: true } } })
+```
+
+The old clinic-level TIN (`clinic_settings.business_tin` = "45665767", 8 digits) does **not** match the branch pattern and is never
+copied. Set each branch's real TIN from Branches → Edit branch, or use the commented `updateOne` templates the script prints.
+
+Tests: `npx vitest run api/_lib/branchBilling.test.js src/pages/admin/branches` and
+`FINANCE_INTEGRATION=1 npx vitest run api/_lib/branchBilling.integration.test.js` (throwaway database, real handlers, dropped afterwards).

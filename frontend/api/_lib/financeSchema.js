@@ -36,6 +36,8 @@ export const INVOICES_VALIDATOR = {
       subtotal: money, discount_amount: money, tax_amount: money, total_amount: money, amount_paid: money, balance_due: money,
       status: { enum: ['Draft', 'Pending', 'Paid', 'Void'], description: 'Overdue is never stored: it is derived from due_date.' },
       payment_instructions: opt('string'), notes: opt('string'), terms: opt('string'),
+      // header details frozen when the invoice is created (TIN, billing email, website, branch name/address/phone)
+      clinic_snapshot: { bsonType: 'object', properties: { clinic_name: opt('string'), tin: opt('string'), billing_email: opt('string'), website: opt('string'), branch_name: opt('string'), address: opt('string'), phone: opt('string'), snapshot_at: opt('date') } },
       sent_at: opt('date'), sent_to: opt('string'), paid_at: opt('date'), payment_id: opt('objectId'),
       void_reason: opt('string'), idempotency_key: opt('string'),
       created_by: opt('objectId'), created_at: opt('date'), updated_at: opt('date'),

@@ -75,7 +75,7 @@ export default function OwnerBillingExpensesPage({ user, onLogout, betaTier }) {
       headerActions={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'add' })}>+ Add expense</button>}
     >
       <div className="fin-page">
-        <BillingTabs />
+        <BillingTabs action={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'add' })}>+ Add expense</button>} />
         <p className="fin-lead">Bills and purchases the clinic pays — utilities, supplies and equipment. These are business expenses, so they never appear on a patient invoice.</p>
 
         <div className={`fin-kpis ${loading && summary ? 'is-loading' : ''}`}>

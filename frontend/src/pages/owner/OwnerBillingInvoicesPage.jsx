@@ -115,7 +115,7 @@ export default function OwnerBillingInvoicesPage({ user, onLogout, betaTier }) {
       headerActions={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'new' })}>+ New invoice</button>}
     >
       <div className="fin-page">
-        <BillingTabs />
+        <BillingTabs action={<button type="button" className="fin-btn fin-btn-primary" onClick={() => setModal({ kind: 'new' })}>+ New invoice</button>} />
         <p className="fin-lead">Invoices you send to patients and guardians. Clinic costs such as bills and supplies are under Expenses.</p>
 
         <div className={`fin-kpis ${loading && summary ? 'is-loading' : ''}`}>

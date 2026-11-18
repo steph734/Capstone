@@ -18,6 +18,13 @@ const branchSchema = new mongoose.Schema(
     // Assigned therapists are never stored: they are counted from `employees`.
     therapist_capacity: { type: Number, min: 0 },
     owner_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+    // Tax & invoice details of THIS branch. All optional; never stored as '' (the collection validator rejects it).
+    tin: { type: String, trim: true },
+    billing_email: { type: String, trim: true, lowercase: true },
+    website: { type: String, trim: true },
+    payment_instructions: { type: String, trim: true },
+    default_invoice_terms: { type: String, trim: true },
     owner_invite_email: { type: String, trim: true, lowercase: true },
     services: [{ type: String }],
     hours: { type: mongoose.Schema.Types.Mixed },

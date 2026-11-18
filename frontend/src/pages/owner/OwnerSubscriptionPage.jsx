@@ -5,10 +5,8 @@ import PatientSidebar from '../../components/PatientSidebar'
 import OwnerPaymentPage from './OwnerPaymentPage'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
-import useDemoWallet, { money } from '../../hooks/useDemoWallet'
-import { call } from './billing/financeApi'
+import { authFetch, getSessionToken } from '../../utils/session'
 import '../SubscriptionPage.css'
-import './billing/DemoWallet.css'
 
 // "Possible" next billing date = one calendar month after a given date.
 function addOneMonth(date) {
@@ -27,6 +25,24 @@ function formatLongDate(date) {
 function planLabelFor(tier) {
   const name = tier.name.split(': ')[1] || tier.name
   return name.charAt(0) + name.slice(1).toLowerCase()
+}
+
+// A plan from GET /api/plans -> the tier shape this page and the checkout use.
+const CARD_COLOR = { free: 'blue', silver: 'silver', gold: 'gold' }
+function tierFromPlan(p) {
+  const base = String(p.name || '').replace(/ plan$/i, '').toUpperCase()
+  return {
+    id: p.slug,
+    name: `THERAPYPRO: ${base}`,
+    price: p.priceMonthly === 0 ? 'FREE' : `₱${p.priceMonthly}`,
+    period: p.priceMonthly === 0 ? '/ forever' : '/month',
+    color: CARD_COLOR[p.slug] || 'silver',
+    monthlyPrice: p.priceMonthly,
+    yearlyPrice: p.priceYearly ?? 0,
+    trialDays: p.trialDays,
+    features: p.features,
+    current: false,
+  }
 }
 
 function MenuIcon() {
@@ -133,18 +149,20 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [trialNoticeDismissed, setTrialNoticeDismissed] = useState(false)
   const [reminderEmail, setReminderEmail] = useState(null) // null | 'sent' | 'error'
+  const [apiTiers, setApiTiers] = useState(null) // plans from the database; null until loaded (or if the request fails)
   const currentUser = user || { name: 'Owner', role: 'Owner', avatar: '/therapy-pro-logo.png', email: 'owner@gmail.com' }
   const billingEmail = currentUser.email
 
-  // Shared demo wallet (same balance as Payouts and Checkout) + the server's view of the subscription.
-  const wallet = useDemoWallet()
-  const serverSub = wallet.subscription
-  const [downgrading, setDowngrading] = useState(false)
-  useEffect(() => { wallet.refreshSubscription() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  // The renewal cron drops a plan to Free after the grace period: mirror that into the app's plan state.
+  // Plans come from the database (Super Admin > Subscription). Hidden plans are not offered, but the plan this Owner is
+  // already on is always included so it still shows as their current plan.
   useEffect(() => {
-    if (serverSub?.status === 'free' && activePlan) onPlanActivate && onPlanActivate(null)
-  }, [serverSub?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!getSessionToken()) return undefined
+    let alive = true
+    authFetch('/api/plans', { query: { include: activePlan || '' } })
+      .then((d) => { if (alive && Array.isArray(d.plans) && d.plans.length) setApiTiers(d.plans.map(tierFromPlan)) })
+      .catch(() => { /* keep the built-in tiers below */ })
+    return () => { alive = false }
+  }, [activePlan])
 
   // Re-evaluate the trial clock each minute so the "ending soon" notice appears
   // and the plan lapses without needing a page reload.
@@ -190,7 +208,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   // What the page treats as the live plan (Free once a trial lapses).
   const activeTierId = isTrialExpired ? 'free' : storedTierId
 
-  const subscriptionTiersRaw = [
+  const fallbackTiers = [
     {
       id: 'free',
       name: 'THERAPYPRO: FREE',
@@ -248,6 +266,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     }
   ]
 
+  const subscriptionTiersRaw = apiTiers || fallbackTiers
+
   // The active plan drives which card shows as "current" / unlocked.
   const subscriptionTiers = subscriptionTiersRaw.map((tier) => ({
     ...tier,
@@ -269,13 +289,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   const lastPaidAt = lastSucceeded ? new Date(lastSucceeded.created * 1000) : new Date()
   const nextBillingDate = isTrialing ? new Date(trialEndMs) : addOneMonth(lastPaidAt)
   const nextBillDate = formatLongDate(nextBillingDate)
-
-  // Demo wallet vs the next bill (centavos). The server's plan wins when the plan was paid from the wallet.
-  const nextBillCentavos = serverSub?.price && serverSub.status !== 'free' ? serverSub.price : Math.round((activeTier.monthlyPrice || 0) * 100)
-  const walletAfterBill = wallet.ready ? wallet.balance - nextBillCentavos : null
-  const walletEnough = walletAfterBill !== null && walletAfterBill >= 0
-  const renewalFailed = serverSub?.status === 'past_due' && isPaidPlan
-  const failedPlanLabel = serverSub?.plan ? serverSub.plan.charAt(0) + serverSub.plan.slice(1).toLowerCase() : planLabel
 
   // The trial is a one-time offer — once used (even if it later lapsed), Select
   // Plan goes straight to payment.
@@ -324,7 +337,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     const selectedTier = subscriptionTiers.find(tier => tier.id === planId)
     if (!selectedTier || selectedTier.current) return
     // From the free plan (and never trialed), offer the 7-day trial first.
-    if (isOnFreePlan && !trialUsed) {
+    if (isOnFreePlan && !trialUsed && selectedTier.trialDays !== 0) {
       setTrialTier(selectedTier)
       setActiveModal('trial')
     } else {
@@ -375,20 +388,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   }
 
   const confirmCancelSubscription = () => {
-    call('subscription/downgrade', { method: 'POST' }).then(() => wallet.refreshSubscription()).catch(() => {}) // stop demo renewals too
     onPlanActivate && onPlanActivate(null)
     setActiveModal(null)
-  }
-
-  // Renewal could not be charged: red banner actions.
-  const handleDowngradeNow = async () => {
-    if (downgrading) return
-    setDowngrading(true)
-    try {
-      await call('subscription/downgrade', { method: 'POST' })
-      onPlanActivate && onPlanActivate(null)
-      await wallet.refreshSubscription()
-    } catch { /* the banner stays; the Owner can retry */ } finally { setDowngrading(false) }
   }
 
   const closeModal = () => setActiveModal(null)
@@ -443,19 +444,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
         </div>
 
         <div className="subscription-content">
-        {renewalFailed && (
-          <div className="dw-banner" role="alert">
-            <div>
-              <strong>Your {failedPlanLabel} renewal can&rsquo;t be charged</strong>
-              Your demo wallet doesn&rsquo;t have enough balance for the next bill ({money(nextBillCentavos)}).
-            </div>
-            <div className="dw-banner-actions">
-              <button type="button" className="dw-btn primary" onClick={() => navigate('/owner/billing/payouts')}>Set demo amount</button>
-              <button type="button" className="dw-btn danger" onClick={handleDowngradeNow} disabled={downgrading}>{downgrading ? 'Downgrading…' : 'Downgrade to Free'}</button>
-            </div>
-          </div>
-        )}
-
         {trialEndingSoon && !trialNoticeDismissed && (
           <div className="trial-banner warn" role="status">
             <span className="trial-banner-text">
@@ -522,13 +510,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
                   )}
                 </p>
                 <p className="plan-hero-payment">Billed to {billingEmail}</p>
-                {wallet.ready && !isTrialing && (
-                  <p className={`dw-paid-line ${walletEnough ? 'ok' : 'bad'}`}>
-                    {walletEnough
-                      ? <>Paid from demo wallet {money(wallet.balance)} → after bill {money(walletAfterBill)}</>
-                      : <>Paid from demo wallet {money(wallet.balance)} → Not enough</>}
-                  </p>
-                )}
               </>
             ) : isTrialExpired ? (
               <p className="plan-hero-meta">
@@ -550,10 +531,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
                 <span>Update card</span>
               </button>
             )}
-            <button className="plan-hero-action" onClick={() => navigate('/owner/billing/payouts')}>
-              <span aria-hidden="true" style={{ fontSize: 22 }}>👛</span>
-              <span>Demo wallet{wallet.ready ? ` · ${money(wallet.balance)}` : ''}</span>
-            </button>
           </div>
         </section>
 
@@ -596,15 +573,6 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
               </div>
               <span className="next-billing-amount">₱{activeTier.monthlyPrice}.00</span>
             </div>
-            {wallet.ready && (
-              <div className="dw-wallet-panel">
-                <div>
-                  <span className="lbl">Demo wallet · balance after billing</span>
-                  <span className="val">{walletEnough ? money(walletAfterBill) : 'Not enough'}</span>
-                </div>
-                <span className={`dw-badge ${walletEnough ? 'ok' : 'bad'}`}>{walletEnough ? '✓ Enough balance' : '✕ Not enough'}</span>
-              </div>
-            )}
           </section>
         )}
 

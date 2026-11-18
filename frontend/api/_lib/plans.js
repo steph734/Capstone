@@ -37,7 +37,7 @@ export function planName(doc) {
 export async function loadPlansAndFeatures(db) {
   const featCol = db.collection('plan_features')
   const planCol = db.collection('subscription')
-  let plans = await planCol.find({}).sort({ sort_order: 1, created_at: 1 }).toArray()
+  let plans = await planCol.find({ archived_at: { $exists: false } }).sort({ sort_order: 1, created_at: 1 }).toArray()
 
   if (!(await featCol.estimatedDocumentCount())) {
     await featCol.createIndex({ key: 1 }, { unique: true }).catch(() => {})
@@ -140,6 +140,7 @@ const limitDoc = (l) => ({
 export function planFields(v, featureLabels) {
   return {
     name: v.name,
+    name_lower: v.name.toLowerCase(),
     tier_name: `THERAPYPRO: ${v.name.toUpperCase()}`,
     description: v.tagline,
     price: money(v.priceMonthly),
@@ -281,7 +282,43 @@ export function serializePlan(doc, { st, popularId }) {
     subscribers: st?.subscribers ?? null,
     revenue: st?.mrr == null ? null : Math.round(st.mrr),
     mostPopular: popularId === String(doc._id),
+    version: Number(doc.version) || 1,
+    isDefault: slug === 'free' || doc.is_default === true,
+    monthsFree: monthsFree(num(doc.price) ?? 0, num(doc.price_yearly)),
   }
+}
+
+// "N months free" for paying yearly: round((12 * monthly - yearly) / monthly, 1). Only when yearly is set and cheaper than 12 months.
+export function monthsFree(monthly, yearly) {
+  if (yearly == null || !(monthly > 0) || !(yearly > 0) || yearly >= 12 * monthly) return null
+  const n = Math.round(((12 * monthly - yearly) / monthly) * 10) / 10
+  return n > 0 ? n : null
+}
+
+const LIMIT_LABEL = { branches: 'Branches', therapists: 'Therapists', patients: 'Patients' }
+const STATUS_TEXT = { live: 'Live', beta: 'Beta', hidden: 'Hidden' }
+
+// The SERVER-computed diff between the stored plan and the validated edit. Drives the success modal and the audit log.
+// Returns [{ field, label, before, after }] in display order (an empty array means nothing changed).
+export function diffPlan(before, value, featureLabelOf) {
+  const cur = serializePlan(before, {})
+  const out = []
+  const add = (field, label, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) out.push({ field, label, before: a, after: b }) }
+  add('status', 'Status', STATUS_TEXT[cur.status] || cur.status, STATUS_TEXT[value.status] || value.status)
+  add('name', 'Plan name', cur.name, value.name)
+  add('tagline', 'Tagline', cur.tagline || null, value.tagline || null)
+  add('priceMonthly', 'Monthly price', cur.priceMonthly, value.priceMonthly)
+  add('priceYearly', 'Yearly price', cur.priceYearly ?? null, value.priceYearly ?? null)
+  add('trialDays', 'Free trial', cur.trialDays, value.trialDays)
+  for (const k of Object.keys(LIMIT_LABEL)) add('limits.' + k, LIMIT_LABEL[k] + ' limit', cur.limits[k] ?? null, value.limits[k] ?? null)
+  const had = new Set(cur.featureKeys); const has = new Set(value.featureKeys)
+  const added = value.featureKeys.filter((k) => !had.has(k)).map(featureLabelOf)
+  const removed = cur.featureKeys.filter((k) => !has.has(k)).map(featureLabelOf)
+  if (added.length || removed.length) out.push({ field: 'features', label: 'Features', before: removed.length ? 'Removed: ' + removed.join(', ') : null, after: added.length ? 'Added: ' + added.join(', ') : null })
+  else if (JSON.stringify(cur.featureKeys) !== JSON.stringify(value.featureKeys)) out.push({ field: 'features', label: 'Feature order', before: null, after: 'Reordered' })
+  add('icon', 'Icon', cur.icon, value.icon)
+  add('color', 'Color', cur.color, value.color)
+  return out
 }
 
 // ── Recent changes (Stripe events) ─────────────────────────────────────────

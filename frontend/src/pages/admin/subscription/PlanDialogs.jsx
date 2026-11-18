@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FlaskConical, ListChecks, Search, Trash2, Users, X, Plus } from 'lucide-react'
+import { Archive, FlaskConical, ListChecks, Search, Trash2, Users, X, Plus } from 'lucide-react'
 import { authFetch } from '../../../utils/session'
 import { peso, tierTag } from './planConstants'
 
@@ -139,6 +139,28 @@ export function DeleteDialog({ plan, onClose, onDeleted }) {
         <span className="br-spacer" />
         <button type="button" className="br-btn btn-line" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="br-btn danger" onClick={go} disabled={busy}>Delete plan</button>
+      </footer>
+    </Dialog>
+  )
+}
+
+export function ArchiveDialog({ plan, onClose, onArchived }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const go = async () => {
+    setBusy(true); setError('')
+    try { await authFetch(`/api/admin/plans/${plan.id}/archive`, { method: 'POST' }); onArchived(`${plan.name} Plan archived.`) } catch (err) { setError(err.message); setBusy(false) }
+  }
+  return (
+    <Dialog title="Archive plan?" icon={Archive} onClose={onClose}>
+      <div className="br-modal-body">
+        <p>{plan.name} Plan will disappear from the plan list. Archiving is only allowed when nobody is subscribed to it.</p>
+        {error && <p className="br-form-error" role="alert">{error}</p>}
+      </div>
+      <footer className="br-modal-foot">
+        <span className="br-spacer" />
+        <button type="button" className="br-btn btn-line" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="br-btn danger" onClick={go} disabled={busy}>Archive plan</button>
       </footer>
     </Dialog>
   )

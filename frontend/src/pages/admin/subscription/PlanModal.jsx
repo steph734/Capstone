@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, CreditCard, Eye, EyeOff, FlaskConical, CircleCheck, GripVertical, Infinity as InfinityIcon, Info, Plus, X } from 'lucide-react'
 import { authFetch } from '../../../utils/session'
 import PlanCard from './PlanCard'
-import { COLORS, ICON_LABEL, ICON_MAP, STATUS_LABEL, tierTag, yearlyDeal } from './planConstants'
+import { COLORS, ICON_LABEL, ICON_MAP, STATUS_LABEL, tierTag, monthsFree, monthsFreeText } from './planConstants'
+import { ConfirmSaveModal, SavedModal, previewChanges } from './SaveModals'
 
 const LIMIT_KEYS = [['branches', 'Branches'], ['therapists', 'Therapists'], ['patients', 'Patients']]
 const STATUS_ICON = { live: CircleCheck, beta: FlaskConical, hidden: EyeOff }
@@ -71,6 +72,9 @@ export default function PlanModal({ plan, plans, features: initialFeatures, onCl
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [confirm, setConfirm] = useState(null) // { asHidden } while the "Save changes?" dialog is open
+  const [saved, setSaved] = useState(null) // { plan, changes, warning } once the server saved it
+  const [makingLive, setMakingLive] = useState(false)
   const [tab, setTab] = useState('form') // mobile: 'form' | 'preview'
   const [addingFeature, setAddingFeature] = useState(false)
   const [newFeature, setNewFeature] = useState('')
@@ -87,7 +91,7 @@ export default function PlanModal({ plan, plans, features: initialFeatures, onCl
   const touch = (key) => setTouched((t) => ({ ...t, [key]: true }))
   const set = (key, value) => { setForm((f) => ({ ...f, [key]: value })); setServerErrors((s) => (s[key] ? { ...s, [key]: undefined } : s)) }
 
-  const requestClose = () => { if (saving) return; if (dirty) setConfirmDiscard(true); else onClose() }
+  const requestClose = () => { if (saving || confirm || saved) return; if (dirty) setConfirmDiscard(true); else onClose() }
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
@@ -132,28 +136,49 @@ export default function PlanModal({ plan, plans, features: initialFeatures, onCl
     }
   }
 
-  const save = async (asHidden) => {
+  const buildBody = (asHidden) => ({
+    name: form.name.trim(), tagline: form.tagline.trim(), priceMonthly: Number(form.priceMonthly),
+    priceYearly: form.priceYearly.trim() === '' ? null : Number(form.priceYearly), trialDays: Number(form.trialDays || 0),
+    status: asHidden ? 'hidden' : form.status, saveHidden: asHidden,
+    limits: Object.fromEntries(LIMIT_KEYS.map(([k]) => [k, form.limits[k] === '' ? null : Number(form.limits[k])])),
+    icon: form.icon, color: form.color, featureKeys,
+    ...(editing ? { expected_version: plan.version } : {}),
+  })
+
+  // Editing asks for confirmation first; creating saves straight away.
+  const save = (asHidden) => {
     setTouched({ all: true })
     if (!valid) { setTab('form'); return }
+    setFormError('')
+    if (editing) setConfirm({ asHidden })
+    else doSave(asHidden)
+  }
+
+  const doSave = async (asHidden) => {
     setSaving(true); setFormError('')
-    const body = {
-      name: form.name.trim(), tagline: form.tagline.trim(), priceMonthly: Number(form.priceMonthly),
-      priceYearly: form.priceYearly.trim() === '' ? null : Number(form.priceYearly), trialDays: Number(form.trialDays || 0),
-      status: asHidden ? 'hidden' : form.status, saveHidden: asHidden,
-      limits: Object.fromEntries(LIMIT_KEYS.map(([k]) => [k, form.limits[k] === '' ? null : Number(form.limits[k])])),
-      icon: form.icon, color: form.color, featureKeys,
-    }
     try {
-      const data = await authFetch(editing ? `/api/admin/plans/${plan.id}` : '/api/admin/plans', { method: editing ? 'PATCH' : 'POST', body })
-      onSaved(editing ? 'Plan updated.' : asHidden ? 'Plan saved as hidden.' : 'Plan created.', data.warning)
+      const data = await authFetch(editing ? `/api/admin/plans/${plan.id}` : '/api/admin/plans', { method: editing ? 'PATCH' : 'POST', body: buildBody(asHidden) })
+      if (editing) { setConfirm(null); setSaved({ plan: data.plan, changes: data.changes, warning: data.warning }) }
+      else onSaved(asHidden ? 'Plan saved as hidden.' : 'Plan created.', data.warning)
     } catch (err) {
-      if (err.fields) { setServerErrors(err.fields); setTab('form') }
-      setFormError(err.message)
+      if (err.fields) { setServerErrors(err.fields); setTab('form'); setConfirm(null) }
+      setFormError(err.message) // STALE_PLAN, NO_CHANGES, ... : shown inside the confirm dialog or under the form
+    } finally {
       setSaving(false)
     }
   }
 
-  const deal = yearlyDeal(Number(form.priceMonthly), form.priceYearly.trim() === '' ? null : Number(form.priceYearly))
+  const makeLive = async () => {
+    setMakingLive(true)
+    try {
+      await authFetch(`/api/admin/plans/${plan.id}`, { method: 'PATCH', body: { action: 'show' } })
+      onSaved(`${saved.plan.name} is now Live.`)
+    } catch (err) { setFormError(err.message); setMakingLive(false) }
+  }
+
+  const featureLabel = (k) => byKey.get(k)?.label || k
+  const pendingChanges = confirm && editing ? previewChanges(plan, form, featureKeys, featureLabel) : []
+  const monthsFreeNow = monthsFree(Number(form.priceMonthly), form.priceYearly.trim() === '' ? null : Number(form.priceYearly))
 
   return (
     <div className="br-backdrop pcx-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose() }}>
@@ -201,7 +226,7 @@ export default function PlanModal({ plan, plans, features: initialFeatures, onCl
                   <span aria-hidden="true">₱</span>
                   <input id="pcx-yearly" type="number" min="0" step="0.01" inputMode="decimal" value={form.priceYearly} onChange={(e) => set('priceYearly', e.target.value)} onBlur={() => touch('priceYearly')} placeholder="6990" />
                 </div>
-                {deal && !show('priceYearly') && <p className="br-hint">2 months free</p>}
+                {monthsFreeNow && !show('priceYearly') && <p className="br-hint">{monthsFreeText(monthsFreeNow)}</p>}
               </Field>
               <Field label="Free trial" htmlFor="pcx-trial" error={show('trialDays')}>
                 <div className={`br-input${show('trialDays') ? ' has-error' : ''}`}>
@@ -323,6 +348,15 @@ export default function PlanModal({ plan, plans, features: initialFeatures, onCl
             <button type="button" className="br-btn primary" onClick={() => save(false)} disabled={saving || !valid}><Check size={16} /> {saving ? 'Saving…' : editing ? 'Save changes' : 'Create plan'}</button>
           </div>
         </footer>
+
+        {confirm && (
+          <ConfirmSaveModal plan={plan} changes={pendingChanges} asHidden={confirm.asHidden} busy={saving} error={formError}
+            onCancel={() => { setConfirm(null); setFormError('') }} onConfirm={() => doSave(confirm.asHidden)} />
+        )}
+        {saved && (
+          <SavedModal plan={plan} saved={saved} busy={makingLive} onMakeLive={makeLive}
+            onDone={() => onSaved(saved.plan.status === 'hidden' ? 'Plan saved as hidden.' : 'Plan updated.', saved.warning)} />
+        )}
 
         {confirmDiscard && (
           <div className="br-confirm-layer" role="alertdialog" aria-labelledby="pcx-discard-title">

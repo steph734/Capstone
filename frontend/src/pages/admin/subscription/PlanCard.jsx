@@ -1,5 +1,5 @@
-import { Check, CircleCheck, Copy, EllipsisVertical, EyeOff, FlaskConical, Pencil, Star, Trash2, Users, X } from 'lucide-react'
-import { ICON_MAP, peso, yearlyDeal } from './planConstants'
+import { Archive, Check, CircleCheck, Copy, EllipsisVertical, EyeOff, FlaskConical, Pencil, Star, Trash2, Users, X } from 'lucide-react'
+import { ICON_MAP, peso, monthsFree, monthsFreeText } from './planConstants'
 
 const MAX_ROWS = 6
 
@@ -13,7 +13,7 @@ function StatusPill({ status }) {
 // (variant="admin") and the live preview in the Add/Edit plan modal
 // (variant="preview"), so the preview is exactly what the card will look like.
 export default function PlanCard({
-  plan, features, variant = 'admin', menuOpen = false, onMenu, onSubscribers, onEdit, onBeta, onToggleHidden, onDuplicate, onDelete,
+  plan, features, variant = 'admin', menuOpen = false, onMenu, onSubscribers, onEdit, onBeta, onToggleHidden, onDuplicate, onDelete, onArchive,
 }) {
   const preview = variant === 'preview'
   const Icon = ICON_MAP[plan.icon] || ICON_MAP.rocket
@@ -26,8 +26,9 @@ export default function PlanCard({
   }
   const shown = preview ? rows : rows.slice(0, MAX_ROWS)
   const hidden = rows.length - shown.length
-  const deal = yearlyDeal(plan.priceMonthly, plan.priceYearly)
-  const canDelete = plan.subscribers === 0
+  const free = monthsFree(plan.priceMonthly, plan.priceYearly)
+  const canDelete = plan.subscribers === 0 && !plan.isDefault
+  const canArchive = plan.subscribers === 0 && !plan.isDefault
 
   return (
     <article className={`pcx-card${plan.mostPopular && !preview ? ' popular' : ''}${plan.status === 'hidden' ? ' is-hidden' : ''}${preview ? ' preview' : ''}`} style={{ '--accent': plan.color }}>
@@ -51,6 +52,10 @@ export default function PlanCard({
                   {plan.status === 'hidden' ? <><CircleCheck size={15} /> Show plan</> : <><EyeOff size={15} /> Hide plan</>}
                 </button>
                 <button type="button" role="menuitem" onClick={() => onDuplicate(plan)}><Copy size={15} /> Duplicate</button>
+                <button type="button" role="menuitem" disabled={!canArchive} onClick={() => onArchive(plan)}
+                  title={plan.isDefault ? 'The Free plan is the fallback plan' : canArchive ? undefined : plan.subscribers == null ? 'Subscriber data is unavailable' : 'Hide the plan instead: it has subscribers'}>
+                  <Archive size={15} /> Archive
+                </button>
                 <button type="button" role="menuitem" className="danger" disabled={!canDelete} onClick={() => onDelete(plan)}
                   title={canDelete ? undefined : plan.subscribers == null ? 'Subscriber data is unavailable' : 'Only plans with 0 subscribers can be deleted'}>
                   <Trash2 size={15} /> Delete
@@ -71,7 +76,7 @@ export default function PlanCard({
 
       <p className="pcx-price"><strong>{peso(plan.priceMonthly || 0)}</strong><span> / month</span></p>
       {preview && plan.priceYearly != null && (
-        <p className="pcx-yearly">or {peso(plan.priceYearly)} / year{deal ? ' (2 months free)' : ''}</p>
+        <p className="pcx-yearly">or {peso(plan.priceYearly)} / year{free ? ` (${monthsFreeText(free)})` : ''}</p>
       )}
 
       {!preview && (

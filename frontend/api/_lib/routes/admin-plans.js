@@ -66,8 +66,12 @@ export default async function handler(req, res) {
         status: 'hidden', limits: src.limits || {}, icon: src.icon, color: src.color, featureKeys: src.feature_keys || [],
       }
     }
+    const wanted = String(body.name || '').trim()
+    if (wanted && taken.has(wanted.toLowerCase())) {
+      return res.status(409).json({ error: 'A plan with this name already exists.', code: 'DUPLICATE_PLAN_NAME', fields: { name: 'A plan with this name already exists.' } })
+    }
     const { fields, value } = validatePlanInput(body, { featureKeys: new Set(featureMap.keys()), takenNames: taken, forceStatus: body.saveHidden ? 'hidden' : undefined })
-    if (Object.keys(fields).length) return res.status(400).json({ error: 'Please fix the highlighted fields.', fields })
+    if (Object.keys(fields).length) return res.status(422).json({ error: 'Please fix the highlighted fields.', code: 'VALIDATION_ERROR', fields })
 
     const now = new Date()
     const slug = await uniqueSlug(ctx.db, value.name)
@@ -76,6 +80,7 @@ export default async function handler(req, res) {
     const doc = {
       ...planFields(value, value.featureKeys.map((k) => featureMap.get(k).label)),
       slug, billing_cycle: 'monthly', currency: 'PHP', is_popular: false, sort_order: new Int32(order), created_at: now, beta_testers: [],
+      version: 1, updated_by: ctx.user._id,
       price_versions: [{ price: money(value.priceMonthly), price_yearly: value.priceYearly == null ? null : money(value.priceYearly), stripe_price_id: sp.priceId || null, effective_from: now, by: ctx.user._id }],
       ...(sp.productId ? { stripe_product_id: sp.productId } : {}),
       ...(value.priceYearly == null ? {} : { price_yearly: money(value.priceYearly) }),
@@ -84,7 +89,11 @@ export default async function handler(req, res) {
     await auditAdmin(ctx, body.duplicateOf ? 'plan_duplicated' : 'plan_created', `${body.duplicateOf ? 'Duplicated' : 'Created'} plan "${value.name}" at ₱${value.priceMonthly}/month (${value.status}).`, { plan_id: String(insertedId), name: value.name, price_monthly: value.priceMonthly, status: value.status })
     return res.status(201).json({ id: String(insertedId), warning: sp.warning || null })
   } catch (err) {
+    if (err.code === 121) {
+      console.error('admin plans: validator rejected the plan', JSON.stringify(err.errInfo?.details || {}).slice(0, 1500))
+      return res.status(422).json({ error: 'The plan did not pass the database validation rules.', code: 'VALIDATION_FAILED' })
+    }
     console.error('admin plans error:', err)
-    return res.status(err.status || 500).json({ error: err.status ? err.message : err.code === 121 ? 'The plan did not pass the database validation rules.' : 'Could not complete that request.' })
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not complete that request.' })
   }
 }

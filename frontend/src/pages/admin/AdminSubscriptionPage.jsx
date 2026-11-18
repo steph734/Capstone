@@ -6,7 +6,7 @@ import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
 import PlanCard from './subscription/PlanCard'
 import PlanModal from './subscription/PlanModal'
-import { BetaDialog, DeleteDialog, FeaturesDialog, SubscribersDialog } from './subscription/PlanDialogs'
+import { ArchiveDialog, BetaDialog, DeleteDialog, FeaturesDialog, SubscribersDialog } from './subscription/PlanDialogs'
 import { peso, tierTag } from './subscription/planConstants'
 import { API_BASE } from '../../utils/api'
 import { authFetch, getSessionToken } from '../../utils/session'
@@ -149,7 +149,7 @@ export default function AdminSubscriptionPage({ user, onLogout }) {
             : plans.map((p) => (
               <PlanCard key={p.id} plan={p} features={features} menuOpen={menuId === p.id} onMenu={setMenuId}
                 onSubscribers={(pl) => open('subscribers', pl)} onEdit={(pl) => open('plan', pl)} onBeta={(pl) => open('beta', pl)}
-                onToggleHidden={toggleHidden} onDuplicate={duplicate} onDelete={(pl) => open('delete', pl)} />
+                onToggleHidden={toggleHidden} onDuplicate={duplicate} onDelete={(pl) => open('delete', pl)} onArchive={(pl) => open('archive', pl)} />
             ))}
         </section>
 
@@ -212,6 +212,7 @@ export default function AdminSubscriptionPage({ user, onLogout }) {
       {dialog?.type === 'plan' && <PlanModal plan={dialog.plan} plans={plans} features={features} onClose={close} onSaved={done} />}
       {dialog?.type === 'subscribers' && <SubscribersDialog plan={dialog.plan} onClose={close} />}
       {dialog?.type === 'beta' && <BetaDialog plan={dialog.plan} onClose={close} onSaved={done} />}
+      {dialog?.type === 'archive' && <ArchiveDialog plan={dialog.plan} onClose={close} onArchived={done} />}
       {dialog?.type === 'delete' && <DeleteDialog plan={dialog.plan} onClose={close} onDeleted={done} />}
       {dialog?.type === 'features' && <FeaturesDialog features={features} plans={plans} onClose={close} onChanged={load} />}
       {toast && <div className="br-toast" role="status"><CircleCheck size={16} /> {toast}</div>}

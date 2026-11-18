@@ -78,10 +78,6 @@
     {
       "path": "/api/expenses/remind",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/demo-wallet-renewals",
-      "schedule": "0 1 * * *"
     }
   ]
 }

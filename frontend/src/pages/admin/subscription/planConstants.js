@@ -17,8 +17,13 @@ export const peso = (n, { compact = false } = {}) => new Intl.NumberFormat('en-P
   maximumFractionDigits: compact && n >= 10000 ? 1 : (Number.isInteger(n) ? 0 : 2),
 }).format(n || 0)
 
-// "2 months free" when paying yearly costs at most ten months of the monthly price.
-export const yearlyDeal = (monthly, yearly) => yearly != null && yearly > 0 && monthly > 0 && yearly <= monthly * 10
+// "N months free" for paying yearly: round((12 * monthly - yearly) / monthly, 1). Only when yearly is set and cheaper than 12 months.
+export function monthsFree(monthly, yearly) {
+  if (yearly == null || !(monthly > 0) || !(yearly > 0) || yearly >= 12 * monthly) return null
+  const n = Math.round(((12 * monthly - yearly) / monthly) * 10) / 10
+  return n > 0 ? n : null
+}
+export const monthsFreeText = (n) => `${n} month${n === 1 ? '' : 's'} free`
 
 export function tierTag(feature, plans) {
   if (feature.minTier === 'all') return 'All plans'

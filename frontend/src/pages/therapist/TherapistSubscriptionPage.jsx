@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
+import useClinicPlan from '../../hooks/useClinicPlan'
 import '../SubscriptionPage.css'
 
 function MenuIcon() {
@@ -39,7 +40,9 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
   const trialEndMs = planTrialEnds ? new Date(planTrialEnds).getTime() : null
   const isTrialing = Boolean(trialEndMs) && trialEndMs > Date.now()
   const isTrialExpired = Boolean(trialEndMs) && !isTrialing
-  const activeTierId = isTrialExpired ? 'free' : (activePlan || 'free')
+  const { tier: clinicTier } = useClinicPlan()
+  const localTierId = isTrialExpired ? 'free' : (activePlan || 'free')
+  const activeTierId = clinicTier && clinicTier !== 'free' ? clinicTier : localTierId
 
   const subscriptionTiersRaw = [
     {

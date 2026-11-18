@@ -74,6 +74,10 @@
     {
       "path": "/api/attendance/remind?type=time_out",
       "schedule": "55 8 * * *"
+    },
+    {
+      "path": "/api/expenses/remind",
+      "schedule": "0 0 * * *"
     }
   ]
 }

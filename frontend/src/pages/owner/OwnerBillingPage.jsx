@@ -3,6 +3,8 @@ import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { TrendChart } from './ReportCharts'
 import { NewInvoiceButton, BILLING_SUBTITLE } from './OwnerBillingShared'
+import { BillingTabs } from './billing/FinanceUi'
+import './billing/OwnerFinance.css'
 import './OwnerBillingPage.css'
 
 const peso = (n) => `₱${Number(n).toLocaleString('en-US')}`
@@ -108,6 +110,7 @@ export default function OwnerBillingPage({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
       headerActions={<NewInvoiceButton />}
     >
+      <BillingTabs />
       <div className="sba-grid">
         {/* Left column */}
         <div className="sba-left">

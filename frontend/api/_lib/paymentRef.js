@@ -5,6 +5,7 @@
 // staff. Generated server-side only, once, at insert — never on update,
 // refund or status change, and never accepted from the client.
 import crypto from 'crypto'
+import { invalidateReportsCache } from './reportsCache.js'
 
 // 10000000-99999999: always exactly 8 digits, never starts with 0.
 export function makePaymentRef() {
@@ -26,6 +27,7 @@ export async function insertPaymentWithRef(paymentsCollection, doc, maxTries = 8
     const toInsert = { ...safeDoc, payment_ref, created_at: safeDoc.created_at || now, updated_at: now }
     try {
       const res = await paymentsCollection.insertOne(toInsert)
+      invalidateReportsCache() // Owner Reports summaries are cached for ~60s; new money must show up
       return { _id: res.insertedId, ...toInsert }
     } catch (err) {
       if (err.code === 11000 && /payment_ref/.test(err.message || '')) continue

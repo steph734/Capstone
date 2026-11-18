@@ -46,6 +46,7 @@ const PUBLIC = [
   /^\/api\/bookings\//, // each call needs the booking token (header x-booking-token); expire-holds needs the cron secret
   /^\/api\/payments\//, // payment attempts: own token / therapist checks inside
   /^\/api\/attendance\/remind$/, // cron secret
+  /^\/api\/expenses\/remind$/, // cron secret (daily expense due-date reminders)
   /^\/api\/branches$/, // branch names for the sign-up form
   /^\/api\/games\/(list|by-name)$/, // public game catalog
   // Loaded by <img src>, which cannot send an Authorization header. The ids are unguessable.
@@ -88,6 +89,8 @@ const LIMITS = [
   { re: /^\/api\/(reset-password|verify-credentials)$/, name: 'auth-misc', max: 20, windowMs: 15 * MIN, byIp: true },
   { re: /^\/api\/auth\/change-password$/, name: 'pw-change', max: 10, windowMs: 15 * MIN },
   { re: /^\/api\/(create-payment-intent|create-setup-intent|create-subscription)$/, name: 'pay', max: 30, windowMs: 15 * MIN },
+  { re: /^\/api\/owner\/reports\/[^/]+\/export$/, name: 'report-export', max: 30, windowMs: 15 * MIN },
+  { re: /^\/api\/owner\/invoices\/[^/]+\/(send|remind)$/, name: 'invoice-mail', max: 40, windowMs: 60 * MIN },
 ]
 
 const lower = (v) => String(v || '').trim().toLowerCase()

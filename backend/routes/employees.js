@@ -379,6 +379,23 @@ router.patch('/:id/approve', async (req, res) => {
   }
 });
 
+// PATCH /api/employees/:id/terminate -> soft delete: keeps the record but marks
+// the employee as terminated so it shows under the "Terminated" filter.
+router.patch('/:id/terminate', async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ error: 'Invalid employee id.' });
+  }
+  try {
+    const employee = await Employee.findByIdAndUpdate(id, { $set: { status: 'terminated' } }, { new: true });
+    if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+    return res.json({ success: true, employee });
+  } catch (err) {
+    console.error('terminate employee error:', err);
+    return res.status(500).json({ error: 'Could not update this employee.' });
+  }
+});
+
 // DELETE /api/employees/:id -> owner rejects a reviewed hire; since they were
 // never actually hired, this removes both the Employee record and its linked
 // (still-unhired) User account.

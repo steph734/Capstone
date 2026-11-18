@@ -2,6 +2,9 @@ import { useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { NewInvoiceButton, BILLING_SUBTITLE } from './OwnerBillingShared'
+import { BillingTabs } from './billing/FinanceUi'
+import ClinicDetailsCard from './billing/ClinicDetailsCard'
+import './billing/OwnerFinance.css'
 import './OwnerBillingPage.css'
 
 const INITIAL_METHODS = [
@@ -50,9 +53,11 @@ export default function OwnerBillingSettingsPage({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
       headerActions={<NewInvoiceButton />}
     >
+      <BillingTabs />
       {toast && <div className="sb-toast">{toast}</div>}
 
       <div className="set-grid">
+        <ClinicDetailsCard />
         <section className="sba-card">
           <h3 className="sba-card-title">Accepted Payment Methods</h3>
           <p className="sba-card-sub">Choose how guardians can pay their invoices</p>

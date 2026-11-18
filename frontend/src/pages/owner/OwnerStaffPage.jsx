@@ -141,6 +141,14 @@ function TrashIcon() {
     </svg>
   )
 }
+function ArchiveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="5" rx="1" />
+      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" />
+    </svg>
+  )
+}
 function RestoreIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2046,7 +2054,7 @@ function mapEmployeeDoc(emp) {
     specialty: emp.specialty || null,
     branch: emp.branch_id?.branch_name || '',
     status: REVERSE_EMPLOYEE_STATUS[emp.status] || 'On Duty',
-    archived: emp.status === 'terminated',
+    archived: false,
     caseload: 0,
     avatar: emp.profile_picture?.storage_key
       ? `${API_BASE}/api/employees/${emp._id}/photo`
@@ -2173,8 +2181,10 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
     return () => { cancelled = true; clearInterval(t) }
   }, [])
 
-  const activeStaff = staff.filter((s) => !s.archived)
-  const archivedStaff = staff.filter((s) => s.archived)
+  // Terminated staff live only under the "Terminated" filter; archived staff
+  // (a separate, reversible state) only under "Archived".
+  const activeStaff = staff.filter((s) => !s.archived && s.status !== 'Terminated')
+  const archivedStaff = staff.filter((s) => s.archived && s.status !== 'Terminated')
   // "Terminated"/"Active" read the real employment status regardless of the
   // (separate, manually-toggled) archived flag — a terminated hire starts
   // out archived automatically, but restoring them shouldn't make them
@@ -2306,6 +2316,61 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         id,
         willArchive ? 'Review' : 'Success'
       )
+    }
+  }
+
+  // Archive / soft delete / permanent delete all go through one confirm modal
+  // followed by one success modal.
+  const [confirmAction, setConfirmAction] = useState(null) // { type, member }
+  const [actionDone, setActionDone] = useState(null) // { type, name }
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const ACTION_COPY = {
+    archive: {
+      title: 'Archive this employee?',
+      desc: 'They will be moved to the Archived list and hidden from the active employee list. You can restore them anytime.',
+      confirm: 'Archive', busy: 'Archiving…',
+      doneTitle: 'Employee archived', doneDesc: (n) => `${n} has been moved to the Archived list.`,
+    },
+    softDelete: {
+      title: 'Delete this employee?',
+      desc: 'They will be removed from the Archived list and moved to Terminated, with their status set to Terminated.',
+      confirm: 'Delete', busy: 'Deleting…',
+      doneTitle: 'Employee moved to Terminated', doneDesc: (n) => `${n} is now listed under Terminated.`,
+    },
+    permDelete: {
+      title: 'Do you still want to delete this employee?',
+      desc: 'This will permanently delete the employee and their account. This action cannot be undone.',
+      confirm: 'Delete permanently', busy: 'Deleting…',
+      doneTitle: 'Employee permanently deleted', doneDesc: (n) => `${n} has been permanently deleted.`,
+    },
+  }
+
+  const closeConfirmAction = () => { if (!actionBusy) { setConfirmAction(null); setActionError('') } }
+
+  const runConfirmAction = async () => {
+    const { type, member } = confirmAction
+    setActionBusy(true)
+    setActionError('')
+    try {
+      if (type === 'archive') {
+        toggleArchive(member.id)
+      } else if (type === 'softDelete') {
+        if (member.mongoEmployeeId) await apiPatch(`/api/employees/${member.mongoEmployeeId}/terminate`)
+        setStaff((prev) => prev.map((s) => (s.id === member.id ? { ...s, status: 'Terminated', archived: false } : s)))
+        logStaff('🗑️', `Moved ${member.name} to Terminated`, member.id, 'Review')
+      } else {
+        if (member.mongoEmployeeId) await apiDelete(`/api/employees/${member.mongoEmployeeId}`)
+        setStaff((prev) => prev.filter((s) => s.id !== member.id))
+        logStaff('🗑️', `Permanently deleted staff member ${member.name}`, member.id, 'Review')
+      }
+      setConfirmAction(null)
+      setActionDone({ type, name: member.name })
+    } catch (err) {
+      setActionError(err.message || 'Something went wrong. Please try again.')
+    } finally {
+      setActionBusy(false)
     }
   }
 
@@ -2587,7 +2652,9 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                       <td data-label="Specialty"><SpecialtyBadge specialty={s.specialty} /></td>
                       <td data-label="Branch"><span className="os-branch-badge">{s.branch}</span></td>
                       <td data-label="Status">
-                        {s.accountStatus === 'pending' ? (
+                        {s.archived ? (
+                          <span className="os-pill os-pill-grey">Archived</span>
+                        ) : s.accountStatus === 'pending' ? (
                           <span className="os-pill os-pill-yellow">Pending Setup</span>
                         ) : (
                           <span className={`os-pill os-pill-${statusPillTone(s.status)}`}>{s.status}</span>
@@ -2599,17 +2666,29 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                           <button className="os-icon-btn os-icon-view" onClick={() => setViewing(s)} title="View" aria-label={`View ${s.name}`}>
                             <EyeIcon />
                           </button>
-                          <button className="os-icon-btn os-icon-edit" onClick={() => setEditing(s)} title="Edit" aria-label={`Edit ${s.name}`}>
-                            <PencilIcon />
-                          </button>
-                          <button
-                            className={`os-icon-btn ${s.archived ? 'os-icon-restore' : 'os-icon-archive'}`}
-                            onClick={() => toggleArchive(s.id)}
-                            title={s.archived ? 'Restore' : 'Archive'}
-                            aria-label={`${s.archived ? 'Restore' : 'Archive'} ${s.name}`}
-                          >
-                            {s.archived ? <RestoreIcon /> : <TrashIcon />}
-                          </button>
+                          {s.status === 'Terminated' ? (
+                            <button className="os-icon-btn os-icon-archive" onClick={() => setConfirmAction({ type: 'permDelete', member: s })} title="Delete permanently" aria-label={`Permanently delete ${s.name}`}>
+                              <TrashIcon />
+                            </button>
+                          ) : s.archived ? (
+                            <>
+                              <button className="os-icon-btn os-icon-archive" onClick={() => setConfirmAction({ type: 'softDelete', member: s })} title="Delete" aria-label={`Delete ${s.name}`}>
+                                <TrashIcon />
+                              </button>
+                              <button className="os-icon-btn os-icon-restore" onClick={() => toggleArchive(s.id)} title="Restore" aria-label={`Restore ${s.name}`}>
+                                <RestoreIcon />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="os-icon-btn os-icon-edit" onClick={() => setEditing(s)} title="Edit" aria-label={`Edit ${s.name}`}>
+                                <PencilIcon />
+                              </button>
+                              <button className="os-icon-btn os-icon-archive" onClick={() => setConfirmAction({ type: 'archive', member: s })} title="Archive" aria-label={`Archive ${s.name}`}>
+                                <ArchiveIcon />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2727,6 +2806,50 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
           existingIds={[...staff, ...applicants].map((s) => s.employeeId).filter(Boolean)}
         />
       )}
+      {confirmAction && (
+        <div className="os-modal-backdrop" onClick={closeConfirmAction}>
+          <div className="os-reject-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="os-reject-top">
+              <div className="os-reject-icon"><AlertCircleIcon /></div>
+              <button className="os-reject-close" onClick={closeConfirmAction} disabled={actionBusy} aria-label="Close">✕</button>
+            </div>
+            <h3 className="os-reject-title">{ACTION_COPY[confirmAction.type].title}</h3>
+            <div className="os-reject-card">
+              <img src={confirmAction.member.avatar} alt="" className="os-avatar" />
+              <div>
+                <div className="os-reject-card-name">{confirmAction.member.name}</div>
+                <div className="os-reject-card-sub">{confirmAction.member.specialty || '—'} · {confirmAction.member.branch || '—'}</div>
+              </div>
+            </div>
+            <p className="os-hire-desc" style={{ margin: '12px 0' }}>{ACTION_COPY[confirmAction.type].desc}</p>
+            {actionError && <p role="alert" style={{ color: '#dc2626', fontSize: 13, margin: '0 0 8px' }}>{actionError}</p>}
+            <div className="os-reject-footer">
+              <button className="os-reject-cancel" onClick={closeConfirmAction} disabled={actionBusy}>Cancel</button>
+              <button className="os-reject-confirm" onClick={runConfirmAction} disabled={actionBusy}>
+                {actionBusy ? ACTION_COPY[confirmAction.type].busy : ACTION_COPY[confirmAction.type].confirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {actionDone && (
+        <div className="os-modal-backdrop" onClick={() => setActionDone(null)}>
+          <div className="os-modal os-modal-success" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="os-modal-body">
+              <div className="os-wizard-single os-wizard-success">
+                <div className="os-success-check"><CheckCircleIcon /></div>
+                <h4 className="os-wizard-section">{ACTION_COPY[actionDone.type].doneTitle}</h4>
+                <p>{ACTION_COPY[actionDone.type].doneDesc(actionDone.name)}</p>
+              </div>
+            </div>
+            <div className="os-modal-footer os-wizard-footer" style={{ justifyContent: 'flex-end' }}>
+              <button className="os-btn-save" onClick={() => setActionDone(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {leaveConfirm && (
         <div className="os-modal-backdrop" onClick={closeLeaveConfirm}>
           <div className="os-reject-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

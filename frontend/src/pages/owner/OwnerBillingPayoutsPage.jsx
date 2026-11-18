@@ -2,6 +2,8 @@ import { useState } from 'react'
 import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { NewInvoiceButton, BILLING_SUBTITLE, peso, fmtDate } from './OwnerBillingShared'
+import { BillingTabs } from './billing/FinanceUi'
+import './billing/OwnerFinance.css'
 import './OwnerBillingPage.css'
 
 const SCHEDULES = [
@@ -38,6 +40,7 @@ export default function OwnerBillingPayoutsPage({ user, onLogout, betaTier }) {
       menuItems={getOwnerMenuItems(betaTier)}
       headerActions={<NewInvoiceButton />}
     >
+      <BillingTabs />
       {toast && <div className="sb-toast">{toast}</div>}
 
       <div className="pay-hero">

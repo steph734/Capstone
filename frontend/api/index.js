@@ -75,6 +75,7 @@ import attendanceAvailability from './_lib/routes/attendance-availability.js'
 import attendanceAvailabilityMonth from './_lib/routes/attendance-availability-month.js'
 import attendanceLeaveRequests from './_lib/routes/attendance-leave-requests.js'
 import attendanceRemind from './_lib/routes/attendance-remind.js'
+import expensesRemind from './_lib/routes/expenses-remind.js'
 import therapistAvailability from './_lib/routes/therapist-availability.js'
 import notesTherapistList from './_lib/routes/notes-therapist-list.js'
 import notesPatientList from './_lib/routes/notes-patient-list.js'
@@ -146,6 +147,14 @@ import adminDashboard from './_lib/routes/admin-dashboard.js'
 import ownerPatients from './_lib/routes/owner-patients.js'
 import ownerAppointments from './_lib/routes/owner-appointments.js'
 import ownerDashboard from './_lib/routes/owner-dashboard.js'
+import {
+  expensesCollection, expensesSummary, expensesPreviousBill, expenseItem, expenseMarkPaid, expenseVoid, expenseNextRent, expenseAttachments, expenseAttachmentFile, vendorsRoute,
+} from './_lib/routes/owner-expenses.js'
+import {
+  clinicRoute, invoicesCollection, invoicesSummary, invoicePatients, invoiceItem, invoiceSend, invoiceRemind, invoiceMarkPaid, invoiceVoid, invoicePdf, patientBillableSessions,
+} from './_lib/routes/owner-invoices.js'
+import ownerReportsSummary from './_lib/routes/owner-reports-summary.js'
+import ownerReportsExport from './_lib/routes/owner-reports-export.js'
 import notesVoiceLog from './_lib/routes/notes-voice-log.js'
 import adminPlans from './_lib/routes/admin-plans.js'
 import adminPlanItem from './_lib/routes/admin-plan-item.js'
@@ -264,6 +273,7 @@ app.all('/api/attendance/availability', attendanceAvailability)
 app.all('/api/attendance/availability-month', attendanceAvailabilityMonth)
 app.all('/api/attendance/leave-requests', attendanceLeaveRequests)
 app.all('/api/attendance/remind', attendanceRemind)
+app.all('/api/expenses/remind', expensesRemind) // daily cron, locked behind CRON_SECRET
 app.all('/api/therapist/availability', therapistAvailability)
 app.all('/api/therapist/availability/:date', therapistAvailability)
 app.all('/api/therapist/availability/:date/undo', therapistAvailability)
@@ -408,6 +418,30 @@ app.all('/api/admin/dashboard', adminDashboard)
 app.all('/api/owner/patients', ownerPatients)
 app.all('/api/owner/appointments', ownerAppointments)
 app.all('/api/owner/dashboard', ownerDashboard)
+// Owner finance: expenses + vendors (static segments are registered before /:id)
+app.all('/api/owner/expenses/summary', expensesSummary)
+app.all('/api/owner/expenses/previous-bill', expensesPreviousBill)
+app.all('/api/owner/expenses/:id/mark-paid', expenseMarkPaid)
+app.all('/api/owner/expenses/:id/void', expenseVoid)
+app.all('/api/owner/expenses/:id/next-rent', expenseNextRent)
+app.all('/api/owner/expenses/:id/attachments/:index', expenseAttachmentFile)
+app.all('/api/owner/expenses/:id/attachments', expenseAttachments)
+app.all('/api/owner/expenses/:id', expenseItem)
+app.all('/api/owner/expenses', expensesCollection)
+app.all('/api/owner/vendors', vendorsRoute)
+app.all('/api/owner/clinic', clinicRoute)
+app.all('/api/owner/invoices/summary', invoicesSummary)
+app.all('/api/owner/invoices/patients', invoicePatients)
+app.all('/api/owner/invoices/:id/send', invoiceSend)
+app.all('/api/owner/invoices/:id/remind', invoiceRemind)
+app.all('/api/owner/invoices/:id/mark-paid', invoiceMarkPaid)
+app.all('/api/owner/invoices/:id/void', invoiceVoid)
+app.all('/api/owner/invoices/:id/pdf', invoicePdf)
+app.all('/api/owner/invoices/:id', invoiceItem)
+app.all('/api/owner/invoices', invoicesCollection)
+app.all('/api/owner/patients/:id/billable-sessions', patientBillableSessions)
+app.all('/api/owner/reports/summary', ownerReportsSummary)
+app.all('/api/owner/reports/:module/export', ownerReportsExport)
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
 app.all('/api/admin/plans/:id', adminPlanItem)
 app.all('/api/admin/plans', adminPlans)

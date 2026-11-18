@@ -101,6 +101,7 @@ const BASE_OWNER_MENU_ITEMS = [
     children: [
       { id: 'billing-overview', label: 'Overview', path: '/owner/billing' },
       { id: 'billing-invoices', label: 'Invoices', path: '/owner/billing/invoices' },
+      { id: 'billing-expenses', label: 'Expenses', path: '/owner/billing/expenses' },
       { id: 'billing-payouts', label: 'Payouts', path: '/owner/billing/payouts' },
       { id: 'billing-settings', label: 'Settings', path: '/owner/billing/settings' },
     ],

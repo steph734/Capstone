@@ -129,9 +129,10 @@ const GAMIFIED_ITEM = { id: 'gamified-activities', label: 'Gamified Activities',
 const TERMS_ITEM = { id: 'terms-policies', label: 'Terms & Policies', icon: <ShieldCheck size={24} />, path: '/patient/terms-policies' }
 
 // Games are part of every patient's account (what they can play today is set by the therapist's game plan),
-// so Gamified Activities is always shown. Speech to Text / TTS still needs the Silver plan or higher.
-function getPatientMenuItems(betaTier) {
-  if (betaTier === 'gold' || betaTier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM, TERMS_ITEM]
+// so Gamified Activities is always shown (Gold only, see the clinic-plan filter below). Speech to Text / TTS needs the
+// Silver plan or higher: `tier` is the higher of the beta preview and the clinic's paid plan.
+function getPatientMenuItems(tier) {
+  if (tier === 'gold' || tier === 'silver') return [...DEFAULT_MENU_ITEMS, SPEECH_ITEM, GAMIFIED_ITEM, TERMS_ITEM]
   return [...DEFAULT_MENU_ITEMS, GAMIFIED_ITEM, TERMS_ITEM]
 }
 
@@ -166,7 +167,9 @@ export default function PatientSidebar({
   const homePractice = useHomePractice(user?.role === 'Patient')
   // Gamified Activities are a Gold-plan feature of the clinic: patients only see them when the Owner is on Gold.
   const clinic = useClinicPlan(user?.role === 'Patient')
-  const resolvedMenuItems = (menuItems ?? getPatientMenuItems(betaTier)).filter((it) => !(user?.role === 'Patient' && it.id === 'gamified-activities' && clinic.gamified === false)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
+  const RANK = { free: 0, silver: 1, gold: 2 }
+  const effectiveTier = (RANK[clinic.tier] || 0) >= (RANK[betaTier] || 0) ? clinic.tier : betaTier
+  const resolvedMenuItems = (menuItems ?? getPatientMenuItems(effectiveTier)).filter((it) => !(user?.role === 'Patient' && it.id === 'gamified-activities' && clinic.gamified === false)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
   const unreadCount = useUnreadCount()
   const emailUnreadCount = useEmailUnreadCount(user?.email)
   const navigate = useNavigate()

@@ -1,4 +1,4 @@
-import { loadPlansAndFeatures, loadSubscriptions, monthlyAmount, paidTierEmails } from './plans.js'
+import { loadPlansAndFeatures, loadSubscriptions, monthlyAmount, paidTierEmails, isLive } from './plans.js'
 
 const OFF = String(process.env.GAMES_REQUIRE_GOLD || '').trim().toLowerCase() === 'false'
 const cache = { at: 0, ttl: 0, info: null }
@@ -11,7 +11,8 @@ const cache = { at: 0, ttl: 0, info: null }
 export async function clinicTierInfo(db) {
   if (OFF) return { tier: 'gold', why: 'The Gold check is switched off on this server (GAMES_REQUIRE_GOLD=false).' }
   if (cache.info && Date.now() - cache.at < cache.ttl) return cache.info
-  const owners = (await db.collection('users').find({ role: 'Owner', is_archived: { $ne: true } }, { projection: { email: 1 } }).toArray()).map((u) => String(u.email).toLowerCase())
+  const ownerDocs = await db.collection('users').find({ role: 'Owner', is_archived: { $ne: true } }, { projection: { email: 1, stripe_subscription_id: 1, stripe_subscription_plan: 1 } }).toArray()
+  const owners = ownerDocs.map((u) => String(u.email).toLowerCase())
   const { plans } = await loadPlansAndFeatures(db)
   const beta = (slug) => plans.some((p) => p.slug === slug && (p.beta_testers || []).some((e) => owners.includes(String(e).toLowerCase())))
   let tier = beta('gold') ? 'gold' : beta('silver') ? 'silver' : 'free'
@@ -23,6 +24,10 @@ export async function clinicTierInfo(db) {
       ttl = 15000
       why = why || 'The server could not read Stripe subscriptions (check STRIPE_SECRET_KEY on the server), so no paid plan was found.'
     } else {
+      // A subscription the Owner created while signed in (see create-subscription.js) counts whatever email was used to pay.
+      const linked = ownerDocs.map((o) => ({ s: o.stripe_subscription_id && subs.find((x) => x.id === o.stripe_subscription_id), plan: o.stripe_subscription_plan })).filter((x) => x.s && isLive(x.s) && ['silver', 'gold'].includes(x.plan))
+      if (linked.some((x) => x.plan === 'gold')) { tier = 'gold'; why = 'The Owner has an active Gold subscription linked to their account.' }
+      else if (linked.length && tier === 'free') { tier = 'silver'; why = 'The Owner has an active Silver subscription linked to their account.' }
       if (owners.some((e) => paidTierEmails(plans.filter((p) => p.slug === 'gold'), subs).has(e))) { tier = 'gold'; why = 'The Owner has an active Gold subscription in Stripe.' }
       else if (tier === 'free' && owners.some((e) => paidTierEmails(plans.filter((p) => p.slug === 'silver'), subs).has(e))) { tier = 'silver'; why = 'The Owner has an active Silver subscription in Stripe.' }
       // A live subscription of the Owner whose Stripe price id we don't know (a re-created price, another Stripe account) still counts when it

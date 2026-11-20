@@ -42,6 +42,7 @@ function validate(f, takenNames) {
   const price = f.priceMonthly.trim()
   if (price === '' || Number.isNaN(Number(price))) e.priceMonthly = 'Monthly price is required.'
   else if (Number(price) < 0) e.priceMonthly = 'Enter a price of ₱0 or more.'
+  else if (Number(price) > 0 && Number(price) < 20) e.priceMonthly = 'Paid plans need at least ₱20 (the minimum Stripe can charge).'
   if (f.priceYearly.trim() !== '' && (Number.isNaN(Number(f.priceYearly)) || Number(f.priceYearly) < 0)) e.priceYearly = 'Enter a yearly price of ₱0 or more.'
   const t = Number(f.trialDays === '' ? 0 : f.trialDays)
   if (!Number.isInteger(t) || t < 0 || t > 60) e.trialDays = 'Free trial must be 0 to 60 days.'

@@ -4,6 +4,8 @@ import { getDb } from './mongo.js'
 // Fixed, server-side Stripe Price IDs — the client only ever sends a tier id
 // and billing period, never a price or amount, so what gets charged can't be
 // tampered with from the browser. Yearly Price IDs aren't set up yet.
+const MIN_PHP_CENTAVOS = 2000 // Stripe's minimum charge for PHP
+
 export const PRICE_IDS = {
   silver: { monthly: 'price_1U8LYZ6BClqAeYB0rj0RWvMp' },
   gold: { monthly: 'price_1U8LYt6BClqAeYB0t0Ps5kNO' },
@@ -35,6 +37,13 @@ export async function createSubscription({ tierId, billingPeriod, email, name })
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
+  // Stripe cannot charge less than about PHP 20. Below that it creates the invoice without a payment to confirm, which used
+  // to surface as the confusing "no payment client secret" error. Say what is actually wrong instead.
+  const stripePrice = await stripe.prices.retrieve(priceId).catch(() => null)
+  if (stripePrice?.unit_amount > 0 && stripePrice.currency === 'php' && stripePrice.unit_amount < MIN_PHP_CENTAVOS) {
+    throw new Error(`${tierId.toUpperCase()} is priced at ₱${(stripePrice.unit_amount / 100).toFixed(2)}, below the ₱20.00 minimum Stripe can charge. Ask the Super Admin to raise the plan price (Subscription > Edit plan).`)
+  }
+
   // Reuse an existing customer for this email if one exists, otherwise create one.
   const existing = await stripe.customers.list({ email, limit: 1 })
   const customer = existing.data[0]
@@ -55,7 +64,9 @@ export async function createSubscription({ tierId, billingPeriod, email, name })
   const invoice = subscription.latest_invoice
   const clientSecret = invoice?.payment_intent?.client_secret || invoice?.confirmation_secret?.client_secret
   if (!clientSecret) {
-    throw new Error('Stripe did not return a payment client secret for this subscription')
+    // Do not leave an unpayable incomplete subscription behind.
+    await stripe.subscriptions.cancel(subscription.id).catch(() => {})
+    throw new Error('Stripe did not return a payment for this subscription. Check the plan price (Stripe needs at least ₱20.00) and try again.')
   }
 
   return {

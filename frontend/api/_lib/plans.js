@@ -96,6 +96,7 @@ export function validatePlanInput(body, { featureKeys, takenNames, forceStatus }
   const price = body.priceMonthly === '' || body.priceMonthly == null ? NaN : Number(body.priceMonthly)
   if (Number.isNaN(price)) fields.priceMonthly = 'Monthly price is required.'
   else if (price < 0 || price > 1000000) fields.priceMonthly = 'Enter a price of ₱0 or more.'
+  else if (price > 0 && price < 20) fields.priceMonthly = 'Paid plans need at least ₱20 (the minimum Stripe can charge). Use ₱0 for a free plan.'
 
   let yearly = null
   if (body.priceYearly !== '' && body.priceYearly != null) {

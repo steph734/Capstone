@@ -6,6 +6,8 @@ import OwnerPaymentPage from './OwnerPaymentPage'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import UpdatePaymentMethodModal from '../../components/UpdatePaymentMethodModal'
 import usePlanTiers from '../../hooks/usePlanTiers'
+import { invalidateEntitlements } from '../../hooks/useEntitlements'
+import { authFetch } from '../../utils/session'
 import '../SubscriptionPage.css'
 
 // "Possible" next billing date = one calendar month after a given date.
@@ -136,7 +138,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
   // Plans come from the database (Super Admin > Subscription). Hidden plans are not offered, but the plan this Owner is
   // already on is always included so it still shows as their current plan.
-  const apiTiers = usePlanTiers(activePlan || '')
+  const { tiers: apiTiers } = usePlanTiers()
 
   // Re-evaluate the trial clock each minute so the "ending soon" notice appears
   // and the plan lapses without needing a page reload.
@@ -319,10 +321,17 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
     }
   }
 
-  const handleStartTrial = () => {
-    if (trialTier) onPlanActivate && onPlanActivate(trialTier.id, { trial: true })
+  const handleStartTrial = async () => {
+    const tier = trialTier
     setActiveModal(null)
     setTrialTier(null)
+    if (!tier) return
+    try {
+      await authFetch('/api/owner/subscription/trial', { method: 'POST', body: { plan: tier.id } }) // recorded for the whole clinic
+      await invalidateEntitlements()
+    } catch {
+      setSelectedTierForPayment(tier) // the one free trial was already used: go straight to payment
+    }
   }
 
   const handleSkipTrialToPayment = () => {
@@ -362,7 +371,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
   }
 
   const confirmCancelSubscription = () => {
-    onPlanActivate && onPlanActivate(null)
+    // Downgrade on the server: every user in the clinic drops to Free on their next request.
+    authFetch('/api/owner/subscription/cancel', { method: 'POST' }).catch(() => {}).finally(() => invalidateEntitlements())
     setActiveModal(null)
   }
 

@@ -161,6 +161,8 @@ import adminPlans from './_lib/routes/admin-plans.js'
 import adminPlanItem from './_lib/routes/admin-plan-item.js'
 import adminPlanArchive from './_lib/routes/admin-plan-archive.js'
 import plansPublic from './_lib/routes/plans-public.js'
+import * as meSub from './_lib/routes/me-subscription.js'
+import { requireFeature } from './_lib/entitlements.js'
 import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
 import adminPlanSubscribers from './_lib/routes/admin-plan-subscribers.js'
 import adminBranches from './_lib/routes/admin-branches.js'
@@ -229,7 +231,7 @@ app.all('/api/send-appointment-sms', sendAppointmentSms)
 app.all('/api/send-receipt', sendReceipt)
 app.all('/api/send-trial-reminder', sendTrialReminder)
 app.all('/api/set-default-payment-method', setDefaultPaymentMethod)
-app.all('/api/tts', tts)
+app.all('/api/tts', requireFeature('text_to_speech'), tts)
 app.all('/api/verify-credentials', verifyCredentials)
 app.all('/api/appointments/create', appointmentsCreate)
 app.all('/api/appointments/:id/respond', appointmentsRespond)
@@ -395,6 +397,7 @@ app.all('/api/games/list', gamesList)
 app.all('/api/games/by-name', gamesByName) // must come before /api/games/:gameId, or "by-name" is read as an id
 app.all('/api/games', gamesAdminList)
 app.all('/api/games/:gameId', gamesAdminItem)
+app.use('/api/speech-recordings', requireFeature('voice_to_text')) // Silver and up
 app.all('/api/speech-recordings/create', speechRecordingsCreate)
 app.all('/api/speech-recordings/list', speechRecordingsList)
 app.all('/api/speech-recordings/:id/summarize', speechRecordingsSummarize)
@@ -447,6 +450,11 @@ app.all('/api/owner/invoices', invoicesCollection)
 app.all('/api/owner/patients/:id/billable-sessions', patientBillableSessions)
 app.all('/api/owner/reports/summary', ownerReportsSummary)
 app.all('/api/owner/reports/:module/export', ownerReportsExport)
+app.get('/api/me/entitlements', meSub.entitlementsRoute) // the clinic's plan for ANY role, resolved on the server
+app.get('/api/me/subscription', meSub.subscriptionRoute)
+app.post('/api/owner/subscription/confirm', meSub.confirmRoute)
+app.post('/api/owner/subscription/trial', meSub.trialRoute)
+app.post('/api/owner/subscription/cancel', meSub.cancelRoute)
 app.get('/api/plans', plansPublic) // Owner-facing: Live (and the caller's Beta) plans only
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
 app.all('/api/admin/plans/:id/archive', adminPlanArchive)

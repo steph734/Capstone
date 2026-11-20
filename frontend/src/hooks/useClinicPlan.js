@@ -1,17 +1,10 @@
-import { useEffect, useState } from 'react'
-import { authFetch, getSessionToken } from '../utils/session'
+import useEntitlements, { tierOf } from './useEntitlements'
 
-// The clinic's plan (its Owner's subscription). Remembered for the session so menus don't flicker.
-// `gamified` is true on the Gold plan; null while unknown.
-const KEY = 'clinicPlan'
-const read = () => { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null') } catch { return null } }
+// Compatibility wrapper for the older callers (sidebar, dashboard, gamified page). The plan is read from the server's
+// entitlements; nothing is cached in sessionStorage any more. `gamified` is true when the plan includes gamified exercises.
+// `tier` is the coarse 'free' | 'silver' | 'gold' view; null while unknown.
 export default function useClinicPlan(enabled = true) {
-  const [plan, setPlan] = useState(read)
-  useEffect(() => {
-    if (!enabled || !getSessionToken()) return undefined // no server session (new tab, expired): asking would only give a 401
-    let alive = true
-    authFetch('/api/clinic/plan').then((d) => { if (!alive) return; setPlan(d); try { sessionStorage.setItem(KEY, JSON.stringify(d)) } catch { /* private mode */ } }).catch(() => {})
-    return () => { alive = false }
-  }, [enabled])
-  return { tier: plan?.tier || null, gamified: plan ? Boolean(plan.gamified) : null, why: plan?.why || '' }
+  const { ent } = useEntitlements({ enabled })
+  if (!ent) return { tier: null, gamified: null, why: '' }
+  return { tier: tierOf(ent) || 'free', gamified: ent.features.includes('gamified_exercises'), why: ent.why || '', entitlements: ent }
 }

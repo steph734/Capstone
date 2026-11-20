@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authFetch, getSessionToken } from '../utils/session'
+import { onPlanChanged } from './useEntitlements'
 
-// The plans every user sees come from the database (Super Admin > Subscription saves to the `subscription` collection).
-// GET /api/plans returns Live plans (Beta only for its testers); Hidden plans are not returned for anyone.
-// `include` is the slug of the plan the user is already on, so their own plan still shows even if it was hidden later.
+// Plans for the Subscription pages (Owner, Therapist, Patient) and the clinic's current plan, from GET /api/me/subscription.
+// Live plans are listed (Beta only for its testers, Hidden for nobody), plus the clinic's own plan even if it was hidden later.
 const CARD_COLOR = { free: 'blue', silver: 'silver', gold: 'gold' }
 
-// A plan from GET /api/plans -> the tier shape the Owner / Therapist / Patient subscription pages use.
 export function tierFromPlan(p) {
   const base = String(p.name || '').replace(/ plan$/i, '').toUpperCase()
   return {
@@ -18,29 +17,29 @@ export function tierFromPlan(p) {
     monthlyPrice: p.priceMonthly,
     yearlyPrice: p.priceYearly ?? 0,
     trialDays: p.trialDays,
+    rank: p.order,
     features: p.features,
     current: false,
   }
 }
 
-// Returns the tiers, or null until loaded / if the request fails (callers keep their built-in tiers meanwhile).
-// Refetches when the tab regains focus so a Super Admin change shows up without a manual reload.
-export default function usePlanTiers(include = '') {
-  const [tiers, setTiers] = useState(null)
+// { tiers, current, clinicName }: tiers is null until loaded (callers keep their built-in tiers), `current` is the clinic's
+// entitlements (plan_key such as 'GOLD'). Refetches on focus and after any payment/downgrade (invalidateEntitlements).
+export default function usePlanTiers() {
+  const [data, setData] = useState({ tiers: null, current: null, clinicName: '' })
   const load = useCallback(() => {
     if (!getSessionToken()) return Promise.resolve()
-    return authFetch('/api/plans', { query: { include: include || '' } })
-      .then((d) => { if (Array.isArray(d.plans)) setTiers(d.plans.map(tierFromPlan)) })
-      .catch(() => { /* keep whatever we already have */ })
-  }, [include])
-
+    return authFetch('/api/me/subscription')
+      .then((d) => setData({ tiers: Array.isArray(d.plans) ? d.plans.map(tierFromPlan) : null, current: d.current || null, clinicName: d.clinic_name || '' }))
+      .catch(() => { /* keep what we have */ })
+  }, [])
   useEffect(() => {
     load()
     const onVisible = () => { if (document.visibilityState === 'visible') load() }
     window.addEventListener('focus', load)
     document.addEventListener('visibilitychange', onVisible)
-    return () => { window.removeEventListener('focus', load); document.removeEventListener('visibilitychange', onVisible) }
+    const off = onPlanChanged(load)
+    return () => { window.removeEventListener('focus', load); document.removeEventListener('visibilitychange', onVisible); off() }
   }, [load])
-
-  return tiers
+  return data
 }

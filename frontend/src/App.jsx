@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import useEntitlements, { invalidateEntitlements, clearEntitlements } from './hooks/useEntitlements'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { MessagesProvider } from './context/MessagesContext'
 import StreamProvider from './stream/StreamProvider'
@@ -175,12 +176,16 @@ function App() {
       return null
     }
   })
+  useEffect(() => { localStorage.removeItem('activePlan'); localStorage.removeItem('activePlanTrialEnds') }, []) // old client-side plan values are no longer used
   const [ownerBetaTier, setOwnerBetaTier] = useState(() => localStorage.getItem('betaTier') || null)
   // The paid, active subscription tier ('silver' | 'gold' | null). Set once a
   // Stripe payment succeeds; supersedes the beta preview flag above.
-  const [ownerActivePlan, setOwnerActivePlan] = useState(() => localStorage.getItem('activePlan') || null)
+  // The clinic's plan comes from the server (GET /api/me/entitlements), resolved from its stored subscription. It is NOT kept
+  // in localStorage / sessionStorage / the login token, so every role sees the same plan and a downgrade reaches everyone.
+  const { ent: clinicEnt } = useEntitlements({ enabled: isAuthenticated })
+  const ownerActivePlan = clinicEnt && clinicEnt.plan_key !== 'FREE' ? clinicEnt.plan_key.toLowerCase() : null
   // ISO date string when the current plan is on a free trial, else null.
-  const [ownerPlanTrialEnds, setOwnerPlanTrialEnds] = useState(() => localStorage.getItem('activePlanTrialEnds') || null)
+  const ownerPlanTrialEnds = clinicEnt?.is_trial ? clinicEnt.renews_at : null
   // Shown as a top-right toast right after a successful login, on whichever
   // dashboard the user lands on — cleared automatically after a few seconds.
   const [loginToast, setLoginToast] = useState(null)
@@ -220,28 +225,8 @@ function App() {
     }
   }
 
-  const handleOwnerPlanActivate = (tier, { trial = false } = {}) => {
-    setOwnerActivePlan(tier)
-    if (tier) {
-      localStorage.setItem('activePlan', tier)
-      // A paid plan replaces the beta preview — drop the beta tags/features.
-      setOwnerBetaTier(null)
-      localStorage.removeItem('betaTier')
-
-      if (trial) {
-        const ends = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        setOwnerPlanTrialEnds(ends)
-        localStorage.setItem('activePlanTrialEnds', ends)
-      } else {
-        setOwnerPlanTrialEnds(null)
-        localStorage.removeItem('activePlanTrialEnds')
-      }
-    } else {
-      localStorage.removeItem('activePlan')
-      setOwnerPlanTrialEnds(null)
-      localStorage.removeItem('activePlanTrialEnds')
-    }
-  }
+  // The plan is changed on the server (payment confirm, trial, downgrade); this just refreshes what every page shows.
+  const handleOwnerPlanActivate = () => { invalidateEntitlements() }
 
   const handleLogin = async (email, password) => {
     const typedEmail = String(email || '').trim().toLowerCase()
@@ -394,6 +379,7 @@ function App() {
     setCurrentUser(null)
     localStorage.removeItem('isAuthenticated')
     localStorage.removeItem('currentUser')
+    clearEntitlements()
     clearPaoSession() // Pao's chat history is session-only and ends with the login
   }
 

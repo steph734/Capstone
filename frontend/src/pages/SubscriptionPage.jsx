@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
-import useClinicPlan from '../hooks/useClinicPlan'
 import usePlanTiers from '../hooks/usePlanTiers'
 import './SubscriptionPage.css'
 
@@ -42,9 +41,9 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
   }
 
   // The Owner pays for the plan, so a patient sees the clinic's current tier (from the server), not always Free.
-  const { tier: clinicTier } = useClinicPlan()
-  const activeTierId = clinicTier || 'free'
-  const apiTiers = usePlanTiers(activeTierId) // Live plans from the database; Hidden ones are not shown
+  const { tiers: apiTiers, current, clinicName } = usePlanTiers() // plans + the clinic's plan, from the server
+  const activeTierId = current ? current.plan_key.toLowerCase() : 'free'
+  const currentRank = current ? current.tier_rank : null
 
   const subscriptionTiersRaw = [
     {
@@ -159,6 +158,7 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
           {/* Subscription Tiers */}
           <section className="tiers-section">
             <h2 className="section-title">Subscription Tiers</h2>
+            {clinicName && <p className="section-subtitle" style={{ margin: '-6px 0 14px', color: '#6b7c75' }}>Your plan comes from {clinicName}. Your clinic&apos;s Owner manages it.</p>}
             
             <div className="tiers-grid">
               {subscriptionTiers.map((tier) => (
@@ -200,9 +200,14 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
                     <button className="tier-button current-button" disabled>
                       Current Plan
                     </button>
+                  ) : currentRank != null && tier.rank != null && tier.rank < currentRank ? (
+                    <button className="tier-button current-button" disabled>
+                      Included in your plan
+                    </button>
                   ) : (
                     <button
                       className="tier-button select-button"
+                      title="Ask your clinic's Owner to upgrade"
                       onClick={() => handleSelectPlan(tier.id)}
                     >
                       Select Plan

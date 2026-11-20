@@ -14,13 +14,13 @@ export default async function handler(req, res) {
 
   try {
     const result = await createSubscription({ tierId, billingPeriod, email, name })
-    // Link the new Stripe subscription to the signed-in Owner's account, so the clinic's plan is found even when the billing
-    // email typed at checkout differs from the account email. clinicPlan.js still requires the subscription to be live.
+    // Remember the subscription this Owner just started. It becomes the clinic's plan only after POST
+    // /api/owner/subscription/confirm re-reads it from Stripe and sees it paid (entitlements.js reads that one record).
     const me = req.sessionCtx?.user
     if (me?.role === 'Owner' && result.subscriptionId) {
       try {
-        await (await getDb()).collection('users').updateOne({ _id: me._id }, { $set: { stripe_subscription_id: result.subscriptionId, stripe_subscription_plan: String(tierId).toLowerCase() } })
-      } catch (err) { console.error('could not link subscription to the owner:', err.message) }
+        await (await getDb()).collection('clinic_settings').updateOne({ _id: 'clinic' }, { $set: { pending_subscription: { stripe_subscription_id: result.subscriptionId, plan_key: String(tierId).toUpperCase(), billing_period: billingPeriod, owner_id: me._id, created_at: new Date() } } }, { upsert: true })
+      } catch (err) { console.error('could not record the pending subscription:', err.message) }
     }
     return res.status(200).json(result)
   } catch (err) {

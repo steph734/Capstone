@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
-import useClinicPlan from '../../hooks/useClinicPlan'
 import usePlanTiers from '../../hooks/usePlanTiers'
 import '../SubscriptionPage.css'
 
@@ -41,10 +40,8 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
   const trialEndMs = planTrialEnds ? new Date(planTrialEnds).getTime() : null
   const isTrialing = Boolean(trialEndMs) && trialEndMs > Date.now()
   const isTrialExpired = Boolean(trialEndMs) && !isTrialing
-  const { tier: clinicTier } = useClinicPlan()
-  const localTierId = isTrialExpired ? 'free' : (activePlan || 'free')
-  const activeTierId = clinicTier && clinicTier !== 'free' ? clinicTier : localTierId
-  const apiTiers = usePlanTiers(activeTierId) // Live plans from the database; Hidden ones are not shown
+  const { tiers: apiTiers, current } = usePlanTiers() // Live plans from the database + the clinic's plan, both from the server
+  const activeTierId = current ? current.plan_key.toLowerCase() : 'free'
 
   const subscriptionTiersRaw = [
     {

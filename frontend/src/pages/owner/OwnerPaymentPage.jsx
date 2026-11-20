@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
 import StripeSubscribeForm from '../../components/StripeSubscribeForm'
+import { authFetch } from '../../utils/session'
+import { invalidateEntitlements } from '../../hooks/useEntitlements'
 import './OwnerPaymentPage.css'
 
 const STRIPE_BILLING_PERIODS = new Set(['monthly', 'yearly'])
@@ -144,11 +146,14 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
 
   const stripeReady = STRIPE_BILLING_PERIODS.has(billingPeriod)
 
-  const handleSubscribeSuccess = () => {
+  const handleSubscribeSuccess = async ({ subscriptionId } = {}) => {
     setPaymentStatus('success')
-    // Mark this tier as the active paid plan — unlocks sidebar features and
-    // flips the tier card to "Active Plan" once we're back on the tiers page.
-    if (onPlanActivate) onPlanActivate(tier.id)
+    // The server re-reads the subscription from Stripe and records it as the CLINIC's plan, so the Owner, therapists and
+    // patients all see it. Retry briefly in case Stripe is still settling the payment.
+    for (let i = 0; i < 4; i += 1) {
+      try { await authFetch('/api/owner/subscription/confirm', { method: 'POST', body: { subscription_id: subscriptionId } }); break } catch { await new Promise((r) => setTimeout(r, 1500)) }
+    }
+    invalidateEntitlements()
   }
 
   const handleGoBack = () => {

@@ -9,6 +9,7 @@
 // signature is checked against the exact bytes Stripe sent.
 import { getDb } from '../mongo.js'
 import { getStripeClient } from '../stripeClient.js'
+import { recordFromStripe, writeRecord, CLINIC_ID } from '../entitlements.js'
 import { finalizePaid, markFailed, friendlyFailure } from '../paymentAttempts.js'
 
 export default async function handler(req, res) {
@@ -27,6 +28,14 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Subscription lifecycle events refresh the clinic's stored plan (the resolver also re-checks Stripe on its own).
+    if (String(event.type).startsWith('customer.subscription.')) {
+      const s = event.data?.object
+      const dbx = await getDb()
+      const doc = await dbx.collection('clinic_settings').findOne({ _id: CLINIC_ID }, { projection: { subscription: 1 } })
+      if (s?.id && doc?.subscription?.stripe_subscription_id === s.id) await writeRecord(dbx, recordFromStripe(s, doc.subscription))
+      return res.status(200).json({ received: true })
+    }
     const pi = event.data?.object
     if (!pi?.id || !String(event.type).startsWith('payment_intent.')) return res.status(200).json({ received: true })
     const db = await getDb()

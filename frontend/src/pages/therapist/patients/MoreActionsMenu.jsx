@@ -57,8 +57,8 @@ export default function MoreActionsMenu({ patient, onBook, onMessage, onArchive,
             <button type="button" role="menuitem" onClick={run(onMessage)}><Mail size={16} aria-hidden="true" /> Message guardian</button>
             <hr />
             {archived
-              ? <button type="button" role="menuitem" onClick={run(onUnarchive)}><ArchiveRestore size={16} aria-hidden="true" /> Unarchive</button>
-              : <button type="button" role="menuitem" onClick={run(onArchive)}><Archive size={16} aria-hidden="true" /> Archive</button>}
+              ? <button type="button" role="menuitem" className="warn" onClick={run(onUnarchive)}><ArchiveRestore size={16} aria-hidden="true" /> Unarchive</button>
+              : <button type="button" role="menuitem" className="warn" onClick={run(onArchive)}><Archive size={16} aria-hidden="true" /> Archive</button>}
             <button type="button" role="menuitem" className="danger" onClick={run(onDelete)}><Trash2 size={16} aria-hidden="true" /> Delete…</button>
           </div>
         </>,

@@ -37,6 +37,9 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const status = SEGMENTS.some(([k]) => k === params.get('status')) ? params.get('status') : 'all'
   const sort = SORTS.some(([k]) => k === params.get('sort')) ? params.get('sort') : 'name'
   const needs = params.get('needs') === '1'
+  const isDay = (v) => /^d{4}-d{2}-d{2}$/.test(v || '')
+  const dFrom = isDay(params.get('from')) ? params.get('from') : ''
+  const dTo = isDay(params.get('to')) ? params.get('to') : ''
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1)
   const urlSearch = params.get('q') || ''
 
@@ -69,18 +72,18 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
     const id = ++reqId.current
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const d = await patientsApi.list({ search: urlSearch, status, needs_session: needs ? '1' : '', sort, page, limit: PAGE_SIZE })
+      const d = await patientsApi.list({ search: urlSearch, status, needs_session: needs ? '1' : '', from: dFrom, to: dTo, sort, page, limit: PAGE_SIZE })
       if (id === reqId.current) { setData(d); setState({ loading: false, error: '' }) }
     } catch (e) {
       if (id === reqId.current) setState({ loading: false, error: e.message || 'Could not load your patients.' })
     }
-  }, [urlSearch, status, needs, sort, page])
+  }, [urlSearch, status, needs, sort, page, dFrom, dTo])
   useEffect(() => { load() }, [load])
 
   const counts = data?.counts || { total: 0, active: 0, inactive: 0, archived: 0, upcoming_booked: 0, need_session: 0 }
   const items = data?.items || []
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / PAGE_SIZE))
-  const filtered = Boolean(urlSearch || needs || status !== 'all')
+  const filtered = Boolean(urlSearch || needs || dFrom || dTo || status !== 'all')
   const from = data?.total ? (page - 1) * PAGE_SIZE + 1 : 0
   const to = Math.min(page * PAGE_SIZE, data?.total || 0)
 
@@ -121,6 +124,11 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
             ))}
           </div>
           <label className="pm-sort">Sort by <select value={sort} onChange={(e) => setParam({ sort: e.target.value === 'name' ? '' : e.target.value, page: '' })} aria-label="Sort patients">{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+          <div className="pm-datef" role="group" aria-label="Filter by session date">
+            <label>Session from <input type="date" value={dFrom} max={dTo || undefined} onChange={(e) => setParam({ from: e.target.value, page: '' })} /></label>
+            <label>to <input type="date" value={dTo} min={dFrom || undefined} onChange={(e) => setParam({ to: e.target.value, page: '' })} /></label>
+            {(dFrom || dTo) && <button type="button" className="pm-inline-link" onClick={() => setParam({ from: '', to: '', page: '' })}>Clear dates</button>}
+          </div>
           <button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)} disabled={!data}><Plus size={16} aria-hidden="true" /> Add patient</button>
         </div>
         {needs && <p className="pm-filter-note">Showing active patients with no upcoming session. <button type="button" className="pm-inline-link" onClick={() => setParam({ needs: '' })}>Clear</button></p>}

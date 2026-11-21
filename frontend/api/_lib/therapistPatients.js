@@ -118,6 +118,13 @@ export async function listPatients(db, employee, q = {}) {
   let out = rows.filter((r) => (status === 'all' ? r.status !== 'archived' : r.status === status))
   if (q.needs_session === '1' || q.needs_session === 'true') out = out.filter((r) => r.status === 'active' && !r.nextSession)
   if (needle) out = out.filter((r) => `${r.name} ${r.nickname || ''} ${r.condition} ${r.guardianName || ''}`.toLowerCase().includes(needle))
+  // Date filter: keep patients whose last or next session falls inside [from, to] (YYYY-MM-DD, Manila calendar days).
+  const dayOf = (d) => (d ? new Date(new Date(d).getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10) : null)
+  const dFrom = /^\d{4}-\d{2}-\d{2}$/.test(str(q.from)) ? str(q.from) : ''
+  const dTo = /^\d{4}-\d{2}-\d{2}$/.test(str(q.to)) ? str(q.to) : ''
+  if (dFrom || dTo) {
+    out = out.filter((r) => [dayOf(r.lastSession), dayOf(r.nextSession)].some((d) => d && (!dFrom || d >= dFrom) && (!dTo || d <= dTo)))
+  }
   out.sort(SORTS[q.sort] || SORTS.name)
   const limit = Math.min(50, Math.max(1, parseInt(q.limit, 10) || 10))
   const total = out.length

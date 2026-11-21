@@ -1,5 +1,5 @@
 /* Therapist "My Patients": list, detail, archive, delete, add patient, payment. Tokens: green #2B4A3F, mint #F3F7F5, border #E3EDE8. */
-.pm-page { --g: #2b4a3f; --g2: #1f3a30; --mint: #f3f7f5; --line: #e3ede8; --ink: #1b2a24; --muted: #6b7c75; --amber: #f3d99a; --amber-bg: #fff4de; --red: #b42318; max-width: 1240px; margin: 0 auto; color: var(--ink); }
+.pm-page, .pm-backdrop, .pm-menu, .pm-toast { --g: #2b4a3f; --g2: #1f3a30; --mint: #f3f7f5; --line: #e3ede8; --ink: #111111; --muted: #6b7c75; --amber: #f3d99a; --amber-bg: #fff4de; --red: #b42318; max-width: 1240px; margin: 0 auto; color: var(--ink); }
 .pm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pm-muted { color: var(--muted); font-size: 14px; }
 .pm-spin { animation: pm-spin .9s linear infinite; }
@@ -86,7 +86,10 @@
 .pm-menu button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: none; background: none; border-radius: 10px; font: inherit; font-size: 14.5px; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
 .pm-menu button:hover:not(:disabled), .pm-menu button:focus-visible { background: var(--mint); }
 .pm-menu button:disabled { opacity: .45; cursor: not-allowed; }
-.pm-menu button.danger { color: var(--red); } .pm-menu button.danger:hover { background: #fdecea; }
+.pm-menu button, .pm-menu button svg { color: #111; opacity: 1; }
+.pm-menu button:disabled, .pm-menu button:disabled svg { color: #111; opacity: .45; }
+.pm-menu button.warn, .pm-menu button.warn svg { color: #b7791f; } .pm-menu button.warn:hover { background: #fff6dc; }
+.pm-menu button.danger, .pm-menu button.danger svg { color: var(--red, #c62828); } .pm-menu button.danger:hover { background: #fdecea; }
 .pm-menu hr { border: none; border-top: 1px solid var(--line); margin: 6px 4px; }
 .pm-sheet-dim { display: none; }
 
@@ -224,3 +227,10 @@
   .pm-pager { justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) { .pm-spin, .pm-skel-row, .pm-skel-block { animation: none; } }
+
+.pm-datef { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pm-datef label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.pm-datef input[type="date"] { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 14px; background: #fff; color: var(--ink); }
+
+.pm-backdrop, .pm-dialog, .pm-pay { color: #111; }
+.pm-dlg-titles p, .pm-field-label, .pm-sum-row span, .pm-hint, .pm-fee-sub, .pm-method em, .pm-photo-text, .pm-foot-note, .pm-opt { color: #333; }

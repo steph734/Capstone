@@ -234,3 +234,8 @@
 
 .pm-backdrop, .pm-dialog, .pm-pay { color: #111; }
 .pm-dlg-titles p, .pm-field-label, .pm-sum-row span, .pm-hint, .pm-fee-sub, .pm-method em, .pm-photo-text, .pm-foot-note, .pm-opt { color: #333; }
+
+.pm-dlg-body, .pm-pay-right { scrollbar-width: thin; scrollbar-color: #c5d6ce #fff; }
+.pm-dlg-body::-webkit-scrollbar, .pm-pay-right::-webkit-scrollbar { width: 10px; background: #fff; }
+.pm-dlg-body::-webkit-scrollbar-track, .pm-pay-right::-webkit-scrollbar-track { background: #fff; }
+.pm-dlg-body::-webkit-scrollbar-thumb, .pm-pay-right::-webkit-scrollbar-thumb { background: #c5d6ce; border-radius: 8px; }

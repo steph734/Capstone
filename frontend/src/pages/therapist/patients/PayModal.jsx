@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CreditCard, QrCode, Check, Loader2, AlertTriangle, ImageIcon, X, Lock } from 'lucide-react'
 import useDialogA11y from '../../../components/payments/useDialogA11y'
 import { Dialog } from './ui'
@@ -10,7 +11,7 @@ const QR_IMG = { gcash: '/instapay-qr.jpg', paymaya: '/maya-qr.jpg' }
 
 function SendingModal() {
   const ref = useDialogA11y({ locked: true })
-  return (
+  return createPortal(
     <div className="pm-backdrop top">
       <div className="pm-dialog narrow center" role="alertdialog" aria-modal="true" aria-labelledby="pm-sending-title" tabIndex={-1} ref={ref}>
         <div className="pm-dlg-body center">
@@ -19,7 +20,8 @@ function SendingModal() {
           <p className="pm-muted">Please keep this window open.</p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -57,7 +59,7 @@ export default function PayModal({ amount, patientName, sending, error, onBack, 
     if (!ok) setTouched(true)
   }
 
-  return (
+  return createPortal(
     <div className="pm-backdrop top" onMouseDown={(e) => { if (e.target === e.currentTarget && !sending && !asking) onBack() }}>
       <div className="pm-pay" role="dialog" aria-modal="true" aria-labelledby="pm-pay-title" tabIndex={-1} ref={ref}>
         <aside className="pm-pay-left">
@@ -135,6 +137,7 @@ export default function PayModal({ amount, patientName, sending, error, onBack, 
         </Dialog>
       )}
       {sending && <SendingModal />}
-    </div>
+    </div>,
+    document.body,
   )
 }

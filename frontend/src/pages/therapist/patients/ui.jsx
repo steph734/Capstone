@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Check } from 'lucide-react'
 import useDialogA11y from '../../../components/payments/useDialogA11y'
 import { palette, initials } from './format'
@@ -6,7 +7,7 @@ import { palette, initials } from './format'
 // Centered dialog: dimmed backdrop, focus trapped, Esc / X / backdrop close it, focus returns to the opener.
 export function Dialog({ title, subtitle, icon: Icon, tone = 'default', onClose, locked = false, wide = false, narrow = false, footer, children, labelId = 'pm-dlg-title' }) {
   const ref = useDialogA11y({ onEscape: onClose, locked })
-  return (
+  return createPortal(
     <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !locked) onClose() }}>
       <div className={`pm-dialog${wide ? ' wide' : ''}${narrow ? ' narrow' : ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} tabIndex={-1} ref={ref}>
         <header className="pm-dlg-head">
@@ -20,7 +21,8 @@ export function Dialog({ title, subtitle, icon: Icon, tone = 'default', onClose,
         <div className="pm-dlg-body">{children}</div>
         {footer && <footer className="pm-dlg-foot">{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

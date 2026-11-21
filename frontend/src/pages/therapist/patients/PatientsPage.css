@@ -1,5 +1,6 @@
 /* Therapist "My Patients": list, detail, archive, delete, add patient, payment. Tokens: green #2B4A3F, mint #F3F7F5, border #E3EDE8. */
-.pm-page, .pm-backdrop, .pm-menu, .pm-toast { --g: #2b4a3f; --g2: #1f3a30; --mint: #f3f7f5; --line: #e3ede8; --ink: #111111; --muted: #6b7c75; --amber: #f3d99a; --amber-bg: #fff4de; --red: #b42318; max-width: 1240px; margin: 0 auto; color: var(--ink); }
+.pm-page, .pm-backdrop, .pm-menu, .pm-toast { --g: #2b4a3f; --g2: #1f3a30; --mint: #f3f7f5; --line: #e3ede8; --ink: #111111; --muted: #6b7c75; --amber: #f3d99a; --amber-bg: #fff4de; --red: #b42318; }
+.pm-page { max-width: 1240px; margin: 0 auto; color: var(--ink); }
 .pm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pm-muted { color: var(--muted); font-size: 14px; }
 .pm-spin { animation: pm-spin .9s linear infinite; }
@@ -95,7 +96,7 @@
 
 /* dialogs */
 :root { --z-modal: 1000; --z-modal-nested: 1100; --z-toast: 1500; }
-.pm-backdrop { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: var(--z-modal); background: rgba(20, 40, 32, .45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: pm-fade .15s ease-out; }
+.pm-backdrop { box-sizing: border-box; max-width: none; margin: 0; position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: var(--z-modal); background: rgba(20, 40, 32, .45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: pm-fade .15s ease-out; }
 .pm-backdrop.top { z-index: var(--z-modal-nested); background: rgba(20, 40, 32, .30); }
 @keyframes pm-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pm-pop { from { transform: scale(.98); } to { transform: scale(1); } }

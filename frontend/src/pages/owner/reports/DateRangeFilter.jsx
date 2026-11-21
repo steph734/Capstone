@@ -29,7 +29,6 @@ function Month({ month, sel, now, focusDay, onPick, onKey }) {
   const hi = sel.end || sel.start
   return (
     <div className="orp-cal-month">
-      <div className="orp-cal-title" id={`orp-cal-${month}`}>{monthTitle(month)}</div>
       <table className="orp-cal-grid" role="grid" aria-labelledby={`orp-cal-${month}`}>
         <thead>
           <tr>{DOW.map((d, i) => <th key={i} scope="col" abbr={DOW_FULL[i]}>{d}</th>)}</tr>
@@ -80,12 +79,7 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
   const [cmpCustom, setCmpCustom] = useState(compareCustom || { from: '', to: '' })
   const [editCmp, setEditCmp] = useState(false)
   const [focusDay, setFocusDay] = useState(range.to)
-  const [view, setView] = useState(() => {
-    const endM = monthStart(range.to)
-    const startM = monthStart(range.from)
-    const prevOfEnd = addMonths(endM, -1)
-    return startM > prevOfEnd ? startM : prevOfEnd
-  })
+  const [view, setView] = useState(() => monthStart(range.to)) // the single month on show
   const [kbd, setKbd] = useState(false)
 
   // Esc and an outside click close the popover WITHOUT applying.
@@ -111,8 +105,7 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
 
   const revealMonth = (day) => {
     const m = monthStart(day)
-    if (m < view) setView(m)
-    else if (m > addMonths(view, 1)) setView(addMonths(m, -1))
+    if (m !== view) setView(m)
   }
 
   const handlePick = (day) => {
@@ -143,7 +136,7 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
     const r = presetRange(key, now)
     setBoth(r.from, r.to)
     setFocusDay(r.to)
-    setView(monthStart(r.from) > addMonths(monthStart(r.to), -1) ? monthStart(r.from) : addMonths(monthStart(r.to), -1))
+    setView(monthStart(r.to))
   }
 
   const startBad = startText.trim() !== '' && !sel.start
@@ -166,8 +159,7 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
     onApply({ range: { from: sel.start, to: sel.end }, compare: cmpMode, compareCustom: cmpMode === 'custom' ? cmpCustom : null })
   }
 
-  const left = view
-  const right = addMonths(view, 1)
+  const nextDisabled = addMonths(view, 1) > monthStart(now)
 
   return (
     <div
@@ -178,8 +170,7 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
       tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}
     >
-      <div className="orp-picker-side">
-        <div className="orp-picker-kicker">Quick ranges</div>
+      <div className="orp-picker-side" role="group" aria-label="Quick ranges">
         {[...PRESETS, { key: 'custom', label: 'Custom range' }].map((p) => (
           <button key={p.key} type="button" className={`orp-quick ${activePreset === p.key ? 'active' : ''}`} onClick={() => applyPreset(p.key)} aria-pressed={activePreset === p.key}>
             {p.label}
@@ -202,12 +193,10 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
 
         <div className="orp-cal-nav">
           <button type="button" className="orp-icon-btn" onClick={() => setView(addMonths(view, -1))} aria-label="Previous month">‹</button>
-          <button type="button" className="orp-icon-btn" onClick={() => setView(addMonths(view, 1))} aria-label="Next month" disabled={right >= monthStart(now)}>›</button>
+          <div className="orp-cal-title" id={`orp-cal-${view}`}>{monthTitle(view)}</div>
+          <button type="button" className="orp-icon-btn" onClick={() => setView(addMonths(view, 1))} aria-label="Next month" disabled={nextDisabled}>›</button>
         </div>
-        <div className="orp-cals">
-          <Month month={left} sel={sel} now={now} focusDay={focusDay} onPick={handlePick} onKey={handleKey} />
-          <Month month={right} sel={sel} now={now} focusDay={focusDay} onPick={handlePick} onKey={handleKey} />
-        </div>
+        <Month month={view} sel={sel} now={now} focusDay={focusDay} onPick={handlePick} onKey={handleKey} />
 
         <div className="orp-picker-summary" aria-live="polite">
           {valid ? (
@@ -241,7 +230,6 @@ function DateRangePicker({ range, compare, compareCustom, busy, onApply, onClose
         )}
 
         <div className="orp-picker-foot">
-          <span className="orp-note">Future dates can't be selected</span>
           <div className="orp-picker-btns">
             <button type="button" className="orp-btn orp-btn-outline" onClick={onClose}>Cancel</button>
             <button type="button" className="orp-btn orp-btn-primary" onClick={apply} disabled={!valid || busy}>Apply range</button>

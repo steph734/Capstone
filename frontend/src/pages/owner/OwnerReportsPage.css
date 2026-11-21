@@ -209,3 +209,29 @@
   .orp-picker { position: fixed; left: 16px; right: 16px; top: 72px; width: auto; }
   .orp-kpi-value { font-size: 28px; }
 }
+
+/* ── Date range picker: minimal, centred dialog over a dimmed page (overrides the popover rules above) ── */
+.orp-picker {
+  position: fixed; top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); z-index: 1000;
+  display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  border: none; border-radius: 18px; background: #fff;
+  box-shadow: 0 0 0 100vmax rgba(20, 36, 30, 0.45), 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+.orp-picker-side { width: auto; flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 18px 18px 0; background: none; border: none; }
+.orp-quick { padding: 6px 12px; border: 1px solid #e3ede8; border-radius: 999px; font-size: 12.5px; font-weight: 700; text-align: center; }
+.orp-quick.active { background: #2e5e4e; border-color: #2e5e4e; color: #fff; }
+.orp-picker-main { padding: 14px 18px 18px; gap: 12px; }
+.orp-inputs { gap: 8px; }
+.orp-field { padding: 6px 12px; border-width: 1px; border-color: #d5e3dc; border-radius: 10px; }
+.orp-field input { font-size: 14px; }
+.orp-field:focus-within { border-color: #2e5e4e; }
+.orp-cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 0; }
+.orp-cal-title { margin: 0; font-size: 14px; }
+.orp-cal-cell button { height: 34px; font-size: 13px; }
+.orp-picker-summary { padding: 8px 12px; font-size: 12.5px; background: none; border: 1px solid #eef3f0; }
+.orp-picker-foot { justify-content: flex-end; }
+@media (max-width: 639px) {
+  .orp-picker { left: 50%; right: auto; top: 50%; width: min(380px, calc(100vw - 32px)); }
+  .orp-inputs { flex-direction: row; align-items: center; }
+  .orp-arrow { display: inline; }
+}

@@ -124,6 +124,9 @@ export default function GamesLibraryPage({ user, onLogout }) {
   const [declineTarget, setDeclineTarget] = useState(null)
   const [drawer, setDrawer] = useState(false)
   const [blocked, setBlocked] = useState(null) // { game, checklist }
+  const [confirmGame, setConfirmGame] = useState(null) // { game, action: 'publish' | 'unpublish' } while the confirm dialog is open
+  const [doneInfo, setDoneInfo] = useState(null) // same shape, once the change was saved
+  const [confirmBusy, setConfirmBusy] = useState(false)
   const requestsRef = useRef(null)
 
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3200) }
@@ -156,14 +159,21 @@ export default function GamesLibraryPage({ user, onLogout }) {
       else flash(e.message)
     } finally { setBusyId('') }
   }
-  const publish = (g) => act(g.id, async () => {
-    try { await publishGame(g.id); flash(`“${g.name}” is published`); load() } catch (e) {
-      if (e.data?.checklist) setBlocked({ game: g, checklist: e.data.checklist }); else throw e
-    }
-  })
-  const unpublish = (g) => {
-    if (!window.confirm(`Unpublish “${g.name}”? Patients and therapists stop seeing it. Scores and history are kept.`)) return
-    act(g.id, async () => { await unpublishGame(g.id); flash(`“${g.name}” is unpublished`); load() })
+  // Publish / Unpublish: confirm first, run the change, then show a success dialog.
+  const publish = (g) => setConfirmGame({ game: g, action: 'publish' })
+  const unpublish = (g) => setConfirmGame({ game: g, action: 'unpublish' })
+  const runConfirmed = async () => {
+    const { game: g, action } = confirmGame
+    setConfirmBusy(true)
+    try {
+      if (action === 'publish') await publishGame(g.id); else await unpublishGame(g.id)
+      setConfirmGame(null); setDoneInfo({ game: g, action }); load()
+    } catch (e) {
+      setConfirmGame(null)
+      if (e.code === 'SESSION_LOCKED') setLocked(true)
+      else if (action === 'publish' && e.data?.checklist) setBlocked({ game: g, checklist: e.data.checklist }) // not ready: show the checklist
+      else flash(e.message)
+    } finally { setConfirmBusy(false) }
   }
   const duplicate = (g) => act(g.id, async () => { const r = await authFetch(`/api/admin/games/${g.id}/duplicate`, { method: 'POST', body: {} }); flash(`Created the draft “${r.name}”`); load() })
   const approve = (r) => act(r.id, async () => { const b = await authFetch(`/api/admin/game-requests/${r.id}/approve-build`, { method: 'POST', body: {} }); navigate(`${BUILDER}/${b.gameId}`) })
@@ -290,6 +300,8 @@ export default function GamesLibraryPage({ user, onLogout }) {
       {drawer && data && <RequestsDrawer requests={data.requests} onClose={() => setDrawer(false)} onApprove={approve} onDecline={(r) => { setDrawer(false); setDeclineTarget(r) }} busyId={busyId} />}
       {declineTarget && <DeclineDialog request={declineTarget} onClose={() => setDeclineTarget(null)} onConfirm={decline} />}
       {deleteTarget && <DeleteDialog game={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={(g) => { setDeleteTarget(null); flash(`Deleted “${g.name}”`); load() }} onUnpublish={(g) => { setDeleteTarget(null); unpublish(g) }} />}
+      {confirmGame && <PublishDialog mode="confirm" {...confirmGame} busy={confirmBusy} onCancel={() => setConfirmGame(null)} onConfirm={runConfirmed} />}
+      {doneInfo && <PublishDialog mode="done" {...doneInfo} onDone={() => setDoneInfo(null)} />}
       {blocked && (
         <div onClick={() => setBlocked(null)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="dialog" aria-modal="true" aria-labelledby="blk-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: 22, width: 'min(460px, 100%)' }}>
@@ -312,6 +324,36 @@ export default function GamesLibraryPage({ user, onLogout }) {
 }
 
 // Delete needs the game's exact name typed. A game that has ever been played
+// Confirm and success dialogs for Publish / Unpublish.
+function PublishDialog({ mode, game, action, busy, onCancel, onConfirm, onDone }) {
+  const publishing = action === 'publish'
+  const Icon = publishing ? Send : EyeOff
+  const confirming = mode === 'confirm'
+  const title = confirming ? (publishing ? `Publish “${game.name}”?` : `Unpublish “${game.name}”?`) : (publishing ? 'Game published' : 'Game unpublished')
+  const text = confirming
+    ? (publishing ? 'Patients and therapists will be able to see and play it right away.' : 'Patients and therapists will stop seeing it. Scores and history are kept, and you can publish it again anytime.')
+    : (publishing ? `“${game.name}” is now live for patients and therapists.` : `“${game.name}” is hidden from patients and therapists. Scores and history are kept.`)
+  return (
+    <div onClick={confirming ? (busy ? undefined : onCancel) : onDone} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="pub-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '26px 24px 22px', width: 'min(400px, 100%)', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.25)' }}>
+        <span aria-hidden="true" style={{ width: 64, height: 64, borderRadius: '50%', margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: confirming ? '#eef1f3' : '#e3f4ea', color: confirming ? '#55636b' : '#16a34a' }}>
+          {confirming ? <Icon size={28} /> : <CheckCircle2 size={30} />}
+        </span>
+        <h3 id="pub-title" style={{ margin: '0 0 6px', fontSize: 19, fontWeight: 800, color: '#1f2a37' }}>{title}</h3>
+        <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.5, color: '#5d7770' }}>{text}</p>
+        {confirming ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" style={{ ...btn(false, busy), flex: 1 }} onClick={onCancel} disabled={busy} autoFocus>Cancel</button>
+            <button type="button" style={{ ...btn(true, busy), flex: 1 }} onClick={onConfirm} disabled={busy}>{busy ? (publishing ? 'Publishing…' : 'Unpublishing…') : (publishing ? 'Yes, publish' : 'Yes, unpublish')}</button>
+          </div>
+        ) : (
+          <button type="button" style={{ ...btn(true), width: '100%' }} onClick={onDone} autoFocus>Done</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // can't be deleted (the server refuses); the dialog points at Unpublish.
 export function DeleteDialog({ game, onClose, onDeleted, onUnpublish }) {
   const [typed, setTyped] = useState('')

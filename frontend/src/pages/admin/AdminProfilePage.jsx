@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import AdminPageShell from './AdminPageShell'
+import { adminMenuItems } from './adminSidebarConfig'
 import '../therapist/TherapistProfilePage.css'
 
 const STORAGE_KEY = 'admin_profile'
@@ -55,7 +56,7 @@ function Field({ icon, label, value, editing, field, draft, onChange }) {
   )
 }
 
-export default function AdminProfilePage({ user, onLogout, menuItems, onUpdateUser }) {
+export default function AdminProfilePage({ user, onLogout, menuItems = adminMenuItems, onUpdateUser }) {
   const [profile, setProfile] = useState(() => loadProfile(user))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)

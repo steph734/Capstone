@@ -11,7 +11,7 @@ import { ProgressProvider } from './context/ProgressContext'
 import { AnalyticsProvider } from './context/AnalyticsContext'
 import { loadAccessibilityPrefs, applyAccessibilityPrefs } from './utils/accessibilityPrefs'
 import { getResetPassword } from './utils/passwordResets'
-import { TEMP_USERS, getEffectiveUsers, setCredentialOverride } from './utils/accounts'
+import { TEMP_USERS, getEffectiveUsers } from './utils/accounts'
 import { sha256Hex } from './utils/hash'
 import { getSessionToken, setSessionToken } from './utils/session'
 import './GlobalToast.css'
@@ -384,15 +384,13 @@ function App() {
   }
 
   const handleUpdateUser = (updates) => {
+    // The account email is the one the server session was issued for. Every API call sends it and the server rejects any
+    // other ("You can only act on your own account"), so a profile page must never overwrite it with a locally saved
+    // profile email. Only display details (name, avatar, ...) are updated here.
+    const { email: _accountEmail, ...safe } = updates || {}
     setCurrentUser((prev) => {
-      const next = { ...prev, ...updates }
+      const next = { ...prev, ...safe }
       localStorage.setItem('currentUser', JSON.stringify(next))
-
-      // A profile email change automatically becomes the login email for this role.
-      if (updates.email && updates.email !== prev?.email && prev?.role) {
-        setCredentialOverride(prev.role, { email: updates.email })
-      }
-
       return next
     })
   }

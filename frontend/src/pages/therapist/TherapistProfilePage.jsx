@@ -114,7 +114,8 @@ function StarIcon() {
 }
 
 export default function TherapistProfilePage({ user, onLogout, menuItems, onUpdateUser }) {
-  const [profile, setProfile] = useState(loadProfile)
+  // The email shown is the real account email, not the demo default.
+  const [profile, setProfile] = useState(() => { const p = loadProfile(); return user?.email ? { ...p, email: user.email } : p })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
   const [toast, setToast] = useState(false)
@@ -122,15 +123,6 @@ export default function TherapistProfilePage({ user, onLogout, menuItems, onUpda
   useEffect(() => {
     if (editing) setDraft(profile)
   }, [editing])
-
-  // Keep the login email in sync with the saved profile email (covers profiles
-  // saved before this sync existed).
-  useEffect(() => {
-    if (profile.email && user?.email && profile.email !== user.email) {
-      onUpdateUser?.({ email: profile.email })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleSave = () => {
     setProfile(draft)

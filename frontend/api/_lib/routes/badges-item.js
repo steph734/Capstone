@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo, getDb } from '../mongo.js'
 import { Badge } from '../models/badge.js'
 import { serializeBadge } from '../serializeBadge.js'
@@ -93,6 +94,7 @@ async function handlePatch(req, res) {
     if (!doc) {
       return res.status(404).json({ error: 'Badge not found.' })
     }
+    await auditAction(req, 'badge_updated', `Edited badge "${doc?.name || id}".`, { badge_code: doc?.code, entity: 'Badge' })
     return res.status(200).json({ badge: serializeBadge(doc) })
   } catch (err) {
     console.error('badges/update error:', err)
@@ -118,6 +120,7 @@ async function handleDelete(req, res) {
       })
     }
     await Badge.findByIdAndDelete(id)
+    await auditAction(req, 'badge_deleted', `Deleted badge "${existing.name}".`, { badge_code: existing.code, entity: 'Badge' })
     return res.status(200).json({ id })
   } catch (err) {
     console.error('badges/delete error:', err)

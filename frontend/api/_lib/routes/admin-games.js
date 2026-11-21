@@ -2,7 +2,9 @@
 //
 //   GET    /api/admin/games/overview        every game + 30-day usage, stats and owner requests
 //   POST   /api/admin/games/:id/duplicate   copy a builder game as a new draft
-//   DELETE /api/admin/games/:id             { confirmName } delete a game that was never played
+//   POST   /api/admin/games/:id/archive    hide a game from everyone and move it to the Archived tab (history is kept)
+//   POST   /api/admin/games/:id/restore    bring an archived game back as an unpublished game / draft
+//   DELETE /api/admin/games/:id             { confirmName } delete a game that was never played (not used by the UI any more)
 //
 // Publish / unpublish go through /api/admin/builder/games/:id/publish|unpublish
 // (they run the "ready to publish" checklist); approve / decline go through
@@ -57,8 +59,8 @@ export default async function handler(req, res) {
           ageRange: g.age_range ? { min: g.age_range.min ?? null, max: g.age_range.max ?? null } : null,
           points: Number(g.points_per_play) || 0, icon: g.icon || null,
           status: g.status || 'draft',
-          // never published = Draft; published once and hidden again = Unpublished
-          state: published ? 'published' : g.published_at ? 'unpublished' : 'draft',
+          // never published = Draft; published once and hidden again = Unpublished; Archived wins over both
+          state: g.status === 'archived' ? 'archived' : published ? 'published' : g.published_at ? 'unpublished' : 'draft',
           builtIn: !g.builder?.doc,
           usage: { plays: ss.length, accuracy: acc === null ? null : Math.round(acc), patients: new Set(ss.map((s) => String(s.patient_id))).size },
           everPlayed: played.get(k) || 0,
@@ -68,10 +70,11 @@ export default async function handler(req, res) {
       return res.status(200).json({
         games: out,
         stats: {
-          total: out.length,
+          total: out.filter((g) => g.state !== 'archived').length,
+          archived: out.filter((g) => g.state === 'archived').length,
           addedThisMonth: games.filter((g) => g.created_at && g.created_at >= monthStart).length,
           published: out.filter((g) => g.state === 'published').length,
-          notPublished: out.filter((g) => g.state !== 'published').length,
+          notPublished: out.filter((g) => g.state !== 'published' && g.state !== 'archived').length,
         },
         requests: requests.map((r) => serializeRequest(r, { ownerName: r.owner_name })),
       })
@@ -93,6 +96,25 @@ export default async function handler(req, res) {
       const made = await createDraftGame(db, user, doc, { note: `Duplicated from ${game.name}` })
       await audit(db, { user, action: 'game_duplicate', ip, meta: { gameId: String(made.id), name, from: id } })
       return res.status(201).json({ id: String(made.id), name })
+    }
+
+    // ── Archive / restore ───────────────────────────────────────────────
+    // Archiving keeps every session, score and badge. Patients and therapists stop seeing the game (only 'published' games are
+    // offered anywhere), and it leaves the default list. Works for built-in and already-played games too.
+    if (req.method === 'POST' && action === 'archive') {
+      if (game.status === 'archived') return fail(res, 409, 'This game is already archived.', { code: 'ALREADY_ARCHIVED' })
+      const now = new Date()
+      await db.collection('games').updateOne({ _id }, { $set: { status: 'archived', archived_at: now, updated_by: user._id, updated_at: now } })
+      await audit(db, { user, action: 'game_archive', ip, meta: { gameId: id, name: game.name, was: game.status } })
+      return res.status(200).json({ ok: true, state: 'archived' })
+    }
+    if (req.method === 'POST' && action === 'restore') {
+      if (game.status !== 'archived') return fail(res, 409, 'This game is not archived.', { code: 'NOT_ARCHIVED' })
+      const now = new Date()
+      // Comes back hidden (Unpublished, or Draft if it was never published); publishing it again is a separate, deliberate step.
+      await db.collection('games').updateOne({ _id }, { $set: { status: 'draft', updated_by: user._id, updated_at: now }, $unset: { archived_at: '' } })
+      await audit(db, { user, action: 'game_restore', ip, meta: { gameId: id, name: game.name } })
+      return res.status(200).json({ ok: true, state: game.published_at ? 'unpublished' : 'draft' })
     }
 
     // ── Delete (only a game nobody ever played) ─────────────────────────

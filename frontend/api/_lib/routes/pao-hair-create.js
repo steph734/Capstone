@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo, getDb } from '../mongo.js'
 import { PaoHair } from '../models/paoHair.js'
 import { serializePaoHair } from '../serializePaoHair.js'
@@ -62,6 +63,7 @@ export default async function handler(req, res) {
       created_by: createdBy,
     })
 
+    await auditAction(req, 'hairstyle_created', `Created hairstyle "${doc.name}" for Pao.`, { item_code: doc.code, entity: 'Pao hairstyle' })
     return res.status(201).json({ item: serializePaoHair(doc) })
   } catch (err) {
     console.error('pao-hair/create error:', err)

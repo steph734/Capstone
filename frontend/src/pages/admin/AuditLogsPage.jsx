@@ -24,6 +24,16 @@ const SERVER_ACTION_META = {
   void: { icon: '🗑️', label: 'Note Voided' },
   voice_log_exported: { icon: '⬇️', label: 'Voice Log Downloaded' },
   denied: { icon: '⛔', label: 'Access Denied' },
+  // Library content (badges, Pao outfits and hairstyles)
+  badge_created: { icon: '🏅', label: 'Badge Created' },
+  badge_updated: { icon: '🏅', label: 'Badge Edited' },
+  badge_deleted: { icon: '🗑️', label: 'Badge Deleted' },
+  outfit_item_created: { icon: '🎩', label: 'Outfit Item Created' },
+  outfit_item_updated: { icon: '🎩', label: 'Outfit Item Edited' },
+  outfit_item_deleted: { icon: '🗑️', label: 'Outfit Item Deleted' },
+  hairstyle_created: { icon: '💇', label: 'Hairstyle Created' },
+  hairstyle_updated: { icon: '💇', label: 'Hairstyle Edited' },
+  hairstyle_deleted: { icon: '🗑️', label: 'Hairstyle Deleted' },
 }
 // Events that mean something was refused or went wrong; everything else is a normal success.
 const FAILED_ACTIONS = new Set(['account_locked', 'login_failed_after_lockout', 'sign_failed', 'sign_locked', 'denied'])
@@ -48,19 +58,29 @@ function mapServerLog(log) {
 
 const ROLE_FILTERS = [
   { key: 'All', label: 'All', cls: 'all' },
+  { key: 'Super Admin', label: 'Super Admin', cls: 'superadmin' },
   { key: 'Owner', label: 'Owner', cls: 'owner' },
   { key: 'Therapist', label: 'Therapist', cls: 'therapist' },
   { key: 'Patient', label: 'Patient', cls: 'patient' },
 ]
 
 const STATUS_CLASS = { Success: 'success', Review: 'review', Failed: 'failed' }
-const ROLE_CLASS = { Owner: 'owner', Therapist: 'therapist', Patient: 'patient', System: 'system' }
+const ROLE_CLASS = { 'Super Admin': 'superadmin', Owner: 'owner', Therapist: 'therapist', Patient: 'patient', System: 'system' }
+
+// "Last 30 days" ending today, as yyyy-mm-dd in local time.
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function defaultRange() {
+  const to = new Date()
+  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000)
+  return { from: ymd(from), to: ymd(to) }
+}
+const dayOf = (log) => { const t = Date.parse(`${log.date} ${log.time || ''}`); return Number.isNaN(t) ? null : ymd(new Date(t)) }
 
 export default function AuditLogsPage({ user, onLogout }) {
   const [logs, setLogs] = useState(() => getAuditLogs())
   const [roleFilter, setRoleFilter] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-06-06')
-  const [toDate, setToDate] = useState('2026-07-06')
+  const [fromDate, setFromDate] = useState(() => defaultRange().from)
+  const [toDate, setToDate] = useState(() => defaultRange().to)
   const [search, setSearch] = useState('')
   const [selectedLog, setSelectedLog] = useState(null)
   // /admin/audit-logs?filter=security (linked from the dashboard) shows only lockouts and repeated failed logins.
@@ -89,6 +109,7 @@ export default function AuditLogsPage({ user, onLogout }) {
 
   const counts = useMemo(() => ({
     All: logs.length,
+    'Super Admin': logs.filter((l) => l.role === 'Super Admin').length,
     Owner: logs.filter((l) => l.role === 'Owner').length,
     Therapist: logs.filter((l) => l.role === 'Therapist').length,
     Patient: logs.filter((l) => l.role === 'Patient').length,
@@ -97,6 +118,8 @@ export default function AuditLogsPage({ user, onLogout }) {
   const visibleLogs = useMemo(() => {
     return logs.filter((log) => {
       const matchesRole = roleFilter === 'All' || log.role === roleFilter
+      const day = dayOf(log)
+      if (day && ((fromDate && day < fromDate) || (toDate && day > toDate))) return false // outside the chosen dates
       if (securityOnly && !Object.values(SERVER_ACTION_META).some((m) => m.label === log.action)) return false
       const query = search.trim().toLowerCase()
       const matchesSearch =
@@ -107,13 +130,13 @@ export default function AuditLogsPage({ user, onLogout }) {
         String(log.id).includes(query)
       return matchesRole && matchesSearch
     })
-  }, [logs, roleFilter, search, securityOnly])
+  }, [logs, roleFilter, search, securityOnly, fromDate, toDate])
 
   const handleClear = () => {
     setRoleFilter('All')
     setSearch('')
-    setFromDate('2026-06-06')
-    setToDate('2026-07-06')
+    setFromDate(defaultRange().from)
+    setToDate(defaultRange().to)
   }
 
   return (
@@ -131,7 +154,7 @@ export default function AuditLogsPage({ user, onLogout }) {
           <span className="al-banner-icon">🛡️</span>
           <div>
             <h2>Activity Audit Logs</h2>
-            <p>All actions performed by Owner, Therapist, and Patient accounts</p>
+            <p>All actions performed by Super Admin, Owner, Therapist, and Patient accounts</p>
           </div>
         </div>
         <span className="al-banner-meta">Last 30 days by default · {logs.length} total entries</span>
@@ -142,6 +165,10 @@ export default function AuditLogsPage({ user, onLogout }) {
         <div className="al-stat-card">
           <div className="al-stat-num">{counts.All}</div>
           <div className="al-stat-label">All Activities</div>
+        </div>
+        <div className="al-stat-card superadmin">
+          <div className="al-stat-num">{counts['Super Admin']}</div>
+          <div className="al-stat-label">Super Admin</div>
         </div>
         <div className="al-stat-card owner">
           <div className="al-stat-num">{counts.Owner}</div>

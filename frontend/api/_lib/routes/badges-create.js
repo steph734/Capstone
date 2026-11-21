@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo, getDb } from '../mongo.js'
 import { Badge } from '../models/badge.js'
 import { serializeBadge } from '../serializeBadge.js'
@@ -70,6 +71,7 @@ export default async function handler(req, res) {
       created_by: createdBy,
     })
 
+    await auditAction(req, 'badge_created', `Created badge "${doc.name}".`, { badge_code: doc.code, entity: 'Badge' })
     return res.status(201).json({ badge: serializeBadge(doc) })
   } catch (err) {
     console.error('badges/create error:', err)

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo } from '../mongo.js'
 import { PaoItem } from '../models/paoItem.js'
 import { serializePaoItem, dbCategoryFromUi } from '../serializePaoItem.js'
@@ -51,6 +52,7 @@ async function handlePatch(req, res) {
     await getMongo()
     const doc = await PaoItem.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true })
     if (!doc) return res.status(404).json({ error: 'Item not found.' })
+    await auditAction(req, 'outfit_item_updated', `Edited ${String(doc?.category || 'outfit').toLowerCase()} "${doc?.name || id}".`, { item_code: doc?.code, entity: 'Pao outfit' })
     return res.status(200).json({ item: serializePaoItem(doc) })
   } catch (err) {
     console.error('pao-items/update error:', err)
@@ -67,6 +69,7 @@ async function handleDelete(req, res) {
     const existing = await PaoItem.findById(id).lean()
     if (!existing) return res.status(404).json({ error: 'Item not found.' })
     await PaoItem.findByIdAndDelete(id)
+    await auditAction(req, 'outfit_item_deleted', `Deleted ${String(existing.category || 'outfit').toLowerCase()} "${existing.name}".`, { item_code: existing.code, entity: 'Pao outfit' })
     return res.status(200).json({ id })
   } catch (err) {
     console.error('pao-items/delete error:', err)

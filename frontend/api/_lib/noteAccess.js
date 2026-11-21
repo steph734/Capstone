@@ -38,7 +38,7 @@ const AUDIT_WORDS = {
   soap_voice_used: 'used voice dictation in a note', denied: 'was denied access to session notes',
 }
 
-export async function audit(db, { user, role, action, patientId = null, noteId = null, ip = null, meta = null }) {
+export async function audit(db, { user, role, action, patientId = null, noteId = null, ip = null, meta = null, mirror = true }) {
   const now = new Date()
   try {
     // Detailed trail: who, what, which patient and note, with optional details.
@@ -52,7 +52,7 @@ export async function audit(db, { user, role, action, patientId = null, noteId =
     throw Object.assign(new Error('Could not record this action in the audit log, so it was not completed.'), { status: 500 })
   }
   // Readable copy for the Audit Logs page. Best effort: the detailed row above already exists.
-  if (user?._id) {
+  if (user?._id && mirror) { // mirror:false when the caller writes its own, more descriptive row (see adminAudit.js)
     try {
       const words = AUDIT_WORDS[action] || action
       const attempted = action === 'denied' && meta?.attempted ? ` (tried: ${meta.attempted})` : ''

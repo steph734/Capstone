@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  CheckCircle2, Copy, EyeOff, Gamepad2, Inbox, LayoutGrid, List, MoreVertical, Pencil, PencilLine, Plus, Search, Send, Star, Trash2, X,
+  Archive, CheckCircle2, Copy, EyeOff, Gamepad2, Inbox, LayoutGrid, List, MoreVertical, Pencil, PencilLine, Plus, RotateCcw, Search, Send, Star, X,
 } from 'lucide-react'
 import AdminPageShell from './AdminPageShell'
 import { adminMenuItems } from './adminSidebarConfig'
@@ -20,9 +20,10 @@ const BUILDER = '/admin/games-library/builder'
 const STATE = {
   published: { label: 'Published', icon: CheckCircle2, bg: '#fff', fg: '#166534' },
   unpublished: { label: 'Unpublished', icon: EyeOff, bg: '#fff', fg: '#9f1239' },
+  archived: { label: 'Archived', icon: Archive, bg: '#fff', fg: '#475569' },
   draft: { label: 'Draft', icon: PencilLine, bg: '#fff', fg: '#92400E' },
 }
-const TABS = [['all', 'All'], ['published', 'Published'], ['draft', 'Draft'], ['unpublished', 'Unpublished']]
+const TABS = [['all', 'All'], ['published', 'Published'], ['draft', 'Draft'], ['unpublished', 'Unpublished'], ['archived', 'Archived']]
 const SORTS = [['plays', 'Most played', 'desc'], ['newest', 'Newest', 'desc'], ['az', 'A–Z', 'asc'], ['accuracy', 'Highest accuracy', 'desc']]
 const SORT_VALUE = {
   plays: (g) => g.usage.plays, newest: (g) => (g.createdAt ? new Date(g.createdAt).getTime() : 0), az: (g) => g.name.toLowerCase(),
@@ -43,7 +44,7 @@ function Tag({ children, color, bg }) {
   return <span style={{ borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 800, color: color || '#4B5B56', background: bg || '#F1F5F3', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{children}</span>
 }
 
-function GameMenu({ game, onDuplicate, onDelete }) {
+function GameMenu({ game, onDuplicate, onArchive, onRestore }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -61,20 +62,22 @@ function GameMenu({ game, onDuplicate, onDelete }) {
       {open && (
         <div role="menu" style={{ position: 'absolute', right: 0, top: 46, zIndex: 30, minWidth: 200, background: '#fff', borderRadius: 14, boxShadow: '0 8px 28px rgba(0,0,0,.18)', border: '1px solid #e3e8e4', padding: 4 }}>
           <button type="button" role="menuitem" style={item(game.builtIn)} disabled={game.builtIn} title={game.builtIn ? 'Built-in games have no layout to copy' : undefined} onClick={() => { setOpen(false); onDuplicate(game) }}><Copy size={16} aria-hidden="true" /> Duplicate</button>
-          <button type="button" role="menuitem" style={{ ...item(false), color: '#b91c1c' }} onClick={() => { setOpen(false); onDelete(game) }}><Trash2 size={16} aria-hidden="true" /> Delete…</button>
+          {game.state === 'archived'
+            ? <button type="button" role="menuitem" style={item(false)} onClick={() => { setOpen(false); onRestore(game) }}><RotateCcw size={16} aria-hidden="true" /> Restore…</button>
+            : <button type="button" role="menuitem" style={item(false)} onClick={() => { setOpen(false); onArchive(game) }}><Archive size={16} aria-hidden="true" /> Archive…</button>}
         </div>
       )}
     </div>
   )
 }
 
-export function GameCard({ g, busy, onPublish, onUnpublish, onEdit, onDuplicate, onDelete }) {
+export function GameCard({ g, busy, onPublish, onUnpublish, onRestore, onEdit, onDuplicate, onArchive }) {
   const s = skillOf(g.skill)
   return (
     <article style={{ display: 'flex', flexDirection: 'column', background: '#fff', border: '1px solid #e3e8e4', borderRadius: 20, overflow: 'visible', minWidth: 0 }}>
       <div style={{ position: 'relative', height: 84, background: s.tint, borderRadius: '20px 20px 0 0' }}>
         <StatusPill state={g.state} style={{ position: 'absolute', top: 12, left: 12 }} />
-        <div style={{ position: 'absolute', top: 4, right: 6 }}><GameMenu game={g} onDuplicate={onDuplicate} onDelete={onDelete} /></div>
+        <div style={{ position: 'absolute', top: 4, right: 6 }}><GameMenu game={g} onDuplicate={onDuplicate} onArchive={onArchive} onRestore={onRestore} /></div>
         <span style={{ position: 'absolute', left: 16, bottom: -24, width: 58, height: 58, borderRadius: 16, background: '#fff', color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(0,0,0,.12)' }}><GameIcon name={g.icon} size={28} /></span>
       </div>
       <div style={{ padding: '36px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
@@ -95,7 +98,9 @@ export function GameCard({ g, busy, onPublish, onUnpublish, onEdit, onDuplicate,
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <button type="button" style={btn(false)} onClick={() => onEdit(g)}><Pencil size={15} aria-hidden="true" /> Edit</button>
-          {g.state === 'published'
+          {g.state === 'archived'
+            ? <button type="button" style={btn(true, busy)} disabled={busy} onClick={() => onRestore(g)}><RotateCcw size={15} aria-hidden="true" /> Restore</button>
+            : g.state === 'published'
             ? <button type="button" style={btn(false, busy)} disabled={busy} onClick={() => onUnpublish(g)}><EyeOff size={15} aria-hidden="true" /> {busy ? 'Working…' : 'Unpublish'}</button>
             : <button type="button" style={btn(true, busy)} disabled={busy} onClick={() => onPublish(g)}><Send size={15} aria-hidden="true" /> {busy ? 'Checking…' : 'Publish'}</button>}
         </div>
@@ -120,7 +125,6 @@ export default function GamesLibraryPage({ user, onLogout }) {
   const [locked, setLocked] = useState(false)
   const [busyId, setBusyId] = useState('')
   const [toast, setToast] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState(null)
   const [declineTarget, setDeclineTarget] = useState(null)
   const [drawer, setDrawer] = useState(false)
   const [blocked, setBlocked] = useState(null) // { game, checklist }
@@ -144,12 +148,12 @@ export default function GamesLibraryPage({ user, onLogout }) {
     if (!data) return []
     const needle = q.trim().toLowerCase()
     const get = SORT_VALUE[sortKey]
-    return data.games.filter((g) => (status === 'all' || g.state === status)
+    return data.games.filter((g) => (status === 'all' ? g.state !== 'archived' : g.state === status)
       && (skill === 'all' || g.skill === skill) && (difficulty === 'all' || g.difficulty === difficulty)
       && (!needle || g.name.toLowerCase().includes(needle) || g.description.toLowerCase().includes(needle)))
       .sort((a, b) => { const x = get(a), y = get(b); const c = typeof x === 'string' ? x.localeCompare(y) : x - y; return (dir === 'asc' ? c : -c) || a.name.localeCompare(b.name) })
   }, [data, q, status, skill, difficulty, sortKey, dir])
-  const counts = useMemo(() => { const c = { all: data?.games.length || 0, published: 0, draft: 0, unpublished: 0 }; (data?.games || []).forEach((g) => { c[g.state] += 1 }); return c }, [data])
+  const counts = useMemo(() => { const c = { all: 0, published: 0, draft: 0, unpublished: 0, archived: 0 }; (data?.games || []).forEach((g) => { c[g.state] += 1; if (g.state !== 'archived') c.all += 1 }); return c }, [data])
   const pendingCount = (data?.requests || []).filter((r) => r.status === 'pending').length
 
   const act = async (id, fn) => {
@@ -162,11 +166,15 @@ export default function GamesLibraryPage({ user, onLogout }) {
   // Publish / Unpublish: confirm first, run the change, then show a success dialog.
   const publish = (g) => setConfirmGame({ game: g, action: 'publish' })
   const unpublish = (g) => setConfirmGame({ game: g, action: 'unpublish' })
+  const archive = (g) => setConfirmGame({ game: g, action: 'archive' })
+  const restore = (g) => setConfirmGame({ game: g, action: 'restore' })
   const runConfirmed = async () => {
     const { game: g, action } = confirmGame
     setConfirmBusy(true)
     try {
-      if (action === 'publish') await publishGame(g.id); else await unpublishGame(g.id)
+      if (action === 'publish') await publishGame(g.id)
+      else if (action === 'unpublish') await unpublishGame(g.id)
+      else await authFetch(`/api/admin/games/${g.id}/${action}`, { method: 'POST', body: {} }) // archive | restore
       setConfirmGame(null); setDoneInfo({ game: g, action }); load()
     } catch (e) {
       setConfirmGame(null)
@@ -247,7 +255,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
 
             {view === 'grid' ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: 16 }}>
-                {games.map((g) => <GameCard key={g.id} g={g} busy={busyId === g.id} onPublish={publish} onUnpublish={unpublish} onEdit={(x) => navigate(`${BUILDER}/${x.id}`)} onDuplicate={duplicate} onDelete={setDeleteTarget} />)}
+                {games.map((g) => <GameCard key={g.id} g={g} busy={busyId === g.id} onPublish={publish} onUnpublish={unpublish} onRestore={restore} onArchive={archive} onEdit={(x) => navigate(`${BUILDER}/${x.id}`)} onDuplicate={duplicate} onArchive={archive} onRestore={restore} />)}
                 <button type="button" onClick={() => navigate(`${BUILDER}/new`)} style={{ minHeight: 280, borderRadius: 20, border: '2px dashed #cfe0d8', background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: '#1f3d36', fontFamily: 'inherit', padding: 20 }}>
                   <span style={{ width: 64, height: 64, borderRadius: 20, background: '#E4F2EC', color: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={30} aria-hidden="true" /></span>
                   <strong style={{ fontSize: 17 }}>Create a new game</strong>
@@ -282,7 +290,7 @@ export default function GamesLibraryPage({ user, onLogout }) {
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <button type="button" style={btn(false)} onClick={() => navigate(`${BUILDER}/${g.id}`)}>Edit</button>
-                            {g.state === 'published' ? <button type="button" style={btn(false, busyId === g.id)} disabled={busyId === g.id} onClick={() => unpublish(g)}>Unpublish</button> : <button type="button" style={btn(true, busyId === g.id)} disabled={busyId === g.id} onClick={() => publish(g)}>Publish</button>}
+                            {g.state === 'archived' ? <button type="button" style={btn(true, busyId === g.id)} disabled={busyId === g.id} onClick={() => restore(g)}>Restore</button> : g.state === 'published' ? <button type="button" style={btn(false, busyId === g.id)} disabled={busyId === g.id} onClick={() => unpublish(g)}>Unpublish</button> : <button type="button" style={btn(true, busyId === g.id)} disabled={busyId === g.id} onClick={() => publish(g)}>Publish</button>}
                             <GameMenu game={g} onDuplicate={duplicate} onDelete={setDeleteTarget} />
                           </div>
                         </td>
@@ -299,7 +307,6 @@ export default function GamesLibraryPage({ user, onLogout }) {
 
       {drawer && data && <RequestsDrawer requests={data.requests} onClose={() => setDrawer(false)} onApprove={approve} onDecline={(r) => { setDrawer(false); setDeclineTarget(r) }} busyId={busyId} />}
       {declineTarget && <DeclineDialog request={declineTarget} onClose={() => setDeclineTarget(null)} onConfirm={decline} />}
-      {deleteTarget && <DeleteDialog game={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={(g) => { setDeleteTarget(null); flash(`Deleted “${g.name}”`); load() }} onUnpublish={(g) => { setDeleteTarget(null); unpublish(g) }} />}
       {confirmGame && <PublishDialog mode="confirm" {...confirmGame} busy={confirmBusy} onCancel={() => setConfirmGame(null)} onConfirm={runConfirmed} />}
       {doneInfo && <PublishDialog mode="done" {...doneInfo} onDone={() => setDoneInfo(null)} />}
       {blocked && (
@@ -326,13 +333,17 @@ export default function GamesLibraryPage({ user, onLogout }) {
 // Delete needs the game's exact name typed. A game that has ever been played
 // Confirm and success dialogs for Publish / Unpublish.
 function PublishDialog({ mode, game, action, busy, onCancel, onConfirm, onDone }) {
-  const publishing = action === 'publish'
-  const Icon = publishing ? Send : EyeOff
   const confirming = mode === 'confirm'
-  const title = confirming ? (publishing ? `Publish “${game.name}”?` : `Unpublish “${game.name}”?`) : (publishing ? 'Game published' : 'Game unpublished')
-  const text = confirming
-    ? (publishing ? 'Patients and therapists will be able to see and play it right away.' : 'Patients and therapists will stop seeing it. Scores and history are kept, and you can publish it again anytime.')
-    : (publishing ? `“${game.name}” is now live for patients and therapists.` : `“${game.name}” is hidden from patients and therapists. Scores and history are kept.`)
+  const n = game.name
+  const COPY = {
+    publish: { icon: Send, ing: 'Publishing…', yes: 'Yes, publish', cTitle: `Publish “${n}”?`, cText: 'Patients and therapists will be able to see and play it right away.', dTitle: 'Game published', dText: `“${n}” is now live for patients and therapists.` },
+    unpublish: { icon: EyeOff, ing: 'Unpublishing…', yes: 'Yes, unpublish', cTitle: `Unpublish “${n}”?`, cText: 'Patients and therapists will stop seeing it. Scores and history are kept, and you can publish it again anytime.', dTitle: 'Game unpublished', dText: `“${n}” is hidden from patients and therapists. Scores and history are kept.` },
+    archive: { icon: Archive, ing: 'Archiving…', yes: 'Yes, archive', cTitle: `Archive “${n}”?`, cText: 'It is hidden from patients and therapists and moved to the Archived tab. Scores and history are kept, and you can restore it anytime.', dTitle: 'Game archived', dText: `“${n}” is archived. Find it under the Archived filter and restore it whenever you like.` },
+    restore: { icon: RotateCcw, ing: 'Restoring…', yes: 'Yes, restore', cTitle: `Restore “${n}”?`, cText: 'It comes back as an unpublished game. Patients will not see it until you publish it again.', dTitle: 'Game restored', dText: `“${n}” is back in your library, unpublished. Publish it when it is ready.` },
+  }[action]
+  const Icon = COPY.icon
+  const title = confirming ? COPY.cTitle : COPY.dTitle
+  const text = confirming ? COPY.cText : COPY.dText
   return (
     <div onClick={confirming ? (busy ? undefined : onCancel) : onDone} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div role="alertdialog" aria-modal="true" aria-labelledby="pub-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '26px 24px 22px', width: 'min(400px, 100%)', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.25)' }}>
@@ -344,7 +355,7 @@ function PublishDialog({ mode, game, action, busy, onCancel, onConfirm, onDone }
         {confirming ? (
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" style={{ ...btn(false, busy), flex: 1 }} onClick={onCancel} disabled={busy} autoFocus>Cancel</button>
-            <button type="button" style={{ ...btn(true, busy), flex: 1 }} onClick={onConfirm} disabled={busy}>{busy ? (publishing ? 'Publishing…' : 'Unpublishing…') : (publishing ? 'Yes, publish' : 'Yes, unpublish')}</button>
+            <button type="button" style={{ ...btn(true, busy), flex: 1 }} onClick={onConfirm} disabled={busy}>{busy ? COPY.ing : COPY.yes}</button>
           </div>
         ) : (
           <button type="button" style={{ ...btn(true), width: '100%' }} onClick={onDone} autoFocus>Done</button>

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo } from '../mongo.js'
 import { PaoHair } from '../models/paoHair.js'
 import { serializePaoHair } from '../serializePaoHair.js'
@@ -44,6 +45,7 @@ async function handlePatch(req, res) {
     await getMongo()
     const doc = await PaoHair.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true })
     if (!doc) return res.status(404).json({ error: 'Hairstyle not found.' })
+    await auditAction(req, 'hairstyle_updated', `Edited hairstyle "${doc?.name || id}".`, { item_code: doc?.code, entity: 'Pao hairstyle' })
     return res.status(200).json({ item: serializePaoHair(doc) })
   } catch (err) {
     console.error('pao-hair/update error:', err)
@@ -60,6 +62,7 @@ async function handleDelete(req, res) {
     const existing = await PaoHair.findById(id).lean()
     if (!existing) return res.status(404).json({ error: 'Hairstyle not found.' })
     await PaoHair.findByIdAndDelete(id)
+    await auditAction(req, 'hairstyle_deleted', `Deleted hairstyle "${existing.name}".`, { item_code: existing.code, entity: 'Pao hairstyle' })
     return res.status(200).json({ id })
   } catch (err) {
     console.error('pao-hair/delete error:', err)

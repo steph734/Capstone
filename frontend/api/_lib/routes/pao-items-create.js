@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { auditAction } from '../auditAction.js'
 import { getMongo, getDb } from '../mongo.js'
 import { PaoItem } from '../models/paoItem.js'
 import { serializePaoItem, dbCategoryFromUi } from '../serializePaoItem.js'
@@ -70,6 +71,7 @@ export default async function handler(req, res) {
       created_by: createdBy,
     })
 
+    await auditAction(req, 'outfit_item_created', `Created ${String(doc.category || 'outfit').toLowerCase()} "${doc.name}" for Pao.`, { item_code: doc.code, category: doc.category, entity: 'Pao outfit' })
     return res.status(201).json({ item: serializePaoItem(doc) })
   } catch (err) {
     console.error('pao-items/create error:', err)

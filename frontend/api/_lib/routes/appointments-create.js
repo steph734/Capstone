@@ -90,6 +90,7 @@ export default async function handler(req, res) {
 
     return res.status(201).json({ success: true, appointmentId, patientId, paymentRecorded, paymentError, paymentRef, amount: total, method: paymentMethod })
   } catch (err) {
+    if (err.code === 'PATIENT_ARCHIVED') return res.status(409).json({ error: err.message, code: err.code })
     console.error('appointments/create error:', err)
     return res.status(500).json({ error: err.message || 'Could not save the appointment.' })
   }

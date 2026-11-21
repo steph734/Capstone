@@ -17,11 +17,11 @@ export function setSessionToken(token) {
 // fetch() that sends the bearer token and turns API errors into Error
 // objects carrying { status, code, fields } so callers can react (lock
 // screen on SESSION_LOCKED, per-field messages, etc.).
-export async function authFetch(path, { method = 'GET', body, query } = {}) {
+export async function authFetch(path, { method = 'GET', body, query, headers = {} } = {}) {
   const url = query ? `${path}?${new URLSearchParams(query)}` : path
   const res = await fetch(url, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}`, ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))

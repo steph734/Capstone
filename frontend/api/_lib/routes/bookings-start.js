@@ -83,6 +83,7 @@ export default async function handler(req, res) {
       amount: ONLINE_AMOUNT_PESOS, currency: CURRENCY, holdExpiresAt: created.appointmentDoc.hold_expires_at,
     })
   } catch (err) {
+    if (err.code === 'PATIENT_ARCHIVED') return res.status(409).json({ error: err.message, code: err.code })
     console.error('bookings/start error:', err)
     return res.status(500).json({ error: 'We could not start your booking. Please try again.' })
   }

@@ -21,6 +21,7 @@ import bookingsExpire from './_lib/routes/bookings-expire.js'
 import paymentsItem from './_lib/routes/payments-item.js'
 import paymentsAwaiting from './_lib/routes/payments-awaiting.js'
 import therapistPayments from './_lib/routes/therapist-payments.js'
+import therapistPatients, { registrationReceiptRoute } from './_lib/routes/therapist-patients.js'
 import * as review from './_lib/routes/appointments-review.js'
 import stripeWebhook from './_lib/routes/stripe-webhook.js'
 
@@ -383,6 +384,11 @@ app.all('/api/therapist/home-sets/note-context', homeSets.homeSetsNoteContext)
 app.all('/api/therapist/home-sets/note-review', homeSets.homeSetsNoteReview)
 app.all('/api/therapist/home-sets/note-redraft', homeSets.homeSetsNoteRedraft)
 app.all('/api/therapist/home-sets/:id/recommendation', homeSets.homeSetsRecommendation)
+// My Patients (after the more specific /api/therapist/patients/:id/home-* routes above)
+app.all('/api/therapist/registration-payments/:id/receipt', registrationReceiptRoute)
+app.all('/api/therapist/patients/:id/:action', therapistPatients)
+app.all('/api/therapist/patients/:id', therapistPatients)
+app.all('/api/therapist/patients', therapistPatients)
 app.all('/api/therapist/today', gamePlans.therapistToday)
 app.all('/api/therapist/games', gamePlans.therapistGames)
 app.all('/api/game-plans', gamePlans.plansCollection)

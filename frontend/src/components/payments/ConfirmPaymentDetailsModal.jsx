@@ -34,7 +34,7 @@ export default function ConfirmPaymentDetailsModal({ methodLabel, amount, therap
       >
         <div className="flex flex-col items-center text-center">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-pm-green-dark"><CreditCard size={28} aria-hidden="true" /></span>
-          <h2 id="cpd-title" className="mt-3 text-2xl font-extrabold">Is your payment complete?</h2>
+          <h2 id="cpd-title" className="mt-3 text-2xl font-extrabold" style={{ color: '#000', WebkitTextFillColor: '#000' }}>Is your payment complete?</h2>
           <p id="cpd-desc" className="mt-1 text-sm text-slate-500">Please check these before we send them to {therapist || 'your therapist'}.</p>
         </div>
 

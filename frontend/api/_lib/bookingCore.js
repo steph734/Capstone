@@ -119,6 +119,7 @@ export async function createBookingRecords(db, body, extra = {}) {
       birthdate: patientDoc.birthdate,
     })
     : null
+  if (existingPatient?.status === 'archived') throw Object.assign(new Error('This patient is archived. Ask the therapist to unarchive them before booking.'), { status: 409, code: 'PATIENT_ARCHIVED' })
   const patientId = existingPatient ? existingPatient._id : (await db.collection('patients').insertOne(patientDoc)).insertedId
 
   if (photoRecord) {

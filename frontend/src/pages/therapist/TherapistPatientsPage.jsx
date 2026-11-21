@@ -1,752 +1,199 @@
-import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
-import { Channel, Window, MessageList, MessageComposer, WithComponents } from 'stream-chat-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Users, UserCheck, CalendarCheck, Clock, Search, Plus, ChevronLeft, ChevronRight, AlertTriangle, RefreshCw, UserPlus } from 'lucide-react'
 import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
-import { useStreamCtx } from '../../stream/StreamProvider'
-import useContact from '../../stream/useContact'
-import EmailGuardianModal from '../../components/EmailGuardianModal'
-import RecommendSessionModal from '../../components/RecommendSessionModal'
-import { TherapistRecommendationAttachment } from '../../components/SessionRecommendationCard'
-import { generateUniqueId } from '../../utils/idGenerator'
+import { patientsApi } from './patients/api'
+import { fmtDay } from './patients/format'
+import { Avatar, StatusBadge, useToast } from './patients/ui'
+import MoreActionsMenu from './patients/MoreActionsMenu'
+import PatientDetailModal from './patients/PatientDetailModal'
+import { ArchiveModal, DeleteModal } from './patients/ArchiveDeleteModals'
+import AddPatientModal from './patients/AddPatientModal'
+import MessageGuardianModal from './patients/MessageGuardianModal'
+import './patients/PatientsPage.css'
 
-function fmtDate(iso) {
-  if (!iso) return null
-  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-// A stable placeholder avatar for a given id — real patient ids are Mongo
-// ObjectId strings (not the small sequential ints a `% N` trick expects), so
-// this hashes the string down to a pravatar image index instead.
-function avatarFor(id) {
-  const s = String(id)
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return `https://i.pravatar.cc/150?img=${(h % 70) + 1}`
-}
+const PAGE_SIZE = 10
+const SEGMENTS = [['all', 'All', 'total'], ['active', 'Active', 'active'], ['inactive', 'Inactive', 'inactive'], ['archived', 'Archived', 'archived']]
+const SORTS = [['name', 'name'], ['name_desc', 'name (Z–A)'], ['newest', 'newest added'], ['last_session', 'last session'], ['next_session', 'next session']]
 
-import './TherapistPatientsPage.css'
-
-function VideoIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" /></svg>
-}
-function PhoneIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" /></svg>
-}
-function EmailIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><path d="M22 6l-10 7L2 6" /></svg>
-}
-function PeopleIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-}
-function PersonCheckIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="m17 11 2 2 4-4" /></svg>
-}
-function CalendarCheckIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="m9 16 2 2 4-4" /></svg>
-}
-function AlertIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-}
-function KebabIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
-}
-function EyeIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-}
-function ArchiveIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>
-}
-function TrashIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /></svg>
-}
-
-const STATUS_CONFIG = {
-  Active:   { cls: 'tp-pill-green' },
-  Inactive: { cls: 'tp-pill-gray'  },
-}
-
-// Deterministic initials + a matching pastel color, so a patient without a
-// real profile photo still gets a stable, recognizable avatar circle.
-const AVATAR_PALETTE = [
-  { bg: '#dbeafe', fg: '#1d4ed8' },
-  { bg: '#dcfce7', fg: '#15803d' },
-  { bg: '#fef3c7', fg: '#b45309' },
-  { bg: '#fce7f3', fg: '#be185d' },
-  { bg: '#ede9fe', fg: '#6d28d9' },
-  { bg: '#ffe4e6', fg: '#be123c' },
-  { bg: '#e0f2fe', fg: '#0369a1' },
-  { bg: '#fef9c3', fg: '#854d0e' },
-]
-function paletteFor(id) {
-  const s = String(id)
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length]
-}
-function initialsFor(name) {
-  return (
-    (name || '')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0].toUpperCase())
-      .join('') || '?'
+function StatCard({ icon: I, tone, value, label, children, onClick, active }) {
+  const body = (
+    <>
+      <span className={`pm-stat-ico ${tone}`} aria-hidden="true"><I size={20} /></span>
+      <span className="pm-stat-text"><strong>{value}</strong><span>{label}</span></span>
+    </>
   )
+  // The clickable card is a div holding two real buttons (filter + link), never a button inside a button.
+  return onClick
+    ? <div className={`pm-stat clickable${active ? ' active' : ''}`}><button type="button" className="pm-stat-main" onClick={onClick} aria-pressed={active}>{body}</button>{children}</div>
+    : <div className="pm-stat">{body}</div>
 }
 
-/* ── Profile Modal ──────────────────────────────────────── */
-function ProfileModal({ patient, onClose, onMessage, onEmail }) {
-  const sc = STATUS_CONFIG[patient.status] || STATUS_CONFIG['Active']
-
-  return (
-    <div className="tp-modal-backdrop" onClick={onClose}>
-      <div className="tp-profile-modal" onClick={e => e.stopPropagation()}>
-        {/* Hero */}
-        <div className="tp-profile-hero">
-          <button className="tp-modal-close tp-profile-close" onClick={onClose} aria-label="Close">✕</button>
-          <img src={patient.avatar} alt={patient.name} className="tp-profile-avatar" />
-          <h2 className="tp-profile-name">{patient.name}</h2>
-          <p className="tp-profile-meta">Age {patient.age} &nbsp;·&nbsp; {patient.condition}</p>
-          <span className={`tp-pill ${sc.cls}`}>{patient.status}</span>
-        </div>
-
-        {/* Body */}
-        <div className="tp-profile-body">
-          <h4 className="tp-section-title">Patient Details</h4>
-          <div className="tp-detail-grid">
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Patient ID</span>
-              <span className="tp-detail-val">{patient.patientId || '—'}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Guardian</span>
-              <span className="tp-detail-val">{patient.guardian}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Contact</span>
-              <span className="tp-detail-val">{patient.contact}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Email</span>
-              <span className="tp-detail-val">{patient.email || '—'}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Joined</span>
-              <span className="tp-detail-val">{patient.joined}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Total Sessions</span>
-              <span className="tp-detail-val">{patient.sessions}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Last Session</span>
-              <span className="tp-detail-val">{patient.lastSession}</span>
-            </div>
-            <div className="tp-detail-row">
-              <span className="tp-detail-lbl">Next Session</span>
-              <span className="tp-detail-val">{patient.nextSession}</span>
-            </div>
-          </div>
-
-          <h4 className="tp-section-title" style={{ marginTop: 20 }}>Clinical Notes</h4>
-          <p className="tp-notes-box">{patient.notes}</p>
-        </div>
-
-        {/* Footer */}
-        <div className="tp-modal-footer">
-          <button className="tp-btn-cancel" onClick={onClose}>Close</button>
-          <button
-            type="button"
-            className="tp-btn-cancel tp-btn-email"
-            onClick={() => { onClose(); onEmail(patient) }}
-          >
-            <EmailIcon />
-            Email Guardian
-          </button>
-          <button className="tp-btn-add" onClick={() => { onClose(); onMessage(patient) }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            Message Guardian
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Message Modal ──────────────────────────────────────── */
-// Wired to the real 1-on-1 Stream channel between this therapist and the
-// patient's guardian (created on open via /api/stream/contact if it doesn't
-// exist yet). Video/voice buttons start real Stream calls.
-function MessageModal({ patient, therapistEmail, onClose }) {
-  const [channel, setChannel] = useState(null)
-  const [loadError, setLoadError] = useState('')
-  const navigate = useNavigate()
-  const { chatClient } = useStreamCtx() || {}
-  const contact = useContact(therapistEmail)
-
-  useEffect(() => {
-    let cancelled = false
-    setChannel(null)
-    setLoadError('')
-    if (!chatClient || !patient?.id) return undefined
-    contact.openChannel({ targetPatientId: patient.id })
-      .then(({ channel: ch }) => { if (!cancelled) setChannel(ch) })
-      .catch((err) => { if (!cancelled) setLoadError(err.message) })
-    return () => { cancelled = true }
-  }, [chatClient, patient?.id])
-
-  const handleCall = (video) => {
-    const other = channel && Object.values(channel.state.members || {}).find((m) => m.user?.id !== chatClient.userID)?.user
-    if (!other?.id) return
-    contact.callOtherUser(other.id, { video, channelId: channel.id }).catch((err) => alert(err.message))
-  }
-
-  return (
-    <div className="tp-modal-backdrop" onClick={onClose}>
-      <div className="tp-msg-modal" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="tp-msg-header">
-          <img src={patient.avatar} alt={patient.name} className="tp-msg-avatar" />
-          <div className="tp-msg-header-info">
-            <span className="tp-msg-header-name">{patient.name}</span>
-            <span className="tp-msg-header-sub">Messaging · {patient.guardian} (Guardian)</span>
-          </div>
-          <div className="tp-msg-header-actions">
-            <button className="tp-icon-btn" onClick={() => handleCall(true)} aria-label="Video call" disabled={!channel}><VideoIcon /></button>
-            <button className="tp-icon-btn" onClick={() => handleCall(false)} aria-label="Voice call" disabled={!channel}><PhoneIcon /></button>
-            {channel && (
-              <button
-                className="tp-icon-btn"
-                onClick={() => navigate(`/messages?cid=${channel.type}:${channel.id}`)}
-                aria-label="Open in Messages"
-                title="Open in Messages"
-              >
-                ↗
-              </button>
-            )}
-            <button className="tp-modal-close" onClick={onClose} aria-label="Close">✕</button>
-          </div>
-        </div>
-
-        {loadError && <div className="tp-msg-body"><p style={{ color: '#9a3b3b' }}>{loadError}</p></div>}
-
-        {channel && (
-          <div className="tp-msg-stream-body">
-            <WithComponents overrides={{ Attachment: TherapistRecommendationAttachment }}>
-            <Channel channel={channel}>
-              <Window>
-                <MessageList />
-                <MessageComposer />
-              </Window>
-            </Channel>
-            </WithComponents>
-          </div>
-        )}
-
-        {!channel && !loadError && <div className="tp-msg-body"><p>Connecting…</p></div>}
-      </div>
-    </div>
-  )
-}
-
-/* ── Add Patient Modal ──────────────────────────────────── */
-function AddPatientModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', age: '', condition: '', status: 'Active' })
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const handleAdd = () => {
-    if (!form.name.trim() || !form.condition.trim()) return
-    onAdd(form)
-    onClose()
-  }
-
-  return (
-    <div className="tp-modal-backdrop" onClick={onClose}>
-      <div className="tp-modal" onClick={e => e.stopPropagation()}>
-        <div className="tp-modal-header">
-          <h3>Add New Patient</h3>
-          <button className="tp-modal-close" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        <div className="tp-modal-body">
-          <div className="tp-modal-form">
-            <div className="tp-form-group">
-              <label>Full Name</label>
-              <input placeholder="e.g. Juan dela Cruz" value={form.name} onChange={e => set('name', e.target.value)} />
-            </div>
-            <div className="tp-form-group">
-              <label>Age</label>
-              <input type="number" placeholder="e.g. 8" min="1" max="18" value={form.age} onChange={e => set('age', e.target.value)} />
-            </div>
-            <div className="tp-form-group tp-form-full">
-              <label>Condition / Diagnosis</label>
-              <input placeholder="e.g. ADHD, Speech Delay" value={form.condition} onChange={e => set('condition', e.target.value)} />
-            </div>
-            <div className="tp-form-group tp-form-full">
-              <label>Status</label>
-              <select value={form.status} onChange={e => set('status', e.target.value)}>
-                <option>Active</option>
-                <option>Inactive</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div className="tp-modal-footer">
-          <button className="tp-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="tp-btn-add" onClick={handleAdd}>Add Patient</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Confirm Modal (Archive / Delete) ─────────────────────── */
-function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCancel }) {
-  return (
-    <div className="tp-modal-backdrop" onClick={onCancel}>
-      <div className="tp-modal tp-confirm-modal" onClick={e => e.stopPropagation()}>
-        <div className="tp-modal-header">
-          <h3>{title}</h3>
-          <button className="tp-modal-close" onClick={onCancel} aria-label="Close">✕</button>
-        </div>
-        <div className="tp-modal-body">
-          <p className="tp-confirm-message">{message}</p>
-        </div>
-        <div className="tp-modal-footer">
-          <button className="tp-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className={`tp-btn-add ${danger ? 'tp-btn-danger' : ''}`} onClick={onConfirm}>
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Main Page ──────────────────────────────────────────── */
 export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
-  const [search, setSearch]       = useState('')
-  const [filter, setFilter]       = useState('All')
-  const [sortBy, setSortBy]       = useState('name')
-  const [patients, setPatients]   = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [loadError, setLoadError] = useState('')
-  const [showAdd, setShowAdd]     = useState(false)
-  const [profilePt, setProfilePt] = useState(null)
-  const [messagePt, setMessagePt] = useState(null)
-  const [emailingPt, setEmailingPt] = useState(null)
-  // Patient the "Recommend next session" modal is open for, and a short success notice.
-  const [recommendPt, setRecommendPt] = useState(null)
-  const [notice, setNotice] = useState('')
-  // "No upcoming session" KPI card toggles this filter.
-  const [noUpcomingOnly, setNoUpcomingOnly] = useState(false)
-  // { type: 'archive' | 'delete', patient } while a confirm modal is open.
-  const [confirmModal, setConfirmModal] = useState(null)
-  const [openMenuId, setOpenMenuId] = useState(null)
-  // Fixed-position coordinates for the open row menu, computed from the
-  // kebab button that opened it. The menu is portaled to <body> (see
-  // RowMenu below) instead of living inside the table's own scroll
-  // container, so it can never get clipped into its own tiny scrollbar by
-  // that container's overflow-x: auto (which — per the CSS overflow spec —
-  // forces overflow-y to auto too whenever only one axis is set).
-  const [menuPos, setMenuPos] = useState(null)
+  const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  // Filters, sort and page live in the URL, so a refresh or a shared link keeps the same view.
+  const status = SEGMENTS.some(([k]) => k === params.get('status')) ? params.get('status') : 'all'
+  const sort = SORTS.some(([k]) => k === params.get('sort')) ? params.get('sort') : 'name'
+  const needs = params.get('needs') === '1'
+  const page = Math.max(1, parseInt(params.get('page'), 10) || 1)
+  const urlSearch = params.get('q') || ''
 
-  // Every patient who has actually booked with this therapist, derived from
-  // the `appointments` collection (see api/_lib/routes/patients-therapist-list.js)
-  // — there's no direct "assigned therapist" field on a patient record, so
-  // having an appointment with this therapist IS what it means to have
-  // chosen them. Add/Mark inactive/Archive below only mutate this in-memory
-  // list; none of it is wired to the backend yet, so changes here won't
-  // survive a reload.
+  const [searchText, setSearchText] = useState(urlSearch)
+  const [data, setData] = useState(null) // { items, total, page, counts, fee, therapist }
+  const [state, setState] = useState({ loading: true, error: '' })
+  const [view, setView] = useState(null) // detail modal: { id, summary }
+  const [archiveFor, setArchiveFor] = useState(null)
+  const [deleteFor, setDeleteFor] = useState(null)
+  const [messageFor, setMessageFor] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [toastEl, toast] = useToast()
+  const reqId = useRef(0)
+
+  const setParam = useCallback((patch) => setParams((p) => {
+    const n = new URLSearchParams(p)
+    for (const [k, v] of Object.entries(patch)) { if (v === '' || v == null || v === false) n.delete(k); else n.set(k, String(v)) }
+    return n
+  }, { replace: true }), [setParams])
+
+  // Search is debounced (300 ms) into the URL.
   useEffect(() => {
-    let cancelled = false
-    if (!user?.email) {
-      setLoading(false)
-      setLoadError('Your account isn’t linked to a staff record yet.')
-      return
+    if (searchText === urlSearch) return undefined
+    const t = setTimeout(() => setParam({ q: searchText.trim(), page: '' }), 300)
+    return () => clearTimeout(t)
+  }, [searchText]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSearchText(urlSearch) }, [urlSearch])
+
+  const load = useCallback(async () => {
+    const id = ++reqId.current
+    setState((s) => ({ ...s, loading: true, error: '' }))
+    try {
+      const d = await patientsApi.list({ search: urlSearch, status, needs_session: needs ? '1' : '', sort, page, limit: PAGE_SIZE })
+      if (id === reqId.current) { setData(d); setState({ loading: false, error: '' }) }
+    } catch (e) {
+      if (id === reqId.current) setState({ loading: false, error: e.message || 'Could not load your patients.' })
     }
-    setLoading(true)
-    fetch(`/api/patients/therapist-list?email=${encodeURIComponent(user.email)}`)
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-        const list = (body.patients || []).map((p) => ({
-          ...p,
-          archived:    false,
-          avatar:      avatarFor(p.id),
-          lastSession: fmtDate(p.lastSessionDate) || 'Not yet',
-          nextSession: fmtDate(p.nextSessionDate) || 'TBD',
-          joined:      fmtDate(p.joinedDate) || '—',
-        }))
-        if (!cancelled) setPatients(list)
-      })
-      .catch((e) => { if (!cancelled) setLoadError(e.message || 'Could not load patients.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [user?.email])
+  }, [urlSearch, status, needs, sort, page])
+  useEffect(() => { load() }, [load])
 
-  // Close the row action menu on an outside click, or on any scroll/resize
-  // — its position is computed once when it opens, so it would otherwise
-  // drift out of place under the button that opened it.
-  useEffect(() => {
-    if (openMenuId == null) return
-    const close = () => { setOpenMenuId(null); setMenuPos(null) }
-    const onDocClick = (e) => {
-      if (!e.target.closest('.tp-menu-cell') && !e.target.closest('.tp-row-menu-portal')) close()
-    }
-    document.addEventListener('mousedown', onDocClick)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [openMenuId])
+  const counts = data?.counts || { total: 0, active: 0, inactive: 0, archived: 0, upcoming_booked: 0, need_session: 0 }
+  const items = data?.items || []
+  const totalPages = Math.max(1, Math.ceil((data?.total || 0) / PAGE_SIZE))
+  const filtered = Boolean(urlSearch || needs || status !== 'all')
+  const from = data?.total ? (page - 1) * PAGE_SIZE + 1 : 0
+  const to = Math.min(page * PAGE_SIZE, data?.total || 0)
 
-  // These just apply the change — the confirm/unarchive decision lives in
-  // the button handlers below (via `confirmModal`), so callers here are
-  // always acting on an already-confirmed action.
-  const toggleArchived = (id) => {
-    setPatients(prev => prev.map(p => (p.id === id ? { ...p, archived: !p.archived } : p)))
+  const bookSession = (p) => navigate('/therapist/appointments', { state: { patientId: p.id, patientName: p.name } })
+  const unarchive = async (p) => {
+    try { await patientsApi.unarchive(p.id); toast(`${p.name} unarchived`); load() } catch (e) { toast(e.message) }
   }
+  const pageNumbers = useMemo(() => {
+    const out = []
+    for (let i = 1; i <= totalPages; i += 1) if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) out.push(i)
+    return out.reduce((acc, n, i) => (i && n - out[i - 1] > 1 ? [...acc, '…', n] : [...acc, n]), [])
+  }, [totalPages, page])
 
-  const deletePatient = (id) => {
-    setPatients(prev => prev.filter(pt => pt.id !== id))
-  }
-
-  // The KPI cards and the All/Active/Inactive tabs only ever look at patients
-  // who aren't archived — an archived patient stays in `patients` (so it can
-  // still be found and unarchived) but is otherwise treated as gone until you
-  // switch to the dedicated Archived tab.
-  const roster = patients.filter(p => !p.archived)
-
-  const filtered = patients.filter(p => {
-    const q = search.toLowerCase()
-    const matchSearch = p.name.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q)
-    if (!matchSearch) return false
-    if (filter === 'Archived') return p.archived
-    if (p.archived) return false
-    if (noUpcomingOnly && p.nextSessionDate) return false
-    return filter === 'All' || p.status === filter
-  })
-
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'next') return (a.nextSessionDate || '9999-99-99').localeCompare(b.nextSessionDate || '9999-99-99')
-    if (sortBy === 'last') return (b.lastSessionDate || '').localeCompare(a.lastSessionDate || '')
-    if (sortBy === 'sessions') return b.sessions - a.sessions
-    return a.name.localeCompare(b.name)
-  })
-
-  const counts = {
-    total:          roster.length,
-    active:         roster.filter(p => p.status === 'Active').length,
-    inactive:       roster.filter(p => p.status === 'Inactive').length,
-    archived:       patients.filter(p => p.archived).length,
-    upcomingBooked: roster.filter(p => p.nextSessionDate).length,
-    noUpcoming:     roster.filter(p => !p.nextSessionDate).length,
-  }
-
-  const handleAdd = (form) => {
-    const id = Date.now()
-    const newPt = {
-      id,
-      patientId:   generateUniqueId('P', patients.map((p) => p.patientId).filter(Boolean)),
-      name:        form.name,
-      age:         Number(form.age) || 0,
-      condition:   form.condition,
-      status:      form.status,
-      archived:    false,
-      avatar:      avatarFor(id),
-      lastSession: 'Not yet',
-      nextSession: 'TBD',
-      nextSessionDate: null,
-      lastSessionDate: null,
-      sessions:    0,
-      guardian:    'Not specified',
-      contact:     'Not specified',
-      email:       'Not specified',
-      joined:      new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      notes:       'No clinical notes yet.',
-    }
-    setPatients(prev => [newPt, ...prev])
-  }
+  const empty = !state.loading && !state.error && items.length === 0
+  const noPatientsAtAll = empty && !filtered && counts.total + counts.archived === 0
 
   return (
-    <TherapistPageShell
-      user={user}
-      onLogout={onLogout}
-      title="My Patients"
-      subtitle="Track your assigned patients and current progress"
-      icon="👨‍👩‍👧"
-      menuItems={getTherapistMenuItems(betaTier)}
-    >
-      {loading ? (
-        <p style={{ color: '#6b7c75', fontSize: 14 }}>Loading your patients…</p>
-      ) : loadError ? (
-        <p style={{ color: '#b91c1c', fontSize: 14 }}>{loadError}</p>
-      ) : (
-      <>
-      {/* KPI Cards */}
-      <div className="tp-kpi-grid">
-        <div className="tp-kpi-card">
-          <span className="tp-kpi-icon tp-kpi-icon-total"><PeopleIcon /></span>
-          <div className="tp-kpi-text">
-            <span className="tp-kpi-num">{counts.total}</span>
-            <span className="tp-kpi-lbl">Total patients</span>
-          </div>
+    <TherapistPageShell user={user} onLogout={onLogout} title="My Patients" subtitle="Track your assigned patients and current progress" icon="" menuItems={getTherapistMenuItems(betaTier)}>
+      <div className="pm-page">
+        <div className="pm-stats">
+          <StatCard icon={Users} tone="violet" value={counts.total} label="Total patients" />
+          <StatCard icon={UserCheck} tone="green" value={counts.active} label="Active" />
+          <StatCard icon={CalendarCheck} tone="blue" value={counts.upcoming_booked} label="Upcoming booked" />
+          <StatCard icon={Clock} tone="amber" value={counts.need_session} label="Need a session" onClick={() => setParam({ needs: needs ? '' : '1', status: '', page: '' })} active={needs}>
+            <button type="button" className="pm-stat-link" onClick={() => navigate('/therapist/appointments')}>Book <ChevronRight size={13} aria-hidden="true" /></button>
+          </StatCard>
         </div>
-        <div className="tp-kpi-card">
-          <span className="tp-kpi-icon tp-kpi-icon-active"><PersonCheckIcon /></span>
-          <div className="tp-kpi-text">
-            <span className="tp-kpi-num">{counts.active}</span>
-            <span className="tp-kpi-lbl">Active</span>
-          </div>
-        </div>
-        <div className="tp-kpi-card">
-          <span className="tp-kpi-icon tp-kpi-icon-booked"><CalendarCheckIcon /></span>
-          <div className="tp-kpi-text">
-            <span className="tp-kpi-num">{counts.upcomingBooked}</span>
-            <span className="tp-kpi-lbl">Upcoming booked</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          className={`tp-kpi-card tp-kpi-card-btn${noUpcomingOnly ? ' tp-kpi-card-on' : ''}`}
-          onClick={() => { setNoUpcomingOnly(v => !v); setFilter('All') }}
-          aria-pressed={noUpcomingOnly}
-          title={noUpcomingOnly ? 'Show all patients' : 'Show only patients with no upcoming session'}
-        >
-          <span className="tp-kpi-icon tp-kpi-icon-alert"><AlertIcon /></span>
-          <div className="tp-kpi-text">
-            <span className="tp-kpi-num">{counts.noUpcoming}</span>
-            <span className="tp-kpi-lbl">No upcoming session{noUpcomingOnly ? ' · filtered' : ''}</span>
-          </div>
-        </button>
-      </div>
 
-      {/* Toolbar */}
-      <div className="tp-toolbar">
-        <div className="tp-search-wrap">
-          <svg className="tp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            className="tp-search"
-            placeholder="Search by name or condition…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="tp-filter-tabs">
-          {[['All', counts.total], ['Active', counts.active], ['Inactive', counts.inactive], ['Archived', counts.archived]].map(([f, n]) => (
-            <button key={f} className={`tp-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-              {f} <span className="tp-filter-count">{n}</span>
-            </button>
-          ))}
-        </div>
-        <select className="tp-sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
-          <option value="name">Sort by name</option>
-          <option value="next">Sort by next session</option>
-          <option value="last">Sort by last session</option>
-          <option value="sessions">Sort by sessions</option>
-        </select>
-        <button className="tp-add-btn" onClick={() => setShowAdd(true)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Add Patient
-        </button>
-      </div>
-
-      {/* Patient Table */}
-      <div className="tp-table-card">
-        <div className="tp-table-scroll">
-          <table className="tp-table">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Last</th>
-                <th>Next</th>
-                <th>Sessions</th>
-                <th></th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="tp-table-empty">No patients match your search.</td>
-                </tr>
-              ) : sorted.map(p => {
-                const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG['Active']
-                const pal = paletteFor(p.id)
-                return (
-                  <tr key={p.id}>
-                    <td className="tp-td-patient">
-                      <div className="tp-table-patient">
-                        <span className="tp-avatar-initials" style={{ background: pal.bg, color: pal.fg }}>
-                          {initialsFor(p.name)}
-                        </span>
-                        <div className="tp-card-info">
-                          <div className="tp-name-row">
-                            <h3 className="tp-patient-name">{p.name}</h3>
-                            <span className={`tp-pill ${sc.cls}`}>{p.status}</span>
-                          </div>
-                          <span className="tp-patient-age">Age {p.age ?? '—'} · {p.condition || '—'}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td data-label="Last">{p.lastSession}</td>
-                    <td data-label="Next">{p.nextSessionDate ? p.nextSession : 'None'}</td>
-                    <td data-label="Sessions">{p.sessions}</td>
-                    <td className="tp-td-actions">
-                      <div className="tp-table-actions">
-                        <button className="tp-action-btn tp-action-view" onClick={() => setProfilePt(p)}>
-                          <EyeIcon /> View
-                        </button>
-                        <button
-                          className="tp-action-btn tp-action-archive"
-                          onClick={() => setConfirmModal({ type: p.archived ? 'unarchive' : 'archive', patient: p })}
-                        >
-                          <ArchiveIcon /> {p.archived ? 'Unarchive' : 'Archive'}
-                        </button>
-                        <button
-                          className="tp-action-btn tp-action-delete"
-                          onClick={() => setConfirmModal({ type: 'delete', patient: p })}
-                        >
-                          <TrashIcon /> Delete
-                        </button>
-                      </div>
-                    </td>
-                    <td className="tp-menu-cell">
-                      <button
-                        className="tp-kebab-btn"
-                        onClick={(e) => {
-                          if (openMenuId === p.id) { setOpenMenuId(null); setMenuPos(null); return }
-                          const r = e.currentTarget.getBoundingClientRect()
-                          const menuW = 190
-                          const left = Math.min(Math.max(r.right - menuW, 8), window.innerWidth - menuW - 8)
-                          setMenuPos({ top: r.bottom + 4, left })
-                          setOpenMenuId(p.id)
-                        }}
-                        aria-label="Patient actions"
-                        aria-expanded={openMenuId === p.id}
-                      >
-                        <KebabIcon />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </>
-      )}
-
-      {openMenuId != null && menuPos && (() => {
-        const p = sorted.find(pt => pt.id === openMenuId)
-        if (!p) return null
-        return createPortal(
-          <div className="tp-row-menu tp-row-menu-portal" style={{ top: menuPos.top, left: menuPos.left }}>
-            <button onClick={() => { setMessagePt(p); setOpenMenuId(null); setMenuPos(null) }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-              Send message
-            </button>
-            <button onClick={() => { setEmailingPt(p); setOpenMenuId(null); setMenuPos(null) }}>
-              <EmailIcon />
-              Send email
-            </button>
-            {!p.nextSessionDate && p.canRecommend && p.lastCompletedAppointmentId && (
-              <button onClick={() => { setRecommendPt(p); setOpenMenuId(null); setMenuPos(null) }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
-                Recommend next session
+        <div className="pm-toolbar">
+          <label className="pm-search"><Search size={16} aria-hidden="true" /><span className="pm-sr">Search patients</span>
+            <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search patients…" />
+          </label>
+          <div className="pm-seg" role="group" aria-label="Filter by status">
+            {SEGMENTS.map(([key, label, ck]) => (
+              <button key={key} type="button" className={status === key && !needs ? 'on' : ''} aria-pressed={status === key && !needs} onClick={() => setParam({ status: key === 'all' ? '' : key, needs: '', page: '' })}>
+                {label} <span>{counts[ck]}</span>
               </button>
-            )}
-            <button onClick={() => { setProfilePt(p); setOpenMenuId(null); setMenuPos(null) }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>
-              View notes
-            </button>
-          </div>,
-          document.body
-        )
-      })()}
+            ))}
+          </div>
+          <label className="pm-sort">Sort by <select value={sort} onChange={(e) => setParam({ sort: e.target.value === 'name' ? '' : e.target.value, page: '' })} aria-label="Sort patients">{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+          <button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)} disabled={!data}><Plus size={16} aria-hidden="true" /> Add patient</button>
+        </div>
+        {needs && <p className="pm-filter-note">Showing active patients with no upcoming session. <button type="button" className="pm-inline-link" onClick={() => setParam({ needs: '' })}>Clear</button></p>}
 
-      {notice && <div className="tp-notice" role="status">{notice}</div>}
-      {recommendPt && (
-        <RecommendSessionModal
-          patient={{ name: recommendPt.name, guardian: recommendPt.guardian, lastSessionLabel: `${recommendPt.lastSession} · Completed` }}
-          appointmentId={recommendPt.lastCompletedAppointmentId}
-          defaultType={recommendPt.condition}
-          onClose={() => setRecommendPt(null)}
-          onSent={() => {
-            const id = recommendPt.id
-            setPatients(prev => prev.map(pt => (pt.id === id ? { ...pt, canRecommend: false } : pt)))
-            setRecommendPt(null)
-            setNotice('Recommendation sent to the parent')
-            setTimeout(() => setNotice(''), 3500)
-          }}
+        <section className="pm-table-card" aria-busy={state.loading}>
+          {state.error ? (
+            <div className="pm-state"><AlertTriangle size={26} aria-hidden="true" /><p>{state.error}</p><button type="button" className="pm-btn light" onClick={load}><RefreshCw size={15} aria-hidden="true" /> Retry</button></div>
+          ) : state.loading && !data ? (
+            <div className="pm-skeleton" aria-label="Loading patients">{[0, 1, 2, 3].map((i) => <div key={i} className="pm-skel-row" />)}</div>
+          ) : noPatientsAtAll ? (
+            <div className="pm-state"><UserPlus size={28} aria-hidden="true" /><p><strong>No patients yet</strong>Add your first patient to start tracking sessions and progress.</p><button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)}><Plus size={16} aria-hidden="true" /> Add your first patient</button></div>
+          ) : empty ? (
+            <div className="pm-state"><Search size={26} aria-hidden="true" /><p><strong>{status === 'archived' && !urlSearch ? 'No archived patients' : 'No patients match'}</strong>{status === 'archived' && !urlSearch ? 'Archived patients appear here and can be unarchived any time.' : 'Try a different search or filter.'}</p>{filtered && <button type="button" className="pm-btn light" onClick={() => { setSearchText(''); setParams({}, { replace: true }) }}>Clear filters</button>}</div>
+          ) : (
+            <>
+              <table className="pm-table">
+                <thead><tr><th scope="col">Patient</th><th scope="col">Last session</th><th scope="col">Next session</th><th scope="col" className="num">Sessions</th><th scope="col"><span className="pm-sr">Actions</span></th></tr></thead>
+                <tbody className={state.loading ? 'loading' : ''}>
+                  {items.map((p) => (
+                    <tr key={p.id}>
+                      <td data-label="Patient">
+                        <div className="pm-who">
+                          <Avatar id={p.id} name={p.name} photoUrl={p.photoUrl} />
+                          <div><div className="pm-name">{p.name} <StatusBadge status={p.status} /></div><div className="pm-sub">{[p.age != null && `Age ${p.age}`, p.condition].filter(Boolean).join(' · ')}</div></div>
+                        </div>
+                      </td>
+                      <td data-label="Last session">{fmtDay(p.lastSession) || <span className="pm-muted">None yet</span>}</td>
+                      <td data-label="Next session">{p.nextSession ? fmtDay(p.nextSession) : <span className="pm-pill amber">Not booked</span>}</td>
+                      <td data-label="Sessions" className="num">{p.sessions}</td>
+                      <td className="act">
+                        <button type="button" className="pm-btn primary sm" onClick={() => setView({ id: p.id, summary: p })}>View</button>
+                        <MoreActionsMenu patient={p} onBook={bookSession} onMessage={setMessageFor} onArchive={setArchiveFor} onUnarchive={unarchive} onDelete={setDeleteFor} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="pm-pager">
+                <span>Showing {from}–{to} of {data.total} patient{data.total === 1 ? '' : 's'}</span>
+                {totalPages > 1 && (
+                  <nav aria-label="Pagination">
+                    <button type="button" className="pm-page-btn" disabled={page <= 1} onClick={() => setParam({ page: page - 1 })}><ChevronLeft size={15} aria-hidden="true" /> Prev</button>
+                    {pageNumbers.map((n, i) => (n === '…' ? <span key={`g${i}`} className="pm-gap">…</span> : <button key={n} type="button" className={`pm-page-btn num${n === page ? ' on' : ''}`} aria-current={n === page ? 'page' : undefined} onClick={() => setParam({ page: n })}>{n}</button>))}
+                    <button type="button" className="pm-page-btn" disabled={page >= totalPages} onClick={() => setParam({ page: page + 1 })}>Next <ChevronRight size={15} aria-hidden="true" /></button>
+                  </nav>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+
+      {view && <PatientDetailModal id={view.id} summary={view.summary} onClose={() => setView(null)} onBook={bookSession} onMessage={(p) => { setView(null); setMessageFor(p) }} flash={toast} />}
+      {messageFor && <MessageGuardianModal patient={messageFor} therapistEmail={user?.email} onClose={() => setMessageFor(null)} />}
+      {archiveFor && (
+        <ArchiveModal patient={archiveFor} onClose={() => setArchiveFor(null)} onArchived={(p) => {
+          setArchiveFor(null); load()
+          toast(`${p.name} archived.`, { label: 'Undo', run: () => patientsApi.unarchive(p.id).then(load).catch((e) => toast(e.message)) })
+        }} />
+      )}
+      {deleteFor && (
+        <DeleteModal patient={deleteFor} onClose={() => setDeleteFor(null)} onArchiveInstead={() => { const p = deleteFor; setDeleteFor(null); setArchiveFor(p) }} onDeleted={(p) => { setDeleteFor(null); load(); toast(`${p.name} was permanently deleted.`) }} />
+      )}
+      {addOpen && (
+        <AddPatientModal
+          fee={data?.fee} therapist={data?.therapist}
+          onClose={() => { setAddOpen(false); load() }}
+          onCreated={() => load()}
+          onOpenExisting={(id) => setView({ id, summary: null })}
+          onBookFirst={(p) => navigate('/therapist/appointments', { state: { patientId: p.id, patientName: p.name } })}
         />
       )}
-      {showAdd && (
-        <AddPatientModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />
-      )}
-      {profilePt && (
-        <ProfileModal
-          patient={profilePt}
-          onClose={() => setProfilePt(null)}
-          onMessage={(p) => { setProfilePt(null); setMessagePt(p) }}
-          onEmail={(p) => { setProfilePt(null); setEmailingPt(p) }}
-        />
-      )}
-      {messagePt && (
-        <MessageModal
-          patient={messagePt}
-          therapistEmail={user?.email}
-          onClose={() => setMessagePt(null)}
-        />
-      )}
-      {emailingPt && (
-        <EmailGuardianModal
-          currentUserEmail={user?.email}
-          mode="compose"
-          patient={{ id: emailingPt.id, name: emailingPt.name }}
-          guardianName={emailingPt.guardian}
-          onClose={() => setEmailingPt(null)}
-        />
-      )}
-      {confirmModal && (
-        <ConfirmModal
-          title={
-            confirmModal.type === 'delete' ? 'Delete patient?'
-              : confirmModal.type === 'unarchive' ? 'Unarchive patient?'
-              : 'Archive patient?'
-          }
-          message={
-            confirmModal.type === 'delete'
-              ? `This permanently removes ${confirmModal.patient.name} from your patient list. This can't be undone.`
-              : confirmModal.type === 'unarchive'
-                ? `${confirmModal.patient.name} will move back into your active roster.`
-                : `${confirmModal.patient.name} will be hidden from your active roster and moved to the Archived tab. You can unarchive them later.`
-          }
-          confirmLabel={
-            confirmModal.type === 'delete' ? 'Delete'
-              : confirmModal.type === 'unarchive' ? 'Unarchive'
-              : 'Archive'
-          }
-          danger={confirmModal.type === 'delete'}
-          onCancel={() => setConfirmModal(null)}
-          onConfirm={() => {
-            if (confirmModal.type === 'delete') deletePatient(confirmModal.patient.id)
-            else toggleArchived(confirmModal.patient.id)
-            setConfirmModal(null)
-          }}
-        />
-      )}
+      {toastEl}
     </TherapistPageShell>
   )
 }

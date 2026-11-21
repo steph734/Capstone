@@ -12,6 +12,7 @@ import { employeeFor, audit } from '../noteAccess.js'
 import { reviewQr } from '../paymentAttempts.js'
 import { notifyPatient } from '../paymentNotifications.js'
 import { REJECT_REASONS } from '../paymentProofRules.js'
+import { registrationProofRows, decideRegistrationPayment, PatientError } from '../therapistPatients.js'
 
 const METHOD_LABEL = { gcash: 'GCash QR', paymaya: 'Maya QR' }
 const NEW_FOR_MS = 24 * 60 * 60 * 1000
@@ -48,6 +49,14 @@ export async function decidePayment(req, res, { id, decision, reason }) {
   if (!ctx) return
   const { db, user, ip, employee } = ctx
   if (!/^[a-f0-9]{24}$/i.test(String(id || ''))) return res.status(400).json({ error: 'Payment not found.', code: 'NOT_ALLOWED' })
+  // A first-session fee paid when a patient was added (not tied to an appointment).
+  try {
+    const reg = await decideRegistrationPayment(db, employee, user, id, decision === 'approve', reason)
+    if (reg) return res.status(200).json(reg)
+  } catch (e) {
+    if (e instanceof PatientError) return res.status(e.status).json({ error: e.message, code: e.code })
+    throw e
+  }
   const attempt = await db.collection('payment_attempts').findOne({ _id: new ObjectId(String(id)) })
   const appointment = attempt ? await db.collection('appointments').findOne({ _id: attempt.appointment_id }) : null
   if (!attempt || !appointment || String(appointment.employee_id) !== String(employee._id)) {
@@ -82,6 +91,7 @@ export default async function handler(req, res) {
         const attempt = (await db.collection('payment_attempts').find({ appointment_id: a._id, status: 'pending_verification' }).sort({ created_at: -1 }).limit(1).toArray())[0]
         if (attempt) payments.push(proofRow(a, attempt, now))
       }
+      payments.push(...await registrationProofRows(db, employee))
       res.setHeader('Cache-Control', 'no-store')
       return res.status(200).json({ payments, reasons: REJECT_REASONS })
     }

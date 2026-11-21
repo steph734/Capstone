@@ -13,7 +13,9 @@ export async function employeeFor(db, user) {
 // them — the same link used everywhere else in the app.
 export async function isAssigned(db, employeeId, patientId) {
   // An unpaid or abandoned online hold does not make a therapist "assigned" to a patient.
-  return Boolean(await db.collection('appointments').findOne({ employee_id: employeeId, patient_id: patientId, payment_state: { $nin: NOT_A_REAL_BOOKING } }, { projection: { _id: 1 } }))
+  if (await db.collection('appointments').findOne({ employee_id: employeeId, patient_id: patientId, payment_state: { $nin: NOT_A_REAL_BOOKING } }, { projection: { _id: 1 } })) return true
+  // A patient the therapist added themselves has an active assignment before the first session is booked.
+  return Boolean(await db.collection('patient_assign').findOne({ employee_id: employeeId, patient_id: patientId, status: 'active' }, { projection: { _id: 1 } }))
 }
 
 // A guardian's patient records (matched on the account email, like the rest of the app).

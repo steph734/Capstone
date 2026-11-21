@@ -5,7 +5,7 @@ import TherapistPageShell from './TherapistPageShell'
 import { getTherapistMenuItems } from './therapistSidebarConfig'
 import { patientsApi } from './patients/api'
 import { fmtDay } from './patients/format'
-import { Avatar, StatusBadge, useToast } from './patients/ui'
+import { Avatar, StatusBadge, useToast, DateInput } from './patients/ui'
 import MoreActionsMenu from './patients/MoreActionsMenu'
 import PatientDetailModal from './patients/PatientDetailModal'
 import { ArchiveModal, DeleteModal } from './patients/ArchiveDeleteModals'
@@ -125,8 +125,8 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           </div>
           <label className="pm-sort">Sort by <select value={sort} onChange={(e) => setParam({ sort: e.target.value === 'name' ? '' : e.target.value, page: '' })} aria-label="Sort patients">{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           <div className="pm-datef" role="group" aria-label="Filter by session date">
-            <label>Session from <input type="date" value={dFrom} max={dTo || undefined} onChange={(e) => setParam({ from: e.target.value, page: '' })} /></label>
-            <label>to <input type="date" value={dTo} min={dFrom || undefined} onChange={(e) => setParam({ to: e.target.value, page: '' })} /></label>
+            <label>Session from <DateInput value={dFrom} max={dTo || undefined} onChange={(e) => setParam({ from: e.target.value, page: '' })} /></label>
+            <label>to <DateInput value={dTo} min={dFrom || undefined} onChange={(e) => setParam({ to: e.target.value, page: '' })} /></label>
             {(dFrom || dTo) && <button type="button" className="pm-inline-link" onClick={() => setParam({ from: '', to: '', page: '' })}>Clear dates</button>}
           </div>
           <button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)} disabled={!data}><Plus size={16} aria-hidden="true" /> Add patient</button>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { UserPlus, User, Upload, Camera, MapPin, Mail, Phone, Banknote, CreditCard, Check, Loader2, AlertTriangle, CalendarPlus } from 'lucide-react'
-import { Dialog } from './ui'
+import { Dialog, DateInput } from './ui'
 import PayModal from './PayModal'
 import { patientsApi } from './api'
 import {
@@ -148,7 +148,7 @@ export default function AddPatientModal({ fee, therapist, onClose, onCreated, on
         <Field id="pm-gender" label="Gender" required error={show('gender')}>
           <select id="pm-gender" className="pm-input" value={form.gender} onChange={set('gender')} onBlur={blur('gender')} aria-invalid={Boolean(show('gender')) || undefined}><option value="">Select gender</option>{GENDERS.map((g) => <option key={g}>{g}</option>)}</select>
         </Field>
-        <Field id="pm-bd" label="Birthdate" required error={show('birthdate')}><input id="pm-bd" type="date" className="pm-input" value={form.birthdate} max={new Date().toISOString().slice(0, 10)} onChange={set('birthdate')} onBlur={blur('birthdate')} aria-invalid={Boolean(show('birthdate')) || undefined} /></Field>
+        <Field id="pm-bd" label="Birthdate" required error={show('birthdate')}><DateInput id="pm-bd" className="pm-input" value={form.birthdate} max={new Date().toISOString().slice(0, 10)} onChange={set('birthdate')} onBlur={blur('birthdate')} aria-invalid={Boolean(show('birthdate')) || undefined} /></Field>
       </div>
       <div className="pm-grid-2">
         <Field id="pm-addr" label="Address" required error={show('address')}><span className="pm-input-wrap"><Icon as={MapPin} /><input id="pm-addr" className="pm-input with-icon" value={form.address} onChange={set('address')} onBlur={blur('address')} placeholder="House no., street, city" autoComplete="off" aria-invalid={Boolean(show('address')) || undefined} /></span></Field>

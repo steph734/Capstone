@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CreditCard, QrCode, Check, Loader2, AlertTriangle, ImageIcon, X, Lock } from 'lucide-react'
 import useDialogA11y from '../../../components/payments/useDialogA11y'
-import { Dialog } from './ui'
+import { Dialog, useModalLock } from './ui'
 import { REF_RULES, formatRef, refError, digitsOf, readAsDataUrl, peso } from './format'
 
 // "Pay Online" for the first-session fee. QR only for now: the therapist sends the GCash / Maya reference number and a receipt
@@ -11,6 +11,7 @@ const QR_IMG = { gcash: '/instapay-qr.jpg', paymaya: '/maya-qr.jpg' }
 
 function SendingModal() {
   const ref = useDialogA11y({ locked: true })
+  useModalLock()
   return createPortal(
     <div className="pm-backdrop top">
       <div className="pm-dialog narrow center" role="alertdialog" aria-modal="true" aria-labelledby="pm-sending-title" tabIndex={-1} ref={ref}>
@@ -36,6 +37,7 @@ export default function PayModal({ amount, patientName, sending, error, onBack, 
   const [agree, setAgree] = useState(false)
   const fileRef = useRef(null)
   const ref = useDialogA11y({ onEscape: onBack, locked: sending || asking })
+  useModalLock()
   const refErr = refError(reference, qr)
 
   useEffect(() => { setReference((r) => formatRef(r, qr)) }, [qr])

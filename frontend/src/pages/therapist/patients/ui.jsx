@@ -4,9 +4,29 @@ import { X, Check } from 'lucide-react'
 import useDialogA11y from '../../../components/payments/useDialogA11y'
 import { palette, initials } from './format'
 
+// Ref-counted scroll lock shared by every dialog: freezes the page (without a layout shift) and hides the floating Pao button while any dialog is open.
+let locks = 0
+export function useModalLock() {
+  useEffect(() => {
+    const b = document.body
+    if (locks === 0) {
+      const gap = window.innerWidth - document.documentElement.clientWidth
+      b.dataset.pmPad = b.style.paddingRight; b.dataset.pmOv = b.style.overflow
+      if (gap > 0) b.style.paddingRight = `${gap}px`
+      b.style.overflow = 'hidden'; b.classList.add('pm-modal-open')
+    }
+    locks += 1
+    return () => {
+      locks -= 1
+      if (locks === 0) { b.style.overflow = b.dataset.pmOv || ''; b.style.paddingRight = b.dataset.pmPad || ''; b.classList.remove('pm-modal-open') }
+    }
+  }, [])
+}
+
 // Centered dialog: dimmed backdrop, focus trapped, Esc / X / backdrop close it, focus returns to the opener.
 export function Dialog({ title, subtitle, icon: Icon, tone = 'default', onClose, locked = false, wide = false, narrow = false, footer, children, labelId = 'pm-dlg-title' }) {
   const ref = useDialogA11y({ onEscape: onClose, locked })
+  useModalLock()
   return createPortal(
     <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !locked) onClose() }}>
       <div className={`pm-dialog${wide ? ' wide' : ''}${narrow ? ' narrow' : ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} tabIndex={-1} ref={ref}>
@@ -55,4 +75,10 @@ export function useToast() {
     </div>
   ) : null
   return [el, show]
+}
+
+// Date field that opens the browser's drop-down calendar on a click anywhere in the field (not only on the tiny icon).
+export function DateInput({ className = 'pm-input', ...props }) {
+  const open = (e) => { try { e.currentTarget.showPicker?.() } catch { /* already open or not allowed: the native icon still works */ } }
+  return <input type="date" className={`${className} pm-date`} onClick={open} {...props} />
 }

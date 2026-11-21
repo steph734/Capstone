@@ -94,18 +94,25 @@
 .pm-sheet-dim { display: none; }
 
 /* dialogs */
-.pm-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(20, 36, 30, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.pm-backdrop.top { z-index: 1100; }
-.pm-dialog { width: min(520px, 100%); max-height: calc(100vh - 32px); background: #fff; border-radius: 22px; display: flex; flex-direction: column; overflow: hidden; outline: none; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
+:root { --z-modal: 1000; --z-modal-nested: 1100; --z-toast: 1500; }
+.pm-backdrop { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: var(--z-modal); background: rgba(20, 40, 32, .45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: pm-fade .15s ease-out; }
+.pm-backdrop.top { z-index: var(--z-modal-nested); background: rgba(20, 40, 32, .30); }
+@keyframes pm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pm-pop { from { transform: scale(.98); } to { transform: scale(1); } }
+.pm-dialog, .pm-pay { animation: pm-pop .15s ease-out; }
+@media (prefers-reduced-motion: reduce) { .pm-backdrop, .pm-dialog, .pm-pay { animation: none; } }
+/* While a dialog is open the floating Pao button must not sit on top of its buttons. */
+body.pm-modal-open .pao-root { display: none; }
+.pm-dialog { width: min(520px, 100%); max-height: calc(100dvh - 48px); background: #fff; border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; outline: none; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
 .pm-dialog.wide { width: min(880px, 100%); } .pm-dialog.narrow { width: min(460px, 100%); }
-.pm-dlg-head { display: flex; align-items: center; gap: 14px; padding: 18px 24px; background: linear-gradient(#e8f5ee, #f3faf6); border-bottom: 1px solid var(--line); }
+.pm-dlg-head { flex: none; position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; padding: 18px 24px; background: linear-gradient(#e8f5ee, #f3faf6); border-bottom: 1px solid var(--line); }
 .pm-dlg-icon { width: 46px; height: 46px; border-radius: 14px; background: #fff; color: var(--g); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .pm-dlg-icon.danger { background: #fde7e5; color: var(--red); }
 .pm-dlg-titles { flex: 1; min-width: 0; } .pm-dlg-titles h2 { margin: 0; font-size: 21px; font-weight: 800; color: var(--ink); overflow-wrap: anywhere; } .pm-dlg-titles p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
 .pm-danger-text { color: var(--red) !important; font-weight: 800; }
 .pm-x { width: 40px; height: 40px; border-radius: 50%; border: none; background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .pm-x.abs { position: absolute; top: 14px; right: 14px; }
-.pm-dlg-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.pm-dlg-body { padding: 20px 24px; overflow-y: auto; flex: 1; scroll-padding-top: 16px; overscroll-behavior: contain; }
 .pm-dlg-body.center { text-align: center; padding: 34px 24px; }
 .pm-dlg-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--line); background: #fbfdfc; flex-wrap: wrap; }
 .pm-dlg-foot .pm-foot-note { margin-right: auto; font-size: 13px; color: var(--muted); }
@@ -239,3 +246,6 @@
 .pm-dlg-body::-webkit-scrollbar, .pm-pay-right::-webkit-scrollbar { width: 10px; background: #fff; }
 .pm-dlg-body::-webkit-scrollbar-track, .pm-pay-right::-webkit-scrollbar-track { background: #fff; }
 .pm-dlg-body::-webkit-scrollbar-thumb, .pm-pay-right::-webkit-scrollbar-thumb { background: #c5d6ce; border-radius: 8px; }
+
+.pm-date { color-scheme: light; cursor: pointer; }
+.pm-date::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; width: 18px; height: 18px; }

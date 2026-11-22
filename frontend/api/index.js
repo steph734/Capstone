@@ -86,6 +86,7 @@ import notesItem from './_lib/routes/notes-item.js'
 import notesOwnerSummary from './_lib/routes/notes-owner-summary.js'
 import authVerifyLoginOtp from './_lib/routes/auth-verify-login-otp.js'
 import authReauth from './_lib/routes/auth-reauth.js'
+import authHeartbeat from './_lib/routes/auth-heartbeat.js'
 import exercisesTherapistList from './_lib/routes/exercises-therapist-list.js'
 import exercisesCreate from './_lib/routes/exercises-create.js'
 import exercisesDelete from './_lib/routes/exercises-delete.js'
@@ -267,6 +268,7 @@ app.all('/api/auth/resend-otp', authResendOtp)
 app.all('/api/auth/login', authLogin)
 app.all('/api/auth/verify-login-otp', authVerifyLoginOtp)
 app.all('/api/auth/reauth', authReauth)
+app.all('/api/auth/heartbeat', authHeartbeat)
 app.all('/api/auth/logout', authReauth)
 app.all('/api/auth/change-password', authChangePassword)
 app.all('/api/auth/send-reset-otp', sendResetOtp)

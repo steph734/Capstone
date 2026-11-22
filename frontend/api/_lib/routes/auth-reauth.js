@@ -2,7 +2,8 @@
 // to unlock a session that went idle. Wrong passwords count toward the lock.
 // POST /api/auth/logout               (Bearer token) -> revoke this session.
 import { getMongo } from '../mongo.js'
-import { requireSession } from '../session.js'
+import { requireSession, getClientIp } from '../session.js'
+import { audit } from '../noteAccess.js'
 import { checkPasswordReentry } from '../passwordCheck.js'
 
 export default async function handler(req, res) {
@@ -16,7 +17,10 @@ export default async function handler(req, res) {
     if (!ctx) return
     const { db, user, session } = ctx
     if (String(req.url).includes('logout')) {
-      await db.collection('sessions').updateOne({ _id: session._id }, { $set: { revoked: true, revoked_at: new Date() } })
+      // body.reason: 'manual' (the user chose to log out) or 'idle' (the browser timed the session out). Anything else counts as manual.
+      const reason = req.body?.reason === 'idle' ? 'idle' : 'manual'
+      await db.collection('sessions').updateOne({ _id: session._id }, { $set: { revoked: true, revoked_at: new Date(), revoked_reason: reason } })
+      if (reason === 'idle') await audit(db, { user, action: 'session_idle_logout', ip: getClientIp(req), meta: { session_id: String(session._id), detected_by: 'browser' }, mirror: false }).catch(() => {})
       return res.status(200).json({ ok: true })
     }
     const check = await checkPasswordReentry(db, user, req.body?.password)

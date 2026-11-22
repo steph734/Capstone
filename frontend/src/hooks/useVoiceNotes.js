@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import useIdleBusy from './useIdleBusy'
 import {
   SECTION_KEYS, SECTION_LABELS, MAX_SECTION_CHARS, parseCommand, appendDictation, applyPunctuation,
 } from '../utils/voiceCommands'
@@ -20,6 +21,7 @@ const newSessionKey = () => `vs_${Date.now().toString(36)}_${Math.random().toStr
 export default function useVoiceNotes({ enabled, getText, setText, onSaveDraft, onRequestClear, onStopped }) {
   const supported = Boolean(SpeechRecognitionCtor)
   const [isListening, setIsListening] = useState(false)
+  useIdleBusy('speech', isListening) // dictation is running: that is activity
   const [isPaused, setIsPaused] = useState(false)
   const [language, setLanguageState] = useState('en-US')
   const [activeSection, setActiveSectionState] = useState('subjective')

@@ -1,0 +1,55 @@
+/* Idle logout warning + "You've been logged out" page. Self-contained: no variables from other pages. */
+.tp-idle-backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100vw; height: 100dvh; max-width: none; margin: 0; box-sizing: border-box; z-index: 2000; background: rgba(20, 40, 32, .45); display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; animation: tp-idle-fade .15s ease-out; }
+.tp-idle-card { position: relative; width: 100%; max-width: 700px; box-sizing: border-box; margin-top: 110px; background: #fff; border-radius: 28px; padding: 150px 48px 28px; text-align: center; box-shadow: 0 26px 80px rgba(0, 0, 0, .35); color: #1b2a24; font-family: inherit; animation: tp-idle-pop .15s ease-out; outline: none; }
+.tp-idle-pao { position: absolute; left: 50%; top: -150px; transform: translateX(-50%); width: 240px; height: auto; max-width: 60%; pointer-events: none; user-select: none; }
+.tp-idle-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 999px; background: #fdf0d3; color: #7a4a00; font-size: 14px; font-weight: 800; }
+.tp-idle-card h2 { margin: 18px 0 8px; font-size: 34px; line-height: 1.15; font-weight: 800; color: #1b2a24; }
+.tp-idle-card p { margin: 0; }
+#tp-idle-desc { font-size: 17px; line-height: 1.55; color: #4a5f57; max-width: 520px; margin: 0 auto; }
+.tp-idle-ring { position: relative; width: 140px; height: 140px; margin: 22px auto 22px; }
+.tp-idle-ring svg { display: block; }
+.tp-idle-ring .track { fill: none; stroke: #e6f1ec; stroke-width: 10; }
+.tp-idle-ring .bar { fill: none; stroke: #16a34a; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .2s; }
+.tp-idle-card.final .bar { stroke: #dc2626; }
+.tp-idle-num { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.tp-idle-num strong { font-size: 48px; line-height: 1; font-weight: 800; color: #1b2a24; }
+.tp-idle-num span { margin-top: 4px; font-size: 14px; font-weight: 700; color: #5d7770; }
+.tp-idle-card.final .tp-idle-num strong { color: #dc2626; }
+.tp-idle-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tp-idle-actions { display: flex; gap: 16px; }
+.tp-idle-btn { flex: 1; min-height: 52px; border-radius: 14px; border: 1px solid #dbe6e0; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; }
+.tp-idle-btn.light { background: #fff; color: #2b4a3f; }
+.tp-idle-btn.primary { background: #2b4a3f; color: #fff; border-color: #2b4a3f; }
+.tp-idle-btn:hover { filter: brightness(.96); }
+.tp-idle-btn:focus-visible { outline: 3px solid rgba(43, 74, 63, .4); outline-offset: 2px; }
+.tp-idle-foot { margin-top: 16px !important; font-size: 14px; color: #6b7c75; }
+/* The Pao help button must never sit on top of the warning. */
+body.tp-idle-open .pao-root { display: none; }
+@keyframes tp-idle-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tp-idle-pop { from { transform: scale(.98); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tp-idle-backdrop, .tp-idle-card { animation: none; } .tp-idle-ring .bar { transition: none; } }
+@media (max-width: 560px) {
+  .tp-idle-backdrop { padding: 16px; }
+  .tp-idle-card { padding: 130px 20px 22px; border-radius: 24px; margin-top: 100px; }
+  .tp-idle-pao { width: 200px; top: -130px; }
+  .tp-idle-card h2 { font-size: 26px; }
+  #tp-idle-desc { font-size: 15px; }
+  .tp-idle-actions { flex-direction: column-reverse; gap: 10px; }
+}
+
+/* logged-out page */
+.tp-out { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; background: linear-gradient(#e6f2ec, #f4f7f5 60%); color: #1b2a24; }
+.tp-out-brand { font-size: 28px; font-weight: 800; color: #2b7a55; margin: 0 0 24px; }
+.tp-out-wrap { position: relative; width: 100%; max-width: 700px; margin-top: 190px; }
+.tp-out-pao { position: absolute; left: 50%; top: -255px; transform: translateX(-50%); width: 300px; max-width: 70%; height: auto; pointer-events: none; }
+.tp-out-card { background: #fff; border-radius: 28px; padding: 50px 48px 30px; text-align: center; box-shadow: 0 26px 80px rgba(20, 50, 40, .12); }
+.tp-out-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 999px; background: #eef2ef; color: #3d554b; font-size: 14px; font-weight: 800; }
+.tp-out-card h1 { margin: 18px 0 8px; font-size: 36px; font-weight: 800; }
+.tp-out-card p { margin: 0 auto; max-width: 520px; font-size: 17px; line-height: 1.55; color: #4a5f57; }
+.tp-out-btn { display: block; width: 100%; box-sizing: border-box; margin-top: 26px; min-height: 58px; line-height: 58px; border-radius: 16px; background: #2b4a3f; color: #fff; font-size: 18px; font-weight: 800; text-align: center; text-decoration: none; border: none; cursor: pointer; font-family: inherit; }
+.tp-out-btn:focus-visible { outline: 3px solid rgba(43, 74, 63, .4); outline-offset: 3px; }
+.tp-out-card .tp-out-foot { margin-top: 18px; font-size: 14px; color: #6b7c75; }
+@media (max-width: 560px) {
+  .tp-out-wrap { margin-top: 150px; } .tp-out-pao { width: 220px; top: -190px; }
+  .tp-out-card { padding: 36px 20px 24px; } .tp-out-card h1 { font-size: 28px; } .tp-out-card p { font-size: 15px; }
+}

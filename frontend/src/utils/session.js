@@ -2,6 +2,8 @@
 // the tab closes, never shared across tabs) rather than localStorage, and
 // only ever the opaque token: clinical note text is never written to browser
 // storage anywhere in the app.
+import { noteActivity, sessionEnded } from '../session/sessionBus'
+
 const KEY = 'sessionToken'
 
 export function getSessionToken() {
@@ -19,12 +21,17 @@ export function setSessionToken(token) {
 // screen on SESSION_LOCKED, per-field messages, etc.).
 export async function authFetch(path, { method = 'GET', body, query, headers = {} } = {}) {
   const url = query ? `${path}?${new URLSearchParams(query)}` : path
+  const token = getSessionToken()
   const res = await fetch(url, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}`, ...headers },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
+  // Idle logout: something the user did (a save, an upload, a send) counts as activity; background reads do not.
+  if (res.ok && method !== 'GET') noteActivity()
+  // The server ended the session (idle limit or revoked): the idle gate logs out once and shows the signed-out page.
+  if (res.status === 401 && token && (data.code === 'SESSION_IDLE' || data.code === 'NO_SESSION')) sessionEnded(data.code)
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`)
     err.status = res.status

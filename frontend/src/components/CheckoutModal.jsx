@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import useIdleBusy from '../hooks/useIdleBusy'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
@@ -167,6 +168,7 @@ function CheckoutBody({
 }) {
   const navigate = useNavigate()
   const [phase, setPhase] = useState(resumeSaved ? 'processing' : 'select_method')
+  useIdleBusy('payment', phase === 'processing') // the card is being charged / the payment is being checked
   const [channel, setChannel] = useState('card')
   const [qrProvider, setQrProvider] = useState('gcash')
   const [qrConfirmed, setQrConfirmed] = useState(false)

@@ -4,6 +4,7 @@ import { CreditCard, QrCode, Check, Loader2, AlertTriangle, ImageIcon, X, Lock }
 import useDialogA11y from '../../../components/payments/useDialogA11y'
 import { Dialog, useModalLock } from './ui'
 import CardPay from './CardPay'
+import useIdleBusy from '../../../hooks/useIdleBusy'
 import { REF_RULES, formatRef, refError, digitsOf, readAsDataUrl, peso } from './format'
 
 // "Pay Online" for the first-session fee. QR only for now: the therapist sends the GCash / Maya reference number and a receipt
@@ -11,6 +12,7 @@ import { REF_RULES, formatRef, refError, digitsOf, readAsDataUrl, peso } from '.
 const QR_IMG = { gcash: '/instapay-qr.jpg', paymaya: '/maya-qr.jpg' }
 
 function SendingModal({ therapistName }) {
+  useIdleBusy('payment')
   const ref = useDialogA11y({ locked: true })
   useModalLock()
   const [secs, setSecs] = useState(0)

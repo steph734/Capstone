@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import useIdleBusy from '../hooks/useIdleBusy'
 import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import PaoCustomizePage, { BadgeCasePage } from './games/PaoCustomizePage'
 import PandaMascot from './games/PandaMascot'
@@ -777,6 +778,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }, [previewGameId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const GAME_PHASES = ['echo','picture-word','puzzle-pieces','money-match','daily-routines','feed-pao','emergency-ready','sort-basket','copy-colors','spot-difference','builder','story-select','alphabet','rhyme-time','sentence-builder','sound-hunt']
+  useIdleBusy('game', GAME_PHASES.includes(phase) || Boolean(launching)) // a game is being played or loaded: long animations must never trigger the idle warning
   useEffect(() => { plan.setGameOpen(GAME_PHASES.includes(phase)) }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
   // Live updates for the therapist's play-time monitor.
   usePlayEvents({ plan, open: GAME_PHASES.includes(phase), getCard: () => lastCardRef.current, activitySessionId })

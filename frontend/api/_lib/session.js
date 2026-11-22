@@ -12,7 +12,15 @@ import { getDb } from './mongo.js'
 import { audit } from './noteAccess.js'
 
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000
-export const IDLE_LOCK_MS = 15 * 60 * 1000
+// Idle logout: 10 minutes without activity, then a 60 second warning, then the session is over.
+// The browser enforces this for the user's benefit; THIS is the enforcement (a tampered browser or a stolen token cannot outlive it).
+// Defaults match src/config/idle.js. Both can be changed with IDLE_TIMEOUT_MS / IDLE_WARNING_MS (server env) for testing.
+export const IDLE_TIMEOUT_MS = Number(process.env.IDLE_TIMEOUT_MS) || 10 * 60 * 1000
+export const IDLE_WARNING_MS = Number(process.env.IDLE_WARNING_MS) || 60 * 1000
+const IDLE_GRACE_MS = 5 * 1000 // clock differences between browser and server
+export const TOUCH_THROTTLE_MS = 30 * 1000 // last_seen is written at most this often, so the limit allows for that much lag
+export const IDLE_LIMIT_MS = IDLE_TIMEOUT_MS + IDLE_WARNING_MS + IDLE_GRACE_MS + TOUCH_THROTTLE_MS
+export const IDLE_LOCK_MS = IDLE_LIMIT_MS // kept for older imports
 
 function secret() {
   const s = String(process.env.SESSION_SECRET || '').trim()
@@ -53,14 +61,14 @@ export async function createSession(user, req, { mfa = false } = {}) {
   const { insertedId } = await db.collection('sessions').insertOne({
     user_id: user._id, role: user.role, email: user.email, mfa,
     created_at: now, last_seen: now, expires_at: new Date(now.getTime() + SESSION_TTL_MS),
-    revoked: false, ip: getClientIp(req),
+    revoked: false, ip: getClientIp(req), user_agent: String(req.headers?.['user-agent'] || '').slice(0, 300),
   })
   return signToken({ sid: String(insertedId), uid: String(user._id), exp: now.getTime() + SESSION_TTL_MS })
 }
 
-export async function revokeSession(sessionId) {
+export async function revokeSession(sessionId, reason = 'manual') {
   const db = await getDb()
-  await db.collection('sessions').updateOne({ _id: new ObjectId(sessionId) }, { $set: { revoked: true, revoked_at: new Date() } })
+  await db.collection('sessions').updateOne({ _id: new ObjectId(sessionId) }, { $set: { revoked: true, revoked_at: new Date(), revoked_reason: reason } })
 }
 
 // Resolves the caller from the Authorization header, or sends the 401/403 and
@@ -82,8 +90,12 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
       res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'NO_SESSION' })
       return null
     }
-    if (idle && Date.now() - session.last_seen.getTime() > IDLE_LOCK_MS) {
-      res.status(401).json({ error: 'Locked after 15 minutes of inactivity. Enter your password to continue.', code: 'SESSION_LOCKED' })
+    if (idle && Date.now() - session.last_seen.getTime() > IDLE_LIMIT_MS) {
+      // Over the idle limit: the session is ended for good (not just locked) and the logout is written to the audit trail.
+      await db.collection('sessions').updateOne({ _id: session._id, revoked: false }, { $set: { revoked: true, revoked_at: new Date(), revoked_reason: 'idle' } }).catch(() => {})
+      const who = await db.collection('users').findOne({ _id: session.user_id }, { projection: { role: 1 } }).catch(() => null)
+      await audit(db, { user: { _id: session.user_id, role: session.role || who?.role }, action: 'session_idle_logout', ip: getClientIp(req), meta: { session_id: String(session._id), detected_by: 'server' }, mirror: false }).catch(() => {})
+      res.status(401).json({ error: 'You were signed out after 10 minutes of inactivity. Please sign in again.', code: 'SESSION_IDLE' })
       return null
     }
     const user = await db.collection('users').findOne({ _id: session.user_id })
@@ -97,7 +109,8 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
       res.status(403).json({ error: 'You do not have access to this.', code: 'FORBIDDEN' })
       return null
     }
-    if (idle && touch) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date() } })
+    // Throttled: at most one write per session every TOUCH_THROTTLE_MS (the idle limit above allows for this lag).
+    if (idle && touch && Date.now() - session.last_seen.getTime() > TOUCH_THROTTLE_MS) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date() } })
     return { db, user, session, ip: getClientIp(req) }
   } catch (err) {
     console.error('requireSession error:', err.message)

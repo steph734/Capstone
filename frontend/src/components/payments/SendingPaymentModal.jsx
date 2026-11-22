@@ -1,6 +1,7 @@
 import { AlertTriangle, Check, Timer } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import useDialogA11y from './useDialogA11y'
+import useIdleBusy from '../../hooks/useIdleBusy'
 import { useElapsedTimer } from './usePaymentSubmit'
 import { formatElapsed } from './submitController'
 import { SLOW_AFTER_SECONDS } from './sendingConfig'
@@ -45,6 +46,7 @@ function StepIcon({ step }) {
 //   steps          see sendingSteps.js
 //   finished       the server confirmed: the ring fills, all steps tick, then the parent opens the success modal
 export default function SendingPaymentModal({ state = 'normal', startedAt, elapsedMs, uploadPercent, steps, therapist, finished = false, onKeepWaiting, onCancel }) {
+  useIdleBusy('payment') // never log the user out while their payment is being sent
   const slow = state === 'slow' && !finished
   const ref = useDialogA11y({ locked: true })
   const keepRef = useRef(null)

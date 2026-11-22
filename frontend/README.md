@@ -45,3 +45,10 @@ widens two enums on the `payments` validator (`payment_for` += `first_session`, 
 
 **Environment**: `MONGO_URI`; `PUBLIC_APP_URL` (base of the guardian "set your password" link, default `https://therapypro.app`); the existing Brevo variables for the invite email.
 The first-session fee is `SESSION_FEE_PESOS` in `api/_lib/pricing.js` (there is no per-therapist rate in the database).
+
+## Idle logout (all roles)
+- 10 minutes without activity -> "Are you still there?" (Pao, 60 second countdown) -> automatic logout and `/session-expired`.
+- Config: `src/config/idle.js`. Test with `VITE_IDLE_TIMEOUT_MS=20000 VITE_IDLE_WARNING_MS=10000` (and `IDLE_TIMEOUT_MS` / `IDLE_WARNING_MS` on the server).
+- The server enforces it: `api/_lib/session.js` ends sessions idle longer than timeout + warning + 5 s (+30 s write throttle) with `401 SESSION_IDLE`, revokes the session and writes `audit_logs` `session_idle_logout`. `POST /api/auth/heartbeat` refreshes; `POST /api/auth/logout { reason }` records manual/idle.
+- Hold the timer from a screen with `useIdleBusy('reason', active)` (uploads, payments, games and dictation already do).
+- One-time DB step: `node scripts/migrate-sessions.mjs --dry-run`, then without `--dry-run`.

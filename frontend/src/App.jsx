@@ -14,6 +14,9 @@ import { getResetPassword } from './utils/passwordResets'
 import { TEMP_USERS, getEffectiveUsers } from './utils/accounts'
 import { sha256Hex } from './utils/hash'
 import { getSessionToken, setSessionToken } from './utils/session'
+import IdleGate from './components/idle/IdleGate'
+import SessionExpiredPage from './pages/SessionExpiredPage'
+import { clearLastActivity } from './session/sessionBus'
 import './GlobalToast.css'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
@@ -367,10 +370,13 @@ function App() {
     }
   }
 
-  const handleLogout = () => {
-    // End the server session too, so the token stops working immediately.
+  // `reason`: 'idle' when the idle timer ended the session, otherwise a normal logout (pages pass a click event here, which counts as manual).
+  const handleLogout = (reason) => {
+    const why = reason === 'idle' ? 'idle' : 'manual'
+    // End the server session too, so the token stops working immediately. keepalive lets it finish even while the page navigates or closes.
     const token = getSessionToken()
-    if (token) fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}' }).catch(() => {})
+    if (token) fetch('/api/auth/logout', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ reason: why }) }).catch(() => {})
+    clearLastActivity()
     setSessionToken('')
     stopSync() // stop sending/receiving before the local copy is erased
     uninstallReadCache()
@@ -407,7 +413,9 @@ function App() {
           {loginToast}
         </div>
       )}
+      <IdleGate isAuthenticated={isAuthenticated} role={currentUser?.role} onLogout={handleLogout} />
       <Routes>
+        <Route path="/session-expired" element={<SessionExpiredPage />} />
         <Route 
           path="/" 
           element={

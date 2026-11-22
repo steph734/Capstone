@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { Loader2, AlertTriangle, Lock } from 'lucide-react'
 import { getStripe } from '../../../utils/stripe'
+import useIdleBusy from '../../../hooks/useIdleBusy'
 import { peso } from './format'
 
 // Card payment for the first-session fee. The SERVER creates the PaymentIntent (amount and therapist are its own) and, after
@@ -30,6 +31,7 @@ function CardForm({ amount, paidId, sending, serverError, onPaid, onBack }) {
     } catch (e) { setError(e.message || 'Something went wrong with the card payment.') } finally { setBusy(false) }
   }
   const working = busy || sending
+  useIdleBusy('payment', working) // card being charged
   return (
     <>
       <div className="pm-card-box">

@@ -1,5 +1,6 @@
 // Therapist "My Patients" API. THERAPIST ONLY; the therapist is always the signed-in session's employee record.
 //   GET    /api/therapist/patients?search=&status=&needs_session=&sort=&page=&limit=
+//   POST   /api/therapist/patients/card-intent          validate the form and start the card payment (Stripe PaymentIntent)
 //   POST   /api/therapist/patients                       add a patient (+ first-session payment), header Idempotency-Key
 //   GET    /api/therapist/patients/:id                   detail
 //   PATCH  /api/therapist/patients/:id/archive | unarchive
@@ -13,7 +14,7 @@ import { employeeFor, audit } from '../noteAccess.js'
 import { SESSION_FEE_PESOS } from '../pricing.js'
 import {
   FEE_CENTAVOS, PatientError, sendPatientError, listPatients, patientDetail, archivePatient, unarchivePatient, deletePreview, deletePatient,
-  createPatient, resendInvite, registrationReceipt,
+  createPatient, startCardPayment, resendInvite, registrationReceipt,
 } from '../therapistPatients.js'
 
 export async function therapistOnly(req, res) {
@@ -34,6 +35,12 @@ export default async function handler(req, res) {
     if (!ctx) return
     const { db, employee, user } = ctx
     res.setHeader('Cache-Control', 'no-store')
+
+    if (id === 'card-intent' && !action) {
+      if (req.method !== 'POST') return allow(res, ['POST'])
+      const out = await startCardPayment(db, employee, req.body || {}, String(req.headers['idempotency-key'] || ''))
+      return res.status(200).json(out)
+    }
 
     if (!id) {
       if (req.method === 'GET') {

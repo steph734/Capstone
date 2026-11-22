@@ -38,6 +38,7 @@ const idx = async (col, key, opts) => { say(`index ${col} ${JSON.stringify(key)}
 await idx('patients', { status: 1, last_name: 1 }, { name: 'status_1_last_name_1' })
 await idx('patients', { patient_code: 1 }, { name: 'patient_code_1_unique', unique: true, partialFilterExpression: { patient_code: { $type: 'string' } } })
 await idx('payments', { idempotency_key: 1 }, { name: 'idempotency_key_1_unique', unique: true, partialFilterExpression: { idempotency_key: { $type: 'string' } } })
+await idx('payments', { stripe_payment_intent_id: 1 }, { name: 'stripe_payment_intent_id_1_unique', unique: true, partialFilterExpression: { stripe_payment_intent_id: { $type: 'string' } } })
 await idx('payments', { therapist_id: 1, payment_for: 1, status: 1 }, { name: 'therapist_id_1_payment_for_1_status_1' })
 
 // 3. payments validator (only the two enums change)
@@ -49,6 +50,7 @@ if (props) {
   const widen = (field, value) => { const e = props[field]?.enum; if (e && !e.includes(value)) { e.push(value); changed = true; say(`payments.${field}: add '${value}'`) } }
   widen('payment_for', 'first_session')
   widen('status', 'awaiting_verification')
+  widen('method', 'card')
   if (changed && !dry) await db.command({ collMod: 'payments', validator, validationLevel: info.options.validationLevel || 'moderate' })
   if (!changed) say('payments validator already allows the new values')
 } else say('payments has no $jsonSchema validator: nothing to change')

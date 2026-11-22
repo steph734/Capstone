@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UserPlus, User, Upload, Camera, MapPin, Mail, Phone, Banknote, CreditCard, Check, Loader2, AlertTriangle, CalendarPlus } from 'lucide-react'
 import { Dialog, DateInput } from './ui'
 import PayModal from './PayModal'
@@ -117,6 +117,16 @@ export default function AddPatientModal({ fee, therapist, onClose, onCreated, on
     } finally { setSending(false) }
   }
 
+  // Card: the server checks the form first, so nobody pays for a registration that would be refused.
+  const getCardIntent = useCallback(async () => {
+    try { return await patientsApi.cardIntent(bodyFor({ method: 'card' }), keyRef.current) } catch (e) {
+      if (e.code === 'duplicate_patient') { setDuplicate(e.data?.patientId || true); setPayOpen(false) }
+      else if (e.fields) { setServerErrors(Object.fromEntries(Object.entries(e.fields).map(([k, v]) => [SERVER_KEY[k] || k, v]))); setStep(1); setPayOpen(false); setTouched({ all: true }) }
+      throw e
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form])
+
   const onContinue = () => { if (method === 'cash') submit({ method: 'cash' }); else if (method === 'online') { setError(''); setPayOpen(true) } }
 
   /* ───────── step 1 ───────── */
@@ -204,7 +214,7 @@ export default function AddPatientModal({ fee, therapist, onClose, onCreated, on
           <span className="pm-method-ico"><Banknote size={20} aria-hidden="true" /></span><span><strong>Cash</strong><em>Collect {peso(amount).replace('.00', '')} at the clinic</em></span><i className="pm-radio" aria-hidden="true" />
         </button>
         <button type="button" role="radio" aria-checked={method === 'online'} className={`pm-method${method === 'online' ? ' on' : ''}`} onClick={() => setMethod('online')}>
-          <span className="pm-method-ico"><CreditCard size={20} aria-hidden="true" /></span><span><strong>Pay Online</strong><em>GCash / Maya QR with reference number</em></span><i className="pm-radio" aria-hidden="true" />
+          <span className="pm-method-ico"><CreditCard size={20} aria-hidden="true" /></span><span><strong>Pay Online</strong><em>Card, GCash or Maya QR</em></span><i className="pm-radio" aria-hidden="true" />
         </button>
       </div>
       {error && <p className="pm-form-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /> {error}</p>}
@@ -268,8 +278,8 @@ export default function AddPatientModal({ fee, therapist, onClose, onCreated, on
 
       {payOpen && (
         <PayModal
-          amount={amount} patientName={`${form.firstName.trim()} ${form.lastName.trim()}`} sending={sending} error={error}
-          onBack={() => { if (!sending) setPayOpen(false) }} onSubmit={submit}
+          amount={amount} therapistName={therapist?.name} patientName={`${form.firstName.trim()} ${form.lastName.trim()}`} sending={sending} error={error}
+          onBack={() => { if (!sending) setPayOpen(false) }} onSubmit={submit} getCardIntent={getCardIntent}
         />
       )}
 

@@ -16,6 +16,7 @@ import { SESSION_FEE_PESOS } from './pricing.js'
 import { validateReference } from './paymentProofRules.js'
 import { prepareReceipt } from './receiptFile.js'
 import { sendEmail } from './brevo.js'
+import { getStripeClient } from './stripeClient.js'
 import { makePaymentRef } from './paymentRef.js'
 import { invalidateReportsCache } from './reportsCache.js'
 
@@ -280,14 +281,16 @@ export function validateNewPatient(body = {}) {
   const email = str(g.email).toLowerCase()
   if (!EMAIL_RE.test(email)) f.email = 'Enter a valid email address.'
   const pay = body.payment || {}
-  const method = ['cash', 'gcash', 'paymaya'].includes(pay.method) ? pay.method : (f.paymentMethod = 'Choose how the first session is paid.', '')
+  const method = ['cash', 'gcash', 'paymaya', 'card'].includes(pay.method) ? pay.method : (f.paymentMethod = 'Choose how the first session is paid.', '')
   let reference = null
   if (method === 'gcash' || method === 'paymaya') {
     const ref = validateReference(pay.reference, method)
     if (!ref.ok) f.reference = ref.error; else reference = ref
     if (!str(pay.receipt)) f.receipt = 'Upload a screenshot of your receipt.'
   }
-  return { fields: f, value: { firstName, lastName, nickname, gender, birthdate, address, condition, gFirst, gLast, relationship, contact, email, method, reference, receipt: str(pay.receipt), photo: str(pt.photo), sendInvite: body.send_invite !== false } }
+  const paymentIntentId = method === 'card' ? str(pay.payment_intent_id) : ''
+  if (method === 'card' && !/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) f.paymentMethod = 'The card payment could not be found. Please try again.'
+  return { fields: f, value: { paymentIntentId, firstName, lastName, nickname, gender, birthdate, address, condition, gFirst, gLast, relationship, contact, email, method, reference, receipt: str(pay.receipt), photo: str(pt.photo), sendInvite: body.send_invite !== false } }
 }
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -300,6 +303,35 @@ function decodeDataUrl(dataUrl) {
 }
 
 const paymentView = (pay) => ({ id: String(pay._id), method: pay.method, amount: pay.amount, amountCentavos: pay.amount_centavos, status: pay.status, reference: pay.reference_number || null })
+const CARD_PURPOSE = 'first_session_new_patient'
+// Reads the PaymentIntent from Stripe and checks it is a paid first-session fee that belongs to THIS therapist.
+async function verifyCardIntent(employee, id) {
+  let pi
+  try { pi = await getStripeClient().paymentIntents.retrieve(id) } catch { throw new PatientError(422, 'CARD_NOT_FOUND', 'We could not find that card payment. Nothing was saved.') }
+  if (pi.metadata?.purpose !== CARD_PURPOSE || pi.metadata?.therapist_id !== String(employee._id) || pi.currency !== 'php' || pi.amount !== FEE_CENTAVOS) throw new PatientError(422, 'CARD_MISMATCH', 'That card payment does not match this registration. Nothing was saved.')
+  if (pi.status !== 'succeeded') throw new PatientError(402, 'CARD_NOT_PAID', pi.status === 'processing' ? 'Your card payment is still processing. Try again in a moment.' : 'The card payment was not completed. You have not been charged for a patient.')
+  return pi
+}
+
+// Step before paying by card: check the form first (so nobody pays for a registration that would be refused), then start the payment.
+export async function startCardPayment(db, employee, body, idempotencyKey) {
+  if (!/^[\w-]{16,80}$/.test(idempotencyKey || '')) throw new PatientError(400, 'IDEMPOTENCY_KEY', 'Missing request key. Please reload and try again.')
+  const probe = { ...body, payment: { method: 'card', payment_intent_id: 'pi_check' } }
+  const { fields, value: v } = validateNewPatient(probe)
+  if (Object.keys(fields).length) throw new PatientError(422, 'VALIDATION_ERROR', 'Please fix the highlighted fields.', { fields })
+  const rosterSet = new Set((await rosterIds(db, employee)).map(String))
+  const dupes = await db.collection('patients').find({ first_name: { $regex: '^' + escapeRe(v.firstName) + '$', $options: 'i' }, birthdate: v.birthdate, $or: [{ guardian_email: v.email }, { email: v.email }] }, { projection: { _id: 1 } }).toArray()
+  const dup = dupes.find((d) => rosterSet.has(String(d._id)))
+  if (dup) throw new PatientError(409, 'duplicate_patient', 'This patient may already exist.', { patientId: String(dup._id) })
+  if (!process.env.STRIPE_SECRET_KEY) throw new PatientError(503, 'CARD_UNAVAILABLE', 'Card payments are not available right now. Use cash or QR.')
+  const pi = await getStripeClient().paymentIntents.create({
+    amount: FEE_CENTAVOS, currency: 'php', automatic_payment_methods: { enabled: true },
+    description: 'TherapyPro first session for ' + v.firstName + ' ' + v.lastName, receipt_email: v.email,
+    metadata: { purpose: CARD_PURPOSE, therapist_id: String(employee._id), guardian_email: v.email.slice(0, 200) },
+  }, { idempotencyKey: 'patient-card-' + employee._id + '-' + idempotencyKey })
+  return { clientSecret: pi.client_secret, paymentIntentId: pi.id, amountCentavos: FEE_CENTAVOS }
+}
+
 const STATUS_LABEL = { pending: 'Pay at clinic', awaiting_verification: 'Awaiting verification', completed: 'Paid' }
 
 async function replayResult(db, pay) {
@@ -326,10 +358,17 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
 
   // Receipt is checked BEFORE anything is written, so a bad image never leaves half a patient behind.
   let receipt = null
-  if (v.method !== 'cash') {
+  if (v.method === 'gcash' || v.method === 'paymaya') {
     const raw = decodeDataUrl(v.receipt)
     if (!raw) throw new PatientError(422, 'VALIDATION_ERROR', 'Please fix the highlighted fields.', { fields: { receipt: 'Upload a JPG or PNG screenshot of your receipt.' } })
     try { receipt = prepareReceipt(raw.buffer) } catch (e) { throw new PatientError(e.status || 422, e.code || 'VALIDATION_ERROR', e.message, { fields: { receipt: e.message } }) }
+  }
+  // Card: the money must already be taken. The SERVER asks Stripe; nothing the browser says counts.
+  let cardPi = null
+  if (v.method === 'card') {
+    const used = await db.collection('payments').findOne({ stripe_payment_intent_id: v.paymentIntentId })
+    if (used) return replayResult(db, used)
+    cardPi = await verifyCardIntent(employee, v.paymentIntentId)
   }
   const photo = v.photo ? decodeDataUrl(v.photo) : null
   if (photo && (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.contentType) || photo.buffer.length > 5 * 1024 * 1024)) throw new PatientError(422, 'VALIDATION_ERROR', 'Please fix the highlighted fields.', { fields: { photo: 'Use a JPG, PNG or WEBP photo up to 5 MB.' } })
@@ -338,7 +377,7 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
   const patientId = new ObjectId()
   let patientCode = newCode()
   for (let i = 0; i < 5 && await db.collection('patients').findOne({ patient_code: patientCode }, { projection: { _id: 1 } }); i += 1) patientCode = newCode()
-  const online = v.method !== 'cash'
+  const online = v.method === 'gcash' || v.method === 'paymaya'
   const inviteToken = crypto.randomBytes(32).toString('base64url')
   let inviteEmailKind = null // 'new' | 'child'
   let payment = null
@@ -388,7 +427,7 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
       const paymentDoc = {
         _id: new ObjectId(), PaymentID: `PAY-${crypto.randomUUID()}`, patient_id: patientId, therapist_id: employee._id, payment_for: 'first_session', method: v.method,
         amount: SESSION_FEE_PESOS, amount_centavos: FEE_CENTAVOS, currency: 'PHP', payment_date: now,
-        status: online ? 'awaiting_verification' : 'pending', ...(online ? { reference_number: v.reference.digits, reference_display: v.reference.display } : {}),
+        status: v.method === 'card' ? 'completed' : online ? 'awaiting_verification' : 'pending', ...(v.method === 'card' ? { stripe_payment_intent_id: cardPi.id, paid_at: now } : {}), ...(online ? { reference_number: v.reference.digits, reference_display: v.reference.display } : {}),
         payment_ref: payRef, idempotency_key: idempotencyKey, patient_name_snapshot: `${v.firstName} ${v.lastName}`, created_at: now, updated_at: now,
       }
       if (receipt) {
@@ -401,7 +440,7 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
     })
   } catch (err) {
     if (err?.code === 11000) { // a racing duplicate of the same request: hand back what the first one made
-      const again = await db.collection('payments').findOne({ idempotency_key: idempotencyKey, therapist_id: employee._id })
+      const again = await db.collection('payments').findOne({ $or: [{ idempotency_key: idempotencyKey, therapist_id: employee._id }, ...(cardPi ? [{ stripe_payment_intent_id: cardPi.id }] : [])] })
       if (again) return replayResult(db, again)
     }
     throw err

@@ -10,5 +10,7 @@ export const patientsApi = {
   remove: (id, confirmName) => authFetch(`/api/therapist/patients/${id}`, { method: 'DELETE', body: { confirm_name: confirmName } }),
   resendInvite: (id) => authFetch(`/api/therapist/patients/${id}/resend-invite`, { method: 'POST', body: {} }),
   // One Idempotency-Key per Add patient attempt: a double click or a retry can never create two patients or two payments.
+  // Card: validates the form on the server, then starts the Stripe payment. The same key always gives the same payment.
+  cardIntent: (body, key) => authFetch('/api/therapist/patients/card-intent', { method: 'POST', body, headers: { 'Idempotency-Key': key } }),
   create: (body, key) => authFetch('/api/therapist/patients', { method: 'POST', body, headers: { 'Idempotency-Key': key } }),
 }

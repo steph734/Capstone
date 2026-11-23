@@ -186,3 +186,8 @@
 .ap-summary { border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; margin: 10px 0; } .ap-summary div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #eef4f1; font-size: 14px; } .ap-summary div:first-child { border-top: none; } .ap-summary span { color: var(--muted); } .ap-summary strong { text-align: right; overflow-wrap: anywhere; }
 .ap-check-done { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #15803d; }
 .ap-warn.center { justify-content: center; }
+
+.ap-datef { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.ap-datef label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.ap-datef .ap-input { width: 160px; min-height: 38px; padding: 0 10px; }
+@media (max-width: 700px) { .ap-datef { margin-left: 0; width: 100%; display: grid; grid-template-columns: 1fr 1fr; } .ap-datef label { flex-direction: column; align-items: flex-start; gap: 4px; } .ap-datef .ap-input { width: 100%; } .ap-datef .ap-link { grid-column: 1 / -1; justify-self: start; } }

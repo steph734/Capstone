@@ -118,6 +118,10 @@ export async function list(db, employee, q = {}, now = new Date()) {
   const filter = { ...mine(employee), is_archived: archivedTab ? true : { $ne: true } }
   const status = STATUSES.find((s) => s.toLowerCase() === String(q.status || '').toLowerCase())
   if (status) filter.status = status
+  // Date filter: from / to, inclusive, as Manila calendar days (YYYY-MM-DD).
+  const from = isDay(q.from) ? q.from : ''
+  const to = isDay(q.to) ? q.to : ''
+  if (from || to) filter.session_date = { ...(from ? { $gte: dayDate(from) } : {}), ...(to ? { $lte: dayDate(to) } : {}) }
   const needle = String(q.q || '').trim().slice(0, 80)
   if (needle) filter.patient_name = { $regex: escapeRe(needle), $options: 'i' }
   const docs = await db.collection('appointments').find(filter, { projection: {

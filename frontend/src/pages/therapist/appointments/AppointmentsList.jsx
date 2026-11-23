@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Plus, Filter, Eye, MoreVertical, CalendarClock, CheckCircle2, MessageSquare, Archive, ArchiveRestore, CalendarX2 } from 'lucide-react'
 import { Avatar, StatusPill, Skeleton } from './ui'
+import { DateInput } from '../patients/ui'
 import { fmt12, longDate, weekday3, dayNum, month3 } from './format'
 
 const CHIPS = ['All', 'Confirmed', 'Completed', 'Cancelled']
@@ -87,12 +88,12 @@ function Row({ appt, onView, onAction }) {
   )
 }
 
-export default function AppointmentsList({ today, state, list, onTab, onStatus, onSearch, search, onMore, onNew, onView, onAction, onRetry }) {
+export default function AppointmentsList({ today, state, list, from, to, onFrom, onTo, onTab, onStatus, onSearch, search, onMore, onNew, onView, onAction, onRetry }) {
   const { tab, status } = state
   const groups = []
   for (const a of list?.items || []) { const g = groups[groups.length - 1]; if (g && g.date === a.date) g.rows.push(a); else groups.push({ date: a.date, past: a.past, rows: [a] }) }
   const firstPastAt = groups.findIndex((g) => g.past)
-  const filtered = Boolean(search || status !== 'All')
+  const filtered = Boolean(search || from || to || status !== 'All')
 
   return (
     <section className="ap-all" aria-label="All appointments">
@@ -106,6 +107,11 @@ export default function AppointmentsList({ today, state, list, onTab, onStatus, 
       </div>
       <div className="ap-chips" role="group" aria-label="Status"><span className="ap-chips-label"><Filter size={13} aria-hidden="true" /> STATUS</span>
         {CHIPS.map((c) => <button key={c} type="button" aria-pressed={status === c} className={status === c ? 'on' : ''} onClick={() => onStatus(c)}>{c}</button>)}
+        <div className="ap-datef" role="group" aria-label="Filter by date">
+          <label>From <DateInput className="ap-input" value={from} max={to || undefined} onChange={(e) => onFrom(e.target.value)} /></label>
+          <label>To <DateInput className="ap-input" value={to} min={from || undefined} onChange={(e) => onTo(e.target.value)} /></label>
+          {(from || to) && <button type="button" className="ap-link" onClick={() => { onFrom(''); onTo('') }}>Clear dates</button>}
+        </div>
       </div>
 
       {list === null ? (

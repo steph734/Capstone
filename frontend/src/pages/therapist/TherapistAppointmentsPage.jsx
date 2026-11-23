@@ -45,6 +45,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [status, setStatus] = useState('All')
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
   const [toast, setToast] = useState('')
   const [dlg, setDlg] = useState(null) // { type, appt?, id? }
@@ -59,7 +61,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [cal, loadCal] = useLoad(() => apptApi.calendar(month), [month])
   const [day, loadDay] = useLoad(() => apptApi.day(selected), [selected])
   const [reqs, loadReqs] = useLoad(() => apptApi.requests(2), [])
-  const [list, loadList] = useLoad(() => apptApi.list({ tab, status: status === 'All' ? '' : status, q, page, pageSize: PAGE_SIZE }), [tab, status, q, page])
+  const [list, loadList] = useLoad(() => apptApi.list({ tab, status: status === 'All' ? '' : status, q, from, to, page, pageSize: PAGE_SIZE }), [tab, status, q, from, to, page])
 
   const refreshAll = useCallback(() => { loadSum(); loadCal(); loadDay(); loadReqs(); loadList() }, [loadSum, loadCal, loadDay, loadReqs, loadList])
   useEffect(() => { // a guardian may have sent new proof: look again when the tab comes back
@@ -106,7 +108,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
         <RequestsToReview data={reqs.data} loading={reqs.loading} error={reqs.error} onRetry={loadReqs} onOpen={(id) => setDlg({ type: 'requests', id })} />
 
         <AppointmentsList
-          today={today} state={{ tab, status }} list={listView} search={search}
+          today={today} state={{ tab, status }} list={listView} search={search} from={from} to={to}
+          onFrom={(v) => { setFrom(v); setPage(1) }} onTo={(v) => { setTo(v); setPage(1) }}
           onTab={(t) => { setTab(t); setPage(1) }} onStatus={(s) => { setStatus(s); setPage(1) }} onSearch={setSearch}
           onMore={() => setPage((p) => p + 1)} onNew={openNew} onView={(a) => setDlg({ type: 'view', appt: a })} onAction={onAction} onRetry={loadList}
         />

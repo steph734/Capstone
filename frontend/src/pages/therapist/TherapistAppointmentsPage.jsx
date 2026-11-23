@@ -9,6 +9,9 @@ import RecommendSessionModal from '../../components/RecommendSessionModal'
 import { manilaDateKey } from '../../utils/manilaTime'
 import { saveLocal } from '../../offline/repo'
 import RequestsSection from '../../components/requests/RequestsSection'
+import AddPatientModal from './patients/AddPatientModal'
+import { patientsApi } from './patients/api'
+import './patients/PatientsPage.css'
 import Collapsible from '../../components/requests/Collapsible'
 import './TherapistAppointmentsPage.css'
 
@@ -672,6 +675,12 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [reloadTick,   setReloadTick]   = useState(0) // bumped when a payment is verified, so the list shows the booking without a page reload
   const [requestCount, setRequestCount] = useState(0) // requests waiting for this therapist (from RequestsSection)
   const navigate = useNavigate()
+  // "New appointment" registers a new patient and settles the first-session fee (the Add new patient flow).
+  const [newOpen, setNewOpen] = useState(false)
+  const [newInfo, setNewInfo] = useState(null) // { fee, therapist } from the server
+  const openNew = async () => {
+    try { const d = await patientsApi.list({ limit: 1 }); setNewInfo({ fee: d.fee, therapist: d.therapist }); setNewOpen(true) } catch (e) { showToast(e.message || 'Could not open the form. Try again.') }
+  }
   // Mark as completed
   const [completeTarget, setCompleteTarget] = useState(null)
   const [completeBusy,   setCompleteBusy]   = useState(false)
@@ -958,8 +967,8 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
             </select>
           )}
           {viewMode === 'active' && (
-            <button className="tapp2-add-btn" onClick={() => setShowAdd(true)}>
-              <PlusIcon /> Add appointment
+            <button className="tapp2-add-btn" onClick={openNew}>
+              <PlusIcon /> New appointment
             </button>
           )}
         </div>
@@ -1068,6 +1077,15 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
         />
       )}
       {toast    && <div className="tapp-toast">{toast}</div>}
+      {newOpen && (
+        <AddPatientModal
+          fee={newInfo?.fee} therapist={newInfo?.therapist}
+          onClose={() => { setNewOpen(false); setReloadTick((t) => t + 1) }}
+          onCreated={() => setReloadTick((t) => t + 1)}
+          onOpenExisting={() => { setNewOpen(false); navigate('/therapist/patients') }}
+          onBookFirst={() => { setNewOpen(false); setReloadTick((t) => t + 1) }}
+        />
+      )}
     </TherapistPageShell>
   )
 }

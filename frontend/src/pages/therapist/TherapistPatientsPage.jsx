@@ -9,7 +9,6 @@ import { Avatar, StatusBadge, useToast, DateInput } from './patients/ui'
 import MoreActionsMenu from './patients/MoreActionsMenu'
 import PatientDetailModal from './patients/PatientDetailModal'
 import { ArchiveModal, DeleteModal } from './patients/ArchiveDeleteModals'
-import AddPatientModal from './patients/AddPatientModal'
 import MessageGuardianModal from './patients/MessageGuardianModal'
 import './patients/PatientsPage.css'
 
@@ -50,7 +49,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
   const [archiveFor, setArchiveFor] = useState(null)
   const [deleteFor, setDeleteFor] = useState(null)
   const [messageFor, setMessageFor] = useState(null)
-  const [addOpen, setAddOpen] = useState(false)
   const [toastEl, toast] = useToast()
   const reqId = useRef(0)
 
@@ -129,7 +127,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
             <label>to <DateInput value={dTo} min={dFrom || undefined} onChange={(e) => setParam({ to: e.target.value, page: '' })} /></label>
             {(dFrom || dTo) && <button type="button" className="pm-inline-link" onClick={() => setParam({ from: '', to: '', page: '' })}>Clear dates</button>}
           </div>
-          <button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)} disabled={!data}><Plus size={16} aria-hidden="true" /> Add patient</button>
         </div>
         {needs && <p className="pm-filter-note">Showing active patients with no upcoming session. <button type="button" className="pm-inline-link" onClick={() => setParam({ needs: '' })}>Clear</button></p>}
 
@@ -139,7 +136,7 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
           ) : state.loading && !data ? (
             <div className="pm-skeleton" aria-label="Loading patients">{[0, 1, 2, 3].map((i) => <div key={i} className="pm-skel-row" />)}</div>
           ) : noPatientsAtAll ? (
-            <div className="pm-state"><UserPlus size={28} aria-hidden="true" /><p><strong>No patients yet</strong>Add your first patient to start tracking sessions and progress.</p><button type="button" className="pm-btn primary" onClick={() => setAddOpen(true)}><Plus size={16} aria-hidden="true" /> Add your first patient</button></div>
+            <div className="pm-state"><UserPlus size={28} aria-hidden="true" /><p><strong>No patients yet</strong>Register your first patient from New appointment to start tracking sessions and progress.</p><button type="button" className="pm-btn primary" onClick={() => navigate('/therapist/appointments')}><Plus size={16} aria-hidden="true" /> Go to Appointments</button></div>
           ) : empty ? (
             <div className="pm-state"><Search size={26} aria-hidden="true" /><p><strong>{status === 'archived' && !urlSearch ? 'No archived patients' : 'No patients match'}</strong>{status === 'archived' && !urlSearch ? 'Archived patients appear here and can be unarchived any time.' : 'Try a different search or filter.'}</p>{filtered && <button type="button" className="pm-btn light" onClick={() => { setSearchText(''); setParams({}, { replace: true }) }}>Clear filters</button>}</div>
           ) : (
@@ -191,15 +188,6 @@ export default function TherapistPatientsPage({ user, onLogout, betaTier }) {
       )}
       {deleteFor && (
         <DeleteModal patient={deleteFor} onClose={() => setDeleteFor(null)} onArchiveInstead={() => { const p = deleteFor; setDeleteFor(null); setArchiveFor(p) }} onDeleted={(p) => { setDeleteFor(null); load(); toast(`${p.name} was permanently deleted.`) }} />
-      )}
-      {addOpen && (
-        <AddPatientModal
-          fee={data?.fee} therapist={data?.therapist}
-          onClose={() => { setAddOpen(false); load() }}
-          onCreated={() => load()}
-          onOpenExisting={(id) => setView({ id, summary: null })}
-          onBookFirst={(p) => navigate('/therapist/appointments', { state: { patientId: p.id, patientName: p.name } })}
-        />
       )}
       {toastEl}
     </TherapistPageShell>

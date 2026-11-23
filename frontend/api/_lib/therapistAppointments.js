@@ -70,8 +70,8 @@ export async function calendar(db, employee, month) {
     const key = `${month}-${String(d).padStart(2, '0')}`
     const a = byDay.get(key)
     const closedDay = CLOSED_WEEKDAYS.includes(dayDate(key).getUTCDay()) || skipped.has(key)
-    // A day that already has bookings shows as Booked even if it is a closed weekday: the therapist must be able to see them.
-    const state = a?.active ? 'booked' : closedDay ? 'closed' : 'available'
+    // Any day with an appointment on it (confirmed, pending or completed) shows as Booked, even on a closed weekday: the therapist must be able to see and open it.
+    const state = a?.count ? 'booked' : closedDay ? 'closed' : 'available'
     days[key] = { state, count: a?.count || 0 }
   }
   return { month, days }

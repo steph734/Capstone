@@ -169,3 +169,7 @@
   .ap-backdrop { padding: 0; align-items: flex-end; } .ap-modal { max-width: none; max-height: 94dvh; border-radius: 22px 22px 0 0; } .ap-modal.xl { height: 94dvh; }
   .ap-facts { grid-template-columns: 1fr; }
 }
+
+/* Headings were picking up the global light heading colour: set them explicitly to black. */
+.ap-page h2, .ap-page h3, .ap-page h4, .ap-modal h2, .ap-modal h3, .ap-modal h4 { color: #111; }
+.ap-all-head p, .ap-sub, .ap-cal-top p { color: #111; }

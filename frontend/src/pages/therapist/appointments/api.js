@@ -16,6 +16,7 @@ export const apptApi = {
   complete: (id, remarks) => authFetch(`${BASE}/${id}/complete`, { method: 'PATCH', body: { remarks } }),
   // The review itself (payment check, accept, decline) is the existing, tested flow.
   verifyPayment: (id) => authFetch(`/api/appointments/${id}/payment/verify`, { method: 'POST', body: { checks: { amountSeen: true, referenceMatches: true } } }),
+  rejectPayment: (id, body) => authFetch(`/api/appointments/${id}/payment/reject`, { method: 'POST', body }),
   accept: (id) => authFetch(`/api/appointments/${id}/accept`, { method: 'POST', body: {} }),
   decline: (id, body) => authFetch(`/api/appointments/${id}/decline`, { method: 'POST', body }),
 }

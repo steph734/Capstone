@@ -173,3 +173,16 @@
 /* Headings were picking up the global light heading colour: set them explicitly to black. */
 .ap-page h2, .ap-page h3, .ap-page h4, .ap-modal h2, .ap-modal h3, .ap-modal h4 { color: #111; }
 .ap-all-head p, .ap-sub, .ap-cal-top p { color: #111; }
+
+/* a dialog on top of another dialog: lighter dim, so the stack never turns black */
+.ap-backdrop.top { z-index: 1100; background: rgba(20, 40, 32, .30); } .ap-backdrop.top .ap-modal { z-index: 1101; }
+/* the global input styles hid the native checkbox: draw it explicitly */
+.ap-check input[type='checkbox'] { appearance: auto; -webkit-appearance: checkbox; display: inline-block; flex: none; width: 20px; height: 20px; min-width: 20px; margin: 0; padding: 0; opacity: 1; position: static; border: initial; background: initial; accent-color: #2b4a3f; cursor: pointer; }
+.ap-check { min-height: 40px; }
+.ap-ico-badge { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.ap-ico-badge.ok { background: #dcf5e4; color: #15803d; } .ap-ico-badge.bad { background: #fde2e0; color: #b42318; } .ap-ico-badge.ask { background: var(--amber-bg); color: var(--amber-ink); }
+.ap-center { text-align: center; } .ap-center h3 { font-size: 20px; margin-bottom: 6px; } .ap-center p { font-size: 14.5px; line-height: 1.5; color: #333; }
+.ap-radio { display: flex; align-items: center; gap: 10px; min-height: 38px; font-size: 14.5px; font-weight: 700; cursor: pointer; } .ap-radio input { appearance: auto; -webkit-appearance: radio; width: 18px; height: 18px; margin: 0; opacity: 1; position: static; accent-color: #2b4a3f; }
+.ap-summary { border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; margin: 10px 0; } .ap-summary div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #eef4f1; font-size: 14px; } .ap-summary div:first-child { border-top: none; } .ap-summary span { color: var(--muted); } .ap-summary strong { text-align: right; overflow-wrap: anywhere; }
+.ap-check-done { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #15803d; }
+.ap-warn.center { justify-content: center; }

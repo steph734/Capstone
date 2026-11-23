@@ -17,11 +17,11 @@ export const Skeleton = ({ h = 16, w = '100%', r = 8, style }) => <span classNam
 
 // Every dialog on this page: rendered into document.body (so no layout ancestor can clip it), one full-screen dim,
 // page scroll locked, Escape / X / click outside close it, focus is trapped and goes back to the button that opened it.
-export function Modal({ title, titleExtra, subtitle, onClose, locked = false, size = 'md', labelId = 'ap-modal-title', footer, children, bodyClass = '' }) {
+export function Modal({ title, titleExtra, subtitle, onClose, locked = false, nested = false, size = 'md', labelId = 'ap-modal-title', footer, children, bodyClass = '' }) {
   const ref = useDialogA11y({ onEscape: onClose, locked })
   useModalLock()
   return createPortal(
-    <div className="ap-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !locked) onClose() }}>
+    <div className={`ap-backdrop${nested ? ' top' : ''}`} onMouseDown={(e) => { if (e.target === e.currentTarget && !locked) onClose() }}>
       <div ref={ref} className={`ap-modal ${size}`} role="dialog" aria-modal="true" aria-labelledby={labelId} tabIndex={-1}>
         <header className="ap-modal-head">
           <div className="ap-modal-titles"><h2 id={labelId}>{title}</h2>{titleExtra}{subtitle && <p>{subtitle}</p>}</div>

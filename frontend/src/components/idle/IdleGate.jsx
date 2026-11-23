@@ -41,6 +41,12 @@ export default function IdleGate({ isAuthenticated, role, onLogout }) {
     for (const src of [PAO_SLEEPY, PAO_WOW]) { const i = new Image(); i.src = src }
   }, [isAuthenticated])
 
+  // Therapist and Owner accounts only ever sign in through the server. A saved "signed in" flag with no token (browser reopened,
+  // token cleared) can never work: every call would be a 401. End it now instead of showing a page that cannot load.
+  useEffect(() => {
+    if (isAuthenticated && (role === 'Therapist' || role === 'Owner') && !getSessionToken()) idle.expire('ended')
+  }, [isAuthenticated, role]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!isAuthenticated || idle.phase !== 'warning') return null
   const { idleMs } = idleFor(role)
   return (

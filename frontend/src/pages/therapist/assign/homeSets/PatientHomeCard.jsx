@@ -8,7 +8,7 @@ const colorOf = (n) => COLORS[[...String(n || '')].reduce((h, c) => (h + c.charC
 const initials = (n) => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?'
 
 // One patient: header, a row of game cards, the celebration banner when the whole set is mastered, and finished sets.
-export default function PatientHomeCard({ patient: p, onReview, onRetry, openSetup }) {
+export default function PatientHomeCard({ patient: p, onReview, onRetry, openSetup, onToggle }) {
   const [showHistory, setShowHistory] = useState(false)
   const [bg, fg] = colorOf(p.name)
   const today = dayKeyOf(new Date())
@@ -18,7 +18,7 @@ export default function PatientHomeCard({ patient: p, onReview, onRetry, openSet
     : freshSet
       ? `Set ${p.setNumber} · assigned today${p.nextSession ? ` · next session ${sessionText(p.nextSession)}` : ''}`
       : `Set ${p.setNumber} · ${relativeDay(p.startedAt) === 'Yesterday' || relativeDay(p.startedAt) === 'Today' ? relativeDay(p.startedAt) : `started ${shortDay(p.startedAt)}`} · ${p.playsUsed} of ${p.playsAllowed} plays used`
-  const badge = p.complete ? ['done', '✓ Set finished'] : freshSet ? ['fresh', '● New set active'] : p.useAtHome ? ['on', 'Home practice on'] : ['off', 'Home practice off']
+  const badge = p.complete ? ['done', '✓ Set finished'] : freshSet ? ['fresh', '● New set active'] : (p.homeOn ?? p.useAtHome) ? ['on', 'Home practice on'] : ['off', 'Home practice off']
   const last = p.history[0]
 
   return (
@@ -27,6 +27,9 @@ export default function PatientHomeCard({ patient: p, onReview, onRetry, openSet
         <span className="hs-avatar" style={{ background: bg, color: fg }} aria-hidden="true">{initials(p.name)}</span>
         <div className="hs-card-title"><h3>{p.name}</h3><p>{subtitle}</p></div>
         <span className={`hs-badge ${badge[0]}`}>{badge[1]}</span>
+        {p.canToggle && (
+          <button type="button" role="switch" aria-checked={Boolean(p.homeOn)} aria-label={`Home practice for ${p.name}`} className={`hs-switch${p.homeOn ? ' on' : ''}`} onClick={() => onToggle(p)}><i aria-hidden="true" /></button>
+        )}
       </header>
 
       {p.games.length === 0 ? (

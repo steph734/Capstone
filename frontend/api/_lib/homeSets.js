@@ -118,7 +118,12 @@ export async function buildOverview(db, employee) {
 
   const noteIds = sets.map(([, s]) => s.soap_draft_id || s.soap_note_id).filter(Boolean)
   const noteBy = new Map((noteIds.length ? await db.collection('therapy_notes').find({ _id: { $in: noteIds }, voided: { $ne: true } }, { projection: { status: 1, signed_at: 1 } }).toArray() : []).map((n) => [String(n._id), n]))
+  // Is the patient's plan live? That is what the patient app reads: home practice is ON only while the plan is active and not over.
+  const planIds = sets.map(([, st]) => st.plan_id).filter(Boolean)
+  const planBy = new Map((planIds.length ? await HomePracticePlan.find({ _id: { $in: planIds } }).select('status ends_at').lean() : []).map((pl) => [String(pl._id), pl]))
   const rows = await Promise.all(sets.map(async ([pid, set]) => {
+    const plan = planBy.get(String(set.plan_id || ''))
+    const homeOn = plan ? plan.status === 'active' && plan.ends_at.getTime() > Date.now() : set.use_at_home !== false
     const note = noteBy.get(String(set.soap_draft_id || set.soap_note_id)) || null
     const m = await masteryForGames(db, pid, set.game_ids, set.started_at, null, contextOf(set))
     const list = set.game_ids.map((id) => { const o = m.get(String(id)); return { gameId: String(id), name: gameBy.get(String(id))?.name || 'Game', ...o, plays: Math.min(o.plays, HOME_PLAYS_PER_GAME), playList: o.playList.slice(0, HOME_PLAYS_PER_GAME), required: HOME_PLAYS_PER_GAME } })
@@ -129,6 +134,7 @@ export async function buildOverview(db, employee) {
     return {
       patientId: String(pid), name, firstName: p?.nickname || p?.first_name || name,
       setId: String(set._id), setNumber: set.set_number, startedAt: set.started_at, assignedAt: set.created_at,
+      homeOn, canToggle: Boolean(plan), homePlanEnds: plan?.ends_at || null, homeEnded: Boolean(plan && !homeOn && plan.ends_at.getTime() <= Date.now()), homePlanDays: plan ? planDays(plan) : null,
       useAtHome: set.use_at_home !== false, useInTherapy: Boolean(set.use_in_therapy), startingLevel: set.starting_level || 'warmup',
       nextSession: set.next_session ? { date: set.next_session.date, start: set.next_session.start } : null,
       games: list, playedCount: list.filter((g) => g.plays > 0).length, masteredCount: list.filter((g) => g.status === 'mastered').length, finishedCount: list.filter((g) => gameIsDone(g.status)).length,
@@ -293,4 +299,28 @@ export async function queuedGamesByAppointment(db, appointmentIds) {
   const docs = ids.length ? await db.collection('games').find({ _id: { $in: ids }, status: 'published' }).toArray() : []
   const by = new Map(docs.map((d) => [String(d._id), serializeGame(d)]))
   return new Map(sets.map((s) => [String(s.next_session.appointment_id), s.game_ids.map((id) => by.get(String(id))).filter(Boolean)]))
+}
+
+// How long a plan runs, in days (at least a week): turning home practice on again after it ended starts a period this long.
+const planDays = (plan) => Math.max(7, Math.round((plan.ends_at.getTime() - plan.starts_at.getTime()) / DAY))
+
+// Home practice ON / OFF for one patient. Off cancels the live plan (the patient app stops unlocking the games at home); on brings
+// the same plan back while its dates have not run out. Progress, plays and the SOAP flow are not touched either way.
+export async function setHomePractice(db, { patientId, enabled, now = new Date() }) {
+  const set = await db.collection('home_sets').findOne({ patient_id: patientId, status: 'active' })
+  if (!set || !set.plan_id) throw httpError(409, 'This patient has no home practice plan to switch. Assign a set for home practice first.', 'NO_PLAN')
+  const plan = await HomePracticePlan.findById(set.plan_id).lean()
+  if (!plan) throw httpError(409, 'This patient has no home practice plan to switch. Assign a set for home practice first.', 'NO_PLAN')
+  const on = plan.status === 'active' && plan.ends_at.getTime() > now.getTime()
+  if (enabled === on) return { ok: true, homeOn: on, already: true, setId: String(set._id), setNumber: set.set_number }
+  if (enabled) {
+    // Still inside its dates (it was only switched off): back on. Its dates ran out: a new period of the same length starts now.
+    const ended = plan.ends_at.getTime() <= now.getTime() || plan.status === 'expired'
+    const set$ = ended ? { status: 'active', ends_at: new Date(now.getTime() + planDays(plan) * DAY) } : { status: 'active' }
+    await HomePracticePlan.updateOne({ _id: plan._id }, { $set: set$ })
+    return { ok: true, homeOn: true, renewed: ended, endsAt: ended ? set$.ends_at : plan.ends_at, setId: String(set._id), setNumber: set.set_number }
+  } else {
+    await HomePracticePlan.updateOne({ _id: plan._id, status: 'active' }, { $set: { status: 'cancelled' } })
+  }
+  return { ok: true, homeOn: enabled, setId: String(set._id), setNumber: set.set_number }
 }

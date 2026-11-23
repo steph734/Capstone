@@ -4,6 +4,7 @@ import { authFetch } from '../../../../utils/session'
 import PatientHomeCard from './PatientHomeCard'
 import ChooseNextSetModal from './ChooseNextSetModal'
 import RecommendedSetModal from './RecommendedSetModal'
+import ToggleHomeModal from './ToggleHomeModal'
 import { sessionText } from './gameIcons'
 import './homeSets.css'
 
@@ -15,6 +16,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
   const [filter, setFilter] = useState('all')
   const [modalFor, setModalFor] = useState(null)
   const [recFor, setRecFor] = useState(null)
+  const [toggleFor, setToggleFor] = useState(null) // the patient whose Home practice switch was pressed
   const [params, setParams] = useSearchParams()
   const [toast, setToast] = useState(null) // { text, undo: { patientId, setId } | null }
   const [note, setNote] = useState('')
@@ -79,7 +81,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
                 {FILTERS.map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} className={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>{label}{id !== 'all' ? ` · ${counts[id]}` : ''}</button>)}
               </div>
               <div className="hs-list">
-                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onReview={setRecFor} onRetry={onReload} openSetup={onSetupHome} />)}
+                {shown.map((p) => <PatientHomeCard key={p.setId} patient={p} onReview={setRecFor} onRetry={onReload} openSetup={onSetupHome} onToggle={setToggleFor} />)}
                 {shown.length === 0 && <p className="hs-muted">No patients in this group.</p>}
               </div>
             </>
@@ -88,6 +90,7 @@ export default function HomePracticeTab({ overview, loading, error, onReload, on
       )}
 
       {recFor && <RecommendedSetModal patient={recFor} config={overview?.config} onClose={() => setRecFor(null)} onAssigned={async (r) => { const p = recFor; setRecFor(null); await afterAssigned(r, p) }} onChangeGames={(rec) => { setModalFor({ ...recFor, preselect: rec?.games.map((g) => g.gameId) || [] }); setRecFor(null) }} />}
+      {toggleFor && <ToggleHomeModal patient={toggleFor} enabled={!toggleFor.homeOn} onClose={() => setToggleFor(null)} onDone={async () => { setToggleFor(null); await onReload() }} />}
       {modalFor && <ChooseNextSetModal patient={modalFor} config={overview?.config} onClose={() => setModalFor(null)} onAssigned={assigned} />}
     </div>
   )

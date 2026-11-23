@@ -6,6 +6,7 @@
 //   GET  /api/therapist/home-sets/games?patientId=   games to pick from, tagged new / played / mastered / recommended
 //   POST /api/therapist/home-sets/assign             { patientId, gameIds[], startingLevel, useInTherapy, useAtHome }
 //   POST /api/therapist/home-sets/undo               { patientId, setId }  (a few seconds after assigning)
+//   POST /api/therapist/home-sets/toggle            { patientId, enabled }  Home practice on / off for one patient
 //   POST /api/therapist/home-sets/dismiss            { setId }  ("Keep this set")
 import { getMongo } from '../mongo.js'
 import { requireSession } from '../session.js'
@@ -14,7 +15,7 @@ import { activeAssignment, employeeFor, oid } from '../gamePlans.js'
 import { buildSetStats } from '../homeSetStats.js'
 import { ensureDrafts, noteContext, recommendationFor, redraft, saveReview, updateObjectives } from '../homeSetDrafts.js'
 import { nextSessionFor } from '../homeSets.js'
-import { assignNewSet, availableGames, buildOverview, dismissSetComplete, undoNewSet } from '../homeSets.js'
+import { assignNewSet, availableGames, buildOverview, dismissSetComplete, setHomePractice, undoNewSet } from '../homeSets.js'
 
 const method = (req, res, ...allowed) => {
   if (allowed.includes(req.method)) return true
@@ -177,4 +178,18 @@ export async function homeSetsRecommendation(req, res) {
     if (req.method === 'PATCH') return res.status(200).json(await updateObjectives(ctx.db, { setId: req.params.id, objectives: req.body?.objectives, employee: ctx.employee, assigned: assignedTo(ctx) }))
     return res.status(200).json(await recommendationFor(ctx.db, { setId: req.params.id, employee: ctx.employee, assigned: assignedTo(ctx) }))
   } catch (err) { return fail(res, err, 'home-sets recommendation') }
+}
+
+export async function homeSetsToggle(req, res) {
+  if (!method(req, res, 'POST')) return
+  try {
+    const ctx = await therapistCtx(req, res)
+    if (!ctx) return
+    const patientId = oid(req.body?.patientId)
+    if (typeof req.body?.enabled !== 'boolean') return res.status(422).json({ error: 'Say whether home practice should be on or off.' })
+    if (!(await mine(ctx, patientId))) return res.status(403).json({ error: 'This patient is not assigned to you.' })
+    const out = await setHomePractice(ctx.db, { patientId, enabled: req.body.enabled })
+    if (!out.already) await audit(ctx.db, { user: ctx.user, role: ctx.user.role, action: out.homeOn ? 'home_practice_on' : 'home_practice_off', patientId, ip: ctx.ip, meta: { set_id: out.setId } }).catch(() => {})
+    return res.status(200).json(out)
+  } catch (err) { return fail(res, err, 'home-sets toggle') }
 }

@@ -3,6 +3,7 @@
 // "Authorization: Bearer <token>" to every request to our own API that doesn't already carry one.
 // The token is only ever sent to our own origin (or VITE_API_URL), never to third-party sites.
 import { getSessionToken } from './session'
+import { sessionEnded } from '../session/sessionBus'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -28,6 +29,18 @@ export function installAuthFetch() {
     if (!token) return realFetch(input, init)
     const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined))
     if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
-    return realFetch(input, { ...(init || {}), headers })
+    return realFetch(input, { ...(init || {}), headers }).then(endedByServer)
   }
+}
+
+// The server said this sign-in is over (idle limit, logged out elsewhere, expired): every page that keeps asking
+// would otherwise pile up 401s while the screen still looks signed in. Tell the idle gate once; it logs out
+// and shows the signed-out page. The sign-in routes themselves (/api/auth/...) are left alone.
+function endedByServer(res) {
+  try {
+    if (res.status === 401 && !new URL(res.url, window.location.origin).pathname.startsWith('/api/auth/')) {
+      res.clone().json().then((d) => { if (d?.code === 'SESSION_IDLE' || d?.code === 'NO_SESSION') sessionEnded(d.code) }).catch(() => {})
+    }
+  } catch { /* never let this break a request */ }
+  return res
 }

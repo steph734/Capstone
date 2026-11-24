@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { getMongo, getDb } from '../mongo.js'
 import { blockingFor, downtimeBody } from '../downtime.js'
+import { onLoginFailure, onLoginSuccess, recordInjection } from '../health/security.js'
 import { User } from '../models/user.js'
 import { AuditLog } from '../models/auditLog.js'
 import { EmailOtp } from '../models/emailOtp.js'
@@ -51,6 +52,10 @@ export default async function handler(req, res) {
   try {
     await getMongo()
     const body = req.body || {}
+    if ((body.email != null && typeof body.email !== 'string') || (body.password != null && typeof body.password !== 'string') || (body.username != null && typeof body.username !== 'string')) {
+      await recordInjection(await getDb(), req, getClientIp(req), 'the login form')
+      return res.status(400).json({ error: 'Email and password are required.' })
+    }
     const identifier = String(body.email || body.username || '').trim().toLowerCase()
     const password = String(body.password || '')
 
@@ -64,6 +69,7 @@ export default async function handler(req, res) {
 
     const user = await User.findOne({ $or: [{ email: identifier }, { username: identifier }] })
     if (!user) {
+      await onLoginFailure(await getDb(), req, { ip: getClientIp(req), email: identifier, user: null })
       return res.status(401).json({ error: 'Invalid email or password.' })
     }
     if (user.is_archived) {
@@ -115,6 +121,7 @@ export default async function handler(req, res) {
       }
 
       await user.save()
+      await onLoginFailure(await getDb(), req, { ip: clientIp, email: identifier, user: user.toObject() })
       const locked = user.is_locked && user.lock_until > now
       return res.status(locked ? 423 : 401).json({
         error: locked
@@ -165,6 +172,7 @@ export default async function handler(req, res) {
     user.last_login = now
     await user.save()
 
+    await onLoginSuccess(await getDb(), req, { ip: clientIp, email: identifier, user: user.toObject() })
     const token = await createSession(user, req, { mfa: false })
     return res.status(200).json({ success: true, user: user.toSafeJSON(), token })
   } catch (err) {

@@ -14,6 +14,8 @@ import { requireSession, getClientIp } from './session.js'
 import { tooManyRequests } from './rateLimit.js'
 import { getDb } from './mongo.js'
 import { blockingFor, downtimeBody } from './downtime.js'
+import { isBlocked, logEvent } from './health/security.js'
+import { getSettings, COLS } from './health/store.js'
 
 // ── 1. query-string sanitising ───────────────────────────────────────────────
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
@@ -96,6 +98,32 @@ const LIMITS = [
   { re: /^\/api\/owner\/invoices\/[^/]+\/(send|remind)$/, name: 'invoice-mail', max: 40, windowMs: 60 * MIN },
 ]
 
+// ── System Health protection (settings come from alert_settings, cached 60 s) ──
+const blockCache = new Map()
+async function ipIsBlocked(ip) {
+  const hit = blockCache.get(ip)
+  if (hit && Date.now() - hit.at < 10000) return hit.blocked
+  let blocked = false
+  try { blocked = await isBlocked(await getDb(), ip) } catch { blocked = false } // a failing check must never lock everyone out
+  if (blockCache.size > 500) blockCache.clear()
+  blockCache.set(ip, { at: Date.now(), blocked })
+  return blocked
+}
+async function publicRateLimited(req, res, path) {
+  try {
+    const db = await getDb()
+    const rl = (await getSettings(db)).protection?.rateLimit
+    if (!rl?.enabled) return false
+    const limited = await tooManyRequests(res, `ip-rpm:${getClientIp(req)}`, { max: rl.perMinute, windowMs: 60000 })
+    if (limited) {
+      const ip = getClientIp(req)
+      const seen = await db.collection(COLS.events).findOne({ type: 'rate_limited', ip, createdAt: { $gte: new Date(Date.now() - 3600000) } }, { projection: { _id: 1 } })
+      if (!seen) await logEvent(db, { type: 'rate_limited', level: 'low', ip, message: `Rate limit reached on ${path}`, status: 'handled' })
+    }
+    return limited
+  } catch { return false }
+}
+
 const lower = (v) => String(v || '').trim().toLowerCase()
 
 export async function apiGuard(req, res, next) {
@@ -109,7 +137,14 @@ export async function apiGuard(req, res, next) {
 
     // Pre-login routes can only be limited by IP.
     if (isPublic && limit && (await tooManyRequests(res, `${limit.name}:${getClientIp(req)}`, limit))) return
-    if (isPublic) return next()
+    if (isPublic) {
+      // System Health: blocked IPs and a per-IP request limit on pre-login routes. The cron / status / webhook routes are never touched.
+      if (!/^\/api\/(system|server-time|stripe\/webhook)$/.test(path)) {
+        if (await ipIsBlocked(getClientIp(req))) return res.status(403).json({ error: 'Access from your network is not available right now. Please try again later.', code: 'IP_BLOCKED' })
+        if (await publicRateLimited(req, res, path)) return
+      }
+      return next()
+    }
 
     // Everything else needs a real, unexpired, unrevoked session. (The 15-minute idle lock is still enforced by the
     // routes that hold clinical notes; here it must not block the lock screen's own "re-enter your password" call.)
@@ -117,6 +152,7 @@ export async function apiGuard(req, res, next) {
     if (!ctx) return
     req.sessionCtx = ctx
     const role = ctx.user.role
+    if (role !== 'Super Admin' && (await ipIsBlocked(getClientIp(req)))) return res.status(403).json({ error: 'Access from your network is not available right now. Please try again later.', code: 'IP_BLOCKED' })
 
     // System downtime: while the system is down, everyone in the notified groups gets 503 (Super Admins never do).
     if (role !== 'Super Admin') {

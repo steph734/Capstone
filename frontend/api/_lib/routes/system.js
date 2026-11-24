@@ -18,6 +18,8 @@ import crypto from 'node:crypto'
 import { getMongo, getDb } from '../mongo.js'
 import { requireSession, IDLE_LIMIT_MS } from '../session.js'
 import { audit } from '../noteAccess.js'
+import { healthTick } from '../health/collect.js'
+import { fireRule } from '../health/security.js'
 import { computePlan, validateSchedule, MAX_LENGTH_MS, GRACE_MS, MIN } from '../downtimePlan.js'
 import {
   COL, ensureIndexes, getCurrent, invalidate, buildStatus, adminOut, oid, isDown,
@@ -61,6 +63,7 @@ export default async function handler(req, res) {
       if (!process.env.CRON_SECRET) return bad(res, 500, 'CRON_SECRET is not configured on the server.')
       if (!secretOk(req)) return bad(res, 401, 'Unauthorized.')
       const out = await runDue(db)
+      await healthTick(db).catch((e) => console.error('healthTick failed:', e.message)) // same cron: health sample + alert rules
       return res.status(200).json({ ok: true, ...out })
     }
 
@@ -148,6 +151,7 @@ export default async function handler(req, res) {
       invalidate()
       const after = await col.findOne({ _id: dt._id })
       await dispatchNotice(db, { ...after, message: 'TherapyPro is starting its update in 5 minutes. Save your work now.' }, 'm15').catch(() => {})
+      await fireRule(db, 'downtime_change', 'Scheduled downtime is starting', `"${dt.title}" is starting in 5 minutes.`).catch(() => {})
       await record(ctx, 'downtime_started_early', `Started system downtime "${dt.title}" early.`, { id: String(dt._id), before: diff(dt, ['startAt', 'endAt']), after: diff(after, ['startAt', 'endAt']) })
       return res.status(200).json({ downtime: adminOut(after) })
     }
@@ -199,6 +203,7 @@ export default async function handler(req, res) {
       await col.updateOne({ _id: dt._id, status: 'active' }, { $set: { status: 'completed', checklist, actualEndAt: now, endedBy: ctx.user._id, updatedAt: now } })
       invalidate()
       const done = await col.findOne({ _id: dt._id })
+      await fireRule(db, 'downtime_change', 'Scheduled downtime ended', `"${dt.title}" is finished and the system is back online.`).catch(() => {})
       await record(ctx, 'downtime_ended', `Brought the system back online after "${dt.title}".`, { id: String(dt._id), before: { status: 'active', endAt: dt.endAt }, after: { status: 'completed', actualEndAt: now } })
       return res.status(200).json({ downtime: adminOut(done) })
     }

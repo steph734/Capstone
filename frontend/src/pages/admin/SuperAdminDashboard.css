@@ -145,3 +145,23 @@
   .sd-toggle { position: static; margin: 0 0 8px; width: fit-content; }
   .sd-chart { height: 220px; }
 }
+
+/* Live health cards (System Health feature) */
+.sd-hpill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font: 700 13px Inter, system-ui, sans-serif; background: #EEF2F0; color: #4A5F56; }
+.sd-hpill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sd-hpill.operational { background: #E3F4E8; color: #15803D; } .sd-hpill.degraded { background: #FFF3DF; color: #7A4A06; } .sd-hpill.down { background: #FDE8E8; color: #B91C1C; }
+.sd-hbanner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 14px; border-radius: 14px; background: #FFF3DF; border: 1px solid #F3DDB5; color: #7A4A06; font-weight: 700; font-size: 14px; }
+.sd-hbanner span { flex: 1; min-width: 200px; }
+.sd-hstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.sd-hstats > div { padding: 8px 10px; border-radius: 12px; background: #F3F7F5; min-width: 0; }
+.sd-hstats b { display: block; font-size: 15px; font-weight: 800; white-space: nowrap; } .sd-hstats small { font: 700 9.5px Inter, system-ui, sans-serif; letter-spacing: .05em; color: #5B7469; }
+.sd-status.degraded { color: #B45309; } .sd-status.down { color: #B91C1C; } .sd-status.unknown { color: #8FA39A; }
+.sd-spark { height: 70px; margin-top: 10px; min-width: 0; }
+.sd-chiprow { margin: 8px 0 0; } .sd-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; font: 700 12px Inter, system-ui, sans-serif; } .sd-chip.amber { background: #FFF3DF; color: #7A4A06; }
+.sd-sec { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.sd-score { width: 104px; height: 104px; border-radius: 50%; border: 9px solid #16A34A; display: grid; place-content: center; text-align: center; flex: none; } .sd-score b { font-size: 28px; font-weight: 800; line-height: 1; } .sd-score small { font: 700 9.5px Inter, system-ui, sans-serif; color: #5B7469; }
+.sd-seclist { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 10px; } .sd-seclist li { display: flex; align-items: center; gap: 8px; font-size: 14px; } .sd-seclist b { margin-left: auto; }
+.sd-risk { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: #FDE8E8; color: #B91C1C; font-weight: 700; font-size: 13.5px; } .sd-risk.medium { background: #FFF3DF; color: #7A4A06; }
+.sd-nodes { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; } .sd-nodes li { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; } .sd-nodes b { padding: 3px 10px; border-radius: 999px; font-size: 12px; } .sd-nodes b.p { background: #E3F4E8; color: #15803D; } .sd-nodes b.s { background: #E6EEFB; color: #1D4ED8; }
+.sd-meter { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #F0F4F2; font-size: 14px; } .sd-meter span { color: #5B7469; } .sd-muted { color: #5B7469; font-size: 13.5px; }
+@media (max-width: 600px) { .sd-hstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

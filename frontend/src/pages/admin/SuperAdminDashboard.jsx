@@ -5,13 +5,14 @@ import {
 } from 'recharts'
 import {
   Building2, Calendar, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CreditCard, FileText, Gamepad2, Inbox,
-  List, Lock, Pencil, Plus, Server, ShieldAlert, TrendingUp, TriangleAlert,
+  List, Lock, Pencil, Plus, Server, ShieldAlert, TrendingUp, TriangleAlert, Activity, Database as DbIcon, Wrench,
 } from 'lucide-react'
 import AdminPageShell from './AdminPageShell'
 import AddBranchModal from './branches/AddBranchModal'
 import { adminMenuItems } from './adminSidebarConfig'
 import { authFetch } from '../../utils/session'
 import './branches/Branches.css'
+import { Area, AreaChart } from 'recharts'
 import './SuperAdminDashboard.css'
 
 const PH_OFFSET_MS = 8 * 60 * 60 * 1000
@@ -202,6 +203,19 @@ export default function SuperAdminDashboard({ user, onLogout }) {
   const [toast, setToast] = useState('')
   const reqId = useRef(0)
   const toastTimer = useRef(null)
+  // Live health cards: ONE request for the whole block (system health, security, database), refreshed every minute while visible.
+  const [hd, setHd] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const pull = () => { if (document.visibilityState === 'visible') authFetch('/api/admin/system-health', { query: { action: 'dashboard' } }).then((r) => { if (alive) setHd(r.data) }).catch(() => {}) }
+    pull()
+    const t = setInterval(pull, 60000)
+    document.addEventListener('visibilitychange', pull)
+    return () => { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', pull) }
+  }, [])
+  const healthPill = hd && (
+    <span className={`sd-hpill ${hd.banner.overall}`}><i aria-hidden="true" />{{ operational: 'All systems operational', degraded: 'Degraded performance', down: 'Service disruption', unknown: 'Checking health' }[hd.banner.overall]}</span>
+  )
 
   const load = useCallback(async () => {
     const id = ++reqId.current
@@ -238,8 +252,12 @@ export default function SuperAdminDashboard({ user, onLogout }) {
   const s = data?.stats
 
   return (
-    <AdminPageShell user={user} onLogout={onLogout} title="Dashboard" subtitle={`${greeting()}. Here's how TherapyPro is doing across all branches.`} icon="" menuItems={adminMenuItems}>
+    <AdminPageShell user={user} onLogout={onLogout} title="Dashboard" subtitle={`${greeting()}. Here's how TherapyPro is doing across all branches.`} icon="" menuItems={adminMenuItems} headerActions={healthPill}>
       <div className="sd-page br-page">
+        {hd && hd.banner.overall !== 'operational' && hd.banner.message && (
+          <div className="sd-hbanner" role="alert"><TriangleAlert size={16} aria-hidden="true" /><span>{hd.banner.message}</span>
+            <Link to="/admin/system-health" className="br-btn btn-line"><Activity size={15} aria-hidden="true" /> Open system health</Link></div>
+        )}
         <div className="sd-toolbar">
           <DateRange from={from} to={to} onChange={setRange} />
           <Link to="/admin/audit-logs" className="br-btn btn-line"><List size={16} aria-hidden="true" /> Review logs</Link>
@@ -272,10 +290,10 @@ export default function SuperAdminDashboard({ user, onLogout }) {
                 <StatCard tile="purple" icon={Gamepad2} value={s.games.total} label="Games in library">
                   <em className="sd-change up">{s.games.updated} updated in range</em>
                 </StatCard>
-                <StatCard tile="red" icon={ShieldAlert} value={s.security.alerts} label="Security alerts today" tone={s.security.alerts ? 'danger' : ''}
-                  action={s.security.alerts > 0 && <Link className="sd-stat-link" to="/admin/audit-logs?filter=security">Review</Link>}>
-                  <em className={`sd-change ${s.security.alerts ? 'down' : 'up'}`}>
-                    {s.security.alerts ? `${s.security.locked} locked · ${s.security.repeatedFailed} repeated failed` : 'All clear'}
+                <StatCard tile="red" icon={ShieldAlert} value={hd ? hd.alertsToday : s.security.alerts} label="Security alerts today" tone={(hd ? hd.alertsToday : s.security.alerts) ? 'danger' : ''}
+                  action={(hd ? hd.alertsToday : s.security.alerts) > 0 && <Link className="sd-stat-link" to={hd ? '/admin/system-health#security' : '/admin/audit-logs?filter=security'}>Review</Link>}>
+                  <em className={`sd-change ${(hd ? hd.alertsToday : s.security.alerts) ? 'down' : 'up'}`}>
+                    {hd ? (hd.alertsToday ? (hd.security.topRisk ? hd.security.topRisk.title : 'Open security events') : 'All clear') : (s.security.alerts ? `${s.security.locked} locked · ${s.security.repeatedFailed} repeated failed` : 'All clear')}
                   </em>
                 </StatCard>
               </>
@@ -287,14 +305,14 @@ export default function SuperAdminDashboard({ user, onLogout }) {
 
             <Panel title="Needs your attention" icon={TriangleAlert} sub="Items waiting on the Super Admin">
               {first ? <div className="sd-skel-list">{[0, 1, 2, 3].map((i) => <Skel key={i} h={46} r={12} />)}</div>
-                : data.attention.length === 0 ? <Empty>Nothing needs your attention right now.</Empty>
+                : (data.attention.length + (hd?.attention?.length || 0)) === 0 ? <Empty>Nothing needs your attention right now.</Empty>
                 : (
                   <ul className="sd-attn">
-                    {data.attention.map((a) => {
+                    {[...(hd?.attention || []).map((a) => ({ ...a, action: a.key === 'new_country' ? 'Review' : 'Fix', tone: a.level === 'high' ? 'red' : 'amber' })), ...data.attention].map((a) => {
                       const Icon = ATTENTION_ICON[a.key] || CircleAlert
                       return (
                         <li key={a.key}>
-                          <span className={`sd-ico ${ATTENTION_TONE[a.key]}`}><Icon size={18} aria-hidden="true" /></span>
+                          <span className={`sd-ico ${ATTENTION_TONE[a.key] || a.tone}`}><Icon size={18} aria-hidden="true" /></span>
                           <div><strong>{a.title}</strong>{a.detail && <small>{a.detail}</small>}</div>
                           <button type="button" className="br-btn btn-line sm" onClick={() => navigate(a.to)}>{a.action}</button>
                         </li>
@@ -352,19 +370,49 @@ export default function SuperAdminDashboard({ user, onLogout }) {
                 )}
             </Panel>
 
-            <Panel title="System health" icon={Server} sub={first ? ' ' : `Checked ${ago(data.health.checkedAt)}`}>
-              {first ? <div className="sd-skel-list">{[0, 1, 2, 3, 4].map((i) => <Skel key={i} h={22} />)}</div> : (
-                <ul className="sd-health">
-                  {data.health.services.map((h) => (
-                    <li key={h.key} title={h.detail || undefined}>
-                      <span>{h.label}</span>
-                      <b className={`sd-status ${h.status}`}>
-                        {h.status === 'online' ? <CircleCheck size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />} {HEALTH_TEXT[h.status]}
-                      </b>
-                    </li>
-                  ))}
-                  <li><span>Last backup</span><b className="sd-plain">{data.health.lastBackup ? new Date(data.health.lastBackup).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not reported'}</b></li>
-                </ul>
+            <Panel title="System health" icon={Activity} sub={hd ? (hd.sampleAt ? `Checked ${ago(hd.sampleAt)}` : 'No health sample yet') : ' '} link={{ to: '/admin/system-health', label: 'Open System Health' }}>
+              {!hd ? <div className="sd-skel-list">{[0, 1, 2, 3, 4].map((i) => <Skel key={i} h={22} />)}</div> : (
+                <>
+                  <div className="sd-hstats">
+                    <div><b>{hd.uptime.pct != null ? `${hd.uptime.pct}%` : 'n/a'}</b><small>UPTIME 30 DAYS</small></div>
+                    <div><b>{hd.avgMs != null ? `${hd.avgMs} ms` : 'n/a'}</b><small>AVG RESPONSE</small></div>
+                    <div><b>{hd.db?.connections != null ? `${hd.db.connections} / ${hd.db.connectionsMax}` : 'n/a'}</b><small>DB CONNECTIONS</small></div>
+                    <div><b>{hd.signedIn ?? 'n/a'}</b><small>SIGNED IN NOW</small></div>
+                  </div>
+                  <ul className="sd-health">
+                    {hd.services.map((h) => (
+                      <li key={h.key}><span>{h.label}</span><b className={`sd-status ${h.status === 'operational' ? 'online' : h.status}`}>{h.latencyMs != null ? `${h.latencyMs >= 1000 ? (h.latencyMs / 1000).toFixed(1) + ' s' : h.latencyMs + ' ms'} ` : ''}{h.status === 'operational' ? 'Operational' : h.status === 'unknown' ? 'Not checked' : h.status === 'degraded' ? 'Degraded' : 'Down'}</b></li>
+                    ))}
+                  </ul>
+                  {hd.series.length > 1 && <div className="sd-spark" role="img" aria-label="API response time, last 24 hours"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hd.series.map((v, i) => ({ i, v }))}><Area type="monotone" dataKey="v" stroke={hd.banner.overall === 'operational' ? '#16A34A' : '#DC2626'} fill={hd.banner.overall === 'operational' ? '#E3F4E8' : '#FDE8E8'} strokeWidth={2} dot={false} isAnimationActive={false} /></AreaChart></ResponsiveContainer></div>}
+                  {hd.next && <p className="sd-chiprow"><span className="sd-chip amber"><Wrench size={12} aria-hidden="true" /> Update {new Date(hd.next.startAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })}</span></p>}
+                </>
+              )}
+            </Panel>
+          </div>
+
+          <div className="sd-row sd-row-two">
+            <Panel title="Security" icon={ShieldAlert} sub="Risks and threats, last 24 hours" link={{ to: '/admin/system-health#security', label: 'Open Security' }}>
+              {!hd ? <Skel h={150} r={12} /> : (
+                <div className="sd-sec">
+                  <div className="sd-score" role="img" aria-label={`Security score ${hd.security.score} out of 100`}><b>{hd.security.score}</b><small>OF 100</small></div>
+                  <ul className="sd-seclist">
+                    <li><Lock size={15} aria-hidden="true" /> Failed logins <b>{hd.security.failed}</b></li>
+                    <li><ShieldAlert size={15} aria-hidden="true" /> Blocked IPs <b>{hd.security.blocked}</b></li>
+                    <li><Server size={15} aria-hidden="true" /> New-country login <b>{hd.security.newCountry}</b></li>
+                  </ul>
+                  {hd.security.topRisk && <p className={`sd-risk ${hd.security.topRisk.level}`}><TriangleAlert size={15} aria-hidden="true" /> {hd.security.topRisk.title}</p>}
+                </div>
+              )}
+            </Panel>
+            <Panel title="Database" icon={DbIcon} sub="MongoDB Atlas . therapypro" link={{ to: '/admin/system-health#database', label: 'Open Database' }}>
+              {!hd ? <Skel h={150} r={12} /> : (
+                <div>
+                  {hd.nodes.length === 0 ? <p className="sd-muted">Replica set details are not available.</p> : <ul className="sd-nodes">{hd.nodes.map((n, i) => <li key={n.host}><span>shard-00-0{i}</span><b className={n.role === 'PRIMARY' ? 'p' : 's'}>{n.role === 'PRIMARY' ? 'Primary' : 'Secondary'}</b></li>)}</ul>}
+                  <div className="sd-meter"><span>Connections</span><b>{hd.db?.connections != null ? `${hd.db.connections} / ${hd.db.connectionsMax}` : 'Not available on this plan'}</b></div>
+                  <div className="sd-meter"><span>Storage</span><b>{hd.db?.storageMb != null ? `${Math.round(hd.db.storageMb)} MB${hd.db.storageMaxMb ? ` / ${hd.db.storageMaxMb} MB` : ''}` : 'Not available'}</b></div>
+                  <div className="sd-meter"><span>Backup</span><b>Connect Atlas API keys</b></div>
+                </div>
               )}
             </Panel>
           </div>

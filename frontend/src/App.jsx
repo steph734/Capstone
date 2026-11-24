@@ -49,6 +49,7 @@ import GamifiedBadgesPage from './pages/admin/GamifiedBadgesPage'
 import GamifiedStatsPage from './pages/admin/GamifiedStatsPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
 import SystemMaintenancePage from './pages/admin/SystemMaintenancePage'
+import SystemHealthPage from './pages/admin/SystemHealth'
 import DowntimeProvider from './downtime/DowntimeProvider'
 import { notifyDowntime } from './downtime/api'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
@@ -1581,6 +1582,20 @@ function App() {
               <Navigate to="/login" replace />
             )
           } 
+        />
+        <Route
+          path="/admin/system-health"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <SystemHealthPage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/admin/system-maintenance"

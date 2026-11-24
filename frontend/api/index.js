@@ -16,6 +16,8 @@ import { securityHeaders, sameSiteOnly, sanitizeBody } from './_lib/hardening.js
 import { sanitizeQuery, apiGuard } from './_lib/guard.js'
 import serverTime from './_lib/routes/server-time.js'
 import system from './_lib/routes/system.js'
+import systemHealth from './_lib/routes/system-health.js'
+import { timing } from './_lib/health/collect.js'
 import bookingsStart from './_lib/routes/bookings-start.js'
 import bookingsItem from './_lib/routes/bookings-item.js'
 import bookingsExpire from './_lib/routes/bookings-expire.js'
@@ -205,9 +207,11 @@ app.use(sameSiteOnly) // changes must come from our own site (or ALLOWED_ORIGINS
 // before the JSON parser.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook)
 app.use(express.json({ limit: '3mb' }))
+app.use(timing) // System Health: per-minute request timing rollups (counts only, no bodies)
 app.use(sanitizeBody) // drop $operators from request bodies
 app.use(sanitizeQuery) // ...and from the URL query string (?email[$ne]=x)
 app.use(apiGuard) // default deny: every route needs a sign-in unless listed as public in _lib/guard.js
+app.all('/api/admin/system-health', systemHealth) // Super Admin: service health, MongoDB, security, alerts (?action=)
 app.all('/api/system', system) // System downtime: status, schedule, start-now, cancel, extend, end ... (?action=)
 app.all('/api/server-time', serverTime) // the server's date for the note form
 // Online booking + payment: hold the slot first, confirm only after the payment is verified on the server.

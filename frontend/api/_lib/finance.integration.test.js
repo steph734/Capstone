@@ -34,7 +34,7 @@ d('finance on a real MongoDB', () => {
     await db.collection('payments').createIndexes([{ key: { PaymentID: 1 }, unique: true, name: 'PaymentID_1' }, { key: { payment_ref: 1 }, unique: true, name: 'uniq_payment_ref', partialFilterExpression: { payment_ref: { $exists: true } } }])
     await setup(db, { apply: true, applyCollMod: true, log: () => {} })
     ids.branch = (await db.collection('branchs').insertOne({ branch_name: 'Davao Main Branch', status: 'Active', tin: '456-657-670-00001', billing_email: 'billing.davao@therapypro.ph', website: 'www.therapypro.ph', payment_instructions: 'Pay at the front desk.', default_invoice_terms: 'Due on the date shown.' })).insertedId
-    ids.patient = (await db.collection('patients').insertOne({ first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187', email: 'p@example.com' })).insertedId
+    ids.patient = (await db.collection('patients').insertOne({ first_name: 'Miguel', last_name: 'Tayao', email: 'p@example.com' })).insertedId
     ids.staff = (await db.collection('employees').insertOne({ first_name: 'Edward', last_name: 'Briones', branch_id: ids.branch })).insertedId
     const appt = (n, day) => ({ patient_id: ids.patient, employee_id: ids.staff, status: 'Completed', session_date: dayToDate(day), session_type: 'Speech', therapist_name: 'Edward Briones', session_fee: 1500, is_archived: false, created_at: new Date() })
     const r = await db.collection('appointments').insertMany([appt(1, '2026-11-02'), appt(2, '2026-11-09'), appt(3, '2026-11-12')])

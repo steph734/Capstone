@@ -18,10 +18,6 @@ export function buildPatientDoc(now = new Date()) {
   const email = randomEmail(firstName, lastName)
 
   return {
-    // Legacy unique key the `patients` collection still indexes on (the app
-    // never reads it) — same pattern appointments-create.js already follows,
-    // just needs a unique value per insert so it doesn't collide on null.
-    PatientID: new mongoose.Types.ObjectId().toString(),
     user_id: null,
     first_name: firstName,
     middle_name: null,

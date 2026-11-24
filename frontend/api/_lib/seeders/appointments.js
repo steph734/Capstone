@@ -167,7 +167,6 @@ async function upsertPatients(db) {
         },
         $setOnInsert: {
           seed_key,
-          PatientID: `seed-${seed_key}`,
           user_id: null,
           middle_name: null,
           created_at: now,

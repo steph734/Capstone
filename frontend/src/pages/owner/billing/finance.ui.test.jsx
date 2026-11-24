@@ -90,7 +90,7 @@ describe('Add expense modal renders each layout', () => {
 })
 
 describe('New invoice', () => {
-  const patient = { _id: new ObjectId(), first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' }
+  const patient = { _id: new ObjectId(), first_name: 'Miguel', last_name: 'Tayao' }
   const appt = new ObjectId()
   const found = { patients: patient, branchs: { _id: new ObjectId(), tin: '456-657-670-00001', branch_name: 'Davao Main Branch' }, appointments: { _id: appt } }
   const base = () => ({ ...blankInvoice({ payment_instructions: 'Pay at the front desk' }), patient: { id: String(patient._id), name: 'Miguel Tayao', record_no: 'PT-0187' }, bc: { name: 'Guardian Name', phone: '0963 539 7681', email: 'guardian@example.com', address: 'Blk 4' }, issue_date: '2026-11-18' })

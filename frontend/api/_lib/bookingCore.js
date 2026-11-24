@@ -89,10 +89,8 @@ export async function createBookingRecords(db, body, extra = {}) {
     }
   }
 
-  // 2. Patient record. `patients` has a unique index on `PatientID` (a legacy key the app never reads);
-  // it just needs a unique value per insert so it does not collide on null.
+  // 2. Patient record. The patient's ID is its own unique `_id` (no separate PatientID / patient_code field).
   const patientDoc = {
-    PatientID: new ObjectId().toString(),
     user_id: bookedById || null,
     first_name: str(patient.firstName), middle_name: null, last_name: str(patient.lastName),
     nickname: str(patient.nickname) || null,

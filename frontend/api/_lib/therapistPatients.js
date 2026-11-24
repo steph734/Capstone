@@ -10,6 +10,7 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { ObjectId } from 'mongodb'
 import { getMongo } from './mongo.js'
+import { patientCodeOf } from './patientCode.js'
 import { realBookingsOnly } from './bookingCore.js'
 import { manilaMidnightUtc } from './ownerGamified.js'
 import { SESSION_FEE_PESOS } from './pricing.js'
@@ -83,7 +84,7 @@ const guardianName = (p) => [p.guardian_first_name, p.guardian_last_name].filter
 
 function toRow(p, st) {
   return {
-    id: String(p._id), patientCode: p.patient_code || `P-${String(p._id).slice(-6).toUpperCase()}`,
+    id: String(p._id), patientCode: patientCodeOf(p._id),
     name: fullName(p), nickname: p.nickname || null, age: ageFrom(p.birthdate), condition: p.condition || st?.condition || '',
     status: statusOf(p), photoUrl: p.profile_photo?.url || null,
     lastSession: st?.last || null, nextSession: st?.next || null, sessions: st?.sessions || 0,
@@ -105,7 +106,7 @@ export async function listPatients(db, employee, q = {}) {
   const empty = { items: [], total: 0, page: 1, limit: 10, counts: { total: 0, active: 0, inactive: 0, archived: 0, upcoming_booked: 0, need_session: 0 } }
   if (!ids.length) return empty
   const [patients, stats] = await Promise.all([
-    db.collection('patients').find({ _id: { $in: ids } }, { projection: { first_name: 1, last_name: 1, nickname: 1, birthdate: 1, condition: 1, status: 1, profile_photo: 1, patient_code: 1, guardian_first_name: 1, guardian_last_name: 1, created_at: 1 } }).toArray(),
+    db.collection('patients').find({ _id: { $in: ids } }, { projection: { first_name: 1, last_name: 1, nickname: 1, birthdate: 1, condition: 1, status: 1, profile_photo: 1, guardian_first_name: 1, guardian_last_name: 1, created_at: 1 } }).toArray(),
     sessionStats(db, employee, ids),
   ])
   const rows = patients.map((p) => toRow(p, stats.get(String(p._id))))
@@ -293,9 +294,6 @@ export function validateNewPatient(body = {}) {
   return { fields: f, value: { paymentIntentId, firstName, lastName, nickname, gender, birthdate, address, condition, gFirst, gLast, relationship, contact, email, method, reference, receipt: str(pay.receipt), photo: str(pt.photo), sendInvite: body.send_invite !== false } }
 }
 
-const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-const newCode = () => `P-${Array.from(crypto.randomBytes(6), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('')}`
-
 function decodeDataUrl(dataUrl) {
   const m = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/)
   if (!m) return null
@@ -336,7 +334,7 @@ const STATUS_LABEL = { pending: 'Pay at clinic', awaiting_verification: 'Awaitin
 
 async function replayResult(db, pay) {
   const patient = await db.collection('patients').findOne({ _id: pay.patient_id })
-  return { patient: patient ? { id: String(patient._id), patientCode: patient.patient_code, name: fullName(patient), guardianName: guardianName(patient), guardianEmail: patient.guardian_email } : null, payment: { ...paymentView(pay), statusLabel: STATUS_LABEL[pay.status] || pay.status }, inviteStatus: patient?.invite_status || null, replay: true }
+  return { patient: patient ? { id: String(patient._id), patientCode: patientCodeOf(patient._id), name: fullName(patient), guardianName: guardianName(patient), guardianEmail: patient.guardian_email } : null, payment: { ...paymentView(pay), statusLabel: STATUS_LABEL[pay.status] || pay.status }, inviteStatus: patient?.invite_status || null, replay: true }
 }
 
 export async function createPatient(db, employee, user, body, idempotencyKey) {
@@ -375,8 +373,6 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
 
   const now = new Date()
   const patientId = new ObjectId()
-  let patientCode = newCode()
-  for (let i = 0; i < 5 && await db.collection('patients').findOne({ patient_code: patientCode }, { projection: { _id: 1 } }); i += 1) patientCode = newCode()
   const online = v.method === 'gcash' || v.method === 'paymaya'
   const inviteToken = crypto.randomBytes(32).toString('base64url')
   let inviteEmailKind = null // 'new' | 'child'
@@ -412,7 +408,7 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
         photoRef = { photo_id: ph.insertedId, url: `/api/patient-photos/${publicId}`, uploaded_at: now }
       }
       await db.collection('patients').insertOne({
-        _id: patientId, PatientID: patientId.toString(), patient_code: patientCode, status: 'active',
+        _id: patientId, status: 'active',
         user_id: guardianUser?._id || null, first_name: v.firstName, middle_name: null, last_name: v.lastName, ...(v.nickname ? { nickname: v.nickname } : {}),
         gender: v.gender, birthdate: v.birthdate, address: v.address, condition: v.condition,
         contact_number: v.contact, email: v.email, profile_photo: photoRef,
@@ -457,7 +453,7 @@ export async function createPatient(db, employee, user, body, idempotencyKey) {
   }
   await db.collection('audit_logs').insertOne({ user_id: user._id, role: user.role, action: 'patient_create', patient_id: patientId, created_at: new Date(), meta: { method: v.method } }).catch(() => {})
   return {
-    patient: { id: String(patientId), patientCode, name: `${v.firstName} ${v.lastName}`, nickname: v.nickname || null, guardianName: `${v.gFirst} ${v.gLast}`, guardianEmail: v.email },
+    patient: { id: String(patientId), patientCode: patientCodeOf(patientId), name: `${v.firstName} ${v.lastName}`, nickname: v.nickname || null, guardianName: `${v.gFirst} ${v.gLast}`, guardianEmail: v.email },
     payment: { ...paymentView(payment), statusLabel: STATUS_LABEL[payment.status], reference: online ? v.reference.display : null },
     inviteStatus, holdHours: online ? 72 : null,
   }

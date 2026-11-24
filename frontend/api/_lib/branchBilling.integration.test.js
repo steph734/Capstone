@@ -232,7 +232,7 @@ d('branch TIN and invoice details on the real handlers', () => {
     let patientId; let ctx
     beforeAll(async () => {
       ctx = { db: testDb, user: { _id: ids.sa, role: 'Owner' }, ip: 't' }
-      patientId = (await testDb.collection('patients').insertOne({ first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' })).insertedId
+      patientId = (await testDb.collection('patients').insertOne({ first_name: 'Miguel', last_name: 'Tayao' })).insertedId
     })
     const body = (branchId) => ({ branch_id: String(branchId), patient_id: String(patientId), invoice_type: 'Custom', billing_contact: { name: 'Guardian', email: 'g@example.com' }, issue_date: '2026-11-18', payment_terms: 'Net 7', line_items: [{ description: 'Package', quantity: 1, unit_price: 450000 }] })
 

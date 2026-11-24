@@ -7,6 +7,7 @@ import {
 } from './finance.js'
 import { addDays } from './reportsRange.js'
 import { makePaymentRef } from './paymentRef.js'
+import { patientCodeOf } from './patientCode.js'
 import { realBookingsOnly } from './bookingCore.js'
 import { invalidateReportsCache } from './reportsCache.js'
 import { sendEmail } from './brevo.js'
@@ -150,7 +151,7 @@ export async function buildInvoice(db, body, { now = new Date() } = {}) {
   if (!clinic.business_tin) throw TIN_MISSING()
   return {
     clinic_snapshot: snapshotOf(clinic),
-    branch_id: branchId, patient_id: patient._id, patient_name: patientName(patient), patient_record_no: patient.PatientID || null,
+    branch_id: branchId, patient_id: patient._id, patient_name: patientName(patient), patient_record_no: patientCodeOf(patient._id),
     billing_contact: contact, invoice_type: body.invoice_type, issue_date: dayToDate(issueDay), due_date: dayToDate(dueDay), payment_terms: terms,
     // Omitted (never an empty array) when there are no sessions: an empty array is indexed as null and would collide.
     line_items: lines, ...(sessionIds.length ? { billed_appointment_ids: sessionIds } : {}),
@@ -421,7 +422,7 @@ export async function voidInvoice(db, ctx, id, body) {
 // ── helpers for the modal ────────────────────────────────────────────────────
 export async function searchPatients(db, q) {
   const f = {}
-  if (q.q) { const rx = new RegExp(escapeRegex(str(q.q, 60)), 'i'); f.$or = [{ first_name: rx }, { last_name: rx }, { PatientID: rx }] }
+  if (q.q) { const rx = new RegExp(escapeRegex(str(q.q, 60)), 'i'); f.$or = [{ first_name: rx }, { last_name: rx }] }
   const list = await db.collection(COL.patients).find(f).sort({ last_name: 1, first_name: 1 }).limit(30).toArray()
   const yrs = (b) => (b ? Math.floor((Date.now() - new Date(b).getTime()) / 31557600000) : null)
   // the patient's branch = the branch of the therapist on their most recent booking
@@ -432,7 +433,7 @@ export async function searchPatients(db, q) {
   const branchOfPatient = new Map()
   for (const x of appts) if (!branchOfPatient.has(String(x.patient_id))) branchOfPatient.set(String(x.patient_id), branchOfEmp.get(String(x.employee_id)) || null)
   return list.map((p) => ({
-    id: String(p._id), branch_id: branchOfPatient.get(String(p._id)) || null, name: patientName(p), record_no: p.PatientID || null, age: yrs(p.birthdate),
+    id: String(p._id), branch_id: branchOfPatient.get(String(p._id)) || null, name: patientName(p), record_no: patientCodeOf(p._id), age: yrs(p.birthdate),
     // Only what is needed to bill: the patient's own contact, or the guardian's.
     contact: { name: patientName(p), phone: p.contact_number || '', email: p.email || '', address: p.address || '' },
     guardian: p.guardian_first_name ? { name: [p.guardian_first_name, p.guardian_last_name].filter(Boolean).join(' '), phone: p.guardian_contact_number || '', email: p.guardian_email || '', address: p.address || '' } : null,

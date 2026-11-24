@@ -123,7 +123,7 @@ describe('expense validation', () => {
 describe('invoice validation', () => {
   const patientId = new ObjectId()
   const apptId = new ObjectId()
-  const found = { patients: { _id: patientId, first_name: 'Miguel', last_name: 'Tayao', PatientID: 'PT-0187' }, branchs: { _id: new ObjectId(), tin: '456-657-670-00001', branch_name: 'Davao Main Branch', contact_number: '0917 123 4567', address: '1 Main St' }, appointments: { _id: apptId } }
+  const found = { patients: { _id: patientId, first_name: 'Miguel', last_name: 'Tayao' }, branchs: { _id: new ObjectId(), tin: '456-657-670-00001', branch_name: 'Davao Main Branch', contact_number: '0917 123 4567', address: '1 Main St' }, appointments: { _id: apptId } }
   const base = () => ({ branch_id: oid(), patient_id: String(patientId), invoice_type: 'Custom', billing_contact: { name: 'Guardian', email: 'g@example.com', is_guardian: true }, issue_date: '2026-11-18', payment_terms: 'Net 7', line_items: [{ description: 'Therapy package', quantity: 1, unit_price: 450000 }], discount_amount: 50000, tax_amount: 0 })
   it('recomputes totals and derives the due date from the terms', async () => {
     const f = await buildInvoice(stubDb(found), base())

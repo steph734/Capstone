@@ -12,6 +12,8 @@
 // To open a new public route, add it to PUBLIC on purpose; everything else is private automatically.
 import { requireSession, getClientIp } from './session.js'
 import { tooManyRequests } from './rateLimit.js'
+import { getDb } from './mongo.js'
+import { blockingFor, downtimeBody } from './downtime.js'
 
 // ── 1. query-string sanitising ───────────────────────────────────────────────
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
@@ -38,6 +40,7 @@ export function sanitizeQuery(req, res, next) {
 // (a booking token, Stripe's signature, the cron secret, a one-time link) or is public information.
 const PUBLIC = [
   /^\/api\/server-time$/,
+  /^\/api\/system$/, // system downtime: status is public, the cron uses CRON_SECRET, every other action checks the Super Admin session itself
   /^\/api\/auth\/(signup|verify-otp|resend-otp|login|verify-login-otp|send-reset-otp|verify-reset-otp|reauth|logout)$/,
   /^\/api\/reset-password$/, // needs the signed one-time reset token
   /^\/api\/set-password\/[^/]+$/, // needs the emailed one-time invite token
@@ -114,6 +117,12 @@ export async function apiGuard(req, res, next) {
     if (!ctx) return
     req.sessionCtx = ctx
     const role = ctx.user.role
+
+    // System downtime: while the system is down, everyone in the notified groups gets 503 (Super Admins never do).
+    if (role !== 'Super Admin') {
+      const down = await blockingFor(ctx.db || (await getDb()), role, ctx.session)
+      if (down) return res.status(503).json(downtimeBody(down))
+    }
 
     const rule = ROLE_RULES.find((r) => r.re.test(path) && (!r.notGet || !['GET', 'HEAD'].includes(req.method)))
     if (rule && !rule.roles.includes(role)) {

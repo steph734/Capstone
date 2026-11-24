@@ -4,6 +4,7 @@
 // The token is only ever sent to our own origin (or VITE_API_URL), never to third-party sites.
 import { getSessionToken } from './session'
 import { sessionEnded } from '../session/sessionBus'
+import { notifyDowntime } from '../downtime/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -38,6 +39,9 @@ export function installAuthFetch() {
 // and shows the signed-out page. The sign-in routes themselves (/api/auth/...) are left alone.
 function endedByServer(res) {
   try {
+    if (res.status === 503 && !new URL(res.url, window.location.origin).pathname.startsWith('/api/auth/')) {
+      res.clone().json().then((d) => { if (d?.code === 'SYSTEM_DOWNTIME') notifyDowntime({ endAt: d.endAt }) }).catch(() => {})
+    }
     if (res.status === 401 && !new URL(res.url, window.location.origin).pathname.startsWith('/api/auth/')) {
       res.clone().json().then((d) => { if (d?.code === 'SESSION_IDLE' || d?.code === 'NO_SESSION') sessionEnded(d.code) }).catch(() => {})
     }

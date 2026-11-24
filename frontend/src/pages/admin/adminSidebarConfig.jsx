@@ -44,7 +44,7 @@ function AuditIcon() {
   )
 }
 
-import { Award, BarChart3, Gamepad2, HelpCircle, LayoutDashboard, LifeBuoy, Ticket } from 'lucide-react'
+import { Award, BarChart3, Gamepad2, HelpCircle, LayoutDashboard, LifeBuoy, Ticket, Wrench } from 'lucide-react'
 
 export const adminMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
@@ -73,4 +73,5 @@ export const adminMenuItems = [
     ],
   },
   { id: 'audit-logs', label: 'Audit Logs', icon: <AuditIcon />, path: '/admin/audit-logs' },
+  { id: 'system-maintenance', label: 'System Maintenance', icon: <Wrench size={24} aria-hidden="true" />, path: '/admin/system-maintenance' },
 ]

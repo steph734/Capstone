@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
-import { getMongo } from '../mongo.js'
+import { getMongo, getDb } from '../mongo.js'
+import { blockingFor, downtimeBody } from '../downtime.js'
 import { User } from '../models/user.js'
 import { AuditLog } from '../models/auditLog.js'
 import { EmailOtp } from '../models/emailOtp.js'
@@ -141,6 +142,10 @@ export default async function handler(req, res) {
         email: user.email,
       })
     }
+
+    // System downtime: the right password, but this role may not sign in right now (Super Admins always can).
+    const down = await blockingFor(await getDb(), user.role)
+    if (down) return res.status(503).json(downtimeBody(down))
 
     if (needsSecondFactor(user.role)) {
       // Password was right; don't clear the failure counter or sign in until the code is too.

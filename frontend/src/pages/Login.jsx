@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import LogoCircle from '../components/LogoCircle'
+import { notifyDowntime } from '../downtime/api'
 import './Login.css'
 
 function EnvelopeIcon() {
@@ -76,6 +77,11 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
       setNotice(result.message || 'We emailed you a 6-digit sign-in code.')
       return
     }
+    if (result?.maintenance) {
+      // The system is down for an update: show the maintenance screen (DowntimeProvider), not an error message.
+      notifyDowntime()
+      return
+    }
     if (result?.requiresVerification) {
       // The wrapper redirects to /verify-otp — no error to show.
       return
@@ -91,6 +97,7 @@ export default function Login({ onLogoClick, onSignUpClick, onForgotPasswordClic
     const result = await onVerify2fa(twoFactorEmail, code.trim())
     if (result?.success) return
     setIsSubmitting(false)
+    if (result?.maintenance) { notifyDowntime(); return }
     setLoginError(result?.message || 'That code is not valid.')
     if (result?.locked) { setTwoFactorEmail(''); setCode(''); setPassword('') }
   }

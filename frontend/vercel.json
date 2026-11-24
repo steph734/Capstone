@@ -64,6 +64,10 @@
   ],
   "crons": [
     {
+      "path": "/api/system?action=cron",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/bookings/expire-holds",
       "schedule": "0 18 * * *"
     },

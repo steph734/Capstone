@@ -3,6 +3,7 @@
 // only ever the opaque token: clinical note text is never written to browser
 // storage anywhere in the app.
 import { noteActivity, sessionEnded } from '../session/sessionBus'
+import { notifyDowntime } from '../downtime/api'
 
 const KEY = 'sessionToken'
 
@@ -32,6 +33,8 @@ export async function authFetch(path, { method = 'GET', body, query, headers = {
   if (res.ok && method !== 'GET') noteActivity()
   // The server ended the session (idle limit or revoked): the idle gate logs out once and shows the signed-out page.
   if (res.status === 401 && token && (data.code === 'SESSION_IDLE' || data.code === 'NO_SESSION')) sessionEnded(data.code)
+  // The system is down for an update: the provider signs this person out and shows the maintenance screen.
+  if (res.status === 503 && data.code === 'SYSTEM_DOWNTIME') notifyDowntime({ endAt: data.endAt })
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`)
     err.status = res.status

@@ -6,6 +6,7 @@ import { User } from '../models/user.js'
 import { EmailOtp } from '../models/emailOtp.js'
 import { OTP_MAX_ATTEMPTS, verifyCodeHash } from '../otp.js'
 import { createSession } from '../session.js'
+import { blockingFor, downtimeBody } from '../downtime.js'
 import { recordFailure, recordSuccess } from '../passwordCheck.js'
 
 export default async function handler(req, res) {
@@ -49,6 +50,8 @@ export default async function handler(req, res) {
     await recordSuccess(db, user.toObject())
     user.last_login = new Date()
     await user.save()
+    const down = await blockingFor(db, user.role)
+    if (down) return res.status(503).json(downtimeBody(down))
     const token = await createSession(user, req, { mfa: true })
     return res.status(200).json({ success: true, user: user.toSafeJSON(), token })
   } catch (err) {

@@ -48,6 +48,9 @@ import GamifiedLibraryDashboardPage from './pages/admin/GamifiedLibraryDashboard
 import GamifiedBadgesPage from './pages/admin/GamifiedBadgesPage'
 import GamifiedStatsPage from './pages/admin/GamifiedStatsPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
+import SystemMaintenancePage from './pages/admin/SystemMaintenancePage'
+import DowntimeProvider from './downtime/DowntimeProvider'
+import { notifyDowntime } from './downtime/api'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerAppointmentsPage from './pages/owner/OwnerAppointmentsPage'
 import OwnerPatientsPage from './pages/owner/OwnerPatientsPage'
@@ -293,6 +296,9 @@ function App() {
         } else if (res.ok && data.user) {
           setSessionToken(data.token || '')
           matchedUser = { avatar: '/therapy-pro-logo.png', ...data.user }
+        } else if (res.status === 503 && data.code === 'SYSTEM_DOWNTIME') {
+          // The system is down for an update and this role may not sign in: Login shows the maintenance screen, not an error.
+          return { success: false, maintenance: true, message: data.error }
         } else if (res.status === 403 && data.requiresVerification) {
           // Right password, but the email was never confirmed. The backend just
           // re-sent a code — route the user to the verification screen.
@@ -326,6 +332,7 @@ function App() {
           body: JSON.stringify({ email: typedEmail, password: passwordHash }),
         })
         const data = await res.json().catch(() => ({}))
+        if (res.status === 503 && data.code === 'SYSTEM_DOWNTIME') { setSessionToken(''); return { success: false, maintenance: true, message: data.error } }
         setSessionToken(res.ok && data.token ? data.token : '')
       } catch {
         setSessionToken('')
@@ -364,6 +371,7 @@ function App() {
         setLoginToast('Login successful!')
         return { success: true, user }
       }
+      if (res.status === 503 && data.code === 'SYSTEM_DOWNTIME') return { success: false, maintenance: true, message: data.error }
       return { success: false, locked: res.status === 423, message: data.error || 'That code is not valid.' }
     } catch {
       return { success: false, message: 'Could not reach the server. Please try again.' }
@@ -414,6 +422,7 @@ function App() {
         </div>
       )}
       <IdleGate isAuthenticated={isAuthenticated} role={currentUser?.role} onLogout={handleLogout} />
+      <DowntimeProvider isAuthenticated={isAuthenticated} role={currentUser?.role} onLogout={handleLogout}>
       <Routes>
         <Route path="/session-expired" element={<SessionExpiredPage />} />
         <Route 
@@ -1573,7 +1582,22 @@ function App() {
             )
           } 
         />
+        <Route
+          path="/admin/system-maintenance"
+          element={
+            isAuthenticated ? (
+              currentUser?.role === 'Super Admin' ? (
+                <SystemMaintenancePage user={currentUser} onLogout={handleLogout} />
+              ) : (
+                <Navigate to={getHomePath(currentUser?.role)} replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
       </Routes>
+      </DowntimeProvider>
       {isAuthenticated && ['Owner', 'Therapist', 'Patient'].includes(currentUser?.role) && <PaoBot user={currentUser} />}
       {/* Therapists have the sync pill in their page header; patients and owners get a floating one. */}
       {isAuthenticated && ['Owner', 'Patient'].includes(currentUser?.role) && <SyncStatus floating />}

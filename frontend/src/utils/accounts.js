@@ -11,8 +11,6 @@ const DEMO_PASSWORDS = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_A
 
 export const TEMP_USERS = [
   { email: 'patient@gmail.com',    password: DEMO_PASSWORDS ? 'patient123' : undefined,    name: 'Alvrin',      role: 'Patient',     avatar: '/therapy-pro-logo.png' },
-  { email: 'superadmin@gmail.com', password: DEMO_PASSWORDS ? 'superadmin123' : undefined, name: 'Super Admin', role: 'Super Admin', avatar: '/therapy-pro-logo.png' },
-  { email: 'owner@gmail.com',      password: DEMO_PASSWORDS ? 'owner123' : undefined,      name: 'Owner',       role: 'Owner',       avatar: '/therapy-pro-logo.png' },
   { email: 'therapists@gmail.com', password: DEMO_PASSWORDS ? 'therapist123' : undefined,  name: 'Therapist',   role: 'Therapist',   avatar: '/therapy-pro-logo.png' },
 ]
 

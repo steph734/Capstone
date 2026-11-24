@@ -11,13 +11,14 @@ This is temporary authentication data for testing purposes only. Not connected t
 ## Super Admin Account
 
 **Email:** superadmin@gmail.com  
-**Password:** superadmin123  
+**Password:** _3N-76xfzz8F
+
 **Name:** Super Admin
 
 ## Owner Account
 
 **Email:** owner@gmail.com  
-**Password:** owner123  
+**Password:** +TZi*$NzpF95
 **Name:** Owner
 
 ## Therapist Account

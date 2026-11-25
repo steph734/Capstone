@@ -49,6 +49,15 @@
       ]
     },
     {
+      "source": "/games/pao-poses-expressions/match-target/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/games/pao-poses-expressions/(.*)",
       "headers": [
         {

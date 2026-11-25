@@ -82,7 +82,7 @@ function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64 }) {
         onError={(e) => { e.currentTarget.parentElement.style.display = 'none' }}
       />
       {!unlocked && (
-        <span style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: '#1e293b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }} aria-hidden="true">🔒</span>
+        <span style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: '#1e293b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }} aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
       )}
     </div>
   )
@@ -161,7 +161,7 @@ const LEGACY_BADGE_BY_CODE = {
 // The hand-drawn art (OUTFIT_MAP) for built-in pieces, or the generated
 // render for admin-designed ones.
 function WardrobeThumb({ item, categoryId, width = 72 }) {
-  if (item.id === 'none' || !item.code) return <span style={{ fontSize: width * 0.5, opacity: 0.7 }}>🐼</span>
+  if (item.id === 'none' || !item.code) return <img src="/games/pao-poses-expressions/poses/pose_relax.png" alt="" draggable={false} style={{ width, height: width, objectFit: 'contain', objectPosition: '50% 20%' }} />
   if (item.design) return <DesignedOutfitThumbnail category={categoryId} design={item.design} width={width} />
   return <OutfitThumbnail category={categoryId === 'hats' ? 'hair' : categoryId} itemId={item.code} width={width} />
 }
@@ -600,7 +600,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     <div className="pc-root">
       <style>{`
         .pc-root { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:18px; background:radial-gradient(circle,rgba(255,255,255,.06) 1.5px,transparent 2px) 0 0/26px 26px,linear-gradient(180deg,#1b2b5c,#14204a); font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; overflow:hidden; }
-        .pc-panel { width:min(1100px,100%); height:min(640px, calc(100vh - 160px)); display:flex; flex-direction:column; background:#f4f8ff; border-radius:22px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.45); border:3px solid #7fb6ff; }
+        .pc-panel { width:min(1240px,100%); height:min(720px, calc(100vh - 36px)); display:flex; flex-direction:column; background:#f4f8ff; border-radius:22px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.45); border:3px solid #7fb6ff; }
         .pc-skel { height:132px; border-radius:14px; background:linear-gradient(90deg,#e2e8f0 25%,#eef2f7 37%,#e2e8f0 63%); background-size:400% 100%; animation:pcSkel 1.4s ease infinite; }
         @keyframes pcSkel { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
         @media (prefers-reduced-motion: reduce) { .pc-skel { animation:none; } }
@@ -608,20 +608,23 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-title h1 { margin:0; font-size:20px; font-weight:900; letter-spacing:.3px; text-shadow:0 2px 0 rgba(0,0,0,.2); }
         .pc-close { width:36px; height:36px; border-radius:10px; border:2px solid #fff; background:#ef4444; color:#fff; font-size:18px; font-weight:900; cursor:pointer; flex-shrink:0; }
         .pc-badges { background:rgba(255,255,255,.2); border:1.5px solid rgba(255,255,255,.6); color:#fff; border-radius:10px; padding:6px 12px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; }
-        .pc-body { flex:1; display:grid; grid-template-columns:200px 1fr 280px; min-height:0; }
+        .pc-body { flex:1; display:grid; grid-template-columns:236px 1fr 340px; min-height:0; }
         .pc-cats { background:#dbeafe; border-right:2px solid #93c5fd; padding:10px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
         .pc-cat { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:2px solid #bfdbfe; background:#fff; cursor:pointer; text-align:left; font-weight:800; color:#1e3a8a; font-size:14px; }
         .pc-cat.on { background:#2f7fe8; border-color:#1d4ed8; color:#fff; }
         .pc-grid-wrap { display:flex; flex-direction:column; min-height:0; }
         .pc-note { margin:10px 12px 0; padding:8px 12px; border-radius:10px; background:#fff7d6; border:1.5px solid #facc15; font-size:12px; font-weight:700; color:#854d0e; }
-        .pc-grid { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; padding:12px; align-content:start; }
-        .pc-tile { position:relative; background:#fff; border:2px solid #cbd5e1; border-radius:14px; padding:10px 8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; min-height:132px; font-family:inherit; }
+        .pc-grid { flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:12px 12px 16px; align-content:start; scrollbar-width:thin; scrollbar-color:#b6cdf0 transparent; }
+        .pc-grid::-webkit-scrollbar { width:8px; } .pc-grid::-webkit-scrollbar-thumb { background:#b6cdf0; border-radius:8px; } .pc-grid::-webkit-scrollbar-track { background:transparent; }
+        .pc-tile { position:relative; background:#fff; border:2px solid #cbd5e1; border-radius:14px; padding:8px; cursor:pointer; display:flex; flex-direction:column; align-items:stretch; gap:4px; min-height:0; font-family:inherit; text-align:left; }
+        .pc-thumb { height:112px; border-radius:11px; background:#fff; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
         .pc-tile.on { border-color:#7c3aed; background:#f5f3ff; box-shadow:0 0 0 3px rgba(124,58,237,.25); }
         .pc-tile.lock { opacity:.6; cursor:not-allowed; background:#f1f5f9; }
-        .pc-tile-name { font-size:12.5px; font-weight:800; text-align:center; color:#1e293b; }
-        .pc-tile-sub { font-size:10.5px; color:#475569; text-align:center; line-height:1.3; }
-        .pc-tile-tag { margin-top:auto; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; background:#e2e8f0; color:#334155; text-align:center; }
-        .pc-stage { width:100%; display:flex; flex-direction:column; align-items:center; min-height:236px; flex:none; }
+        .pc-tile-name { font-size:13px; font-weight:800; color:#14306B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-tile-sub { font-size:11px; color:#475569; line-height:1.3; height:29px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .pc-tile-tag { margin-top:auto; height:40px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; padding:0 8px; border-radius:10px; background:#e2e8f0; color:#334155; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-tile-tag.wear { background:#2f7fe8; color:#fff; } .pc-tile-tag.eq { background:#16a34a; color:#fff; }
+        .pc-stage { width:100%; display:flex; flex-direction:column; align-items:center; flex:1 1 auto; min-height:0; max-height:300px; overflow:hidden; border:2px solid #BFD4F5; border-radius:16px; background:#f8fbff; }
         .pc-tile.ring { border-color:#2f7fe8; box-shadow:0 0 0 3px rgba(47,127,232,.3); }
         .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); padding-bottom:16px; }
         .pc-scard { display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:2px solid #D6E4FA; border-radius:16px; background:#fff; }
@@ -641,14 +644,20 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-scard.off .pc-sbtn { background:#e2e8f0; color:#64748b; }
         .pc-sbtn:focus-visible, .pc-remove:focus-visible { outline:3px solid #1d4ed8; outline-offset:2px; }
         .pc-remove { flex-shrink:0; border:1.5px solid currentColor; background:#fff; color:inherit; border-radius:10px; padding:5px 10px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
-        .pc-preview { background:#fff; border-left:2px solid #93c5fd; padding:14px; display:flex; flex-direction:column; align-items:center; gap:10px; overflow-y:auto; }
+        .pc-preview { background:#fff; border-left:2px solid #93c5fd; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px; overflow:hidden; min-height:0; }
+        .pc-phead { width:100%; display:flex; align-items:center; justify-content:space-between; height:28px; flex:none; font-weight:800; color:#14306B; }
+        .pc-pill { font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:#dcfce7; color:#166534; }
+        .pc-wlabel { width:100%; height:16px; flex:none; font-size:10.5px; font-weight:800; letter-spacing:1px; color:#475569; }
+        .pc-actions { width:100%; margin-top:auto; display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:none; }
         .pc-equipped { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; }
-        .pc-eq { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:6px 8px; font-size:11px; }
+        .pc-eq { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:4px 8px; font-size:12px; font-weight:700; height:46px; box-sizing:border-box; min-width:0; display:flex; flex-direction:column; justify-content:center; }
+        .pc-eq.off { background:#f8fafc; border:1.5px dashed #cbd5e1; }
+        .pc-eq span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
         .pc-eq b { display:block; color:#1e40af; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
-        .pc-unequip { flex-shrink:0; width:18px; height:18px; border-radius:999px; border:none; background:#fee2e2; color:#b91c1c; font-size:11px; font-weight:900; cursor:pointer; line-height:1; }
-        .pc-unequip-all { width:100%; border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:10px; padding:8px; font-size:12.5px; font-weight:800; cursor:pointer; }
+        .pc-unequip { flex-shrink:0; width:22px; height:22px; padding:0; border-radius:999px; border:1.5px solid #fca5a5; background:#fff; color:#b91c1c; font-size:11px; font-weight:900; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; }
+        .pc-unequip-all { height:42px; box-sizing:border-box; border:1.5px solid #cbd5e1; background:#fff; color:#2f7fe8; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; } .pc-unequip-all:disabled { opacity:.5; cursor:default; }
         .pc-bubble { width:100%; background:#f8fafc; border:2px solid #cbd5e1; border-radius:14px; padding:8px 10px; font-size:12.5px; font-weight:700; color:#1e293b; min-height:40px; }
-        .pc-play { width:100%; margin-top:auto; border:none; border-radius:14px; padding:13px; background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 5px 0 #0f7a3a; }
+        .pc-play { height:42px; box-sizing:border-box; border:none; border-radius:12px; background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; font-size:15px; font-weight:900; cursor:pointer; box-shadow:0 3px 0 #0f7a3a; }
         @media (max-width: 900px) {
           .pc-root { overflow-y:auto; align-items:flex-start; }
           .pc-panel { height:auto; min-height:100%; overflow:visible; }
@@ -659,7 +668,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           .pc-cats { flex-direction:row; overflow-x:auto; overflow-y:hidden; border-right:none; border-bottom:2px solid #93c5fd; padding:8px; }
           .pc-cat { flex-shrink:0; padding:8px 12px; }
           .pc-grid, .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-          .pc-play { margin-top:0; }
+          .pc-preview { overflow:visible; }
+          .pc-stage { max-height:none; }
         }
         @media (max-width: 560px) {
           .pc-root { padding:0; }
@@ -779,9 +789,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 const unlockLabel = !badge && item.unlock && item.unlock.type !== 'free'
                   ? describeUnlock(item.unlock.type, { gameId: item.unlock.gameId, value: item.unlock.value, badgeCode: item.unlock.badgeCode }, games, [])
                   : null
-                const tag = isEquipped ? '✓ Equipped'
-                  : !unlocked ? (badge ? `🔒 ${item.badge}` : unlockLabel ? `🔒 ${unlockLabel}` : '🔒 Locked')
-                  : 'Tap to wear'
+                const tag = isEquipped ? 'Equipped'
+                  : !unlocked ? (badge ? `Locked: ${item.badge}` : unlockLabel ? `Locked: ${unlockLabel}` : 'Locked')
+                  : 'Wear'
                 const itemKey = item.id !== 'none' ? resolveItemKey(item.name) : null
                 const hasLayerArt = itemKey && layerManifest?.layers?.some((l) => l.category === activeTab && l.item_key === itemKey)
                 return (
@@ -790,14 +800,14 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                     onClick={() => (unlocked ? equip(activeTab, item) : tapLocked(item))}
                     aria-pressed={isEquipped}
                     aria-label={`${item.name}${unlocked ? '' : ', locked'}`}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:56 }}>
+                    <div className="pc-thumb">
                       {hasLayerArt
-                        ? <LayerCardIcon manifest={layerManifest} category={activeTab} itemKey={itemKey} unlocked={unlocked} width={64} />
-                        : <div style={{ opacity: unlocked ? 1 : 0.55 }}><WardrobeThumb item={item} categoryId={activeTab} width={64}/></div>}
+                        ? <LayerCardIcon manifest={layerManifest} category={activeTab} itemKey={itemKey} unlocked={unlocked} width={96} />
+                        : <div style={{ opacity: unlocked ? 1 : 0.55 }}><WardrobeThumb item={item} categoryId={activeTab} width={88}/></div>}
                     </div>
-                    <div className="pc-tile-name">{item.name}</div>
+                    <div className="pc-tile-name" title={item.name}>{item.name}</div>
                     <div className="pc-tile-sub">{item.desc}</div>
-                    <div className="pc-tile-tag" style={isEquipped ? { background:'#ede9fe', color:'#6d28d9' } : null}>{tag}</div>
+                    <div className={`pc-tile-tag ${isEquipped ? 'eq' : unlocked ? 'wear' : ''}`}>{tag}</div>
                   </button>
                 )
               })}
@@ -806,6 +816,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           </div>
 
           <div className="pc-preview">
+            <div className="pc-phead"><span>Pao's look</span><span className="pc-pill">{categories.filter(c => !isNatural(c.id)).length} outfit items on</span></div>
             {/* Stage: speech bubble (flex:none) above Pao. Pao shrinks first if the panel is short. */}
             <div className="pc-stage">
               <PaoSpeechBubble text={line?.text} kind={line?.kind} lang={lang} />
@@ -820,38 +831,38 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 />
               </div>
             </div>
+            <div className="pc-wlabel">WEARING NOW</div>
             <div className="pc-equipped">
-              {categories.map(cat => (
-                <div key={cat.id} className="pc-eq">
-                  <b>{cat.label}</b>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
-                    <span style={{ overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{getEquippedName(cat.id)}</span>
-                    {!isNatural(cat.id) && (
-                      <button type="button" className="pc-unequip" onClick={() => unequip(cat.id)} aria-label={`Take off ${cat.label}`} title="Take off">✕</button>
+              {categories.map(cat => {
+                const on = !isNatural(cat.id)
+                return (
+                  <div key={cat.id} className={`pc-eq ${on ? '' : 'off'}`} style={{ position:'relative' }}>
+                    <b>{cat.label}</b>
+                    <span style={{ color: on ? undefined : '#94a3b8', paddingRight: on ? 26 : 0 }}>{on ? getEquippedName(cat.id) : 'Natural'}</span>
+                    {on && (
+                      <button type="button" className="pc-unequip" style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)' }} onClick={() => unequip(cat.id)} aria-label={`Take off ${cat.label}`} title="Take off">&#10005;</button>
                     )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {STYLE_TABS.map((t) => {
                 const on = !!styleKey(t.type)
                 return (
-                  <div key={t.type} className="pc-eq" style={on ? null : { borderStyle:'dashed', background:'#f8fafc' }}>
+                  <div key={t.type} className={`pc-eq ${on ? '' : 'off'}`} style={{ position:'relative' }}>
                     <b>{t.single}</b>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
-                      <span style={{ color: on ? undefined : '#94a3b8' }}>{on ? styleName(t.type) : 'Off'}</span>
-                      {on && (
-                        <button type="button" className="pc-unequip" onClick={() => removeStyle(t.type)} aria-label={`Remove ${t.single.toLowerCase()}`} title="Remove">✕</button>
-                      )}
-                    </div>
+                    <span style={{ color: on ? undefined : '#94a3b8', paddingRight: on ? 26 : 0 }}>{on ? styleName(t.type) : 'Off'}</span>
+                    {on && (
+                      <button type="button" className="pc-unequip" style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)' }} onClick={() => removeStyle(t.type)} aria-label={`Remove ${t.single.toLowerCase()}`} title="Remove">&#10005;</button>
+                    )}
                   </div>
                 )
               })}
             </div>
-            {categories.some(c => !isNatural(c.id)) && (
-              <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take outfit off</button>
-            )}
             {styleError && <div role="alert" className="pc-bubble" style={{ borderColor:'#ef4444', color:'#b91c1c' }}>{styleError}</div>}
-            <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); say('play'); setTimeout(onDone, 700) }}>Let's Play!</button>
+            <div className="pc-actions">
+              <button type="button" className="pc-unequip-all" onClick={unequipAll} disabled={!categories.some(c => !isNatural(c.id))}>Take outfit off</button>
+              <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); say('play'); setTimeout(onDone, 700) }}>Let's Play!</button>
+            </div>
           </div>
         </div>
       </div>

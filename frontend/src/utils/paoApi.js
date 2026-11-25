@@ -50,6 +50,17 @@ export async function equipPaoTheme(ident, themeCode) {
   }))
 }
 
+export async function getPaoStyles() {
+  return jsonOrThrow(await fetch('/api/pao/styles'))
+}
+
+export async function selectPaoStyle(ident, type, key) {
+  return jsonOrThrow(await fetch('/api/pao/styles/select', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...identBody(ident), type, key }),
+  }))
+}
+
 export async function markPaoSeen(ident, { badgeCodes = [], unlocks = [] }) {
   return jsonOrThrow(await fetch('/api/pao/seen', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

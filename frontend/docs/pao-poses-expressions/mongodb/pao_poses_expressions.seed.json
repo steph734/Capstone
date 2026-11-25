@@ -1,0 +1,506 @@
+[
+  {
+    "key": "relax",
+    "type": "pose",
+    "name": "Relaxed",
+    "description": "Just chilling",
+    "asset_key": "pose_relax",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_relax.png",
+    "sort_order": {
+      "$numberInt": "1"
+    },
+    "is_default": true,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "wave",
+    "type": "pose",
+    "name": "Wave",
+    "description": "Say hello",
+    "asset_key": "pose_wave",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_wave.png",
+    "sort_order": {
+      "$numberInt": "2"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "cheer",
+    "type": "pose",
+    "name": "Cheer",
+    "description": "Hooray!",
+    "asset_key": "pose_cheer",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_cheer.png",
+    "sort_order": {
+      "$numberInt": "3"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "hello",
+    "type": "pose",
+    "name": "Big hello",
+    "description": "Both paws up",
+    "asset_key": "pose_hello",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_hello.png",
+    "sort_order": {
+      "$numberInt": "4"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "jump",
+    "type": "pose",
+    "name": "Jump",
+    "description": "Up in the air",
+    "asset_key": "pose_jump",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_jump.png",
+    "sort_order": {
+      "$numberInt": "5"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "dance",
+    "type": "pose",
+    "name": "Dance",
+    "description": "Feel the beat",
+    "asset_key": "pose_dance",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_dance.png",
+    "sort_order": {
+      "$numberInt": "6"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "groove",
+    "type": "pose",
+    "name": "Groove",
+    "description": "Music time",
+    "asset_key": "pose_groove",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_groove.png",
+    "sort_order": {
+      "$numberInt": "7"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "tada",
+    "type": "pose",
+    "name": "Ta-da",
+    "description": "Arms wide open",
+    "asset_key": "pose_tada",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_tada.png",
+    "sort_order": {
+      "$numberInt": "8"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "think",
+    "type": "pose",
+    "name": "Thinking",
+    "description": "Paw on chin",
+    "asset_key": "pose_think",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_think.png",
+    "sort_order": {
+      "$numberInt": "9"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "shy",
+    "type": "pose",
+    "name": "Shy",
+    "description": "Paws on cheeks",
+    "asset_key": "pose_shy",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_shy.png",
+    "sort_order": {
+      "$numberInt": "10"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "hug",
+    "type": "pose",
+    "name": "Cuddle",
+    "description": "Warm and cozy",
+    "asset_key": "pose_hug",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_hug.png",
+    "sort_order": {
+      "$numberInt": "11"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "lean",
+    "type": "pose",
+    "name": "Cozy lean",
+    "description": "Tilted and relaxed",
+    "asset_key": "pose_lean",
+    "preview_image_url": "/games/pao-poses-expressions/poses/pose_lean.png",
+    "sort_order": {
+      "$numberInt": "12"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "happy",
+    "type": "expression",
+    "name": "Happy",
+    "description": "Big smile",
+    "asset_key": "expr_happy",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_happy.png",
+    "sort_order": {
+      "$numberInt": "1"
+    },
+    "is_default": true,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "proud",
+    "type": "expression",
+    "name": "Proud",
+    "description": "So pleased",
+    "asset_key": "expr_proud",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_proud.png",
+    "sort_order": {
+      "$numberInt": "2"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "wink",
+    "type": "expression",
+    "name": "Wink",
+    "description": "Playful",
+    "asset_key": "expr_wink",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_wink.png",
+    "sort_order": {
+      "$numberInt": "3"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "excited",
+    "type": "expression",
+    "name": "Excited",
+    "description": "Wow, wow!",
+    "asset_key": "expr_excited",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_excited.png",
+    "sort_order": {
+      "$numberInt": "4"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "laugh",
+    "type": "expression",
+    "name": "Laugh",
+    "description": "Happy tears",
+    "asset_key": "expr_laugh",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_laugh.png",
+    "sort_order": {
+      "$numberInt": "5"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "surprised",
+    "type": "expression",
+    "name": "Surprised",
+    "description": "Oh my!",
+    "asset_key": "expr_surprised",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_surprised.png",
+    "sort_order": {
+      "$numberInt": "6"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "silly",
+    "type": "expression",
+    "name": "Silly",
+    "description": "Tongue out",
+    "asset_key": "expr_silly",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_silly.png",
+    "sort_order": {
+      "$numberInt": "7"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "cool",
+    "type": "expression",
+    "name": "Cool",
+    "description": "Shades on",
+    "asset_key": "expr_cool",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_cool.png",
+    "sort_order": {
+      "$numberInt": "8"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "love",
+    "type": "expression",
+    "name": "Love",
+    "description": "Heart eyes",
+    "asset_key": "expr_love",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_love.png",
+    "sort_order": {
+      "$numberInt": "9"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "sleepy",
+    "type": "expression",
+    "name": "Sleepy",
+    "description": "Nap time",
+    "asset_key": "expr_sleepy",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_sleepy.png",
+    "sort_order": {
+      "$numberInt": "10"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "sad",
+    "type": "expression",
+    "name": "Sad",
+    "description": "Needs a hug",
+    "asset_key": "expr_sad",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_sad.png",
+    "sort_order": {
+      "$numberInt": "11"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  },
+  {
+    "key": "grumpy",
+    "type": "expression",
+    "name": "Grumpy",
+    "description": "Hmph",
+    "asset_key": "expr_grumpy",
+    "preview_image_url": "/games/pao-poses-expressions/expressions/expr_grumpy.png",
+    "sort_order": {
+      "$numberInt": "12"
+    },
+    "is_default": false,
+    "is_free": true,
+    "is_active": true,
+    "is_archived": false,
+    "created_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    },
+    "updated_at": {
+      "$date": "2026-11-25T15:18:05.933Z"
+    }
+  }
+]

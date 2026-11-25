@@ -7,6 +7,7 @@ import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializePaoProfile } from '../serializePaoProfile.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 import { serializePaoHair } from '../serializePaoHair.js'
+import { resolveSelection } from '../paoStyles.js'
 
 const SLOTS = ['hair', 'hats', 'clothes', 'pants', 'shoes']
 
@@ -49,7 +50,9 @@ export default async function handler(req, res) {
       shoes: equipped.shoes ? itemByCode.get(equipped.shoes) || null : null,
     }
 
-    return res.status(200).json({ profile: { ...serializePaoProfile(profile), equipped: equippedFull } })
+    const selection = await resolveSelection(db, profile)
+
+    return res.status(200).json({ profile: { ...serializePaoProfile(profile), equipped: equippedFull, ...selection } })
   } catch (err) {
     console.error('pao/profile error:', err)
     return res.status(500).json({ error: err.message || 'Could not load the Pao profile.' })

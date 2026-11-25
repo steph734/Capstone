@@ -5,7 +5,7 @@ import { DesignedOutfitThumbnail } from './PaoDesignedOutfit'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
 import { usePao } from '../../context/PaoContext'
-import { getWardrobe } from '../../utils/paoApi'
+import { getWardrobe, getPaoStyles } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 import PaoLayered from '../../components/pao/PaoLayered'
@@ -132,6 +132,12 @@ const CATEGORY_META = [
   { id: 'pants', label: 'Pants', icon: '👖' },
   { id: 'shoes', label: 'Shoes', icon: '👟' },
 ]
+
+const STYLE_TABS = [
+  { type: 'pose', label: 'Poses' },
+  { type: 'expression', label: 'Expressions' },
+]
+const DEFAULT_STYLE = { pose: 'relax', expression: 'happy' }
 
 const NATURAL_DESC = {
   hair: 'Just Pao being Pao!',
@@ -381,6 +387,17 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     calm: reducedMotion,
     onSpeak: (text) => { if (text) tts(text, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) }) },
   })
+  const [styles, setStyles] = useState([])
+  const [stylesLoading, setStylesLoading] = useState(true)
+  const [styleError, setStyleError] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    getPaoStyles()
+      .then((b) => { if (!cancelled) setStyles(b.items || []) })
+      .catch(() => { if (!cancelled) setStyleError('Could not load poses and expressions.') })
+      .finally(() => { if (!cancelled) setStylesLoading(false) })
+    return () => { cancelled = true }
+  }, [])
   const [games, setGames] = useState([])
   const [unlockedItemCodes, setUnlockedItemCodes] = useState(() => new Set())
   const mouthRef = useRef(null)
@@ -517,6 +534,21 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
 
   const activeCategory = categories.find(c => c.id === activeTab)
 
+  // Poses and expressions: the list comes from the API (never hard-coded).
+  // The saved choice lives on the Pao profile; choosing is optimistic and
+  // rolls back with a message if the server refuses.
+  const isStyleTab = activeTab === 'pose' || activeTab === 'expression'
+  const styleItems = styles.filter((s) => s.type === activeTab)
+  const styleKey = (type) => (type === 'pose'
+    ? pao.profile?.selectedPoseKey || DEFAULT_STYLE.pose
+    : pao.profile?.selectedExpressionKey || DEFAULT_STYLE.expression)
+  const styleName = (type) => styles.find((s) => s.type === type && s.key === styleKey(type))?.name || (type === 'pose' ? 'Relaxed' : 'Happy')
+  const chooseStyle = (type, key) => {
+    if (styleKey(type) === key) return
+    setStyleError('')
+    pao.selectStyle(type, key).catch((err) => setStyleError(err.message || 'Could not save that choice.'))
+  }
+
   // Which layer-art item_key is equipped in each of the four layered
   // categories, for <PaoLayered/>. Hair has no overlay art yet (see
   // paoLayers.js), so it isn't part of this and still shows as text only.
@@ -620,11 +652,47 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 {cat.label}
               </button>
             ))}
+            <div style={{ fontSize:10.5, fontWeight:800, letterSpacing:1, color:'#475569', margin:'6px 4px 0' }}>STYLE</div>
+            {STYLE_TABS.map((t) => (
+              <button key={t.type} role="tab" aria-selected={activeTab === t.type}
+                className={`pc-cat ${activeTab === t.type ? 'on' : ''}`} onClick={() => setActiveTab(t.type)}>
+                <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1.2 }}>
+                  {t.label}
+                  <span style={{ fontSize:11, fontWeight:600, opacity:.8 }}>{styleName(t.type)}</span>
+                </span>
+              </button>
+            ))}
           </div>
 
           <div className="pc-grid-wrap">
-            <div className="pc-note">Each item shows the badge needed to unlock it</div>
-            {wardrobeLoading ? (
+            <div className="pc-note">
+              {isStyleTab
+                ? (activeTab === 'pose' ? 'All 12 poses are free. Pick how Pao stands.' : 'All 12 expressions are free. Pick how Pao feels.')
+                : 'Each item shows the badge needed to unlock it'}
+            </div>
+            {isStyleTab ? (
+              <div className="pc-grid">
+                {stylesLoading && Array.from({ length: 8 }).map((_, i) => <div key={i} className="pc-skel" />)}
+                {!stylesLoading && styleItems.length === 0 && <div className="pc-tile-sub" style={{ gridColumn:'1 / -1' }}>Nothing to show right now.</div>}
+                {styleItems.map((s) => {
+                  const selected = styleKey(activeTab) === s.key
+                  return (
+                    <div key={s.key} className={`pc-tile ${selected ? 'on' : ''}`} style={selected ? { borderColor:'#16a34a', background:'#f0fdf4', boxShadow:'0 0 0 3px rgba(22,163,74,.22)' } : null}>
+                      <img src={s.preview_image_url} alt="" draggable={false} style={{ width:72, height:72, objectFit:'contain' }} />
+                      <div className="pc-tile-name">{s.name}</div>
+                      <div className="pc-tile-sub">{s.description}</div>
+                      <span style={{ fontSize:9.5, fontWeight:800, padding:'1px 6px', borderRadius:999, background:'#dcfce7', color:'#166534' }}>FREE</span>
+                      <button type="button" className="pc-tile-tag" aria-pressed={selected}
+                        aria-label={`${selected ? 'Selected' : 'Choose'} ${s.name}`}
+                        onClick={() => chooseStyle(activeTab, s.key)}
+                        style={{ border:'none', cursor:'pointer', width:'100%', fontFamily:'inherit', ...(selected ? { background:'#16a34a', color:'#fff' } : { background:'#2f7fe8', color:'#fff' }) }}>
+                        {selected ? 'Selected' : 'Choose'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : wardrobeLoading ? (
               <div className="pc-grid">
                 {Array.from({ length: 8 }).map((_, i) => <div key={i} className="pc-skel" />)}
               </div>
@@ -686,10 +754,17 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                   </div>
                 </div>
               ))}
+              {STYLE_TABS.map((t) => (
+                <div key={t.type} className="pc-eq">
+                  <b>{t.label}</b>
+                  <span>{styleName(t.type)}</span>
+                </div>
+              ))}
             </div>
             {categories.some(c => !isNatural(c.id)) && (
               <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take everything off</button>
             )}
+            {styleError && <div role="alert" className="pc-bubble" style={{ borderColor:'#ef4444', color:'#b91c1c' }}>{styleError}</div>}
             <div className="pc-bubble" aria-live="polite">
               {talking && <span style={{ color:'#7c3aed', marginRight:6 }}>🎵</span>}
               {displayText || reaction.bubble || 'Pao is excited!'}

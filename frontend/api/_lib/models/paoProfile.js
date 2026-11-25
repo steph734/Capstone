@@ -44,6 +44,10 @@ const paoProfileSchema = new mongoose.Schema(
 
     equipped: { type: equippedSchema, required: true, default: () => ({}) },
 
+    // Optional; missing means the default (relax / happy). See paoStyles.js.
+    selected_pose_key: { type: String },
+    selected_expression_key: { type: String },
+
     voice_language: { type: String, enum: ['en', 'tl', 'ceb'], default: 'en' },
     last_played_at: { type: Date, default: null },
   },

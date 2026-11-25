@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useOptionalPao } from '../../context/PaoContext'
 import { loadLayerManifest, resolveLayerStack, layerUrl, allLayerFiles, BASE_TOP, poseFile, fxFile, loadPosesManifest, allPoseFiles } from './paoLayers'
 
 // Pao assembled from stacked outfit layers: base-bottom, base-top (or a
@@ -20,8 +21,23 @@ const VIEWBOX = '0 -40 300 380'
 const ASPECT = 380 / 300
 const CROSSFADE_MS = 120
 
-export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false }) {
+const STYLE_BASE = '/games/pao-poses-expressions'
+const DEFAULT_POSE = 'relax'
+const DEFAULT_EXPRESSION = 'happy'
+
+export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false, stylePose, styleExpression }) {
   const [manifest, setManifest] = useState(null)
+  // The patient's chosen pose / expression (Customize Pao > Style). Props
+  // override the saved profile (used for the modal's instant preview).
+  const paoCtx = useOptionalPao()
+  const chosenPose = stylePose || paoCtx?.profile?.selectedPoseKey || DEFAULT_POSE
+  const chosenExpression = styleExpression || paoCtx?.profile?.selectedExpressionKey || DEFAULT_EXPRESSION
+  // Until the layered rig exists, a non-default choice is a full picture of a
+  // bare Pao. A transient reaction pose (pose !== 'idle') still wins.
+  const stylePicture = pose && pose !== 'idle' ? null
+    : chosenPose !== DEFAULT_POSE ? `${STYLE_BASE}/poses/pose_${chosenPose}.png`
+    : chosenExpression !== DEFAULT_EXPRESSION ? `${STYLE_BASE}/expressions/expr_${chosenExpression}.png`
+    : null
 
   useEffect(() => {
     let cancelled = false
@@ -94,7 +110,10 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
       onClick={onClick}
       onKeyDown={interactive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(e) } } : undefined}
     >
-      {belowPose.map((layer) => (
+      {stylePicture && (
+        <img src={stylePicture} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ objectFit: 'contain' }} />
+      )}
+      {!stylePicture && belowPose.map((layer) => (
         <img
           key={layer.file}
           src={layerUrl(layer.file)}
@@ -106,12 +125,12 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
         />
       ))}
       {/* Pose layer (z=4): crossfades on its own, under the outfit's fore/hat layers. */}
-      {frames.map((frame) => (
+      {!stylePicture && frames.map((frame) => (
         <div key={`pose-${frame.id}`} className="absolute inset-0" style={{ opacity: frame.visible ? 1 : 0, transition: `opacity ${CROSSFADE_MS}ms ease` }}>
           <img src={layerUrl(frame.poseFile)} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
         </div>
       ))}
-      {abovePose.map((layer) => (
+      {!stylePicture && abovePose.map((layer) => (
         <img
           key={layer.file}
           src={layerUrl(layer.file)}
@@ -123,7 +142,7 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
         />
       ))}
       {/* fx layer (z=7): above everything, including hats. */}
-      {frames.map((frame) => frame.fxFile && (
+      {!stylePicture && frames.map((frame) => frame.fxFile && (
         <div key={`fx-${frame.id}`} className="absolute inset-0" style={{ opacity: frame.visible ? 1 : 0, transition: `opacity ${CROSSFADE_MS}ms ease` }}>
           <img src={layerUrl(frame.fxFile)} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
         </div>

@@ -180,6 +180,8 @@ import paoWardrobe from './_lib/routes/pao-wardrobe.js'
 import paoEquip from './_lib/routes/pao-equip.js'
 import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
 import paoSeen from './_lib/routes/pao-seen.js'
+import paoStyles from './_lib/routes/pao-styles.js'
+import paoStylesSelect from './_lib/routes/pao-styles-select.js'
 import * as gamePlans from './_lib/routes/game-plans.js'
 import * as homePractice from './_lib/routes/home-practice.js'
 import * as homeSets from './_lib/routes/home-sets.js'
@@ -492,6 +494,8 @@ app.all('/api/pao/wardrobe', paoWardrobe)
 app.all('/api/pao/equip', paoEquip)
 app.all('/api/pao/equip-theme', paoEquipTheme)
 app.all('/api/pao/seen', paoSeen)
+app.all('/api/pao/styles', paoStyles)
+app.all('/api/pao/styles/select', paoStylesSelect)
 app.all('/api/games/:gameId/sessions', gameSessionsStart)
 app.all('/api/sessions/:id/abandon', gameSessionsAbandon)
 app.all('/api/sessions/:id/complete', gameSessionsComplete)

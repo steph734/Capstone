@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getPaoProfile, equipPao, equipPaoTheme, hasIdent } from '../utils/paoApi'
+import { getPaoProfile, equipPao, equipPaoTheme, selectPaoStyle, hasIdent } from '../utils/paoApi'
 import RewardsFlow from '../games/shared/rewards/RewardsFlow'
 import AppErrorBoundary from '../components/AppErrorBoundary'
 
@@ -11,6 +11,8 @@ const PaoContext = createContext(null)
 
 export function PaoProvider({ ident, children }) {
   const [profile, setProfile] = useState(null)
+  const profileRef = useRef(null)
+  profileRef.current = profile
   const [error, setError] = useState('')
   const [pendingReward, setPendingReward] = useState(null)
   const actionsRef = useRef({}) // { playAgain, allGames }, registered by the games page
@@ -47,6 +49,20 @@ export function PaoProvider({ ident, children }) {
     return refresh()
   }, [identKey, refresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pose / expression choice. Optimistic: the profile updates immediately and
+  // rolls back (and rethrows) if the server refuses.
+  const selectStyle = useCallback(async (type, key) => {
+    const field = type === 'pose' ? 'selectedPoseKey' : 'selectedExpressionKey'
+    const previous = profileRef.current?.[field]
+    setProfile((prev) => ({ ...(prev || {}), [field]: key }))
+    try {
+      await selectPaoStyle(ident, type, key)
+    } catch (err) {
+      setProfile((prev) => ({ ...(prev || {}), [field]: previous }))
+      throw err
+    }
+  }, [identKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const equipTheme = useCallback(async (themeCode) => {
     const res = await equipPaoTheme(ident, themeCode)
     await refresh()
@@ -54,9 +70,9 @@ export function PaoProvider({ ident, children }) {
   }, [identKey, refresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(() => ({
-    profile, error, refresh, applyServerProfile, equip, equipTheme,
+    profile, error, refresh, applyServerProfile, equip, equipTheme, selectStyle,
     showReward: setPendingReward, setRewardActions, ident,
-  }), [profile, error, refresh, applyServerProfile, equip, equipTheme, setRewardActions, identKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [profile, error, refresh, applyServerProfile, equip, equipTheme, selectStyle, setRewardActions, identKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <PaoContext.Provider value={value}>

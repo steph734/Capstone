@@ -11,6 +11,8 @@ import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializePaoItem } from '../serializePaoItem.js'
 import { serializePaoHair } from '../serializePaoHair.js'
 import { describeUnlock } from '../describeUnlock.js'
+import { criteriaProgress } from '../evaluateUnlock.js'
+import { buildUnlockContext } from '../unlockContext.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -58,6 +60,9 @@ export default async function handler(req, res) {
       for (const u of toBackfill) unlockedSet.add(`${u.item_type}:${u.item_code}`)
     }
 
+    const unlockCtx = await buildUnlockContext(patientId).catch(() => null)
+    const progressOf = (u) => (u && unlockCtx ? criteriaProgress({ type: u.type, gameId: u.game_id, value: u.value, badgeCode: u.badge_code }, unlockCtx) : null)
+
     const unlockedMeta = new Map(unlocks.map((u) => [`${u.item_type}:${u.item_code}`, u]))
     const gameNameById = new Map(games.map((g) => [String(g._id), g.name]))
     const badgeNameByCode = new Map(badges.map((b) => [b.code, b.name]))
@@ -75,6 +80,7 @@ export default async function handler(req, res) {
         equipped: equipped[slot] === doc.code,
         isNew: isUnlocked ? !(meta?.seen ?? true) : false,
         howToUnlock: isUnlocked ? null : describe(doc.unlock),
+        progress: isUnlocked ? null : progressOf(doc.unlock),
       }
     }
 

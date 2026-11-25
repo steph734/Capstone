@@ -44,3 +44,22 @@ export function evaluateCriteria({ type, gameId, value, badgeCode, taskKey }, ct
       return false
   }
 }
+
+// How far along the patient is toward a countable unlock rule, for the
+// progress bar on locked wardrobe cards. Returns { have, need } (have is
+// capped at need) or null when the rule has no meaningful count.
+export function criteriaProgress({ type, gameId, value, badgeCode }, ctx) {
+  const gid = gameId ? String(gameId) : null
+  const need = value == null ? 1 : value
+  const cap = (have) => ({ have: Math.max(0, Math.min(Number(have) || 0, need)), need })
+  switch (type) {
+    case 'complete_any_game': return cap(ctx.gamesCompleted ?? ctx.completedGameIds?.size)
+    case 'complete_specific_game': return gid ? cap(ctx.completionCountByGame?.get(gid) || 0) : null
+    case 'perfect_score': return gid ? { have: ctx.perfectGameIds?.has(gid) ? 1 : 0, need: 1 } : cap(ctx.perfectGames ?? (ctx.anyPerfect ? 1 : 0))
+    case 'reach_level': return cap(ctx.level)
+    case 'total_xp': return cap(ctx.totalXp)
+    case 'games_in_a_row': return cap(ctx.gamesInARow)
+    case 'earn_badge': return badgeCode ? { have: ctx.earnedBadgeCodes?.has(badgeCode) ? 1 : 0, need: 1 } : null
+    default: return null
+  }
+}

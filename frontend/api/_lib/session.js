@@ -87,7 +87,7 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
     const db = await getDb()
     const session = await db.collection('sessions').findOne({ _id: new ObjectId(payload.sid) })
     if (!session || session.revoked || session.expires_at < new Date()) {
-      res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'NO_SESSION' })
+      res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'NO_SESSION', reason: !session ? 'not_found' : session.revoked ? `revoked:${session.revoked_reason || 'unknown'}` : 'expired' })
       return null
     }
     if (idle && Date.now() - session.last_seen.getTime() > IDLE_LIMIT_MS) {
@@ -110,7 +110,7 @@ export async function requireSession(req, res, { roles, idle = true, touch = tru
       return null
     }
     // Throttled: at most one write per session every TOUCH_THROTTLE_MS (the idle limit above allows for this lag).
-    if (idle && touch && Date.now() - session.last_seen.getTime() > TOUCH_THROTTLE_MS) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date() } })
+    if (idle && touch && Date.now() - session.last_seen.getTime() > TOUCH_THROTTLE_MS) await db.collection('sessions').updateOne({ _id: session._id }, { $set: { last_seen: new Date(), expires_at: new Date(Date.now() + SESSION_TTL_MS) } }) // sliding: people who are active are never cut off by the 8h cap
     return { db, user, session, ip: getClientIp(req) }
   } catch (err) {
     console.error('requireSession error:', err.message)

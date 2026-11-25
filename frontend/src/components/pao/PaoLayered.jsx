@@ -24,14 +24,14 @@ const CROSSFADE_MS = 120
 
 const STYLE_BASE = '/games/pao-poses-expressions'
 
-export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false }) {
+export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false, fill = false, noStyle = false }) {
   const [manifest, setManifest] = useState(null)
   // The patient's chosen pose OR expression (exclusive; none = default Pao).
   // Until the layered rig exists it is a full picture of a bare Pao. A
   // transient reaction pose (pose !== 'idle') still wins.
   const paoCtx = useOptionalPao()
-  const chosenPose = paoCtx?.profile?.selectedPoseKey || null
-  const chosenExpression = paoCtx?.profile?.selectedExpressionKey || null
+  const chosenPose = noStyle ? null : paoCtx?.profile?.selectedPoseKey || null
+  const chosenExpression = noStyle ? null : paoCtx?.profile?.selectedExpressionKey || null
   const stylePicture = pose && pose !== 'idle' ? null
     : chosenPose ? animatedPoseUrl(chosenPose)
     : chosenExpression ? animatedExpressionUrl(chosenExpression)
@@ -96,8 +96,9 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
     }
   }, [frames])
 
-  const width = size
-  const height = Math.round(size * ASPECT)
+  // fill: take the size of the parent box (full body, meet), so nothing is cut off.
+  const width = fill ? '100%' : size
+  const height = fill ? '100%' : Math.round(size * ASPECT)
 
   return (
     <div

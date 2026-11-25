@@ -8,6 +8,10 @@ import { Badge } from '../models/badge.js'
 import { PatientBadge } from '../models/patientBadge.js'
 import { resolveRequestPatient } from '../resolveRequestPatient.js'
 import { serializeBadge } from '../serializeBadge.js'
+import { getDb } from '../mongo.js'
+import { criteriaProgress } from '../evaluateUnlock.js'
+import { buildUnlockContext } from '../unlockContext.js'
+import { describeUnlock } from '../describeUnlock.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -32,10 +36,34 @@ export default async function handler(req, res) {
       : []
     const earnedByCode = new Map(earned.map((e) => [e.badge_code, e]))
 
+    // Extra detail for the Badge Case: how to earn, progress, outfit reward.
+    const db = await getDb()
+    const [ctx, games, clothes, hair] = await Promise.all([
+      patientId ? buildUnlockContext(patientId).catch(() => null) : null,
+      db.collection('games').find({}, { projection: { name: 1 } }).toArray(),
+      db.collection('clothes').find({}, { projection: { code: 1, name: 1 } }).toArray(),
+      db.collection('pao_hair').find({}, { projection: { code: 1, name: 1 } }).toArray(),
+    ])
+    const gameName = new Map(games.map((g) => [String(g._id), g.name]))
+    const outfitName = new Map([...clothes, ...hair].map((d) => [d.code, d.name]))
+    const isPlaceholder = (n) => !n || !String(n).trim() || /^untitled/i.test(String(n).trim())
+
     return res.status(200).json({
       badges: badges.map((b) => {
         const e = earnedByCode.get(b.code)
-        return { ...serializeBadge(b), earned: !!e, earnedAt: e?.earned_at || null, seen: e ? !!e.seen : true }
+        const crit = b.criteria ? { type: b.criteria.type, gameId: b.criteria.game_id, value: b.criteria.value } : null
+        const pr = !e && ctx && crit ? criteriaProgress(crit, ctx) : null
+        return {
+          ...serializeBadge(b),
+          earned: !!e, earnedAt: e?.earned_at || null, seen: e ? !!e.seen : true,
+          howToEarn: crit ? describeUnlock(crit.type, { gameId: crit.gameId, value: crit.value }, gameName) : null,
+          progress: pr ? pr.have : null,
+          target: pr ? pr.need : null,
+          relatedGameId: crit?.gameId ? String(crit.gameId) : null,
+          relatedGameName: crit?.gameId ? gameName.get(String(crit.gameId)) || null : null,
+          rewardOutfit: b.unlock_item_code ? (outfitName.get(b.unlock_item_code) || b.unlock_item_code) : null,
+          isSecret: isPlaceholder(b.name),
+        }
       }),
     })
   } catch (err) {

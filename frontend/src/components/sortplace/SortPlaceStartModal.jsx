@@ -33,7 +33,7 @@ export default function SortPlaceStartModal({ game, ready = true, onStart, onCan
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
           <img src="/games/money-match/100%20pesos.jpg" alt="" style={{ height: 70, width: 'auto', transform: 'rotate(-8deg)', borderRadius: 8, boxShadow: '0 4px 10px rgba(0,0,0,.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-          <img src="/games/money-match/20%20pesos%20coin.png" alt="" style={{ height: 52, width: 52, marginLeft: -14, marginTop: 22, borderRadius: '50%', boxShadow: '0 4px 10px rgba(0,0,0,.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          <img src="/games/money-match/20%20pesos%20bill.jpg" alt="" style={{ height: 52, width: 52, objectFit: 'cover', marginLeft: -14, marginTop: 22, borderRadius: '50%', boxShadow: '0 4px 10px rgba(0,0,0,.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
         </div>
         <h2 id="mm-title" style={{ color: '#3a2e6b', fontSize: 22, fontWeight: 800, margin: '0 0 10px', textAlign: 'center' }}>{game.name || game.title}</h2>
         <p style={{ color: 'rgba(58,46,107,.75)', fontSize: 14, lineHeight: 1.5, margin: '0 0 20px', textAlign: 'center' }}>{game.description || game.desc}</p>

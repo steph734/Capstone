@@ -180,6 +180,7 @@ import paoWardrobe from './_lib/routes/pao-wardrobe.js'
 import paoEquip from './_lib/routes/pao-equip.js'
 import paoEquipTheme from './_lib/routes/pao-equip-theme.js'
 import paoSeen from './_lib/routes/pao-seen.js'
+import paoHub from './_lib/routes/pao-hub.js'
 import paoStyles from './_lib/routes/pao-styles.js'
 import paoStylesSelect from './_lib/routes/pao-styles-select.js'
 import paoStylesClear from './_lib/routes/pao-styles-clear.js'
@@ -495,6 +496,7 @@ app.all('/api/pao/wardrobe', paoWardrobe)
 app.all('/api/pao/equip', paoEquip)
 app.all('/api/pao/equip-theme', paoEquipTheme)
 app.all('/api/pao/seen', paoSeen)
+app.all('/api/pao/hub', paoHub)
 app.all('/api/pao/styles', paoStyles)
 app.all('/api/pao/styles/select', paoStylesSelect)
 app.all('/api/pao/styles/clear', paoStylesClear)

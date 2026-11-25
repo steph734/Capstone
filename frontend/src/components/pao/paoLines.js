@@ -54,6 +54,13 @@ export const ITEM_LINES = {
   play: "Let's play! Ready when you are.",
 }
 
+// Hub greeting bubble: one line, filled from the patient's real progress.
+export function hubLine({ name, xpAway, nextLevel }) {
+  const who = name ? `Hi ${clip(name)}!` : 'Hi!'
+  if (Number.isFinite(xpAway) && xpAway > 0 && nextLevel) return `${who} You are ${xpAway} XP away from Level ${nextLevel}.`
+  return `${who} Ready to play?`
+}
+
 const SLOT_WORD = { hair: 'hair', hats: 'hat', clothes: 'clothes', pants: 'pants', shoes: 'shoes' }
 
 function clip(value) {

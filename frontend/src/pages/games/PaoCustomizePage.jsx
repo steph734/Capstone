@@ -7,7 +7,7 @@ import { CUSTOMIZE_LINES, pickLine } from '../../utils/paoLines'
 import { usePao } from '../../context/PaoContext'
 import { getWardrobe, getPaoStyles } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
-import BadgeMedal from '../../components/BadgeMedal'
+import BadgeCaseView from '../../components/hub/BadgeCase'
 import PaoLayered from '../../components/pao/PaoLayered'
 import PaoAvatar from '../../components/pao/PaoAvatar'
 import PaoSpeechBubble from '../../components/pao/PaoSpeechBubble'
@@ -60,8 +60,8 @@ const CROP_CENTER = { hats: { x: 0.5, y: 0.28 }, clothes: { x: 0.5, y: 0.79 }, p
 const CROP_ZOOM = { hats: 2.4, clothes: 2.1, pants: 2.6, shoes: 1.6 }
 const CANVAS_ASPECT = 380 / 300
 
-function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64 }) {
-  const layer = manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey && l.layer === (LAYER_PICK[category] || l.layer))
+function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64, natural = false }) {
+  const layer = natural ? { file: 'base-bottom.svg' } : manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey && l.layer === (LAYER_PICK[category] || l.layer))
     || manifest?.layers?.find((l) => l.category === category && l.item_key === itemKey)
   if (!layer) return null
 
@@ -73,12 +73,12 @@ function LayerCardIcon({ manifest, category, itemKey, unlocked, width = 64 }) {
   const top = -(center.y * imgH - width / 2)
 
   return (
-    <div style={{ width, height: width, borderRadius: 10, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
+    <div style={{ width, height: width, borderRadius: 10, overflow: 'hidden', background: 'transparent', position: 'relative' }}>
       <img
         src={layerUrl(layer.file)}
         alt=""
         draggable={false}
-        style={{ position: 'absolute', width: imgW, height: imgH, left, top, opacity: unlocked ? 1 : 0.55 }}
+        style={{ position: 'absolute', width: imgW, height: imgH, left, top, opacity: unlocked ? 1 : 0.55, filter: unlocked ? 'none' : 'grayscale(1)' }}
         onError={(e) => { e.currentTarget.parentElement.style.display = 'none' }}
       />
       {!unlocked && (
@@ -172,169 +172,8 @@ function tts(text, { onStart, onEnd, onWord } = {}) {
   speakPao(text, { pitch: 1.62, rate: 1.1, onStart, onEnd, onWord })
 }
 
-// ─── Badge Case Page ──────────────────────────────────────────────────────────
-
-const BADGE_PAGE_SIZE = 8
-
-export function BadgeCasePage({ patientEmail, onBack }) {
-  const [badges, setBadges] = useState([])
-  const [earnedCodes, setEarnedCodes] = useState(() => new Set())
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
-
-  // Reads the durable patient_badges record (same source as the Pao profile),
-  // so a badge earned at the end of a game shows here straight away.
-  const pao = usePao()
-  const ident = pao?.ident || {}
-  const identQuery = ident.activitySessionId
-    ? `activitySessionId=${encodeURIComponent(ident.activitySessionId)}`
-    : `patientEmail=${encodeURIComponent(patientEmail || ident.patientEmail || '')}`
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    fetch(`/api/pao/badges?${identQuery}`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (cancelled) return
-        const list = (body.badges || []).filter((b) => b.isActive)
-        setBadges(list)
-        setEarnedCodes(new Set(list.filter((b) => b.earned).map((b) => b.code)))
-      })
-      .catch(() => { if (!cancelled) setBadges([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [identQuery])
-
-  const pageCount = Math.max(1, Math.ceil(badges.length / BADGE_PAGE_SIZE))
-  const pageBadges = badges.slice(page * BADGE_PAGE_SIZE, page * BADGE_PAGE_SIZE + BADGE_PAGE_SIZE)
-  const percent = badges.length ? Math.round((earnedCodes.size / badges.length) * 100) : 0
-
-  const goPage = (p) => setPage(Math.max(0, Math.min(pageCount - 1, p)))
-
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:9999, overflowY:'auto', background:'radial-gradient(circle, rgba(255,255,255,.05) 1.5px, transparent 2px) 0 0/28px 28px, #0b2b30', fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
-      <style>{`
-        @keyframes bcIn   { from{opacity:0;transform:scale(.88) translateY(18px)} to{opacity:1;transform:scale(1) translateY(0)} }
-        @keyframes bcBadge{ 0%{transform:scale(0) rotate(-10deg)} 65%{transform:scale(1.12) rotate(3deg)} 100%{transform:scale(1) rotate(0)} }
-        @keyframes bcPulse{ 0%,100%{opacity:.4} 50%{opacity:1} }
-        @keyframes bcGlow { 0%,100%{box-shadow:0 0 14px rgba(96,165,250,.3)} 50%{box-shadow:0 0 30px rgba(96,165,250,.65)} }
-      `}</style>
-
-      <button onClick={onBack} style={{ position:'absolute', top:20, left:20, zIndex:10, display:'flex', alignItems:'center', gap:6, background:'#fff', border:'1px solid rgba(15,23,42,.12)', color:'#1e293b', borderRadius:10, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,.18)' }}>
-        ← Back
-      </button>
-
-      <div style={{ minHeight:'100%', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'86px 20px 40px' }}>
-      <div style={{ width:520, maxWidth:'95vw', animation:'bcIn .45s cubic-bezier(.34,1.56,.64,1)' }}>
-
-        {/* ── Lid ── */}
-        <div style={{ background:'linear-gradient(180deg,#1c1c2e 0%,#16213e 100%)', border:'3px solid #1e3a5f', borderBottom:'none', borderRadius:'16px 16px 0 0', padding:'12px 16px 8px' }}>
-          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
-            <div>
-              <h2 style={{ margin:0, fontSize:16, fontWeight:900, color:'#e2e8f0' }}>🏆 Pao's Badge Case</h2>
-              <div style={{ fontSize:11, color:'rgba(96,165,250,.7)', marginTop:2, fontWeight:600 }}>
-                {earnedCodes.size} / {badges.length} badges collected
-              </div>
-            </div>
-            {/* LED dots */}
-            <div style={{ display:'flex', gap:4, marginTop:3 }}>
-              {[0,0.15,0.3,0.45,0.6].map((d,i) => (
-                <div key={i} style={{ width:6, height:6, borderRadius:'50%', background:'#60a5fa', animation:`bcPulse 1.8s ease-in-out ${d}s infinite`, boxShadow:'0 0 6px #60a5fa' }}/>
-              ))}
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
-            <div style={{ flex:1, height:5, background:'rgba(255,255,255,.08)', borderRadius:4, position:'relative' }}>
-              <div style={{ height:'100%', width:`${percent}%`, background:'linear-gradient(90deg,#38bdf8,#60a5fa)', borderRadius:4 }}/>
-              <div style={{ position:'absolute', left:`${percent}%`, top:'50%', transform:'translate(-50%,-50%)', width:11, height:11, borderRadius:'50%', background:'#60a5fa', border:'2px solid #0d1b2a', boxShadow:'0 0 8px rgba(96,165,250,.7)' }}/>
-            </div>
-            <span style={{ fontSize:11, fontWeight:700, color:'rgba(96,165,250,.85)', whiteSpace:'nowrap' }}>{percent}% Complete</span>
-          </div>
-        </div>
-
-        {/* ── Hinge ── */}
-        <div style={{ height:6, background:'linear-gradient(90deg,#0d2b4a,#1a4a7a,#1a4a7a,#0d2b4a)', position:'relative' }}>
-          <div style={{ position:'absolute', inset:'2px 18%', background:'rgba(96,165,250,.2)', borderRadius:2 }}/>
-          {[25, 75].map(p => (
-            <div key={p} style={{ position:'absolute', left:`${p}%`, top:'50%', transform:'translate(-50%,-50%)', width:9, height:9, borderRadius:'50%', background:'#1b3a5c', border:'2px solid rgba(96,165,250,.4)' }}/>
-          ))}
-        </div>
-
-        {/* ── Interior ── */}
-        <div style={{ background:'linear-gradient(180deg,#090912 0%,#0d0d1c 100%)', border:'3px solid #1e3a5f', borderTop:'none', borderRadius:'0 0 16px 16px', padding:'16px 16px 14px', boxShadow:'inset 0 6px 28px rgba(0,0,0,.7), 0 20px 56px rgba(0,0,0,.7)' }}>
-
-          {loading ? (
-            <p style={{ textAlign:'center', color:'rgba(191,219,254,.7)', fontSize:12, fontWeight:600, padding:'20px 0' }}>Loading badges…</p>
-          ) : badges.length === 0 ? (
-            <p style={{ textAlign:'center', color:'rgba(191,219,254,.5)', fontSize:12, fontWeight:600, padding:'20px 0' }}>No badges yet — check back soon!</p>
-          ) : (
-          <div key={page} style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-            {pageBadges.map((b, idx) => {
-              const earned = earnedCodes.has(b.code)
-              return (
-                <div key={b.id} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                  {/* Slot */}
-                  <div style={{
-                    width:'100%', aspectRatio:'1', borderRadius:12,
-                    background: earned ? 'rgba(96,165,250,.1)' : 'rgba(255,255,255,.025)',
-                    border: `2px solid ${earned ? 'rgba(96,165,250,.35)' : 'rgba(255,255,255,.06)'}`,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    position:'relative', overflow:'hidden', padding:4,
-                    boxShadow: earned ? '0 0 20px rgba(96,165,250,.2)' : 'none',
-                    animation: earned ? `bcBadge .5s ${idx*.04}s cubic-bezier(.34,1.56,.64,1) both` : 'none',
-                  }}>
-                    <BadgeMedal shape={b.shape} colour={b.colour} symbol={b.symbol} size={56} muted={!earned} />
-                  </div>
-
-                  {/* Label */}
-                  <div style={{ textAlign:'center' }}>
-                    <div style={{ fontSize:9.5, fontWeight:700, color: earned ? '#93c5fd' : 'rgba(255,255,255,.18)', lineHeight:1.25 }}>{b.name}</div>
-                    <div style={{ fontSize:8.5, color: earned ? 'rgba(147,197,253,.7)' : 'rgba(255,255,255,.13)', lineHeight:1.25, marginTop:1 }}>
-                      {earned ? 'Collected!' : 'Locked'}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          )}
-
-          {/* Pagination */}
-          {pageCount > 1 && (
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:14, marginTop:16 }}>
-              <button onClick={() => goPage(page - 1)} disabled={page === 0}
-                style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', color: page===0 ? 'rgba(255,255,255,.2)' : '#bfdbfe', borderRadius:8, width:28, height:28, cursor: page===0 ? 'default' : 'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                ‹
-              </button>
-              <div style={{ display:'flex', gap:6 }}>
-                {Array.from({ length: pageCount }).map((_, i) => (
-                  <button key={i} onClick={() => goPage(i)}
-                    style={{ width:24, height:24, borderRadius:7, border:'none', cursor:'pointer', background: i===page ? '#60a5fa' : 'rgba(255,255,255,.1)', color: i===page ? '#0d1b2a' : 'rgba(191,219,254,.6)', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', transition:'all .2s' }}>
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => goPage(page + 1)} disabled={page === pageCount - 1}
-                style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', color: page===pageCount-1 ? 'rgba(255,255,255,.2)' : '#bfdbfe', borderRadius:8, width:28, height:28, cursor: page===pageCount-1 ? 'default' : 'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                ›
-              </button>
-              <span style={{ fontSize:11, fontWeight:700, color:'rgba(191,219,254,.7)', minWidth:52 }}>Page {page + 1} of {pageCount}</span>
-            </div>
-          )}
-
-          {/* Bottom strip */}
-          <div style={{ marginTop:14, textAlign:'center', fontSize:11, color:'rgba(96,165,250,.38)', fontWeight:600, letterSpacing:.5 }}>
-            Play games to earn more badges and unlock Pao's outfits!
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
-  )
-}
+// The Badge Case is shared with the hub (src/components/hub/BadgeCase.jsx).
+export { default as BadgeCasePage } from '../../components/hub/BadgeCase'
 
 // ─── Bedroom scenery ────────────────────────────────────────────────────────────
 
@@ -363,12 +202,41 @@ function Boat({ size = 46 }) {
   )
 }
 
+// Left-menu icons (line icons, same set for every tab).
+const NAV_ICONS = {
+  hair: <path d="M3 7l6 5-6 5V7zM21 7l-6 5 6 5V7zM9 12h6" />,
+  hats: <path d="M4 18h16M6 18c0-6 2-10 6-10s6 4 6 10" />,
+  clothes: <path d="M8 4L3 8l3 3 2-1v10h8V10l2 1 3-3-5-4a4 4 0 0 1-8 0z" />,
+  pants: <path d="M7 3h10l1 18h-5l-1-9-1 9H6z" />,
+  shoes: <path d="M3 16c4 0 4-5 7-5l3 3h5c2 0 3 1 3 3v1H3z" />,
+  pose: <><circle cx="12" cy="5" r="2" /><path d="M12 8v6m-4-4h8m-6 11l2-7 2 7" /></>,
+  expression: <><circle cx="12" cy="12" r="9" /><path d="M8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01" /></>,
+}
+
+// One left-menu row: icon tile, name, current value, state dot.
+function NavItem({ id, label, value, on, off = false, active, onSelect }) {
+  return (
+    <button type="button" role="tab" aria-selected={active} onClick={onSelect}
+      className={`pc-cat ${active ? 'on' : ''} ${off ? 'off' : ''}`}>
+      <span className="pc-cat-ico" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{NAV_ICONS[id]}</svg>
+      </span>
+      <span className="pc-cat-txt">
+        <span className="pc-cat-name">{label}</span>
+        <span className="pc-cat-val">{value}</span>
+      </span>
+      <span className={`pc-dot ${on ? 'on' : ''}`} aria-hidden="true" />
+    </button>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = null }) {
   const [activeTab,     setActiveTab]     = useState('hair')
   const pao = usePao()
   const [howToUnlockByCode, setHowToUnlockByCode] = useState({})
+  const [progressByCode, setProgressByCode] = useState({})
   const [equipped,      setEquipped]      = useState({ hair:'none', hats:'none', clothes:'none', pants:'none', shoes:'none' })
   const [talking,       setTalking]       = useState(false)
   const [mouthOpen,     setMouthOpen]     = useState(false)
@@ -453,6 +321,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
       }
       setUnlockedItemCodes(codes)
       setHowToUnlockByCode(howTo)
+      const prog = {}
+      for (const i of all) { if (!i.unlocked && i.progress) prog[i.code] = i.progress }
+      setProgressByCode(prog)
     }).catch(() => { /* keep whatever was last shown */ })
     return () => { cancelled = true }
   }, [identKey, showBadgeCase]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -473,7 +344,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .filter((i) => i.category === meta.label)
         .map((i) => ({
           id: i.code, code: i.code, name: i.name, design: i.design,
-          badge: LEGACY_BADGE_BY_CODE[i.code] || null,
+          badge: null,
           unlock: i.unlock || null,
           desc: (!unlockedItemCodes.has(i.code) && howToUnlockByCode[i.code]) || i.description || '',
         })),
@@ -497,10 +368,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     return () => clearInterval(mouthRef.current)
   }, [talking])
 
-  const isUnlocked = (item) => {
-    if (item.unlock) return item.unlock.type === 'free' || unlockedItemCodes.has(item.code)
-    return !item.badge || earnedBadges.has(item.badge)
-  }
+  // One source of truth: the server's patient_unlocks (via the wardrobe API).
+  // The old per-browser badge list (localStorage) made items look locked or
+  // unlocked differently from the Badge Case.
+  const isUnlocked = (item) => item.id === 'none' || unlockedItemCodes.has(item.code)
 
   const getEquippedName = (catId) =>
     categories.find(c => c.id === catId)?.items.find(i => i.id === equipped[catId])?.name ?? 'None'
@@ -542,7 +413,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     const goal = !badge && item.unlock && item.unlock.type !== 'free'
       ? describeUnlock(item.unlock.type, { gameId: item.unlock.gameId, value: item.unlock.value, badgeCode: item.unlock.badgeCode }, games, [])
       : howToUnlockByCode[item.code] || null
-    say('locked', { name: item.name, badge, goal })
+    const pr = progressByCode[item.code]
+    say('locked', { name: item.name, badge, goal, have: pr?.have, need: pr?.need })
   }
 
   const activeCategory = categories.find(c => c.id === activeTab)
@@ -593,7 +465,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   }, [equipped, categories])
 
   if (showBadgeCase) {
-    return <BadgeCasePage earnedBadges={earnedBadges} onBack={() => setShowBadgeCase(false)}/>
+    return <BadgeCaseView patientEmail={patientEmail} onBack={() => setShowBadgeCase(false)}/>
   }
 
   return (
@@ -612,6 +484,26 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-cats { background:#dbeafe; border-right:2px solid #93c5fd; padding:10px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
         .pc-cat { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:2px solid #bfdbfe; background:#fff; cursor:pointer; text-align:left; font-weight:800; color:#1e3a8a; font-size:14px; }
         .pc-cat.on { background:#2f7fe8; border-color:#1d4ed8; color:#fff; }
+        .pc-cat { position:relative; min-height:52px; box-sizing:border-box; gap:10px; padding:8px 10px; text-align:left; font-family:inherit; }
+        .pc-cat-ico { width:32px; height:32px; border-radius:9px; background:#eaf2ff; color:#2f6fd0; display:flex; align-items:center; justify-content:center; flex:none; }
+        .pc-cat.on .pc-cat-ico { background:rgba(255,255,255,.22); color:#fff; }
+        .pc-cat-txt { display:flex; flex-direction:column; min-width:0; flex:1; line-height:1.2; }
+        .pc-cat-name { font-size:14px; font-weight:800; }
+        .pc-cat-val { font-size:11px; font-weight:600; opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-cat.off { border-style:dashed; opacity:.6; }
+        .pc-cat.off.on { opacity:1; }
+        .pc-dot { width:10px; height:10px; border-radius:50%; border:2px solid #b6c7e3; flex:none; box-sizing:border-box; }
+        .pc-dot.on { background:#16a34a; border-color:#16a34a; box-shadow:0 0 0 2px rgba(22,163,74,.25); }
+        .pc-navlabel { font-size:10.5px; font-weight:800; letter-spacing:1px; color:#475569; margin:6px 4px 0; }
+        .pc-tile.on { border:3px solid #16a34a; background:#fff; box-shadow:0 0 0 3px rgba(22,163,74,.18); padding:7px; }
+        .pc-thumb { position:relative; }
+        .pc-lockchip { position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:center; }
+        .pc-lockrow { margin-top:auto; height:40px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:0 4px; }
+        .pc-lockname { font-size:11.5px; font-weight:800; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-lockbar { display:flex; align-items:center; gap:6px; }
+        .pc-lockbar b { font-size:10.5px; color:#92400e; }
+        .pc-bar { flex:1; height:6px; border-radius:6px; background:#e2e8f0; overflow:hidden; }
+        .pc-bar i { display:block; height:100%; background:#f59e0b; border-radius:6px; }
         .pc-grid-wrap { display:flex; flex-direction:column; min-height:0; }
         .pc-note { margin:10px 12px 0; padding:8px 12px; border-radius:10px; background:#fff7d6; border:1.5px solid #facc15; font-size:12px; font-weight:700; color:#854d0e; }
         .pc-grid { flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:12px 12px 16px; align-content:start; scrollbar-width:thin; scrollbar-color:#b6cdf0 transparent; }
@@ -624,7 +516,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-tile-sub { font-size:11px; color:#475569; line-height:1.3; height:29px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
         .pc-tile-tag { margin-top:auto; height:40px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; padding:0 8px; border-radius:10px; background:#e2e8f0; color:#334155; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .pc-tile-tag.wear { background:#2f7fe8; color:#fff; } .pc-tile-tag.eq { background:#16a34a; color:#fff; }
-        .pc-stage { width:100%; display:flex; flex-direction:column; align-items:center; flex:1 1 auto; min-height:0; max-height:300px; overflow:hidden; border:2px solid #BFD4F5; border-radius:16px; background:#f8fbff; }
+        .pc-stage { width:100%; display:flex; flex-direction:column; align-items:center; flex:none; height:268px; overflow:hidden; border:2px solid #BFD4F5; border-radius:16px; background:#f8fbff; }
         .pc-tile.ring { border-color:#2f7fe8; box-shadow:0 0 0 3px rgba(47,127,232,.3); }
         .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); padding-bottom:16px; }
         .pc-scard { display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:2px solid #D6E4FA; border-radius:16px; background:#fff; }
@@ -650,12 +542,13 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-wlabel { width:100%; height:16px; flex:none; font-size:10.5px; font-weight:800; letter-spacing:1px; color:#475569; }
         .pc-actions { width:100%; margin-top:auto; display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:none; }
         .pc-equipped { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; }
-        .pc-eq { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:4px 8px; font-size:12px; font-weight:700; height:46px; box-sizing:border-box; min-width:0; display:flex; flex-direction:column; justify-content:center; }
-        .pc-eq.off { background:#f8fafc; border:1.5px dashed #cbd5e1; }
+        .pc-eq { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:0 9px; font-size:12.5px; font-weight:700; line-height:1.2; height:46px; box-sizing:border-box; min-width:0; display:flex; flex-direction:column; justify-content:center; }
+        .pc-eq.idle { background:#f8fafc; border:1.5px solid #dbe5f3; }
+        .pc-eq.off { border-style:dashed; }
         .pc-eq span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-        .pc-eq b { display:block; color:#1e40af; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+        .pc-eq b { display:block; color:#1e40af; font-size:9px; text-transform:uppercase; letter-spacing:.5px; }
         .pc-unequip { flex-shrink:0; width:22px; height:22px; padding:0; border-radius:999px; border:1.5px solid #fca5a5; background:#fff; color:#b91c1c; font-size:11px; font-weight:900; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; }
-        .pc-unequip-all { height:42px; box-sizing:border-box; border:1.5px solid #cbd5e1; background:#fff; color:#2f7fe8; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; } .pc-unequip-all:disabled { opacity:.5; cursor:default; }
+        .pc-unequip-all { height:42px; box-sizing:border-box; border:1.5px solid #cbd5e1; background:#fff; color:#2f7fe8; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; } .pc-unequip-all:disabled { border-color:#E3EAF5; color:#A9B6CB; background:#fff; box-shadow:none; cursor:default; }
         .pc-bubble { width:100%; background:#f8fafc; border:2px solid #cbd5e1; border-radius:14px; padding:8px 10px; font-size:12.5px; font-weight:700; color:#1e293b; min-height:40px; }
         .pc-play { height:42px; box-sizing:border-box; border:none; border-radius:12px; background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; font-size:15px; font-weight:900; cursor:pointer; box-shadow:0 3px 0 #0f7a3a; }
         @media (max-width: 900px) {
@@ -669,7 +562,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           .pc-cat { flex-shrink:0; padding:8px 12px; }
           .pc-grid, .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); }
           .pc-preview { overflow:visible; }
-          .pc-stage { max-height:none; }
+          .pc-stage { height:268px; }
         }
         @media (max-width: 560px) {
           .pc-root { padding:0; }
@@ -693,26 +586,16 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         <div className="pc-body">
           <div className="pc-cats" role="tablist" aria-label="Categories">
             {categories.map(cat => (
-              <button key={cat.id} role="tab" aria-selected={activeTab === cat.id}
-                className={`pc-cat ${activeTab === cat.id ? 'on' : ''}`} onClick={() => setActiveTab(cat.id)}>
-                <span style={{ fontSize:20 }} aria-hidden="true">{cat.icon}</span>
-                {cat.label}
-              </button>
+              <NavItem key={cat.id} id={cat.id} label={cat.label} value={isNatural(cat.id) ? 'Natural' : getEquippedName(cat.id)}
+                on={!isNatural(cat.id)} active={activeTab === cat.id} onSelect={() => setActiveTab(cat.id)} />
             ))}
-            <div style={{ fontSize:10.5, fontWeight:800, letterSpacing:1, color:'#475569', margin:'6px 4px 0' }}>STYLE</div>
+            <div className="pc-navlabel">STYLE (ONE AT A TIME)</div>
             {STYLE_TABS.map((t) => {
               const off = isOff(t.type)
               return (
-                <button key={t.type} role="tab" aria-selected={activeTab === t.type}
-                  className={`pc-cat ${activeTab === t.type ? 'on' : ''}`} onClick={() => setActiveTab(t.type)}
-                  style={off ? { borderStyle:'dashed', opacity: activeTab === t.type ? 1 : .6 } : null}>
-                  <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1.2 }}>
-                    {t.label}
-                    <span style={{ fontSize:11, fontWeight:600, opacity:.8 }}>
-                      {off ? `Off while ${activeStyleName} is on` : styleKey(t.type) ? styleName(t.type) : 'Not set'}
-                    </span>
-                  </span>
-                </button>
+                <NavItem key={t.type} id={t.type} label={t.label}
+                  value={off ? `Off while ${activeStyleName} is on` : styleKey(t.type) ? styleName(t.type) : 'Not set'}
+                  on={!!styleKey(t.type)} off={off} active={activeTab === t.type} onSelect={() => setActiveTab(t.type)} />
               )
             })}
           </div>
@@ -803,11 +686,28 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                     <div className="pc-thumb">
                       {hasLayerArt
                         ? <LayerCardIcon manifest={layerManifest} category={activeTab} itemKey={itemKey} unlocked={unlocked} width={96} />
-                        : <div style={{ opacity: unlocked ? 1 : 0.55 }}><WardrobeThumb item={item} categoryId={activeTab} width={88}/></div>}
+                        : item.id === 'none' && LAYER_CATEGORIES.includes(activeTab)
+                          ? <LayerCardIcon manifest={layerManifest} category={activeTab} natural unlocked width={96} />
+                          : <div style={{ opacity: unlocked ? 1 : 0.55, filter: unlocked ? 'none' : 'grayscale(1)' }}><WardrobeThumb item={item} categoryId={activeTab} width={88}/></div>}
+                      {isEquipped && <span className="pc-scheck" aria-hidden="true">&#10003;</span>}
+                      {!unlocked && <span className="pc-lockchip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>}
                     </div>
                     <div className="pc-tile-name" title={item.name}>{item.name}</div>
                     <div className="pc-tile-sub">{item.desc}</div>
-                    <div className={`pc-tile-tag ${isEquipped ? 'eq' : unlocked ? 'wear' : ''}`}>{tag}</div>
+                    {unlocked
+                      ? <div className={`pc-tile-tag ${isEquipped ? 'eq' : 'wear'}`}>{tag}</div>
+                      : (() => {
+                          const pr = progressByCode[item.code]
+                          const label = item.badge || unlockLabel || howToUnlockByCode[item.code] || 'Locked'
+                          return (
+                            <div className="pc-lockrow">
+                              <div className="pc-lockname" title={label}>{label}</div>
+                              {pr ? (
+                                <div className="pc-lockbar"><div className="pc-bar" role="progressbar" aria-valuemin={0} aria-valuemax={pr.need} aria-valuenow={pr.have}><i style={{ width: `${Math.round((pr.have / pr.need) * 100)}%` }} /></div><b>{pr.have}/{pr.need}</b></div>
+                              ) : <div className="pc-lockbar"><span style={{ fontSize: 11, color: '#64748b' }}>Locked</span></div>}
+                            </div>
+                          )
+                        })()}
                   </button>
                 )
               })}
@@ -820,12 +720,12 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
             {/* Stage: speech bubble (flex:none) above Pao. Pao shrinks first if the panel is short. */}
             <div className="pc-stage">
               <PaoSpeechBubble text={line?.text} kind={line?.kind} lang={lang} />
-              <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
+              <div style={{ flex: '1 1 0', minHeight: 0, width: '100%', padding: '0 8px 8px', boxSizing: 'border-box', animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
                 <PaoLayered
                   equipped={equippedLayerKeys}
                   pose={reaction.pose}
                   showFx={reaction.fx}
-                  size={150}
+                  fill
                   interactive
                   onClick={reaction.tapCycle}
                 />
@@ -836,7 +736,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
               {categories.map(cat => {
                 const on = !isNatural(cat.id)
                 return (
-                  <div key={cat.id} className={`pc-eq ${on ? '' : 'off'}`} style={{ position:'relative' }}>
+                  <div key={cat.id} className={`pc-eq ${on ? '' : 'idle'}`} style={{ position:'relative' }}>
                     <b>{cat.label}</b>
                     <span style={{ color: on ? undefined : '#94a3b8', paddingRight: on ? 26 : 0 }}>{on ? getEquippedName(cat.id) : 'Natural'}</span>
                     {on && (
@@ -848,9 +748,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
               {STYLE_TABS.map((t) => {
                 const on = !!styleKey(t.type)
                 return (
-                  <div key={t.type} className={`pc-eq ${on ? '' : 'off'}`} style={{ position:'relative' }}>
+                  <div key={t.type} className={`pc-eq ${on ? '' : 'idle'} ${isOff(t.type) ? 'off' : ''}`} style={{ position:'relative' }}>
                     <b>{t.single}</b>
-                    <span style={{ color: on ? undefined : '#94a3b8', paddingRight: on ? 26 : 0 }}>{on ? styleName(t.type) : 'Off'}</span>
+                    <span style={{ color: on ? undefined : '#94a3b8', paddingRight: on ? 26 : 0 }}>{on ? styleName(t.type) : isOff(t.type) ? 'Off' : 'Not set'}</span>
                     {on && (
                       <button type="button" className="pc-unequip" style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)' }} onClick={() => removeStyle(t.type)} aria-label={`Remove ${t.single.toLowerCase()}`} title="Remove">&#10005;</button>
                     )}
@@ -861,7 +761,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
             {styleError && <div role="alert" className="pc-bubble" style={{ borderColor:'#ef4444', color:'#b91c1c' }}>{styleError}</div>}
             <div className="pc-actions">
               <button type="button" className="pc-unequip-all" onClick={unequipAll} disabled={!categories.some(c => !isNatural(c.id))}>Take outfit off</button>
-              <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); say('play'); setTimeout(onDone, 700) }}>Let's Play!</button>
+              <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); say('play'); setTimeout(onDone, 700) }}>Let's Play! <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 4 }}><path d="M6 4l14 8-14 8z" /></svg></button>
             </div>
           </div>
         </div>

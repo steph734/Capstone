@@ -35,7 +35,11 @@ async function fetchAudioUrl(text) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   })
-  if (!res.ok) throw new Error(`tts ${res.status}`)
+  if (!res.ok) {
+    const err = new Error(`tts ${res.status}`)
+    err.status = res.status
+    throw err
+  }
   const url = URL.createObjectURL(await res.blob())
   if (cache.size >= CACHE_LIMIT) {
     const oldest = cache.keys().next().value
@@ -108,8 +112,11 @@ export function speakPao(text, opts = {}) {
       audio.onerror = () => { audioEl = null; fallback() }
       return audio.play().catch(() => { audioEl = null; fallback() }) // e.g. autoplay blocked
     })
-    .catch(() => {
-      ttsDisabledUntil = Date.now() + 30_000 // don't hammer a failing API
+    .catch((err) => {
+      // Plan/key problems (401/402/403/404) won't fix themselves mid-session: stop asking for 30 min.
+      // Anything else (network blip, 5xx): retry after 30 s.
+      const hard = [401, 402, 403, 404].includes(err?.status)
+      ttsDisabledUntil = Date.now() + (hard ? 30 * 60_000 : 30_000)
       fallback()
     })
 }

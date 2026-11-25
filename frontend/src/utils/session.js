@@ -32,7 +32,10 @@ export async function authFetch(path, { method = 'GET', body, query, headers = {
   // Idle logout: something the user did (a save, an upload, a send) counts as activity; background reads do not.
   if (res.ok && method !== 'GET') noteActivity()
   // The server ended the session (idle limit or revoked): the idle gate logs out once and shows the signed-out page.
-  if (res.status === 401 && token && (data.code === 'SESSION_IDLE' || data.code === 'NO_SESSION')) sessionEnded(data.code)
+  if (res.status === 401 && token && token === getSessionToken() && (data.code === 'SESSION_IDLE' || data.code === 'NO_SESSION')) {
+    console.warn('[session] ended by server:', data.code, data.reason || '', url)
+    sessionEnded(data.code)
+  }
   // The system is down for an update: the provider signs this person out and shows the maintenance screen.
   if (res.status === 503 && data.code === 'SYSTEM_DOWNTIME') notifyDowntime({ endAt: data.endAt })
   if (!res.ok) {

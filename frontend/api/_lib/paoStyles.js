@@ -152,16 +152,19 @@ export async function listActiveStyles(db) {
   return rows.map(({ sort_order, ...r }) => r)
 }
 
-// Saved key if it is still an active, non-archived row; otherwise the default.
+// The patient's style state. A saved key only counts if it is still an
+// active, non-archived row. Pose and expression are exclusive: nothing set
+// means plain default Pao. If legacy data has both, the pose wins.
 export async function resolveSelection(db, profile) {
   const rows = await db.collection(COLLECTION)
     .find({ is_active: true, is_archived: false }, { projection: { _id: 0, key: 1, type: 1 } })
     .toArray()
-  const valid = (type, key) => key && rows.some((r) => r.type === type && r.key === key)
-  const pose = profile?.[SELECT_FIELD.pose]
-  const expr = profile?.[SELECT_FIELD.expression]
+  const valid = (type, key) => (key && rows.some((r) => r.type === type && r.key === key) ? key : null)
+  const pose = valid('pose', profile?.[SELECT_FIELD.pose])
+  const expression = pose ? null : valid('expression', profile?.[SELECT_FIELD.expression])
   return {
-    selectedPoseKey: valid('pose', pose) ? pose : DEFAULTS.pose,
-    selectedExpressionKey: valid('expression', expr) ? expr : DEFAULTS.expression,
+    selected_pose_key: pose,
+    selected_expression_key: expression,
+    active: pose ? 'pose' : expression ? 'expr' : null,
   }
 }

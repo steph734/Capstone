@@ -22,22 +22,20 @@ const ASPECT = 380 / 300
 const CROSSFADE_MS = 120
 
 const STYLE_BASE = '/games/pao-poses-expressions'
-const DEFAULT_POSE = 'relax'
-const DEFAULT_EXPRESSION = 'happy'
 
-export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false, stylePose, styleExpression }) {
+export default function PaoLayered({ equipped = {}, ghost = null, size = 260, pose = 'idle', showFx = true, className = '', onClick, interactive = false }) {
   const [manifest, setManifest] = useState(null)
-  // The patient's chosen pose / expression (Customize Pao > Style). Props
-  // override the saved profile (used for the modal's instant preview).
+  // The patient's chosen pose OR expression (exclusive; none = default Pao).
+  // Until the layered rig exists it is a full picture of a bare Pao. A
+  // transient reaction pose (pose !== 'idle') still wins.
   const paoCtx = useOptionalPao()
-  const chosenPose = stylePose || paoCtx?.profile?.selectedPoseKey || DEFAULT_POSE
-  const chosenExpression = styleExpression || paoCtx?.profile?.selectedExpressionKey || DEFAULT_EXPRESSION
-  // Until the layered rig exists, a non-default choice is a full picture of a
-  // bare Pao. A transient reaction pose (pose !== 'idle') still wins.
+  const chosenPose = paoCtx?.profile?.selectedPoseKey || null
+  const chosenExpression = paoCtx?.profile?.selectedExpressionKey || null
   const stylePicture = pose && pose !== 'idle' ? null
-    : chosenPose !== DEFAULT_POSE ? `${STYLE_BASE}/poses/pose_${chosenPose}.png`
-    : chosenExpression !== DEFAULT_EXPRESSION ? `${STYLE_BASE}/expressions/expr_${chosenExpression}.png`
+    : chosenPose ? `${STYLE_BASE}/poses/pose_${chosenPose}.png`
+    : chosenExpression ? `${STYLE_BASE}/expressions/expr_${chosenExpression}.png`
     : null
+
 
   useEffect(() => {
     let cancelled = false

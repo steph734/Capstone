@@ -134,10 +134,9 @@ const CATEGORY_META = [
 ]
 
 const STYLE_TABS = [
-  { type: 'pose', label: 'Poses' },
-  { type: 'expression', label: 'Expressions' },
+  { type: 'pose', label: 'Poses', single: 'POSE' },
+  { type: 'expression', label: 'Expressions', single: 'EXPRESSION' },
 ]
-const DEFAULT_STYLE = { pose: 'relax', expression: 'happy' }
 
 const NATURAL_DESC = {
   hair: 'Just Pao being Pao!',
@@ -390,9 +389,10 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const [styles, setStyles] = useState([])
   const [stylesLoading, setStylesLoading] = useState(true)
   const [styleError, setStyleError] = useState('')
+  const [styleBusy, setStyleBusy] = useState(false)
   useEffect(() => {
     let cancelled = false
-    getPaoStyles()
+    getPaoStyles(pao.ident)
       .then((b) => { if (!cancelled) setStyles(b.items || []) })
       .catch(() => { if (!cancelled) setStyleError('Could not load poses and expressions.') })
       .finally(() => { if (!cancelled) setStylesLoading(false) })
@@ -535,19 +535,23 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const activeCategory = categories.find(c => c.id === activeTab)
 
   // Poses and expressions: the list comes from the API (never hard-coded).
-  // The saved choice lives on the Pao profile; choosing is optimistic and
-  // rolls back with a message if the server refuses.
+  // Pao uses a pose OR an expression, never both; nothing set = default Pao.
+  // State is saved on the server and applied from its response.
   const isStyleTab = activeTab === 'pose' || activeTab === 'expression'
   const styleItems = styles.filter((s) => s.type === activeTab)
-  const styleKey = (type) => (type === 'pose'
-    ? pao.profile?.selectedPoseKey || DEFAULT_STYLE.pose
-    : pao.profile?.selectedExpressionKey || DEFAULT_STYLE.expression)
-  const styleName = (type) => styles.find((s) => s.type === type && s.key === styleKey(type))?.name || (type === 'pose' ? 'Relaxed' : 'Happy')
-  const chooseStyle = (type, key) => {
-    if (styleKey(type) === key) return
-    setStyleError('')
-    pao.selectStyle(type, key).catch((err) => setStyleError(err.message || 'Could not save that choice.'))
+  const styleKey = (type) => (type === 'pose' ? pao.profile?.selectedPoseKey : pao.profile?.selectedExpressionKey) || null
+  const styleName = (type) => styles.find((s) => s.type === type && s.key === styleKey(type))?.name || ''
+  const activeStyleType = styleKey('pose') ? 'pose' : styleKey('expression') ? 'expression' : null
+  const activeStyle = activeStyleType === 'pose' ? 'pose' : activeStyleType ? 'expr' : null
+  const activeStyleName = activeStyleType ? styleName(activeStyleType) : ''
+  const isOff = (type) => !!activeStyleType && activeStyleType !== type
+  const blocked = isStyleTab && isOff(activeTab)
+  const runStyle = (fn) => {
+    setStyleError(''); setStyleBusy(true)
+    fn().catch((err) => setStyleError(err.message || 'Could not save that choice.')).finally(() => setStyleBusy(false))
   }
+  const chooseStyle = (type, key) => { if (styleKey(type) !== key) runStyle(() => pao.selectStyle(type, key)) }
+  const removeStyle = (type) => runStyle(() => pao.clearStyle(type))
 
   // Which layer-art item_key is equipped in each of the four layered
   // categories, for <PaoLayered/>. Hair has no overlay art yet (see
@@ -604,6 +608,23 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-tile-name { font-size:12.5px; font-weight:800; text-align:center; color:#1e293b; }
         .pc-tile-sub { font-size:10.5px; color:#475569; text-align:center; line-height:1.3; }
         .pc-tile-tag { margin-top:auto; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; background:#e2e8f0; color:#334155; text-align:center; }
+        .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); padding-bottom:16px; }
+        .pc-scard { display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:2px solid #D6E4FA; border-radius:16px; background:#fff; }
+        .pc-scard.sel { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.2); }
+        .pc-scard.off { opacity:.6; background:#f8fafc; }
+        .pc-scard.off .pc-sthumb img { filter:grayscale(1); }
+        .pc-sthumb { position:relative; aspect-ratio:4/3; overflow:hidden; border-radius:11px; background:#fff; }
+        .pc-sthumb img { width:100%; height:100%; object-fit:contain; display:block; }
+        .pc-sfree { position:absolute; top:6px; left:6px; font-size:9.5px; font-weight:800; padding:1px 7px; border-radius:999px; background:#dcfce7; color:#166534; }
+        .pc-scheck { position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:#16a34a; color:#fff; font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
+        .pc-sname { font-weight:700; font-size:13px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-sdesc { font-size:12px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pc-sbtn { width:100%; height:34px; box-sizing:border-box; border:none; border-radius:10px; background:#2f7fe8; color:#fff; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+        .pc-sbtn.sel { background:#16a34a; }
+        .pc-sbtn:disabled { cursor:not-allowed; }
+        .pc-scard.off .pc-sbtn { background:#e2e8f0; color:#64748b; }
+        .pc-sbtn:focus-visible, .pc-remove:focus-visible { outline:3px solid #1d4ed8; outline-offset:2px; }
+        .pc-remove { flex-shrink:0; border:1.5px solid currentColor; background:#fff; color:inherit; border-radius:10px; padding:5px 10px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
         .pc-preview { background:#fff; border-left:2px solid #93c5fd; padding:14px; display:flex; flex-direction:column; align-items:center; gap:10px; overflow-y:auto; }
         .pc-equipped { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; }
         .pc-eq { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:6px 8px; font-size:11px; }
@@ -621,13 +642,13 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           .pc-preview { order:-1; flex-direction:row; flex-wrap:wrap; justify-content:center; border-left:none; border-bottom:2px solid #93c5fd; padding:10px; }
           .pc-cats { flex-direction:row; overflow-x:auto; overflow-y:hidden; border-right:none; border-bottom:2px solid #93c5fd; padding:8px; }
           .pc-cat { flex-shrink:0; padding:8px 12px; }
-          .pc-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+          .pc-grid, .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); }
           .pc-play { margin-top:0; }
         }
         @media (max-width: 560px) {
           .pc-root { padding:0; }
           .pc-panel { border-radius:0; border:none; }
-          .pc-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; }
+          .pc-grid, .pc-sgrid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; }
           .pc-tile { min-height:118px; }
           .pc-title h1 { font-size:17px; }
           .pc-preview .pc-equipped { grid-template-columns:repeat(2,1fr); }
@@ -653,41 +674,68 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
               </button>
             ))}
             <div style={{ fontSize:10.5, fontWeight:800, letterSpacing:1, color:'#475569', margin:'6px 4px 0' }}>STYLE</div>
-            {STYLE_TABS.map((t) => (
-              <button key={t.type} role="tab" aria-selected={activeTab === t.type}
-                className={`pc-cat ${activeTab === t.type ? 'on' : ''}`} onClick={() => setActiveTab(t.type)}>
-                <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1.2 }}>
-                  {t.label}
-                  <span style={{ fontSize:11, fontWeight:600, opacity:.8 }}>{styleName(t.type)}</span>
-                </span>
-              </button>
-            ))}
+            {STYLE_TABS.map((t) => {
+              const off = isOff(t.type)
+              return (
+                <button key={t.type} role="tab" aria-selected={activeTab === t.type}
+                  className={`pc-cat ${activeTab === t.type ? 'on' : ''}`} onClick={() => setActiveTab(t.type)}
+                  style={off ? { borderStyle:'dashed', opacity: activeTab === t.type ? 1 : .6 } : null}>
+                  <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1.2 }}>
+                    {t.label}
+                    <span style={{ fontSize:11, fontWeight:600, opacity:.8 }}>
+                      {off ? `Off while ${activeStyleName} is on` : styleKey(t.type) ? styleName(t.type) : 'Not set'}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
           <div className="pc-grid-wrap">
-            <div className="pc-note">
-              {isStyleTab
-                ? (activeTab === 'pose' ? 'All 12 poses are free. Pick how Pao stands.' : 'All 12 expressions are free. Pick how Pao feels.')
-                : 'Each item shows the badge needed to unlock it'}
-            </div>
+            {isStyleTab && activeStyle ? (
+              <div className="pc-note" style={blocked ? { background:'#ffedd5', borderColor:'#fb923c', color:'#9a3412' } : null}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                  <span>
+                    {blocked
+                      ? `Pao is using the ${activeStyleName} ${activeStyle === 'pose' ? 'pose' : 'expression'}, so ${activeTab === 'pose' ? 'poses' : 'expressions'} are off. Remove the ${activeStyle === 'pose' ? 'pose' : 'expression'} to pick one.`
+                      : `${activeStyleName} is on. ${activeStyle === 'pose' ? 'Expressions' : 'Poses'} are off while ${activeStyle === 'pose' ? 'a pose' : 'an expression'} is on.`}
+                  </span>
+                  <button type="button" className="pc-remove" onClick={() => removeStyle(activeStyleType)}>
+                    Remove {activeStyle === 'pose' ? 'pose' : 'expression'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pc-note">
+                {isStyleTab
+                  ? `All 12 ${activeTab === 'pose' ? 'poses' : 'expressions'} are free. Pao can use a pose or an expression, not both.`
+                  : 'Each item shows the badge needed to unlock it'}
+              </div>
+            )}
             {isStyleTab ? (
-              <div className="pc-grid">
-                {stylesLoading && Array.from({ length: 8 }).map((_, i) => <div key={i} className="pc-skel" />)}
+              <div className="pc-grid pc-sgrid">
+                {stylesLoading && Array.from({ length: 6 }).map((_, i) => <div key={i} className="pc-skel" />)}
                 {!stylesLoading && styleItems.length === 0 && <div className="pc-tile-sub" style={{ gridColumn:'1 / -1' }}>Nothing to show right now.</div>}
                 {styleItems.map((s) => {
                   const selected = styleKey(activeTab) === s.key
+                  const label = selected ? 'Selected' : blocked ? 'Unavailable' : 'Choose'
                   return (
-                    <div key={s.key} className={`pc-tile ${selected ? 'on' : ''}`} style={selected ? { borderColor:'#16a34a', background:'#f0fdf4', boxShadow:'0 0 0 3px rgba(22,163,74,.22)' } : null}>
-                      <img src={s.preview_image_url} alt="" draggable={false} style={{ width:72, height:72, objectFit:'contain' }} />
-                      <div className="pc-tile-name">{s.name}</div>
-                      <div className="pc-tile-sub">{s.description}</div>
-                      <span style={{ fontSize:9.5, fontWeight:800, padding:'1px 6px', borderRadius:999, background:'#dcfce7', color:'#166534' }}>FREE</span>
-                      <button type="button" className="pc-tile-tag" aria-pressed={selected}
-                        aria-label={`${selected ? 'Selected' : 'Choose'} ${s.name}`}
-                        onClick={() => chooseStyle(activeTab, s.key)}
-                        style={{ border:'none', cursor:'pointer', width:'100%', fontFamily:'inherit', ...(selected ? { background:'#16a34a', color:'#fff' } : { background:'#2f7fe8', color:'#fff' }) }}>
-                        {selected ? 'Selected' : 'Choose'}
-                      </button>
+                    <div key={s.key} className={`pc-scard ${selected ? 'sel' : ''} ${blocked ? 'off' : ''}`}>
+                      <div className="pc-sthumb">
+                        <img src={s.preview_image_url} alt="" draggable={false} />
+                        <span className="pc-sfree">FREE</span>
+                        {selected && <span className="pc-scheck" aria-hidden="true">&#10003;</span>}
+                      </div>
+                      <div className="pc-sname" title={s.name}>{s.name}</div>
+                      <div className="pc-sdesc" title={s.description}>{s.description}</div>
+                      <div style={{ marginTop:'auto' }}>
+                        <button type="button" className={`pc-sbtn ${selected ? 'sel' : ''}`}
+                          aria-pressed={selected} disabled={blocked || styleBusy}
+                          aria-label={`${label}: ${s.name}`}
+                          onClick={() => chooseStyle(activeTab, s.key)}>
+                          {label}
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -754,15 +802,23 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                   </div>
                 </div>
               ))}
-              {STYLE_TABS.map((t) => (
-                <div key={t.type} className="pc-eq">
-                  <b>{t.label}</b>
-                  <span>{styleName(t.type)}</span>
-                </div>
-              ))}
+              {STYLE_TABS.map((t) => {
+                const on = !!styleKey(t.type)
+                return (
+                  <div key={t.type} className="pc-eq" style={on ? null : { borderStyle:'dashed', background:'#f8fafc' }}>
+                    <b>{t.single}</b>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
+                      <span style={{ color: on ? undefined : '#94a3b8' }}>{on ? styleName(t.type) : 'Off'}</span>
+                      {on && (
+                        <button type="button" className="pc-unequip" onClick={() => removeStyle(t.type)} aria-label={`Remove ${t.single.toLowerCase()}`} title="Remove">✕</button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             {categories.some(c => !isNatural(c.id)) && (
-              <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take everything off</button>
+              <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take outfit off</button>
             )}
             {styleError && <div role="alert" className="pc-bubble" style={{ borderColor:'#ef4444', color:'#b91c1c' }}>{styleError}</div>}
             <div className="pc-bubble" aria-live="polite">

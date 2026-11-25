@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
     const selection = await resolveSelection(db, profile)
 
-    return res.status(200).json({ profile: { ...serializePaoProfile(profile), equipped: equippedFull, ...selection } })
+    return res.status(200).json({ profile: { ...serializePaoProfile(profile), equipped: equippedFull, selectedPoseKey: selection.selected_pose_key, selectedExpressionKey: selection.selected_expression_key, styleActive: selection.active } })
   } catch (err) {
     console.error('pao/profile error:', err)
     return res.status(500).json({ error: err.message || 'Could not load the Pao profile.' })

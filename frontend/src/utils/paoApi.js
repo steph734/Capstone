@@ -20,7 +20,7 @@ export function hasIdent(ident) {
 
 async function jsonOrThrow(res) {
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status })
+  if (!res.ok) throw Object.assign(new Error(data.error || data.message || `Request failed (${res.status})`), { status: res.status })
   return data
 }
 
@@ -50,8 +50,15 @@ export async function equipPaoTheme(ident, themeCode) {
   }))
 }
 
-export async function getPaoStyles() {
-  return jsonOrThrow(await fetch('/api/pao/styles'))
+export async function getPaoStyles(ident) {
+  return jsonOrThrow(await fetch(`/api/pao/styles?${identQuery(ident)}`))
+}
+
+export async function clearPaoStyle(ident, type) {
+  return jsonOrThrow(await fetch('/api/pao/styles/clear', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...identBody(ident), ...(type ? { type } : {}) }),
+  }))
 }
 
 export async function selectPaoStyle(ident, type, key) {

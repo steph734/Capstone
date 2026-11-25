@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb, Volume2 } from "lucide-react";
 import SunnyScenery from "../../pages/games/SunnyScenery";
 import GameFinishScreen from "../GameFinishScreen";
+import { speakPao, stopPaoVoice } from "../../utils/paoVoice";
 import { buildRounds, initRound, pick } from "./feedPao";
 
 // Feed Pao: listen to a direction, then give Pao the right food, in order.
@@ -123,31 +124,17 @@ export default function FeedPao({ game, onExit, onComplete }) {
     setLine(text || "");
     const gen = ++speakGen.current;
     const finish = () => { if (gen === speakGen.current) onEnd?.(); };
-    if (!readAloud || !text || typeof window === "undefined" || !("speechSynthesis" in window)) {
+    if (!readAloud || !text) {
       if (onEnd) later(finish, 900);
       return;
     }
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = SPEECH_RATE;
-      u.pitch = SPEECH_PITCH;
-      u.onend = finish;
-      u.onerror = finish;
-      window.speechSynthesis.speak(u);
-    } catch { finish(); }
+    speakPao(text, { rate: SPEECH_RATE, pitch: SPEECH_PITCH, onEnd: finish });
   };
   // Reads text without touching Pao's pose or the speech bubble.
   const readOnly = (text) => {
-    if (!readAloud || !text || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      speakGen.current += 1;
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = SPEECH_RATE;
-      u.pitch = SPEECH_PITCH;
-      window.speechSynthesis.speak(u);
-    } catch { /* read-aloud is best-effort */ }
+    if (!readAloud || !text) return;
+    speakGen.current += 1;
+    speakPao(text, { rate: SPEECH_RATE, pitch: SPEECH_PITCH });
   };
 
   const neededOption = (r, s) => {
@@ -209,7 +196,7 @@ export default function FeedPao({ game, onExit, onComplete }) {
     clearTimers();
     setPose("pao-feed-hello");
     say("Hi! It's snack time!", () => startRound(0));
-    return () => { clearTimers(); speakGen.current += 1; try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } };
+    return () => { clearTimers(); speakGen.current += 1; stopPaoVoice(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playKey]);
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import PandaMascot from '../../pages/games/PandaMascot'
 import PaoLayered from './PaoLayered'
+import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import {
   POSE_DESCRIPTION, REACTION_CYCLE, REACTION_CYCLE_CALM, CALM_SAFE_POSES,
   FALLBACK_PANDA_STATE, FALLBACK_TALKING_POSES, poseImagePaths, hasPoseArt,
@@ -9,7 +10,6 @@ import {
 
 const EXPLAIN_SET = new Set(EXPLAIN_POSES)
 
-const SPEECH_LANG = { en: 'en-US', tl: 'fil-PH', ceb: 'fil-PH' }
 
 // A soft, quiet "pop" for a successful tap — never loud, never a buzzer.
 function popSound() {
@@ -106,18 +106,16 @@ export default function PaoBuddy({
 
   // Speech sync: show `talk` while speechSynthesis plays `say`, then return.
   useEffect(() => {
-    if (!say || !readAloud || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    if (!say || !readAloud || typeof window === 'undefined') return
     try {
-      window.speechSynthesis.cancel()
-      const u = new SpeechSynthesisUtterance(say.split(/\s+/).slice(0, 24).join(' '))
-      u.rate = 0.85
-      u.lang = SPEECH_LANG[lang] || 'en-US'
-      u.onstart = () => setSpeaking(true)
-      u.onend = () => setSpeaking(false)
-      u.onerror = () => setSpeaking(false)
-      window.speechSynthesis.speak(u)
+      speakPao(say.split(/\s+/).slice(0, 24).join(' '), {
+        rate: 0.85,
+        pitch: 1.15,
+        onStart: () => setSpeaking(true),
+        onEnd: () => setSpeaking(false),
+      })
     } catch { /* read-aloud is best-effort */ }
-    return () => { try { window.speechSynthesis.cancel() } catch { /* ignore */ } }
+    return () => { stopPaoVoice(); setSpeaking(false) }
   }, [say, readAloud, lang])
 
   const handleTap = () => {

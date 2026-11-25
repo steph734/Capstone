@@ -42,6 +42,13 @@ const EXPRESSIONS = [
 
 const BASE = '/games/pao-poses-expressions'
 
+// Short card text for the animated poses.
+const POSE_MOTION = {
+  relax: 'Gentle sway', wave: 'Waves hello', cheer: 'Pumps and hops', hello: 'Big arm swings',
+  jump: 'Leaps, lands', dance: 'Sways, notes float', groove: 'Rocks, one arm up', tada: 'Arms open, sparkles',
+  think: 'Taps chin, thinks', shy: 'Fidgets, blushes', hug: 'Squeezes, hearts rise', lean: 'Slow cozy rocking',
+}
+
 // Short card text for the animated expressions (what moves).
 const MOTION = {
   happy: 'Bobs and blinks', proud: 'Chin up, glowing', wink: 'Winks, tongue out', excited: 'Bounces, sparkles',
@@ -55,6 +62,7 @@ export const STYLE_ROWS = [
     key, type: 'pose', name, description,
     asset_key: `pose_${key}`, preview_image_url: `${BASE}/poses/pose_${key}.png`,
     sort_order: i + 1, is_default: key === DEFAULTS.pose,
+    is_animated: true, animation_class: 'p-' + key, motion_description: POSE_MOTION[key],
   })),
   ...EXPRESSIONS.map(([key, name, description], i) => ({
     key, type: 'expression', name, description,
@@ -91,7 +99,7 @@ export const VALIDATOR = {
       preview_image_url: str({ maxLength: 500 }),
       sort_order: { bsonType: 'int', minimum: 0 },
       is_animated: { bsonType: 'bool' },
-      animation_class: str({ pattern: '^x-[a-z][a-z0-9_]*$', maxLength: 40 }),
+      animation_class: str({ pattern: '^[xp]-[a-z][a-z0-9_]*$', maxLength: 40 }),
       motion_description: str({ maxLength: 120 }),
       is_free: { bsonType: 'bool' },
       is_default: { bsonType: 'bool' },

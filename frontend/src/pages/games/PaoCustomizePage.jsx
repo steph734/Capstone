@@ -391,6 +391,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const [stylesLoading, setStylesLoading] = useState(true)
   const [styleError, setStyleError] = useState('')
   const [styleBusy, setStyleBusy] = useState(false)
+  const [hoverKey, setHoverKey] = useState('')
   useEffect(() => {
     let cancelled = false
     getPaoStyles(pao.ident)
@@ -722,13 +723,20 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                   const selected = styleKey(activeTab) === s.key
                   const label = selected ? 'Selected' : blocked ? 'Unavailable' : 'Choose'
                   return (
-                    <div key={s.key} className={`pc-scard ${selected ? 'sel' : ''} ${blocked ? 'off' : ''}`}>
+                    <div key={s.key} className={`pc-scard ${selected ? 'sel' : ''} ${blocked ? 'off' : ''}`}
+                      onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey('')}
+                      onFocus={() => setHoverKey(s.key)} onBlur={() => setHoverKey('')}>
                       <div className="pc-sthumb">
+                        {/* Expressions are light, so they always play. The 12 pose
+                            cards only animate when hovered, focused or selected;
+                            the rest show a still picture (kinder to phones). */}
                         {s.type === 'expression' && s.is_animated
                           ? <PaoAvatar expression={s.key} variant="bust" />
-                          : <img src={s.preview_image_url} alt="" draggable={false} />}
+                          : s.type === 'pose' && s.is_animated && (selected || hoverKey === s.key) && !blocked
+                            ? <PaoAvatar pose={s.key} variant="card" />
+                            : <img src={s.preview_image_url} alt="" draggable={false} />}
                         <span className="pc-sfree">FREE</span>
-                        {s.type === 'expression' && s.is_animated && <span className="pc-slive">LIVE</span>}
+                        {s.is_animated && <span className="pc-slive">LIVE</span>}
                         {selected && <span className="pc-scheck" aria-hidden="true">&#10003;</span>}
                       </div>
                       <div className="pc-sname" title={s.name}>{s.name}</div>

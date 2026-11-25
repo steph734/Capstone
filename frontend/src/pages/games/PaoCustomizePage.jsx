@@ -10,6 +10,8 @@ import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 import PaoLayered from '../../components/pao/PaoLayered'
 import PaoAvatar from '../../components/pao/PaoAvatar'
+import PaoSpeechBubble from '../../components/pao/PaoSpeechBubble'
+import { paoSay } from '../../components/pao/paoLines'
 import { loadLayerManifest, layerUrl, resolveItemKey, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
 import { usePaoReaction } from '../../components/pao/usePaoReaction'
 
@@ -385,8 +387,15 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   useEffect(() => { loadLayerManifest().then(setLayerManifest) }, [])
   const reaction = usePaoReaction({
     calm: reducedMotion,
-    onSpeak: (text) => { if (text) tts(text, { onStart: () => setTalking(true), onEnd: () => setTalking(false), onWord: (p) => setDisplayText(p) }) },
+    // Pao's words are shown in the speech bubble (src/components/pao/paoLines.js);
+    // nothing is read aloud unless the patient taps the speaker button.
+    onSpeak: () => {},
   })
+  // The one line Pao is "saying" right now (newest wins) and the locked card
+  // that was last tapped (gets a blue ring).
+  const [line, setLine] = useState(() => paoSay('open'))
+  const [lockedRing, setLockedRing] = useState('')
+  const say = (event, payload) => { const l = paoSay(event, payload); if (l) setLine({ ...l }) }
   const [styles, setStyles] = useState([])
   const [stylesLoading, setStylesLoading] = useState(true)
   const [styleError, setStyleError] = useState('')
@@ -478,16 +487,9 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     catch {}
   }, [showBadgeCase])
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      tts(pickLine(CUSTOMIZE_LINES.intro, lang), {
-        onStart: () => setTalking(true),
-        onEnd:   () => { setTalking(false); setMouthOpen(false) },
-        onWord:  (p) => setDisplayText(p),
-      })
-    }, 350)
-    return () => { clearTimeout(t); stopPaoVoice() }
-  }, []) // eslint-disable-line
+  // The opening line is the initial `line` state; just make sure no old voice
+  // keeps playing when the modal closes.
+  useEffect(() => () => stopPaoVoice(), [])
 
   useEffect(() => {
     if (talking) { mouthRef.current = setInterval(() => setMouthOpen(p => !p), 155) }
@@ -512,6 +514,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
 
   const unequipAll = () => {
     categories.forEach((cat) => { if (!isNatural(cat.id)) unequip(cat.id) })
+    say('takeOff') // outfit only; pose and expression are untouched
   }
 
   const equip = (catId, item) => {
@@ -520,6 +523,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     pao.equip(catId, item.id === 'none' ? null : item.code).catch(() => { /* server keeps the last good outfit */ })
     if (!reducedMotion) { setHop(true); setTimeout(() => setHop(false), 220) }
     softPop()
+    setLockedRing('')
+    say(item.id === 'none' ? 'remove' : 'wear', { slot: catId, name: item.name })
     if (item.id === 'none') {
       reaction.reactToUnequip()
     } else if (LAYER_CATEGORIES.includes(catId)) {
@@ -530,8 +535,14 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
     }
   }
 
+  // A locked card never changes what Pao wears; it just explains what to earn.
   const tapLocked = (item) => {
-    reaction.reactToLocked(item.badge)
+    setLockedRing(item.id)
+    const badge = item.badge || null
+    const goal = !badge && item.unlock && item.unlock.type !== 'free'
+      ? describeUnlock(item.unlock.type, { gameId: item.unlock.gameId, value: item.unlock.value, badgeCode: item.unlock.badgeCode }, games, [])
+      : howToUnlockByCode[item.code] || null
+    say('locked', { name: item.name, badge, goal })
   }
 
   const activeCategory = categories.find(c => c.id === activeTab)
@@ -548,12 +559,12 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
   const activeStyleName = activeStyleType ? styleName(activeStyleType) : ''
   const isOff = (type) => !!activeStyleType && activeStyleType !== type
   const blocked = isStyleTab && isOff(activeTab)
-  const runStyle = (fn) => {
+  const runStyle = (fn, onOk) => {
     setStyleError(''); setStyleBusy(true)
-    fn().catch((err) => setStyleError(err.message || 'Could not save that choice.')).finally(() => setStyleBusy(false))
+    fn().then(onOk).catch((err) => setStyleError(err.message || 'Could not save that choice.')).finally(() => setStyleBusy(false))
   }
-  const chooseStyle = (type, key) => { if (styleKey(type) !== key) runStyle(() => pao.selectStyle(type, key)) }
-  const removeStyle = (type) => runStyle(() => pao.clearStyle(type))
+  const chooseStyle = (type, key) => { if (styleKey(type) !== key) runStyle(() => pao.selectStyle(type, key), () => say(type, { key })) }
+  const removeStyle = (type) => runStyle(() => pao.clearStyle(type), () => say('removeStyle'))
 
   // Which layer-art item_key is equipped in each of the four layered
   // categories, for <PaoLayered/>. Hair has no overlay art yet (see
@@ -610,6 +621,8 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-tile-name { font-size:12.5px; font-weight:800; text-align:center; color:#1e293b; }
         .pc-tile-sub { font-size:10.5px; color:#475569; text-align:center; line-height:1.3; }
         .pc-tile-tag { margin-top:auto; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; background:#e2e8f0; color:#334155; text-align:center; }
+        .pc-stage { width:100%; display:flex; flex-direction:column; align-items:center; min-height:236px; flex:none; }
+        .pc-tile.ring { border-color:#2f7fe8; box-shadow:0 0 0 3px rgba(47,127,232,.3); }
         .pc-sgrid { grid-template-columns:repeat(3,minmax(0,1fr)); padding-bottom:16px; }
         .pc-scard { display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:2px solid #D6E4FA; border-radius:16px; background:#fff; }
         .pc-scard.sel { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.2); }
@@ -773,7 +786,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                 const hasLayerArt = itemKey && layerManifest?.layers?.some((l) => l.category === activeTab && l.item_key === itemKey)
                 return (
                   <button key={item.id} type="button"
-                    className={`pc-tile ${isEquipped ? 'on' : ''} ${!unlocked ? 'lock' : ''}`}
+                    className={`pc-tile ${isEquipped ? 'on' : ''} ${!unlocked ? 'lock' : ''} ${!unlocked && lockedRing === item.id ? 'ring' : ''}`}
                     onClick={() => (unlocked ? equip(activeTab, item) : tapLocked(item))}
                     aria-pressed={isEquipped}
                     aria-label={`${item.name}${unlocked ? '' : ', locked'}`}>
@@ -793,15 +806,19 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
           </div>
 
           <div className="pc-preview">
-            <div style={{ animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
-              <PaoLayered
-                equipped={equippedLayerKeys}
-                pose={reaction.pose}
-                showFx={reaction.fx}
-                size={180}
-                interactive
-                onClick={reaction.tapCycle}
-              />
+            {/* Stage: speech bubble (flex:none) above Pao. Pao shrinks first if the panel is short. */}
+            <div className="pc-stage">
+              <PaoSpeechBubble text={line?.text} kind={line?.kind} lang={lang} />
+              <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: reducedMotion ? 'none' : 'cpFloat 3s ease-in-out infinite', transform: hop && !reducedMotion ? 'translateY(-10px)' : 'none', transition: 'transform .22s ease' }}>
+                <PaoLayered
+                  equipped={equippedLayerKeys}
+                  pose={reaction.pose}
+                  showFx={reaction.fx}
+                  size={150}
+                  interactive
+                  onClick={reaction.tapCycle}
+                />
+              </div>
             </div>
             <div className="pc-equipped">
               {categories.map(cat => (
@@ -834,11 +851,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
               <button type="button" className="pc-unequip-all" onClick={unequipAll}>Take outfit off</button>
             )}
             {styleError && <div role="alert" className="pc-bubble" style={{ borderColor:'#ef4444', color:'#b91c1c' }}>{styleError}</div>}
-            <div className="pc-bubble" aria-live="polite">
-              {talking && <span style={{ color:'#7c3aed', marginRight:6 }}>🎵</span>}
-              {displayText || reaction.bubble || 'Pao is excited!'}
-            </div>
-            <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); onDone() }}>Let's Play! 🎮</button>
+            <button className="pc-play" onClick={() => { reaction.handoffNow(); stopPaoVoice(); say('play'); setTimeout(onDone, 700) }}>Let's Play!</button>
           </div>
         </div>
       </div>

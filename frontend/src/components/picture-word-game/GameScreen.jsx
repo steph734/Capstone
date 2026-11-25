@@ -1,206 +1,206 @@
 import { useEffect, useRef, useState } from 'react'
-import { SkyBackground, useSpeech } from './ui'
-import { BuddyBubble } from './Modals'
-import { EmojiPicture, SpeakerIcon, CheckIcon, HandTapIcon, StarIcon, BackArrowIcon } from './illustrations'
+import { PwSky, usePwSpeech } from './pwUi'
+import { PaoBubble, PaoStage, usePictureWordPao } from './PicturePao'
+import { WordPicture } from './wordArt'
+import { SpeakerIcon, CheckIcon, StarIcon, BackArrowIcon } from './illustrations'
+import { PAO_PROP_CSS } from '../../games/pictureWord/PaoProps'
+import { IDLE_THINKING_MS, PICTURE_WORD_REACTIONS, STREAK_EVERY } from '../../games/pictureWord/paoReactions'
+import usePwStage from './usePwStage'
 
-const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" }
+const SearchIcon = (p) => (
+  <svg width={p.size || 22} height={p.size || 22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+)
+const RetryIcon = (p) => (
+  <svg width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2" /><path d="M4 4v5h5" /></svg>
+)
+const ArrowRight = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+)
 
-function article(word) {
-  return /^[aeiou]/i.test(word) ? 'an' : 'a'
-}
+const TILES = ['#6366F1', '#F59E0B', '#EC4899']
+const BURST = ['#FFD43B', '#4ADE80', '#F472B6', '#38BDF8', '#FB923C', '#A78BFA', '#FFD43B', '#4ADE80']
 
 export default function GameScreen({
-  questions, categoryLabel, Mascot, readAloud = true, autoHintAfter = 2,
+  questions, categoryLabel, readAloud = true, autoHintAfter = 2, preview = false, patientName = 'friend',
   onBack, onFinish, onWrongTry, logger,
 }) {
-  const [current, setCurrent]     = useState(0)
-  const [wrongSet, setWrongSet]   = useState(() => new Set())
-  const [tries, setTries]         = useState(0)
-  const [hintOn, setHintOn]       = useState(false)
+  const [current, setCurrent] = useState(0)
+  const [wrongSet, setWrongSet] = useState(() => new Set())
+  const [lastWrong, setLastWrong] = useState(null)
+  const [tries, setTries] = useState(0)
+  const [hint, setHint] = useState(null) // { fade: word | null }
   const [correctPicked, setCorrectPicked] = useState(false)
-  const [showBanner, setShowBanner] = useState(false)
-  const [stars, setStars]         = useState(0)
-  const [bubble, setBubble]       = useState({ message: 'Which word is this?', tone: 'neutral' })
-  const [mouthOpen, setMouthOpen] = useState(false)
+  const [stars, setStars] = useState(0)
+  const [results, setResults] = useState([]) // [{ word, firstTry, hint }]
+  const [announce, setAnnounce] = useState('')
 
-  const { speak, speaking } = useSpeech(readAloud)
-  const mouthRef = useRef(null)
-  const advanceRef = useRef(null)
-  const promptShownAtRef = useRef(null)
-
-  useEffect(() => {
-    if (speaking) mouthRef.current = setInterval(() => setMouthOpen((p) => !p), 160)
-    else { clearInterval(mouthRef.current); setMouthOpen(false) }
-    return () => clearInterval(mouthRef.current)
-  }, [speaking])
-
-  useEffect(() => () => clearTimeout(advanceRef.current), [])
-
+  const stage = usePwStage()
   const question = questions[current]
+  const answer = question?.item.word || ''
+  const letter = answer.charAt(0).toUpperCase()
+  const pao = usePictureWordPao({ category: (categoryLabel || 'fruits').toLowerCase(), word: answer, letter, name: String(patientName).split(' ')[0] })
+  const { speak, cancel } = usePwSpeech(readAloud, { onListening: pao.setListening })
 
-  // New question: reset per-question state and prompt.
+  const promptShownAtRef = useRef(null)
+  const startedAtRef = useRef(Date.now())
+  const streakRef = useRef(0) // correct on the first try, in a row
+  const thinkTimer = useRef(null)
+  const tryRef = useRef(0)
+  const wrongRef = useRef(new Set()) // refs mirror the state the delayed auto-hint needs to see fresh
+  const hintRef = useRef(false)
+  const correctRef = useRef(false)
+
+  useEffect(() => () => { clearTimeout(thinkTimer.current); cancel() }, []) // eslint-disable-line
+
+  // New word: reset the per-word state, then greet (first word) and ask the question while Pao listens.
   useEffect(() => {
-    setWrongSet(new Set()); setTries(0); setHintOn(false); setCorrectPicked(false); setShowBanner(false)
-    setBubble({ message: 'Which word is this?', tone: 'neutral' })
+    setWrongSet(new Set()); setLastWrong(null); setTries(0); setHint(null); setCorrectPicked(false); setAnnounce('')
+    tryRef.current = 0; wrongRef.current = new Set(); hintRef.current = false; correctRef.current = false
     promptShownAtRef.current = Date.now()
     logger?.log('prompt_shown', {})
-    const t = setTimeout(() => speak('Which word is this?'), 400)
+    const ask = () => {
+      pao.say(PICTURE_WORD_REACTIONS.listening.lines[0])
+      speak('Which word is this?', { listen: true })
+    }
+    const t = setTimeout(() => {
+      if (current === 0) { const line = pao.play('ready'); speak(line, { onEnd: ask }) } else ask()
+    }, 400)
+    // No answer for a while: Pao thinks along (once per word).
+    clearTimeout(thinkTimer.current)
+    thinkTimer.current = setTimeout(() => pao.play('thinking'), IDLE_THINKING_MS + 400)
     return () => clearTimeout(t)
   }, [current]) // eslint-disable-line
 
-  const handleHearIt = () => speak(question.item.word)
+  const stopThinking = () => clearTimeout(thinkTimer.current)
 
-  const handleNeedHelp = () => {
-    if (correctPicked || hintOn) return
-    setHintOn(true)
-    setBubble({ message: 'Look! The right word is glowing.', tone: 'hint' })
-    speak('Look! The right word is glowing.')
+  const showHint = () => {
+    if (hintRef.current || correctRef.current) return
+    hintRef.current = true
+    stopThinking()
+    const candidates = question.options.filter((w) => w !== answer && !wrongRef.current.has(w))
+    setHint({ fade: candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null })
+    const line = pao.play('hint', { letter })
+    speak(line)
+    setAnnounce(`Hint. It starts with ${letter}.`)
   }
 
-  const handleSelect = (word) => {
-    if (correctPicked || wrongSet.has(word)) return
-    const isCorrect = word === question.item.word
-    const responseTimeMs = promptShownAtRef.current ? Date.now() - promptShownAtRef.current : null
-    logger?.log('response_given', { responseTimeMs, isCorrect, inputMethod: 'tap' })
+  const select = (word) => {
+    if (correctPicked || wrongSet.has(word) || hint?.fade === word) return
+    stopThinking()
+    const isCorrect = word === answer
+    logger?.log('response_given', { responseTimeMs: promptShownAtRef.current ? Date.now() - promptShownAtRef.current : null, isCorrect, inputMethod: 'tap' })
 
     if (isCorrect) {
-      const nextStars = stars + 1
-      setStars(nextStars)
+      const firstTry = tryRef.current === 0
+      streakRef.current = firstTry ? streakRef.current + 1 : 0
+      const isStreak = firstTry && streakRef.current > 0 && streakRef.current % STREAK_EVERY === 0
+      setStars((s) => s + 1)
       setCorrectPicked(true)
-      setShowBanner(true)
-      const line = `Yes! That is ${article(word)} ${word.toLowerCase()}!`
-      setBubble({ message: line, tone: 'success' })
+      correctRef.current = true
+      setResults((r) => [...r, { word: answer, firstTry, hint: Boolean(hint) }])
+      const line = pao.play(isStreak ? 'streak' : 'correct', { word: answer.toLowerCase(), n: streakRef.current })
       speak(line)
+      setAnnounce('Correct')
       logger?.log('praise_shown', {})
-      advanceRef.current = setTimeout(() => {
-        if (current + 1 >= questions.length) onFinish(nextStars)
-        else setCurrent((c) => c + 1)
-      }, 1800)
       return
     }
 
+    streakRef.current = 0
+    tryRef.current += 1
+    wrongRef.current.add(word)
     onWrongTry?.()
+    setLastWrong(word)
     setWrongSet((prev) => new Set(prev).add(word))
     const nextTries = tries + 1
     setTries(nextTries)
-    setBubble({ message: 'Almost! Try another one.', tone: 'hint' })
-    speak('Almost! Try another one.')
-    if (nextTries >= autoHintAfter) {
-      setHintOn(true)
-    }
+    const line = pao.play(tryRef.current >= 2 ? 'encourage' : 'oops')
+    speak(line)
+    setAnnounce('Try again')
+    if (!hint && nextTries >= autoHintAfter) setTimeout(showHint, 1200) // helper after a couple of tries, as before
+  }
+
+  const next = () => {
+    cancel()
+    const last = current + 1 >= questions.length
+    if (last) {
+      const all = results
+      onFinish({
+        stars, firstTry: all.filter((r) => r.firstTry).length, hints: all.filter((r) => r.hint).length,
+        seconds: Math.round((Date.now() - startedAtRef.current) / 1000), results: all,
+      })
+    } else setCurrent((c) => c + 1)
   }
 
   if (!question) return null
 
+  const title = correctPicked ? 'You found it!' : lastWrong ? 'Almost! Try again' : 'Which word is this?'
+
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden" style={{ fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" }}>
-      <SkyBackground/>
+    <div className="pw-root">
+      <style>{PAO_PROP_CSS}</style>
+      <PwSky />
+      <div className={`pw-stage${stage.narrow ? ' narrow' : ''}`} style={stage.style}>
+        <button type="button" className="pw-pill pw-back" onClick={() => { cancel(); onBack() }}><BackArrowIcon size={18} /> Back</button>
 
-      {/* Top bar */}
-      <div className="relative z-10 flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="pwg-pressable flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-extrabold text-[#2B2A4C] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
-          style={HEADING}
-        >
-          <BackArrowIcon size={18}/> Back
-        </button>
-
-        <div className="flex h-12 items-center gap-2 rounded-full bg-white px-4 shadow-md">
-          {questions.map((_, i) => (
-            <span key={i} aria-hidden="true" className="flex h-5 w-5 items-center justify-center">
-              {i < current || (i === current && correctPicked)
-                ? <StarIcon size={18} className="text-[#F59E0B]"/>
-                : i === current
-                  ? <span className="block h-3.5 w-3.5 rounded-full border-[3px] border-[#F59E0B]"/>
-                  : <span className="block h-2.5 w-2.5 rounded-full bg-[#D8D4E6]"/>
-              }
-            </span>
-          ))}
-        </div>
-
-        <div className="flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[17px] font-extrabold text-[#C97A00] shadow-md" style={HEADING}>
-          <StarIcon size={18} className="text-[#F59E0B]"/> {stars}
-        </div>
-      </div>
-
-      {/* Main content — the only part that scrolls, so the top bar and Pao stay visible */}
-      <div className="relative z-10 flex min-h-0 flex-1 flex-wrap items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-3 md:gap-10">
-
-        {/* Picture card — max 380px wide, 200px picture circle */}
-        <div className="relative flex w-[min(380px,92vw)] flex-col items-center gap-4 rounded-[28px] bg-white p-6 shadow-lg">
-          {showBanner && (
-            <div className="pwg-pop absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#E3F4E8] px-4 py-1.5 text-[14px] font-extrabold text-[#2F8A4C] shadow-md" style={HEADING}>
-              🎉 Great job!
-            </div>
-          )}
-          <EmojiPicture emoji={question.item.emoji} tint={question.item.tint} size={200}/>
-          <button
-            type="button"
-            onClick={handleHearIt}
-            aria-label={`Hear the word ${question.item.word}`}
-            className="pwg-pressable flex h-14 items-center gap-2 rounded-full bg-[#F59E0B] px-6 text-[17px] font-extrabold text-white focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
-            style={{ boxShadow: '0 4px 10px rgba(201,122,0,.35)', ...HEADING }}
-          >
-            <SpeakerIcon size={20}/> Hear it
-          </button>
-        </div>
-
-        {/* Word choices — 3 buttons, 68px tall, 26px text */}
-        <div className="flex w-[min(400px,92vw)] flex-col gap-2.5">
-          <h2 className="text-center text-[26px] font-extrabold text-[#2B2A4C]" style={HEADING}>
-            Which word is this?
-          </h2>
-
-          {question.options.map((word) => {
-            const isCorrectWord = word === question.item.word
-            const isFaded = wrongSet.has(word)
-            const isChosenCorrect = correctPicked && isCorrectWord
-            const isGlowing = hintOn && !correctPicked && isCorrectWord
-
-            let style = { ...HEADING, fontSize: 26 }
-            if (isChosenCorrect) {
-              style = { ...style, background: '#2F8A4C', borderColor: '#256E3C', color: '#fff', boxShadow: '0 3px 8px rgba(47,138,76,.35)' }
-            } else if (isFaded) {
-              style = { ...style, background: '#F4F2EA', borderColor: '#E4DFCE', color: '#8A8578', opacity: 0.6 }
-            } else if (isGlowing) {
-              style = { ...style, background: '#FFF0CC', borderColor: '#F59E0B', color: '#7A4E00', boxShadow: '0 0 0 4px rgba(245,158,11,.3)' }
-            } else {
-              style = { ...style, background: '#fff', borderColor: '#E4DFCE', color: '#2B2A4C', boxShadow: '0 2px 6px rgba(43,42,76,.10)' }
-            }
-
+        <div className="pw-progress" role="img" aria-label={`${categoryLabel}, word ${current + 1} of ${questions.length}`}>
+          <span className="pw-cat">{categoryLabel}</span>
+          {questions.map((_, i) => {
+            const done = i < current || (i === current && correctPicked)
             return (
-              <button
-                key={word}
-                type="button"
-                onClick={() => handleSelect(word)}
-                disabled={isFaded || correctPicked}
-                className={`pwg-pressable flex h-[68px] items-center justify-center gap-2.5 rounded-2xl border-2 px-5 text-center font-extrabold transition-all focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] ${isFaded ? 'pwg-fade-out cursor-not-allowed' : 'cursor-pointer'}`}
-                style={style}
-              >
-                {isChosenCorrect && <CheckIcon size={24}/>}
-                {isGlowing && <HandTapIcon size={22}/>}
-                {word}
-              </button>
+              <span key={i} className={`pw-dot${done ? ' done' : i === current ? ' now' : ''}`}>
+                {done ? <CheckIcon size={20} /> : i === current ? i + 1 : ''}
+              </span>
             )
           })}
+        </div>
+        {preview && <div className="pw-preview">Preview mode: scores are not saved</div>}
+        <div className="pw-pill pw-stars" aria-label={`${stars} stars`}><StarIcon size={26} className="pw-star-gold" /> {stars}</div>
 
-          <button
-            type="button"
-            onClick={handleNeedHelp}
-            disabled={correctPicked || hintOn}
-            className="mx-auto mt-1 flex h-11 items-center rounded-full px-5 text-[15px] font-bold text-[#5A5670] underline decoration-dotted underline-offset-4 disabled:opacity-40 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
-          >
-            Need help?
-          </button>
+        <section className="pw-picture-card">
+          <span className="pw-chip">{categoryLabel}</span>
+          {correctPicked && <span className="pw-plus" key={`p${current}`}><StarIcon size={20} /> +1 star</span>}
+          <div className="pw-circle" style={{ background: question.item.tint }}>
+            <WordPicture word={answer} size={230} />
+            {correctPicked && <span className="pw-check-badge"><CheckIcon size={44} /></span>}
+            {correctPicked && BURST.map((c, i) => <i key={i} className="pw-burst" style={{ '--a': `${i * 45 + 20}deg`, color: c }}><StarIcon size={18} /></i>)}
+            {hint && !correctPicked && <span className="pw-hintpill"><b>{letter}</b> It starts with {letter}</span>}
+          </div>
+          <button type="button" className="pw-hear" onClick={() => speak(answer, { listen: true })} aria-label={`Hear the word ${answer}`}><SpeakerIcon size={24} /> Hear it</button>
+        </section>
+
+        <section className="pw-answers">
+          <h2 className="pw-title">{title}</h2>
+          {question.options.map((word, i) => {
+            const isRight = word === answer
+            const chosenRight = correctPicked && isRight
+            const orange = !correctPicked && lastWrong === word
+            const faded = (correctPicked && !isRight) || (!correctPicked && (hint?.fade === word || (wrongSet.has(word) && lastWrong !== word)))
+            const cls = chosenRight ? ' right' : orange ? ' retry' : faded ? ' faded' : ''
+            return (
+              <div key={word} className={`pw-answer${cls}`}>
+                <button type="button" className="pw-answer-main" onClick={() => select(word)} disabled={correctPicked || faded || orange} aria-label={word}>
+                  <span className="pw-num" style={{ background: chosenRight ? '#22C55E' : orange ? '#FB923C' : TILES[i % 3] }}>
+                    {chosenRight ? <CheckIcon size={26} /> : orange ? <RetryIcon /> : i + 1}
+                  </span>
+                  <span className="pw-word">{word}</span>
+                  {chosenRight && <span className="pw-tag green">Great!</span>}
+                  {orange && <span className="pw-tag orange">Try again</span>}
+                </button>
+                <button type="button" className="pw-speaker" onClick={() => speak(word, { listen: true })} aria-label={`Hear ${word}`}><SpeakerIcon size={22} /></button>
+              </div>
+            )
+          })}
+          {correctPicked
+            ? <button type="button" className="pw-next" onClick={next} data-autofocus>{current + 1 >= questions.length ? 'See results' : 'Next word'} <ArrowRight /></button>
+            : <button type="button" className={`pw-help${hint ? ' used' : ''}`} onClick={showHint} disabled={Boolean(hint)}><SearchIcon /> {hint ? 'Hint used' : 'Need help?'}</button>}
+        </section>
+
+        <div className="pw-pao-wrap">
+          <PaoStage view={pao.view} height={stage.narrow ? 180 : 300} />
+          <PaoBubble text={pao.line} />
         </div>
       </div>
-
-      {/* Buddy bar — pinned to the bottom, always visible */}
-      <div className="relative z-10 flex flex-shrink-0 items-center px-4 pb-3 pt-1 sm:px-6">
-        <BuddyBubble Mascot={Mascot} mouthOpen={mouthOpen} message={bubble.message} tone={bubble.tone} pandaState={correctPicked ? 'excited' : 'happy'} pxWidth={96}/>
-      </div>
+      <div className="pw-sr" aria-live="polite">{announce}</div>
     </div>
   )
 }

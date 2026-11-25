@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState, useRef, useMemo } from 'rea
 import PaoCustomizePage from './games/PaoCustomizePage'
 import HubView from '../components/hub/HubView'
 import BadgeCasePage from '../components/hub/BadgeCase'
-import PandaMascot from './games/PandaMascot'
 import PaoSprite from '../components/pao/PaoSprite'
 import { getWardrobe } from '../utils/paoApi'
 import { resolveItemKey } from '../components/pao/paoLayers'
@@ -715,19 +714,12 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'picture-word') {
     return (
-      <PictureWordGame
-        Mascot={PandaMascot}
-        readAloud={true}
-        questionCount={6}
-        patientId={patientId}
-        patientEmail={patientEmail}
-        onExit={backToGames}
-      />
+      <PictureWordGame readAloud={true} questionCount={6} patientId={patientId} patientEmail={patientEmail} patientName={playerName} preview={Boolean(previewGameId)} onExit={backToGames}/>
     )
   }
 
   if (phase === 'echo') {
-    return <SlowMotionEchoGame patientId={patientId} patientEmail={patientEmail} lang={lang} onExit={backToGames}/>
+    return <SlowMotionEchoGame patientId={patientId} patientEmail={patientEmail} lang={lang} patientName={playerName} preview={Boolean(previewGameId)} onExit={backToGames}/>
   }
 
   if (phase === 'puzzle-pieces') {
@@ -775,7 +767,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
 
   if (phase === 'alphabet') {
     const key = patientEmail || String(patientId)
-    return <AlphabetBlast patientName={playerName} settings={loadSettings(key)} settingsKey={key} onExit={backToGames}/>
+    return <AlphabetBlast patientName={playerName} settings={loadSettings(key)} settingsKey={key} preview={Boolean(previewGameId)} onExit={backToGames}/>
   }
 
   if (phase === 'spot-difference') {

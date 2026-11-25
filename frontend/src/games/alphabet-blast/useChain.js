@@ -6,7 +6,7 @@ const shuffle = (a) => { const r = [...a]; for (let i = r.length - 1; i > 0; i -
 
 // The chain lives in refs and is moved along the precomputed track with direct
 // transform updates, so React only re-renders when balls are added or removed.
-export default function useChain({ path, gap, settings, running, onRescue }) {
+export default function useChain({ path, gap, settings, running, frozen = false, onRescue, onDanger }) {
   const [balls, setBalls] = useState([])
   const ballsRef = useRef([])
   const dispRef = useRef(new Map())
@@ -17,9 +17,12 @@ export default function useChain({ path, gap, settings, running, onRescue }) {
   const halfSpeed = useRef(false)
   const gapRef = useRef(gap)
   const rescueRef = useRef(onRescue)
+  const dangerRef = useRef(onDanger)
+  const dangerOn = useRef(false)
+  const frozenRef = useRef(frozen)
   const settingsRef = useRef(settings)
   const tmp = useRef({ x: 0, y: 0 })
-  useEffect(() => { gapRef.current = gap; rescueRef.current = onRescue; settingsRef.current = settings })
+  useEffect(() => { gapRef.current = gap; rescueRef.current = onRescue; dangerRef.current = onDanger; frozenRef.current = frozen; settingsRef.current = settings })
 
   const make = useCallback((letter) => {
     const c = settingsRef.current.letterCase
@@ -85,7 +88,7 @@ export default function useChain({ path, gap, settings, running, onRescue }) {
     let raf = 0
     let last = performance.now()
     const frame = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
+      const dt = frozenRef.current ? 0 : Math.min(0.05, (now - last) / 1000) // frozen: balls are placed but do not move (intro screen)
       last = now
       const list = ballsRef.current
       let mult = 1
@@ -101,6 +104,9 @@ export default function useChain({ path, gap, settings, running, onRescue }) {
       })
       if (list.length) {
         const front = headRef.current - (dispRef.current.get(list[0].id) ?? 0) * g
+        // Danger: the head of the chain is within about 6 balls of the black hole.
+        const inDanger = path.length - front < 6 * g
+        if (inDanger !== dangerOn.current) { dangerOn.current = inDanger; dangerRef.current?.(inDanger) }
         if (front >= path.length - 30) {
           headRef.current -= path.length * 0.25
           slowUntil.current = now + 3500

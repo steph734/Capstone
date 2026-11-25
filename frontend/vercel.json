@@ -58,6 +58,24 @@
       ]
     },
     {
+      "source": "/games/pao-picture-word/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/games/pao-echo/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/games/pao-poses-expressions/(.*)",
       "headers": [
         {

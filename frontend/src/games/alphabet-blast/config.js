@@ -1,16 +1,25 @@
 // Defaults, colours and the track layout for Alphabet Blast.
-export const VIEW = { w: 1600, h: 900 }
-export const BALL = 62
-export const GAP = 66
-export const LAUNCHER = { x: 830, y: 530 }
-export const HOLE = { x: 590, y: 555 }
+export const VIEW = { w: 1440, h: 900 }
+export const BALL = 56
+export const GAP = 57
+export const LAUNCHER = { x: 640, y: 500 }
 
-// A smooth inward spiral: starts top-left, loops the board once, then circles the launcher
-// and ends at the black hole. Points are joined with a Catmull-Rom curve.
-const SPIRAL = [
-  [110, 330], [300, 250], [650, 215], [1000, 225], [1230, 330], [1300, 520], [1200, 730], [900, 825], [550, 830], [300, 740], [240, 560],
-  [350, 430], [600, 372], [900, 375], [1090, 470], [1080, 620], [900, 695], [700, 660], [590, 555],
-]
+// Landscape track: two laps of a shrinking ellipse around Pao (clockwise: along the top to the right, down the
+// side, back along the bottom), spiralling in to the black hole on the left. The ribbon, the arrows and the balls
+// are all built from this one point list, so they always agree. Joined with a Catmull-Rom curve.
+function ellipseSpiral(c) {
+  const pts = []
+  const N = 70
+  for (let i = 0; i <= N; i += 1) {
+    const t = i / N
+    const a = ((200 + 700 * t) * Math.PI) / 180
+    pts.push([Math.round(c.x + (540 - 240 * t) * Math.cos(a)), Math.round(c.y + (285 - 120 * t) * Math.sin(a))])
+  }
+  return pts
+}
+const SPIRAL = ellipseSpiral(LAUNCHER)
+export const HOLE = { x: SPIRAL[SPIRAL.length - 1][0], y: SPIRAL[SPIRAL.length - 1][1] }
+
 export function buildPathD(p = SPIRAL) {
   let d = `M ${p[0][0]} ${p[0][1]}`
   for (let i = 0; i < p.length - 1; i += 1) {
@@ -39,6 +48,10 @@ export const SPEEDS = { 'very-slow': 18, slow: 30, normal: 42 } // px per second
 export const SPEED_LABELS = { 'very-slow': 'Very slow', slow: 'Slow', normal: 'Normal' }
 export const SPEED_FILL = { 'very-slow': 25, slow: 50, normal: 75 }
 export const LETTER_SETS = { 'a-z': 'A to Z', 'a-m': 'A to M', 'n-z': 'N to Z', custom: 'Custom list' }
+// In-game chain-speed control and difficulty chips: the three existing speeds, slowest first.
+export const SPEED_ORDER = ['very-slow', 'slow', 'normal']
+export const SPEED_BUTTONS = { 'very-slow': 'Slow', slow: 'Normal', normal: 'Fast' }
+export const DIFFICULTY = { 'very-slow': 'Easy', slow: 'Medium', normal: 'Hard' }
 export const HINT_DELAYS = [4, 6, 10]
 
 export const DEFAULT_SETTINGS = {
@@ -65,8 +78,10 @@ export function lettersFor(settings) {
 
 export const ALL_LETTERS = ALPHABET
 
-const PASTELS = ['#ffb3c1', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff']
-export const colorFor = (letter) => PASTELS[(letter.charCodeAt(0) - 65) % PASTELS.length]
+const PASTELS = ['#86EFAC', '#7DD3FC', '#FDBA74', '#FDA4AF', '#C4B5FD', '#FDE68A']
+export const DARKER = ['#3FA866', '#3B93BF', '#C9833A', '#C95E6F', '#7F6BD0', '#C9B24F']
+export const colorIndex = (letter) => (letter.charCodeAt(0) - 65 + 6000) % PASTELS.length
+export const colorFor = (letter) => PASTELS[colorIndex(letter)]
 
 const KEY = 'alphabetBlast:settings:'
 export function loadSettings(who) {

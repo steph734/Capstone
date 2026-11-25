@@ -1,12 +1,14 @@
 import { useMemo, useRef, useState } from 'react'
 import './game.css'
+import './pictureWord.css'
 import { CATEGORIES, buildQuestions } from './data'
-import { StartModal, CategoryModal, ResultsModal } from './Modals'
+import { CategoryScreen, ResultsScreen } from './Modals'
 import { ModalShell, PressableButton } from './ui'
 import GameScreen from './GameScreen'
 import { useAnalytics } from '../../context/AnalyticsContext'
 import { createSessionId, createEventLogger } from '../../utils/gameplayLogger'
-import { fetchGameBadge } from '../../utils/gameProgress'
+import { fetchBadgeRow } from '../../utils/gameBadgeRow'
+import { useOptionalPao } from '../../context/PaoContext'
 import { useGameSession } from '../../hooks/useGameSession'
 
 // ─── Optional therapist settings panel (hidden by default; only reachable
@@ -72,15 +74,19 @@ function SettingChip({ active, onClick, children }) {
 // ─── Main switcher ──────────────────────────────────────────────────────────
 
 export default function PictureWordGame({
-  Mascot, readAloud = true, questionCount = 6, onExit, onComplete,
+  readAloud = true, questionCount = 6, onExit, onComplete, preview = false, patientName = 'friend',
   patientId = 'alvrin', patientEmail = null, exerciseId = 'picture-word', domain = 'Cognitive',
 }) {
   const gameSession = useGameSession({ gameName: 'Picture-Word Matching' })
   const wrongTriesRef = useRef(0)
-  const [phase, setPhase] = useState('start') // start | settings | category | game | results
+  const ident = useOptionalPao()?.ident
+  const masteredKey = `pictureWord:mastered:${patientEmail || patientId}`
+  const readMastered = () => { try { return JSON.parse(localStorage.getItem(masteredKey) || '{}') } catch { return {} } }
+  const [mastered, setMastered] = useState(readMastered) // { categoryId: [words read first try] } kept on this device
+  const [phase, setPhase] = useState('category') // category | settings | game | results
+  const [resultStats, setResultStats] = useState(null)
   const [categoryId, setCategoryId] = useState(null)
   const [questions, setQuestions] = useState([])
-  const [stars, setStars] = useState(0)
   const [realBadge, setRealBadge] = useState(null)
   const [settings, setSettings] = useState({ choices: 3, questionsPerRound: questionCount, readAloud, autoHintAfter: 2 })
 
@@ -93,7 +99,7 @@ export default function PictureWordGame({
   const startCategory = (id) => {
     setCategoryId(id)
     setQuestions(buildQuestions(id, settings.questionsPerRound, settings.choices))
-    setStars(0)
+    setResultStats(null)
     wrongTriesRef.current = 0
     setRealBadge(null)
     sessionIdRef.current = createSessionId()
@@ -101,8 +107,8 @@ export default function PictureWordGame({
     setPhase('game')
   }
 
-  const handleFinish = async (finalStars) => {
-    setStars(finalStars)
+  const handleFinish = async (stats) => {
+    setResultStats(stats)
     loggerRef.current.log('exit', {})
     setPhase('results')
 
@@ -113,51 +119,64 @@ export default function PictureWordGame({
       }
     } catch { /* no-op */ }
 
-    gameSession.finish({
-      correct: finalStars, attempts: questions.length + wrongTriesRef.current, hints_used: 0, stars: finalStars,
-      detail: { categoryId, wrongTries: wrongTriesRef.current },
-    })
-    fetchGameBadge('Picture-Word Matching').then(setRealBadge)
+    // Words read on the first try count towards "mastered" on the category tiles (this device only; never in preview).
+    if (!preview) {
+      try {
+        const cur = readMastered()
+        const set = new Set([...(cur[categoryId] || []), ...stats.results.filter((r) => r.firstTry).map((r) => r.word)])
+        const next = { ...cur, [categoryId]: [...set] }
+        localStorage.setItem(masteredKey, JSON.stringify(next))
+        setMastered(next)
+      } catch { /* storage blocked */ }
+    }
 
-    await onComplete?.({ categoryId, stars: finalStars, total: questions.length, xp: 100, badge: 'Word Wizard' })
+    await gameSession.finish({
+      correct: stats.stars, attempts: questions.length + wrongTriesRef.current, hints_used: stats.hints, stars: stats.stars,
+      detail: { categoryId, wrongTries: wrongTriesRef.current, firstTry: stats.firstTry, durationSeconds: stats.seconds },
+    })
+    fetchBadgeRow(ident, 'Picture-Word Matching').then(setRealBadge)
+
+    await onComplete?.({ categoryId, stars: stats.stars, total: questions.length, xp: 100, badge: 'Word Wizard' })
   }
 
   const handleReplay = () => startCategory(categoryId)
   const handleNewGroup = () => setPhase('category')
   const handleExit = () => { loggerRef.current.log('exit', {}); onExit?.() }
 
+  const masteredCounts = Object.fromEntries(Object.entries(mastered).map(([k, v]) => [k, Array.isArray(v) ? v.length : 0]))
+
   return (
     <>
-      {phase === 'start' && (
-        <StartModal onStart={() => setPhase('category')} onCancel={handleExit} onOpenSettings={() => setPhase('settings')}/>
-      )}
       {phase === 'settings' && (
-        <SettingsPanel settings={settings} onChange={setSettings} onClose={() => setPhase('start')}/>
+        <SettingsPanel settings={settings} onChange={setSettings} onClose={() => setPhase('category')}/>
       )}
       {phase === 'category' && (
-        <CategoryModal onSelect={startCategory} onClose={handleExit}/>
+        <CategoryScreen onSelect={startCategory} onClose={handleExit} onOpenSettings={() => setPhase('settings')} patientName={patientName} wordsPerRound={settings.questionsPerRound} mastered={masteredCounts}/>
       )}
       {phase === 'game' && questions.length > 0 && (
         <GameScreen
           onWrongTry={() => { wrongTriesRef.current += 1 }}
           questions={questions}
           categoryLabel={category?.label}
-          Mascot={Mascot}
           readAloud={settings.readAloud}
           autoHintAfter={settings.autoHintAfter === 'off' ? Infinity : settings.autoHintAfter}
+          preview={preview}
+          patientName={patientName}
           onBack={() => setPhase('category')}
           onFinish={handleFinish}
           logger={loggerRef.current}
         />
       )}
-      {phase === 'results' && (
-        <ResultsModal
+      {phase === 'results' && resultStats && (
+        <ResultsScreen
           categoryLabel={category?.label}
-          stars={stars}
-          badgeLabel={realBadge ? realBadge.name : 'Word Picture badge'}
-          xp={100}
+          patientName={patientName}
+          stats={resultStats}
+          badge={realBadge}
+          preview={preview}
           onReplay={handleReplay}
           onNewGroup={handleNewGroup}
+          onBack={handleExit}
         />
       )}
     </>

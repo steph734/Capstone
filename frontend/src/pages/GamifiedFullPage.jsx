@@ -771,7 +771,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'spot-difference') {
-    return <SpotDifferencePage onExit={backToGames}/>
+    return <SpotDifferencePage patientName={playerName} preview={Boolean(previewGameId)} onExit={backToGames}/>
   }
 
   if (phase === 'builder') {

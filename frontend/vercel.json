@@ -76,6 +76,15 @@
       ]
     },
     {
+      "source": "/games/pao-spot-difference-pack/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/games/pao-poses-expressions/(.*)",
       "headers": [
         {

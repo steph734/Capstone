@@ -7,7 +7,7 @@ import { SkyBackground } from "../../components/picture-word-game/ui";
 // and starts a play session for it.
 const GAME_NAME = "Spot the Difference";
 
-export default function SpotDifferencePage({ onExit }) {
+export default function SpotDifferencePage({ onExit, preview = false, patientName = "friend" }) {
   const [game, setGame] = useState(null);
   const [error, setError] = useState("");
   const gameSession = useGameSession({ gameName: GAME_NAME });
@@ -37,5 +37,5 @@ export default function SpotDifferencePage({ onExit }) {
 
   if (!game) return null;
 
-  return <SpotDifference game={game} onExit={onExit} onComplete={(result) => gameSession.finish(result)} />;
+  return <SpotDifference game={game} onExit={onExit} preview={preview} patientName={patientName} onComplete={(result) => gameSession.finish(result)} />;
 }

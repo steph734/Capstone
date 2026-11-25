@@ -170,22 +170,31 @@
 }
 
 /* Portrait (phones held upright): the stage is 900x1600 and the HUD is re-laid out around the board. */
-.ab-portrait .ab-top { left: 20px; right: 20px; top: 16px; height: 58px; gap: 10px; }
-.ab-portrait .ab-sq { width: 58px; height: 58px; border-radius: 16px; }
+/* Everything here is drawn at ~0.4x on a phone, so the portrait sizes are deliberately large. */
+.ab-portrait .ab-top { left: 20px; right: 20px; top: 14px; height: 72px; gap: 10px; }
+.ab-portrait .ab-sq { width: 72px; height: 72px; border-radius: 18px; }
 .ab-portrait .ab-title { flex: 1; min-width: 0; }
-.ab-portrait .ab-title strong { font-size: 26px; }
-.ab-portrait .ab-stat { height: 58px; min-width: 0; padding: 0 14px; font-size: 20px; border-radius: 16px; }
+.ab-portrait .ab-title span { font-size: 17px; }
+.ab-portrait .ab-title strong { font-size: 36px; white-space: nowrap; }
+.ab-portrait .ab-stat { height: 72px; min-width: 0; padding: 0 16px; font-size: 30px; border-radius: 18px; }
 .ab-portrait .ab-stats-r { gap: 8px; }
-.ab-portrait .ab-strip { top: 88px; gap: 3px; padding: 6px 8px; }
-.ab-portrait .ab-chip { width: 29px; height: 29px; font-size: 13px; }
-.ab-portrait .ab-previewpill { top: 140px; }
-.ab-portrait .ab-combo { top: 176px; }
+.ab-portrait .ab-strip { top: 98px; display: grid; grid-template-columns: repeat(13, 42px); gap: 4px; padding: 8px 12px; border-radius: 30px; }
+.ab-portrait .ab-chip { width: 42px; height: 42px; font-size: 21px; }
+.ab-portrait .ab-chip.now { transform: scale(1.08); }
+.ab-portrait .ab-previewpill { top: 212px; left: 20px; transform: none; font-size: 16px; padding: 5px 16px; }
+.ab-portrait .ab-combo { top: 212px; left: auto; right: 20px; transform: none; font-size: 24px; padding: 8px 26px; animation-name: ab-pop-in-p; }
+@keyframes ab-pop-in-p { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
 .ab-portrait .ab-target { left: 500px; top: 1428px; width: 380px; height: 156px; padding: 8px 14px; display: grid; grid-template-columns: 130px 1fr; grid-template-rows: auto 1fr; align-items: center; column-gap: 8px; row-gap: 0; border-radius: 22px; }
 .ab-portrait .ab-target-label { grid-column: 2; grid-row: 1; align-self: end; }
 .ab-portrait .ab-target-letter { grid-column: 1; grid-row: 1 / span 2; font-size: 104px; }
 .ab-portrait .ab-hear { grid-column: 2; grid-row: 2; align-self: start; margin-top: 6px; }
 .ab-portrait .ab-speed-label, .ab-portrait .ab-speedseg { display: none; }
 .ab-portrait .ab-say { left: 20px; top: 1428px; bottom: auto; height: 156px; max-width: 460px; }
+.ab-portrait .ab-bubble { max-width: 340px; padding: 12px 16px; }
+.ab-portrait .ab-bubble p { font-size: 26px; line-height: 1.25; }
+.ab-portrait .ab-bubble small { font-size: 18px; }
+.ab-portrait .ab-target-label { font-size: 16px; }
+.ab-portrait .ab-hear { font-size: 24px; min-height: 60px; }
 .ab-portrait .ab-how { display: none; }
 @media (max-width: 640px) {
   .ab-steps { grid-template-columns: 1fr; }

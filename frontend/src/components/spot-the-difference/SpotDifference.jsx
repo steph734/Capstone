@@ -1,41 +1,89 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import PandaMascot from "../../pages/games/PandaMascot";
-import GameFinishScreen from "../GameFinishScreen";
-import { SkyBackground, PressableButton, GhostButton, ModalShell, CloseButton } from "../picture-word-game/ui";
+import { SkyBackground, GhostButton } from "../picture-word-game/ui";
+import { PwModal, PwSky } from "../picture-word-game/pwUi";
+import usePwStage from "../picture-word-game/usePwStage";
 import { speakPao, stopPaoVoice } from "../../utils/paoVoice";
 import { buildLevels, initLevel, tapPicture, helpPress, nextUnfound } from "./spotDifference";
+import { PaoBubble, PaoStage, useSpotPao } from "./SpotPao";
+import { SPOT_PROP_CSS } from "../../games/spotDifference/spotCostume";
+import { PAO_PROP_CSS as PICTURE_WORD_PROP_CSS } from "../../games/pictureWord/PaoProps";
+import { STREAK_EVERY, ENCOURAGE_AFTER } from "../../games/spotDifference/paoReactions";
+import "../picture-word-game/pictureWord.css";
+import "./spotDifference.css";
 
 // Spot the Difference (Hard): compare two pictures and tap what is different.
-// Rules live in spotDifference.js; this file only draws, positions and speaks.
-const HEADING = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
+// Rules live in spotDifference.js (unchanged); this file only draws, positions, speaks and reacts.
 const BODY = { fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif" };
 const SPEECH = { rate: 0.85, pitch: 1.15 };
 const DONE_DELAY_MS = 1200;
+const MISS_RING_MS = 1200;
+const BURST_MS = 600;
+const COLS = 16; // keyboard grid: about 40px cells on a 620px card
+const ROWS = 10;
+const HEIGHT_PER_WIDTH = 5 / 3;
 
-// A circle of radius r (% of width) centred at (x, y) (% of the picture).
-// Heights are 3/5 of widths in the 5:3 picture, so the top offset is scaled.
+// A circle of radius r (% of width) centred at (x, y) (% of the picture); heights are 3/5 of widths in the 5:3 picture.
 function ringStyle(d) {
-  return {
-    left: `${d.x - d.r}%`,
-    top: `${d.y - d.r * (5 / 3)}%`,
-    width: `${d.r * 2}%`,
-    aspectRatio: "1 / 1",
-  };
+  return { left: `${d.x - d.r}%`, top: `${d.y - d.r * HEIGHT_PER_WIDTH}%`, width: `${d.r * 2}%`, aspectRatio: "1 / 1" };
+}
+const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+const I = ({ size = 22, children, sw = 2.4 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+const ArrowLeft = (p) => <I {...p}><path d="M19 12H5M11 18l-6-6 6-6" /></I>;
+const ArrowRight = (p) => <I {...p}><path d="M5 12h14M13 6l6 6-6 6" /></I>;
+const Check = (p) => <I {...p} sw={3.4}><path d="M5 13l4 4L19 7" /></I>;
+const Search = (p) => <I {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></I>;
+const Replay = (p) => <I {...p}><path d="M4 12a8 8 0 1 0 3-6.2" /><path d="M4 4v5h5" /></I>;
+const Home = (p) => <I {...p}><path d="M4 11l8-7 8 7v9H4z" /></I>;
+const Clock = (p) => <I {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></I>;
+const InfoI = (p) => <I {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></I>;
+const StarI = ({ size = 24, className = "", filled = true }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.6 6.1 20.6l1.3-6.6-4.9-4.6 6.6-.8L12 2.5Z" /></svg>
+);
+
+// 3 stars for no hints and 2 or fewer retries, 2 for one hint or up to 4 retries, otherwise 1.
+export function rating(hints, retries) {
+  if (hints === 0 && retries <= 2) return 3;
+  if (hints <= 1 || retries <= 4) return 2;
+  return 1;
 }
 
-export default function SpotDifference({ game, onExit, onComplete }) {
+// A square crop of the picture around a difference (used on the results screen).
+function cropStyle(src, d) {
+  const w = 0.3; // fraction of the picture width shown
+  const vis = (w * 5) / 3; // visible fraction of the picture height for a square crop of a 5:3 picture
+  const px = Math.min(100, Math.max(0, ((d.x / 100 - w / 2) / (1 - w)) * 100));
+  const py = Math.min(100, Math.max(0, ((d.y / 100 - vis / 2) / (1 - vis)) * 100));
+  return { backgroundImage: `url(${src})`, backgroundSize: `${100 / w}% auto`, backgroundPosition: `${px}% ${py}%` };
+}
+
+export default function SpotDifference({ game, onExit, onComplete, preview = false, patientName = "friend" }) {
   const levels = useMemo(() => buildLevels(game), [game]);
-  const [started, setStarted] = useState(false);
+  const stage = usePwStage();
   const [levelIdx, setLevelIdx] = useState(0);
   const [s, setS] = useState(initLevel);
   const [levelDone, setLevelDone] = useState(false);
   const [allDone, setAllDone] = useState(false);
-  const results = useRef([]);       // one entry per finished level
+  const [miss, setMiss] = useState(null); // { x, y, pic } the soft orange ring + tip after a wrong tap
+  const [burst, setBurst] = useState(null); // { i, key } stars around a fresh find
+  const [head, setHead] = useState(null); // { text, tone } headline override
+  const [announce, setAnnounce] = useState("");
+  const [kf, setKf] = useState(null); // keyboard focus cell { pic, cx, cy }
+  const [secs, setSecs] = useState(0);
+  const results = useRef([]); // one entry per finished level
   const reportedRef = useRef(false);
   const timers = useRef([]);
+  const missRef = useRef(null);
+  const wrongRun = useRef(0); // wrong taps in a row
+  const cleanRun = useRef(0); // finds in a row with no wrong tap
+  const startedAt = useRef(Date.now());
 
   const level = levels[levelIdx];
   const total = level?.differences.length ?? 0;
+  const pao = useSpotPao({ total, name: String(patientName).split(" ")[0] });
 
   const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
@@ -48,12 +96,13 @@ export default function SpotDifference({ game, onExit, onComplete }) {
     if (!allDone || reportedRef.current) return;
     reportedRef.current = true;
     const sum = (key) => results.current.reduce((n, r) => n + r[key], 0);
+    const seconds = results.current.reduce((n, r) => n + (r.seconds || 0), 0);
     onComplete?.({
       correct: sum("found"),
       attempts: sum("attempts"),
       hints_used: sum("hints"),
       stars: sum("stars"),
-      detail: { level_order: level.order, misses: sum("misses"), shows_used: sum("shows") },
+      detail: { level_order: level.order, misses: sum("misses"), shows_used: sum("shows"), ...(seconds ? { duration_seconds: seconds } : {}) },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDone]);
@@ -61,29 +110,71 @@ export default function SpotDifference({ game, onExit, onComplete }) {
   const beginLevel = (idx) => {
     clearTimers();
     stopPaoVoice();
+    missRef.current = null;
+    wrongRun.current = 0;
+    cleanRun.current = 0;
+    startedAt.current = Date.now();
+    setMiss(null); setBurst(null); setHead(null); setAnnounce(""); setKf(null);
     setLevelDone(false);
     setLevelIdx(idx);
     setS(initLevel());
   };
 
-  const start = () => { setStarted(true); beginLevel(0); };
+  // Greet when a picture appears.
+  useEffect(() => {
+    if (level) pao.fx("ready", { total: level.differences.length });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levelIdx, levels.length]);
 
-  // Pictures are buttons; the tap is turned into % of the clicked picture.
-  const tapAt = (e) => {
-    if (!level || s.phase !== "play") return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
+  const react = (next, prev, x, y, pic) => {
+    const ev = next.event;
+    if (ev === "found" || ev === "done") {
+      wrongRun.current = 0;
+      cleanRun.current += 1;
+      const idx = next.found[next.found.length - 1];
+      const left = total - next.found.length;
+      const say = next.message.text;
+      setHead({ text: "You found it!", tone: "good" });
+      setBurst({ i: idx, key: Date.now() });
+      later(() => setBurst(null), BURST_MS);
+      setAnnounce(`Found. ${next.found.length} of ${total}`);
+      if (ev === "done") pao.fx("finished", {}, pao.lineFor("finished", { name: String(patientName).split(" ")[0] }));
+      else if (left === 1) pao.fx("oneToGo");
+      else if (cleanRun.current % STREAK_EVERY === 0) pao.fx("streak");
+      else pao.fx("found", {}, `Yes! ${say} ${left} to go!`);
+    } else if (ev === "miss" || ev === "auto-clue") {
+      wrongRun.current += 1;
+      cleanRun.current = 0;
+      missRef.current = { x, y, pic };
+      setMiss({ x, y, pic });
+      later(() => { missRef.current = null; setMiss(null); }, MISS_RING_MS);
+      setAnnounce("Not a difference");
+      if (ev === "auto-clue") {
+        setHead({ text: `Clue: ${lowerFirst(next.message.text).replace(/\.$/, "")}`, tone: "clue" });
+        pao.fx("hint", {}, next.message.text);
+      } else if (wrongRun.current % ENCOURAGE_AFTER === 0) pao.fx("encourage");
+      else pao.fx("notQuite");
+    } else if (ev === "already") {
+      setAnnounce("Already found");
+      pao.say(next.message.text);
+    }
+    void prev;
+  };
+
+  // The tap, already turned into % of the picture. Taps are ignored while the soft ring is showing.
+  const tapPct = (x, y, pic) => {
+    if (!level || s.phase !== "play" || missRef.current) return;
     const next = tapPicture(s, level, x, y);
     if (next === s) return;
     speakPao(next.message?.text || "", SPEECH);
     setS(next);
-    if (next.phase === "done") {
-      later(() => finishLevel(next), DONE_DELAY_MS);
-    }
+    react(next, s, x, y, pic);
+    if (next.phase === "done") later(() => finishLevel(next), DONE_DELAY_MS);
   };
 
   const finishLevel = (finalState) => {
+    const seconds = Math.round((Date.now() - startedAt.current) / 1000);
+    setSecs(seconds);
     results.current.push({
       found: finalState.found.length,
       attempts: finalState.attempts,
@@ -91,6 +182,7 @@ export default function SpotDifference({ game, onExit, onComplete }) {
       misses: finalState.totalMisses,
       shows: finalState.shows,
       stars: finalState.stars,
+      seconds,
     });
     setLevelDone(true);
     if (levelIdx === levels.length - 1) setAllDone(true);
@@ -102,6 +194,14 @@ export default function SpotDifference({ game, onExit, onComplete }) {
     if (next === s) return;
     speakPao(next.message?.text || "", SPEECH);
     setS(next);
+    if (next.event === "clue") {
+      setHead({ text: `Clue: ${lowerFirst(next.message.text).replace(/\.$/, "")}`, tone: "clue" });
+      pao.fx("hint", {}, next.message.text);
+      setAnnounce(`Hint: ${next.message.text}`);
+    } else {
+      pao.fx("hint", {}, "Look here!");
+      setAnnounce("Hint: the next difference is highlighted");
+    }
   };
 
   const leave = () => { clearTimers(); stopPaoVoice(); onExit?.(); };
@@ -116,155 +216,168 @@ export default function SpotDifference({ game, onExit, onComplete }) {
     );
   }
 
-  if (!started) return <StartModal game={game} levels={levels} onStart={start} onCancel={leave} />;
-
   const nextIdx = nextUnfound(s, level);
-  const foundLabels = s.found.map((i) => level.differences[i].say);
   const isLast = levelIdx === levels.length - 1;
+  const glowing = s.glow >= 0 ? level.differences[s.glow] : null;
+  const headline = miss
+    ? { text: "Not quite. Try another spot", tone: "" }
+    : head || { text: `Find all ${total} differences`, tone: "" };
+  const helpDisabled = s.phase !== "play" || nextIdx < 0 || s.glow >= 0;
+  const helpLabel = s.glow >= 0 ? "Hint used" : s.helpStage === 0 ? "Help me" : "Show me";
+
+  const pics = [
+    { id: "a", tag: "A", name: "Picture A", src: level.imageA, color: "#6366F1" },
+    { id: "b", tag: "B", name: "Picture B", src: level.imageB, color: "#EC4899" },
+  ];
+
+  const onPicClick = (e, pic) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.detail === 0 && kf && kf.pic === pic.id) { // keyboard (Enter / Space): tap the middle of the focused cell
+      tapPct(((kf.cx + 0.5) / COLS) * 100, ((kf.cy + 0.5) / ROWS) * 100, pic.id);
+      return;
+    }
+    tapPct(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100, pic.id);
+  };
+  const onPicKey = (e, pic) => {
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    setKf((cur) => {
+      const c = cur && cur.pic === pic.id ? cur : { pic: pic.id, cx: Math.floor(COLS / 2), cy: Math.floor(ROWS / 2) };
+      return { pic: pic.id, cx: Math.min(COLS - 1, Math.max(0, c.cx + d[0])), cy: Math.min(ROWS - 1, Math.max(0, c.cy + d[1])) };
+    });
+  };
+
+  const burstDots = (d) => Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2;
+    return <i key={i} className="sd-burst" style={{ left: `${d.x}%`, top: `${d.y}%`, "--dx": `${Math.cos(a) * 46}px`, "--dy": `${Math.sin(a) * 46}px`, color: ["#FFD43B", "#4ADE80", "#F472B6", "#38BDF8"][i % 4] }}><StarI size={18} /></i>;
+  });
+
+  const retries = s.totalMisses;
+  const stars = rating(s.hints, retries);
 
   return (
-    <div className="sd-screen fixed inset-0 z-[9999] overflow-y-auto" style={BODY}>
-      <style>{`
-        .sd-ring { position:absolute; border-radius:50%; pointer-events:none; }
-        .sd-ring--found { border:4px solid #16A34A; box-shadow:0 0 12px rgba(22,163,74,.6); }
-        .sd-ring--show { border:4px dashed #F59E0B; box-shadow:0 0 16px rgba(245,158,11,.8); }
-        @keyframes sdPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-        .sd-ring--show { animation: sdPulse 1.4s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .sd-ring--show { animation:none; } }
-        .sd-pic { width:100%; max-width:520px; aspect-ratio:5 / 3; }
-      `}</style>
-      <SkyBackground />
+    <div className="sd-root">
+      <style>{SPOT_PROP_CSS + PICTURE_WORD_PROP_CSS}</style>
+      <PwSky />
+      <div className={`sd-stage${stage.narrow ? " narrow" : ""}`} style={stage.style}>
+        <button type="button" className="sd-pill sd-back" onClick={leave}><ArrowLeft size={18} /> Games</button>
 
-      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-3 px-3 pb-6 pt-3 md:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-2">
-          <button type="button" onClick={leave} className="flex h-11 items-center rounded-full bg-white px-4 text-[15px] font-extrabold text-[#2B2366] shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]" style={HEADING}>← Games</button>
-          <div className="order-last flex w-full flex-wrap items-center justify-center gap-2 rounded-full bg-white px-4 py-2 shadow-md md:order-none md:w-auto" style={HEADING}>
-            <span className="text-[16px] font-extrabold text-[#2B2366]">Spot the Difference</span>
-            <span className="rounded-full bg-[#DC2626] px-2.5 py-0.5 text-[13px] font-extrabold text-white">Hard</span>
-            <span className="text-[13px] font-bold text-[#5b21b6]">{level.name} · {level.label}</span>
-          </div>
-          <div className="flex h-11 items-center rounded-full bg-white px-4 text-[17px] font-extrabold text-[#C97A00] shadow-md" style={HEADING} aria-label={`${s.stars} stars`}>⭐ {s.stars}</div>
-        </header>
+        <div className="sd-title">
+          <strong>Spot the Differences</strong><span className="sd-sep" />
+          <em>{level.label}</em>
+          <span className="sd-diff">Hard <i /><i /><i /></span>
+        </div>
+        {preview && <div className="sd-preview"><InfoI size={13} /> Preview mode: scores are not saved</div>}
+        <div className="sd-pill sd-stars" aria-label={`${s.stars} stars`}><StarI size={26} className="sd-star-gold" /> {s.stars}</div>
 
-        <h1 className="text-center text-[20px] font-extrabold text-[#2B2366] md:text-[24px]" style={HEADING}>Hard · find all {total} differences</h1>
+        <h1 className={`sd-headline ${headline.tone}`}>{headline.tone === "good" && <StarI size={36} className="sd-star-gold" />}{headline.text}</h1>
 
-        <div className="flex flex-col items-center gap-3 md:flex-row md:items-start md:justify-center md:gap-5">
-          {[
-            { label: "Picture A", src: level.imageA, id: "a" },
-            { label: "Picture B", src: level.imageB, id: "b" },
-          ].map((pic) => (
-            <div key={pic.id} className="flex w-full max-w-[520px] flex-col items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-0.5 text-[14px] font-extrabold text-[#2B2366] shadow" style={HEADING}>{pic.label}</span>
+        {pics.map((pic) => (
+          <div key={pic.id} className={`sd-pic-wrap ${pic.id}`}>
+            <span className="sd-pic-tag"><b style={{ background: pic.color }}>{pic.tag}</b> {pic.name}</span>
+            <div className="sd-frame">
               <button
                 type="button"
-                aria-label={pic.label}
-                onClick={tapAt}
+                className="sd-pic"
+                aria-label={`${pic.name}: ${level.label}. Tap what looks different. Arrow keys move, Enter taps.`}
+                onClick={(e) => onPicClick(e, pic)}
+                onKeyDown={(e) => onPicKey(e, pic)}
+                onFocus={() => setKf((c) => c || { pic: pic.id, cx: Math.floor(COLS / 2), cy: Math.floor(ROWS / 2) })}
+                onBlur={() => setKf(null)}
                 disabled={s.phase !== "play"}
-                className="sd-pic relative overflow-hidden rounded-[26px] border-[6px] border-white bg-white shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6]"
               >
-                <img src={pic.src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable="false" />
-                {s.found.map((i) => (
-                  <span key={`f${i}`} className="sd-ring sd-ring--found" style={ringStyle(level.differences[i])} aria-hidden="true" />
-                ))}
-                {s.glow >= 0 && (
-                  <span key="glow" className="sd-ring sd-ring--show" style={ringStyle(level.differences[s.glow])} aria-hidden="true" />
+                <img src={pic.src} alt="" draggable="false" />
+                {glowing && (
+                  <>
+                    <span className="sd-dim" style={{ background: `radial-gradient(ellipse ${glowing.r + 3}% ${(glowing.r + 3) * HEIGHT_PER_WIDTH}% at ${glowing.x}% ${glowing.y}%, transparent 90%, rgba(27,43,107,.42) 100%)` }} aria-hidden="true" />
+                    <span className="sd-ring hint" style={ringStyle({ ...glowing, r: glowing.r + 3 })} aria-hidden="true" />
+                  </>
+                )}
+                {s.found.map((i) => {
+                  const d = level.differences[i];
+                  return (
+                    <span key={`f${i}`}>
+                      <span className="sd-ring found" style={ringStyle(d)} aria-hidden="true" />
+                      <span className="sd-check" style={{ left: `calc(${d.x + d.r * 0.72}% - 15px)`, top: `calc(${d.y - d.r * 0.72 * HEIGHT_PER_WIDTH}% - 15px)` }} aria-hidden="true"><Check size={16} /></span>
+                    </span>
+                  );
+                })}
+                {burst && burstDots(level.differences[burst.i])}
+                {miss && miss.pic === pic.id && (
+                  <>
+                    <span className="sd-ring miss" style={{ left: `${miss.x - 4.8}%`, top: `${miss.y - 4.8 * HEIGHT_PER_WIDTH}%`, width: "9.6%", aspectRatio: "1 / 1" }} aria-hidden="true" />
+                    <span className="sd-misstip" style={{ left: `${Math.min(80, Math.max(20, miss.x))}%`, top: `${Math.min(88, miss.y + 12)}%` }}>Those two match</span>
+                  </>
+                )}
+                {kf && kf.pic === pic.id && (
+                  <span className="sd-kfocus" style={{ left: `${(kf.cx / COLS) * 100}%`, top: `${(kf.cy / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%` }} aria-hidden="true" />
                 )}
               </button>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
 
-        <ul className="sr-only" aria-label="Found differences">
-          {foundLabels.map((text, i) => <li key={i}>Found: {text}</li>)}
-        </ul>
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow" style={HEADING}>
-            <span className="text-[14px] font-extrabold text-[#2B2366]">Found {s.found.length} of {total}</span>
-            <span className="flex gap-1.5" aria-hidden="true">
-              {level.differences.map((_, i) => (
-                <span key={i} className={`h-3.5 w-3.5 rounded-full ${s.found.includes(i) ? "bg-[#16A34A]" : "bg-[#D6D3E0]"}`} />
-              ))}
+        <div className="sd-bottom">
+          <div className="sd-found">
+            <span>Found {s.found.length} of {total}</span>
+            <span className="sd-dots" aria-hidden="true">
+              {level.differences.map((_, i) => <i key={i} className={s.found.includes(i) ? "on" : ""}>{s.found.includes(i) && <Check size={20} />}</i>)}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={help}
-            disabled={s.phase !== "play" || nextIdx < 0}
-            className="h-12 rounded-2xl border-2 border-dashed border-[#D97706] bg-[#FFF7E6] px-5 text-[15px] font-extrabold text-[#92400E] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#3B82F6] disabled:opacity-60"
-            style={HEADING}
-          >
-            {s.helpStage === 0 ? "Help me" : "Show me"}
-          </button>
+          <button type="button" className="sd-help" onClick={help} disabled={helpDisabled}><Search size={24} /> {helpLabel}</button>
         </div>
 
-        <div className="flex flex-col items-start gap-2 md:flex-row md:items-end md:justify-center">
-          <PandaMascot entered pandaState="normal" pxWidth={120} />
-          <div
-            aria-live="polite"
-            className={`max-w-[520px] rounded-[18px] border-2 px-4 py-2.5 text-[16px] font-bold ${s.message?.tone === "try" ? "border-[#F59E0B] bg-[#FFF4D6] text-[#92400E]" : "border-[#E4DFCE] bg-white text-[#2B2A4C]"}`}
-            style={BODY}
-          >
-            {s.message?.text || level.question}
-          </div>
+        <div className="sd-pao-wrap">
+          <PaoStage view={pao.view} height={stage.narrow ? 150 : 300} />
+          <PaoBubble text={pao.line || level.question} />
         </div>
       </div>
+
+      <div className="sd-sr" aria-live="polite">{announce}</div>
 
       {levelDone && (
-        <GameFinishScreen
-          title={isLast ? "Eagle eyes!" : "Great looking!"}
-          subtitle={`You found all ${total} differences in ${level.label}.`}
-          badgeFallback={isLast ? { emoji: "🦅", name: game?.badge?.name || "Eagle Eyes" } : null}
-          xp={game?.points_per_play ?? 150}
-          chips={isLast ? Object.entries(game?.stat_gains || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k[0].toUpperCase()}${k.slice(1)} +${v}`) : []}
-          stars={s.stars}
-          replayLabel={isLast ? "Play again" : "Next level"}
-          onReplay={() => {
-            if (isLast) { results.current = []; reportedRef.current = false; setAllDone(false); beginLevel(0) }
-            else { setLevelDone(false); beginLevel(levelIdx + 1) }
-          }}
-          onExit={leave}
-        />
+        <PwModal onClose={leave} width={1070} label="Results" className="sd-results">
+          <h2 className="sd-res-title">You spotted all {total} differences!</h2>
+          <p className="sd-res-says">Pao says: &ldquo;{pao.lineFor("finished", { name: String(patientName).split(" ")[0] })}&rdquo;</p>
+          <div className="sd-res-hero">
+            <div className="sd-res-pao"><PaoStage view="finished" height={220} /></div>
+            <div className="sd-res-stars" role="img" aria-label={`${stars} out of 3 stars`}>
+              {[1, 2, 3].map((n) => <StarI key={n} size={n === 2 ? 110 : 82} className={n <= stars ? "sd-gold" : "sd-dark"} />)}
+            </div>
+          </div>
+          <div className="sd-stat-grid">
+            <div><span className="sd-tile-i" style={{ background: "#22C55E" }}><Check size={26} /></span><b>{s.found.length} of {total}</b><small>Found</small></div>
+            <div><span className="sd-tile-i" style={{ background: "#6366F1" }}><Clock size={24} /></span><b>{clock(secs)}</b><small>Time</small></div>
+            <div><span className="sd-tile-i" style={{ background: "#F59E0B" }}><Search size={24} /></span><b>{s.hints}</b><small>Hints used</small></div>
+            <div><span className="sd-tile-i" style={{ background: "#F97316" }}><Replay size={24} /></span><b>{retries}</b><small>Retries</small></div>
+          </div>
+          <div className="sd-label">What you found</div>
+          <div className="sd-crops" style={{ gridTemplateColumns: `repeat(${Math.min(total, 4) || 1}, 1fr)` }}>
+            {level.differences.map((d, i) => (
+              <div key={i} className="sd-crop">
+                <div className="sd-crop-img">
+                  <span style={cropStyle(level.imageA, d)} role="img" aria-label="Picture A" />
+                  <span style={cropStyle(level.imageB, d)} role="img" aria-label="Picture B" />
+                </div>
+                <b>{d.say}</b>
+              </div>
+            ))}
+          </div>
+          <div className="sd-res-btns" style={{ gridTemplateColumns: isLast ? "1fr 1fr" : "1.1fr 1.1fr 1fr" }}>
+            <button
+              type="button" className="sd-btn green" data-autofocus
+              onClick={() => {
+                if (isLast) { results.current = []; reportedRef.current = false; setAllDone(false); beginLevel(0); }
+                else { results.current.pop(); beginLevel(levelIdx); } // replay this picture; only the last attempt counts
+              }}
+            ><Replay size={22} /> Play again</button>
+            {!isLast && <button type="button" className="sd-btn indigo" onClick={() => beginLevel(levelIdx + 1)}>Next picture <ArrowRight size={22} /></button>}
+            <button type="button" className="sd-btn light" onClick={leave}><Home size={22} /> All games</button>
+          </div>
+          {preview && <p className="sd-foot">Preview mode: this score was not saved</p>}
+        </PwModal>
       )}
     </div>
-  );
-}
-
-function StartModal({ game, levels, onStart, onCancel }) {
-  const first = levels[0];
-  const gains = Object.entries(game?.stat_gains || {}).filter(([, v]) => v > 0);
-  return (
-    <ModalShell onClose={onCancel} label="Spot the Difference">
-      <CloseButton onClose={onCancel} />
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div className="flex gap-2">
-          <img src={first.imageA} alt="" className="h-[72px] w-[120px] rounded-xl border-2 border-white object-cover shadow" />
-          <img src={first.imageB} alt="" className="h-[72px] w-[120px] rounded-xl border-2 border-white object-cover shadow" />
-        </div>
-        <h2 className="text-[30px] font-extrabold text-[#2B2366]" style={HEADING}>Spot the Difference</h2>
-        <span className="rounded-full bg-[#DC2626] px-3 py-1 text-[13px] font-extrabold text-white">Hard · Ages 12-19</span>
-        <p className="text-[16px] text-[#2B2A4C]">{game?.description || "Compare the two pictures and tap what is different."}</p>
-        <div className="flex flex-wrap justify-center gap-2 text-[14px] font-extrabold" style={HEADING}>
-          <span className="rounded-full bg-[#FEF3C7] px-3 py-1 text-[#92400E]">1. Look</span>
-          <span className="rounded-full bg-[#EDE9FE] px-3 py-1 text-[#5b21b6]">2. Compare</span>
-          <span className="rounded-full bg-[#DCFCE7] px-3 py-1 text-[#166534]">3. Tap</span>
-        </div>
-        <div className="flex flex-wrap justify-center gap-2 text-[14px] font-bold text-[#2B2A4C]">
-          <span className="rounded-full bg-white px-3 py-1 shadow">🦅 {game?.badge?.name || "Eagle Eyes"}</span>
-          <span className="rounded-full bg-white px-3 py-1 shadow">⭐ +{game?.points_per_play ?? 150} XP</span>
-          {gains.map(([k, v]) => (
-            <span key={k} className="rounded-full bg-white px-3 py-1 shadow">{k[0].toUpperCase()}{k.slice(1)} +{v}</span>
-          ))}
-        </div>
-        <div className="w-full rounded-2xl border-2 border-[#86EFAC] bg-[#F0FDF4] p-3 text-left text-[14px] text-[#14532D]">
-          <p className="font-extrabold" style={HEADING}>Why this helps</p>
-          <p>Builds visual attention and noticing details. Pao names each difference, so it also grows vocabulary. No timer, gentle hints.</p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:flex-row">
-          <PressableButton color="#F59E0B" shadow="#C97A00" className="h-14 flex-1 text-[18px]" onClick={onStart}>Start Game</PressableButton>
-          <GhostButton className="h-14 flex-1 text-[16px]" onClick={onCancel}>Cancel</GhostButton>
-        </div>
-      </div>
-    </ModalShell>
   );
 }

@@ -33,7 +33,7 @@ export function Headphones() {
   );
 }
 
-function Magnifier() {
+export function Magnifier() {
   return (
     <g className="pw-lens">
       <g transform="translate(178 150) scale(.85)">

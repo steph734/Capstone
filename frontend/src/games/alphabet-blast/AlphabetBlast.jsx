@@ -23,8 +23,10 @@ const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 function useStage() {
   const get = () => {
-    const w = window.innerWidth
-    const h = window.innerHeight
+    // visualViewport excludes mobile browser toolbars, so the stage is not cut off at the bottom.
+    const vv = window.visualViewport
+    const w = Math.round(vv?.width || window.innerWidth)
+    const h = Math.round(vv?.height || window.innerHeight)
     const portrait = h > w
     const view = LAYOUTS[portrait ? 'portrait' : 'landscape'].view
     const scale = Math.min(w / view.w, h / view.h)
@@ -35,7 +37,8 @@ function useStage() {
     const on = () => setS(get())
     window.addEventListener('resize', on)
     window.addEventListener('orientationchange', on)
-    return () => { window.removeEventListener('resize', on); window.removeEventListener('orientationchange', on) }
+    window.visualViewport?.addEventListener('resize', on)
+    return () => { window.removeEventListener('resize', on); window.removeEventListener('orientationchange', on); window.visualViewport?.removeEventListener('resize', on) }
   }, [])
   return s
 }

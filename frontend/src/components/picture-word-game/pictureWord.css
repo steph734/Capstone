@@ -62,10 +62,10 @@
 .pw-modal { position: relative; box-sizing: border-box; border-radius: 30px; background: #fff; padding: 36px 48px 32px; margin: auto; box-shadow: 0 10px 0 rgba(30, 60, 130, .25), 0 30px 60px rgba(0, 0, 0, .3); text-align: center; }
 .pw-x { position: absolute; right: 28px; top: 28px; width: 60px; height: 60px; border: 0; border-radius: 18px; background: #E9EEFB; color: #3A4A80; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .pw-x.left { right: auto; left: 28px; }
-.pw-picker-title { margin: 6px 0 8px; font-family: 'Poppins', system-ui, sans-serif; font-size: 44px; font-weight: 700; color: #1B1F7A; }
+.pw-picker-title { padding: 0 72px; margin: 6px 0 8px; font-family: 'Poppins', system-ui, sans-serif; font-size: 44px; font-weight: 700; color: #1B1F7A; }
 .pw-picker-sub { margin: 0 0 26px; font-size: 18px; font-weight: 500; color: #4A5380; }
 .pw-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-.pw-tile { height: 218px; box-sizing: border-box; border: 3px solid; border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; margin-bottom: 8px; transition: transform .12s; }
+.pw-tile { height: clamp(150px, 24vh, 218px); box-sizing: border-box; border: 3px solid; border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; margin-bottom: 8px; transition: transform .12s; }
 .pw-tile:active { transform: translateY(4px); }
 .pw-tile b { font-family: 'Poppins', system-ui, sans-serif; font-size: 32px; font-weight: 700; }
 .pw-tile small { font-size: 16px; font-weight: 600; opacity: .85; }
@@ -121,6 +121,19 @@
 
 /* under 900px wide: the picture card sits above the answers, Pao shrinks and his bubble sits above him */
 .pw-stage.narrow { position: relative; transform: none !important; width: 100%; height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 76px 14px 250px; box-sizing: border-box; }
+/* stacked column: nothing may shrink to fit the viewport (that squashed the rows and overlapped their text), the page scrolls instead */
+.pw-stage.narrow > * { flex-shrink: 0; }
+.pw-stage.narrow .pw-answers { align-items: stretch; }
+.pw-stage.narrow .pw-answers > * { flex-shrink: 0; }
+.pw-stage.narrow .pw-answers .pw-help, .pw-stage.narrow .pw-answers .pw-next { align-self: center; }
+.pw-stage.narrow .pw-answer { height: auto; min-height: 76px; margin-bottom: 14px; }
+.pw-stage.narrow .pw-answer-main { position: relative; inset: auto; min-height: 70px; gap: 14px; padding: 8px 74px 8px 12px; }
+.pw-stage.narrow .pw-num { width: 48px; height: 48px; border-radius: 14px; font-size: 22px; }
+.pw-stage.narrow .pw-word { font-size: clamp(20px, 6vw, 28px); line-height: 1.15; overflow-wrap: anywhere; min-width: 0; }
+.pw-stage.narrow .pw-tag { font-size: 13px; flex-shrink: 0; }
+.pw-stage.narrow .pw-speaker { right: 12px; width: 46px; height: 46px; margin-top: -23px; }
+.pw-stage.narrow .pw-help, .pw-stage.narrow .pw-next { height: 56px; font-size: 20px; padding: 0 28px; }
+.pw-stage.narrow .pw-hear { height: 54px; font-size: 20px; padding: 0 30px; }
 .pw-stage.narrow .pw-back { left: 12px; top: 12px; height: 48px; }
 .pw-stage.narrow .pw-stars { right: 12px; top: 12px; height: 48px; }
 .pw-stage.narrow .pw-progress { top: 12px; height: 48px; padding: 0 10px; gap: 6px; max-width: calc(100% - 250px); }
@@ -136,10 +149,28 @@
 .pw-stage.narrow .pw-bubble { margin: 0 0 8px 0; max-width: calc(100vw - 24px); font-size: 15px; }
 .pw-stage.narrow .pw-bubble::before { left: 40px; bottom: -8px; }
 .pw-stage.narrow .pw-bubble.above { position: relative; left: auto; bottom: auto; }
+/* compact category picker on desktop / tablet */
+@media (min-width: 641px) {
+  .pw-modal.pw-picker { width: min(94vw, 520px) !important; padding: 24px 28px 22px; border-radius: 26px; }
+  .pw-picker .pw-x { width: 44px; height: 44px; right: 18px; top: 18px; border-radius: 14px; }
+  .pw-picker .pw-x.left { right: auto; left: 18px; }
+  .pw-picker .pw-picker-title { font-size: 28px; padding: 0 56px; margin: 2px 0 4px; }
+  .pw-picker .pw-picker-sub { font-size: 14px; margin-bottom: 16px; }
+  .pw-picker .pw-tiles { gap: 12px; }
+  .pw-picker .pw-tile { height: auto; min-height: 0; padding: 12px 6px 10px; border-radius: 20px; margin-bottom: 6px; }
+  .pw-picker .pw-tile svg { width: 56px; height: 56px; }
+  .pw-picker .pw-tile b { font-size: 22px; }
+  .pw-picker .pw-tile small { font-size: 13px; }
+  .pw-picker .pw-dots i { width: 10px; height: 10px; }
+  .pw-picker .pw-dots { gap: 6px; }
+  .pw-picker .pw-later { height: 48px; font-size: 17px; margin-top: 10px; border-radius: 16px; }
+}
 @media (max-width: 640px) {
   .pw-modal { padding: 24px 18px 22px; }
   .pw-picker-title, .pw-res-title { font-size: 28px; }
-  .pw-tile { height: 190px; }
+  .pw-picker-title { padding: 0 54px; }
+  .pw-tile { height: auto; min-height: 150px; padding: 8px 4px; }
+  .pw-tile b { font-size: clamp(20px, 5.4vw, 28px); overflow-wrap: anywhere; }
   .pw-stat-grid { grid-template-columns: repeat(2, 1fr); }
   .pw-res-hero { flex-direction: column; gap: 10px; }
   .pw-res-btns { grid-template-columns: 1fr; }

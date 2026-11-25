@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOptionalPao } from '../../context/PaoContext'
+import { animatedExpressionUrl } from './PaoAvatar'
 import { loadLayerManifest, resolveLayerStack, layerUrl, allLayerFiles, BASE_TOP, poseFile, fxFile, loadPosesManifest, allPoseFiles } from './paoLayers'
 
 // Pao assembled from stacked outfit layers: base-bottom, base-top (or a
@@ -33,7 +34,7 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
   const chosenExpression = paoCtx?.profile?.selectedExpressionKey || null
   const stylePicture = pose && pose !== 'idle' ? null
     : chosenPose ? `${STYLE_BASE}/poses/pose_${chosenPose}.png`
-    : chosenExpression ? `${STYLE_BASE}/expressions/expr_${chosenExpression}.png`
+    : chosenExpression ? animatedExpressionUrl(chosenExpression)
     : null
 
 
@@ -109,7 +110,8 @@ export default function PaoLayered({ equipped = {}, ghost = null, size = 260, po
       onKeyDown={interactive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(e) } } : undefined}
     >
       {stylePicture && (
-        <img src={stylePicture} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ objectFit: 'contain' }} />
+        <img src={stylePicture} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ objectFit: 'contain' }}
+          onError={(e) => { if (chosenExpression && !chosenPose && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = `${STYLE_BASE}/expressions/expr_${chosenExpression}.png` } }} />
       )}
       {!stylePicture && belowPose.map((layer) => (
         <img

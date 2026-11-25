@@ -42,6 +42,13 @@ const EXPRESSIONS = [
 
 const BASE = '/games/pao-poses-expressions'
 
+// Short card text for the animated expressions (what moves).
+const MOTION = {
+  happy: 'Bobs and blinks', proud: 'Chin up, glowing', wink: 'Winks, tongue out', excited: 'Bounces, sparkles',
+  laugh: 'Shakes, happy tears', surprised: 'Pops, wide eyes', silly: 'Wobbles, tongue out', cool: 'Nods, lens glint',
+  love: 'Eyes beat, hearts float', sleepy: 'Drifts down, Zs rise', sad: 'Head sinks, tear rolls', grumpy: 'Shakes, anger mark',
+}
+
 // Plain rows (sort_order as a JS number); use toDocs() for driver-ready docs.
 export const STYLE_ROWS = [
   ...POSES.map(([key, name, description], i) => ({
@@ -53,6 +60,7 @@ export const STYLE_ROWS = [
     key, type: 'expression', name, description,
     asset_key: `expr_${key}`, preview_image_url: `${BASE}/expressions/expr_${key}.png`,
     sort_order: i + 1, is_default: key === DEFAULTS.expression,
+    is_animated: true, animation_class: 'x-' + key, motion_description: MOTION[key],
   })),
 ]
 
@@ -82,6 +90,9 @@ export const VALIDATOR = {
       asset_key: str({ pattern: '^[a-z][a-z0-9_]*$', maxLength: 64 }),
       preview_image_url: str({ maxLength: 500 }),
       sort_order: { bsonType: 'int', minimum: 0 },
+      is_animated: { bsonType: 'bool' },
+      animation_class: str({ pattern: '^x-[a-z][a-z0-9_]*$', maxLength: 40 }),
+      motion_description: str({ maxLength: 120 }),
       is_free: { bsonType: 'bool' },
       is_default: { bsonType: 'bool' },
       is_active: { bsonType: 'bool' },
@@ -145,7 +156,7 @@ export async function extendProfileValidator(db) {
 export async function listActiveStyles(db) {
   const rows = await db.collection(COLLECTION)
     .find({ is_active: true, is_archived: false })
-    .project({ _id: 0, key: 1, type: 1, name: 1, description: 1, asset_key: 1, preview_image_url: 1, is_default: 1, sort_order: 1 })
+    .project({ _id: 0, key: 1, type: 1, name: 1, description: 1, asset_key: 1, preview_image_url: 1, is_default: 1, sort_order: 1, is_animated: 1, animation_class: 1, motion_description: 1 })
     .toArray()
   rows.sort((a, b) => (a.type === b.type ? Number(a.sort_order) - Number(b.sort_order) : a.type < b.type ? 1 : -1))
   // type order: pose first, then expression (descending string order does that)

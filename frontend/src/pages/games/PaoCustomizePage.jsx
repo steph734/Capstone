@@ -9,6 +9,7 @@ import { getWardrobe, getPaoStyles } from '../../utils/paoApi'
 import { describeUnlock } from '../admin/PaoClothingDesigner'
 import BadgeMedal from '../../components/BadgeMedal'
 import PaoLayered from '../../components/pao/PaoLayered'
+import PaoAvatar from '../../components/pao/PaoAvatar'
 import { loadLayerManifest, layerUrl, resolveItemKey, LAYER_CATEGORIES } from '../../components/pao/paoLayers'
 import { usePaoReaction } from '../../components/pao/usePaoReaction'
 
@@ -616,6 +617,7 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
         .pc-sthumb { position:relative; aspect-ratio:4/3; overflow:hidden; border-radius:11px; background:#fff; }
         .pc-sthumb img { width:100%; height:100%; object-fit:contain; display:block; }
         .pc-sfree { position:absolute; top:6px; left:6px; font-size:9.5px; font-weight:800; padding:1px 7px; border-radius:999px; background:#dcfce7; color:#166534; }
+        .pc-slive { position:absolute; left:6px; bottom:6px; font-size:9.5px; font-weight:800; letter-spacing:.4px; padding:1px 7px; border-radius:999px; background:#e0edff; color:#1d4ed8; }
         .pc-scheck { position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:#16a34a; color:#fff; font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
         .pc-sname { font-weight:700; font-size:13px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .pc-sdesc { font-size:12px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -722,12 +724,15 @@ export default function PaoCustomizePage({ onDone, lang = 'en', patientEmail = n
                   return (
                     <div key={s.key} className={`pc-scard ${selected ? 'sel' : ''} ${blocked ? 'off' : ''}`}>
                       <div className="pc-sthumb">
-                        <img src={s.preview_image_url} alt="" draggable={false} />
+                        {s.type === 'expression' && s.is_animated
+                          ? <PaoAvatar expression={s.key} variant="bust" />
+                          : <img src={s.preview_image_url} alt="" draggable={false} />}
                         <span className="pc-sfree">FREE</span>
+                        {s.type === 'expression' && s.is_animated && <span className="pc-slive">LIVE</span>}
                         {selected && <span className="pc-scheck" aria-hidden="true">&#10003;</span>}
                       </div>
                       <div className="pc-sname" title={s.name}>{s.name}</div>
-                      <div className="pc-sdesc" title={s.description}>{s.description}</div>
+                      <div className="pc-sdesc" title={s.motion_description || s.description}>{s.motion_description || s.description}</div>
                       <div style={{ marginTop:'auto' }}>
                         <button type="button" className={`pc-sbtn ${selected ? 'sel' : ''}`}
                           aria-pressed={selected} disabled={blocked || styleBusy}

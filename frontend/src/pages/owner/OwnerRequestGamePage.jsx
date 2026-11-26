@@ -186,12 +186,13 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
   const [errors, setErrors] = useState({})
   const [file, setFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [sent, setSent] = useState(false)
   const [formError, setFormError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [resubmitOf, setResubmitOf] = useState(null)
   const [viewing, setViewing] = useState(null)
   const [withdrawing, setWithdrawing] = useState(null)
+  const [confirming, setConfirming] = useState(false) // "Send this request?" modal
+  const [done, setDone] = useState(null) // success modal: { name, edited }
   const [toast, setToast] = useState('')
   const [similar, setSimilar] = useState([])
   const fileRef = useRef(null)
@@ -221,7 +222,7 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
   }, [form.name, form.skill, libraryGames])
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
-  const setField = (key, value) => { setForm((f) => ({ ...f, [key]: value })); setErrors((e) => ({ ...e, [key]: '' })); setSent(false) }
+  const setField = (key, value) => { setForm((f) => ({ ...f, [key]: value })); setErrors((e) => ({ ...e, [key]: '' })) }
 
   const stats = useMemo(() => {
     const list = requests || []
@@ -268,7 +269,7 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
   }
 
   const startEdit = (r) => {
-    setEditingId(r.id); setResubmitOf(null); setFile(null); setErrors({}); setFormError(''); setSent(false)
+    setEditingId(r.id); setResubmitOf(null); setFile(null); setErrors({}); setFormError('');
     setForm({ name: r.name, skill: r.skill, ageMin: String(r.ageMin), ageMax: String(r.ageMax), priority: r.priority, reason: r.reason, referenceUrl: r.referenceUrl || '' })
     setMobileTab('form'); nameRef.current?.focus()
   }
@@ -281,6 +282,11 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
     evt.preventDefault()
     const e = validate()
     if (Object.keys(e).length || errors.file) { setErrors({ ...e, file: errors.file }); setFormError('Please fix the highlighted fields.'); return }
+    setFormError('')
+    setConfirming(true) // nothing is sent until the owner confirms
+  }
+
+  const sendRequest = async () => {
     setSubmitting(true); setFormError('')
     try {
       let res
@@ -309,10 +315,11 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
         description: `${editingId ? 'Edited' : 'Requested'} a gamified activity: "${saved.name}" (${saved.skillLabel}, ages ${saved.ageMin}–${saved.ageMax})`,
         entity: 'Gamified Activities', status: 'Success',
       })
-      showToast(editingId ? 'Request updated' : 'Request sent to the Super Admin')
-      resetForm(); setSent(true); setStatusTab('all'); setMobileTab('list')
-      setTimeout(() => setSent(false), 2600)
+      setConfirming(false)
+      setDone({ name: saved.name, edited: Boolean(editingId) })
+      resetForm(); setStatusTab('all')
     } catch (err) {
+      setConfirming(false)
       setFormError(err.message)
     } finally {
       setSubmitting(false)
@@ -335,7 +342,16 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
   }
 
   const closeViewing = useCallback(() => setViewing(null), [])
-  const submitLabel = submitting ? 'Sending…' : sent ? '✓ Sent to the Super Admin' : editingId ? 'Save changes' : resubmitOf ? 'Resubmit to Super Admin →' : 'Send to Super Admin →'
+  useEffect(() => {
+    if (!confirming && !done) return undefined
+    const onKey = (ev) => {
+      if (ev.key !== 'Escape') return
+      if (done) { setDone(null); setMobileTab('list') } else if (!submitting) setConfirming(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [confirming, done, submitting])
+  const submitLabel = submitting ? 'Sending…' : editingId ? 'Save changes' : resubmitOf ? 'Resubmit to Super Admin →' : 'Send to Super Admin →'
 
   const summary = [
     { icon: '⏳', bg: '#FFF1D6', ib: '#FFE1A6', label: 'Pending review', value: stats.pending },
@@ -472,7 +488,7 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
                 )}
 
                 {formError && <p role="alert" style={{ ...errStyle, margin: 0, fontSize: 13, fontWeight: 700 }}>{formError}</p>}
-                <PrimaryButton type="submit" onClick={undefined} disabled={submitting} style={{ width: '100%', minHeight: 48, borderRadius: 14, fontSize: 15, background: sent ? '#16a34a' : GREEN_700 }}>{submitLabel}</PrimaryButton>
+                <PrimaryButton type="submit" onClick={undefined} disabled={submitting} style={{ width: '100%', minHeight: 48, borderRadius: 14, fontSize: 15, background: GREEN_700 }}>{submitLabel}</PrimaryButton>
                 <p className="text-center text-[12px]" style={{ color: MUTED, margin: 0 }}>You’ll get an email and a notification when the status changes.</p>
               </form>
             </section>
@@ -543,6 +559,44 @@ export default function OwnerRequestGamePage({ user, onLogout, betaTier }) {
             <div className="flex justify-end gap-2">
               <SecondaryButton onClick={() => setWithdrawing(null)}>Keep it</SecondaryButton>
               <PrimaryButton onClick={confirmWithdraw} style={{ background: '#B4233C' }}>Withdraw</PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {confirming && (
+        <div onClick={() => { if (!submitting) setConfirming(false) }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="sr-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: 24, width: 'min(440px, 100%)', fontFamily: FONT, boxShadow: '0 24px 60px rgba(0,0,0,.25)' }}>
+            <h3 id="sr-title" style={{ fontSize: 19, fontWeight: 800, color: GREEN_900, margin: 0 }}>{editingId ? 'Save these changes?' : resubmitOf ? 'Resubmit this request?' : 'Send this request to the Super Admin?'}</h3>
+            <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.5, margin: '6px 0 14px' }}>Please check the details before you send.</p>
+            <dl style={{ margin: 0, padding: 14, borderRadius: 14, background: '#F4F8F6', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', fontSize: 14 }}>
+              <dt style={{ color: MUTED, fontWeight: 700 }}>Game</dt><dd style={{ margin: 0, color: GREEN_900, fontWeight: 800, overflowWrap: 'anywhere' }}>{form.name.trim()}</dd>
+              <dt style={{ color: MUTED, fontWeight: 700 }}>Skill</dt><dd style={{ margin: 0, color: GREEN_900, fontWeight: 700 }}>{SKILL_BY_ID[form.skill]?.label || form.skill}</dd>
+              <dt style={{ color: MUTED, fontWeight: 700 }}>Ages</dt><dd style={{ margin: 0, color: GREEN_900, fontWeight: 700 }}>{form.ageMin}–{form.ageMax}</dd>
+              <dt style={{ color: MUTED, fontWeight: 700 }}>Priority</dt><dd style={{ margin: 0, color: GREEN_900, fontWeight: 700, textTransform: 'capitalize' }}>{form.priority}</dd>
+              {file && <><dt style={{ color: MUTED, fontWeight: 700 }}>Attachment</dt><dd style={{ margin: 0, color: GREEN_900, fontWeight: 700, overflowWrap: 'anywhere' }}>{file.name}</dd></>}
+            </dl>
+            <div className="flex justify-end gap-2" style={{ marginTop: 18 }}>
+              <SecondaryButton onClick={() => setConfirming(false)} disabled={submitting}>Go back</SecondaryButton>
+              <PrimaryButton onClick={sendRequest} disabled={submitting} style={{ background: GREEN_700 }}>{submitting ? 'Sending…' : editingId ? 'Yes, save' : 'Yes, send'}</PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {done && (
+        <div onClick={() => { setDone(null); setMobileTab('list') }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,30,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="sd-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, padding: '28px 24px 22px', width: 'min(400px, 100%)', fontFamily: FONT, textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.25)' }}>
+            <div aria-hidden="true" style={{ width: 64, height: 64, margin: '0 auto 12px', borderRadius: '50%', background: '#D9F2E3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3 id="sd-title" style={{ fontSize: 20, fontWeight: 800, color: GREEN_900, margin: 0 }}>{done.edited ? 'Changes saved' : 'Request sent!'}</h3>
+            <p style={{ fontSize: 14, color: GREEN_900, fontWeight: 700, margin: '8px 0 0', overflowWrap: 'anywhere' }}>“{done.name}”</p>
+            <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.5, margin: '6px 0 18px' }}>{done.edited ? 'Your request was updated.' : 'The Super Admin will review it within 3–5 business days.'} You’ll get an email and a notification when the status changes.</p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <PrimaryButton onClick={() => { setDone(null); setMobileTab('list') }} style={{ background: GREEN_700, width: '100%', minHeight: 46 }}>View my requests</PrimaryButton>
+              <SecondaryButton onClick={() => { setDone(null); setMobileTab('form'); nameRef.current?.focus() }} style={{ width: '100%', minHeight: 46 }}>Send another request</SecondaryButton>
             </div>
           </div>
         </div>

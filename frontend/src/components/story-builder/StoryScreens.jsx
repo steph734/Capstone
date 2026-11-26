@@ -80,7 +80,7 @@ const optionState = (choice, picks, missed, stepDone) => {
   return stepDone ? 'faded' : 'idle'
 }
 
-export function StepScreen({ story, item, stepIndex, state, paoView, paoLine, paoHeight, onTap, onNext, onRead, onBack, scene, preview, stars }) {
+export function StepScreen({ story, item, stepIndex, state, paoView, paoLine, paoHeight, onTap, onNext, onRead, onBack, scene, preview, stars, order }) {
   const picks = state.picks[stepIndex] || []
   const missed = state.wrong[stepIndex] || []
   const need = pickCountOf(item)
@@ -125,6 +125,31 @@ export function StepScreen({ story, item, stepIndex, state, paoView, paoLine, pa
         </div>
       </section>
 
+      {order ? (
+        <section className="sbn-q" aria-label="Put the story in order">
+          <h2>{order.placed.length === 0 ? 'Put the story in order' : 'What happened next?'}</h2>
+          <span className="sbn-chip">{order.placed.length} of {order.cards.length} placed</span>
+          <div className="sbn-grid sbn-order">
+            {order.cards.map((c) => {
+              const pos = order.placed.indexOf(c.idx)
+              const st = pos >= 0 ? 'right' : order.flash === c.idx ? 'wrong' : state.stepDone ? 'faded' : 'idle'
+              return (
+                <button key={c.idx} type="button" className={`sbn-opt sbn-ocard ${st}`} aria-pressed={pos >= 0} disabled={pos >= 0 || state.stepDone} onClick={() => order.onTap(c.idx)} aria-label={pos >= 0 ? `${c.label}, number ${pos + 1}` : c.label}>
+                  {pos >= 0 && <span className="sbn-opt-mark green sbn-num">{pos + 1}</span>}
+                  {st === 'wrong' && <span className="sbn-opt-mark orange"><Redo size={16} /></span>}
+                  <span className="sbn-ocard-pic">{c.scene}</span>
+                  <b>{c.label}</b>
+                </button>
+              )
+            })}
+            <div className="sbn-action">
+              {state.stepDone
+                ? <button type="button" className="sbn-next" onClick={onNext} data-autofocus>{lastStep ? 'See my story' : 'Next step'} <ArrowRight size={22} /></button>
+                : <span className="sbn-wait">{order.flash != null && <Redo size={18} />} {order.flash != null ? 'Try again' : `Pick number ${order.placed.length + 1}`}</span>}
+            </div>
+          </div>
+        </section>
+      ) : (
       <section className="sbn-q" aria-label="Choose what happens next">
         <h2>{item.question}</h2>
         {need > 1 && <span className="sbn-chip">{picks.length} of {need} picked</span>}
@@ -153,6 +178,8 @@ export function StepScreen({ story, item, stepIndex, state, paoView, paoLine, pa
         </div>
       </section>
 
+      )}
+
       <div className="sbn-pao-wrap"><PaoStage view={paoView} height={paoHeight} /><PaoBubble text={paoLine} /></div>
     </>
   )
@@ -172,39 +199,25 @@ export function SceneFor({ story, item, index, label, paused = false, restartKey
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
-export function ResultsScreen({ story, panels, stats, stars, preview, onWatch, onOther, onExit }) {
+export function ResultsScreen({ story, stats, stars, preview, onWatch, onOther, onExit }) {
   return (
-    <PwModal onClose={onExit} width={1070} label="Results" className="sbn-results">
+    <PwModal onClose={onExit} width={520} label="Results" className="sbn-results">
+      <div className="sbn-res-stars" role="img" aria-label={`${stars} out of 3 stars`}>
+        {[1, 2, 3].map((n) => <StarI key={n} size={n === 2 ? 58 : 44} className={n <= stars ? 'sbn-gold' : 'sbn-dark'} />)}
+      </div>
       <h2 className="sbn-res-title">Your story is built!</h2>
-      <p className="sbn-res-says">Pao says: &ldquo;{stats.line}&rdquo;</p>
-      <div className="sbn-res-hero">
-        <div className="sbn-res-pao"><PaoStage view="finished" height={220} /></div>
-        <div className="sbn-res-stars" role="img" aria-label={`${stars} out of 3 stars`}>
-          {[1, 2, 3].map((n) => <StarI key={n} size={n === 2 ? 110 : 82} className={n <= stars ? 'sbn-gold' : 'sbn-dark'} />)}
-        </div>
-      </div>
-      <div className="sbn-stat-grid">
-        <div><span className="sbn-tile-i" style={{ background: '#22C55E' }}><Check size={26} /></span><b>{stats.steps} of {stats.steps}</b><small>Steps</small></div>
-        <div><span className="sbn-tile-i" style={{ background: '#F59E0B' }}><StarI size={24} filled={false} /></span><b>{stats.firstTry} of {stats.steps}</b><small>First try</small></div>
-        <div><span className="sbn-tile-i" style={{ background: '#6366F1' }}><Clock size={24} /></span><b>{clock(stats.seconds)}</b><small>Time</small></div>
-      </div>
-      <div className="sbn-label">Your story book</div>
-      <div className="sbn-book" style={{ gridTemplateColumns: `repeat(${panels.length > 7 ? 5 : 4}, 1fr)` }}>
-        {panels.map((p, i) => (
-          <div key={i} className="sbn-thumb">
-            <span className="sbn-thumb-n">{i + 1}</span>
-            <div className="sbn-thumb-img">{p.scene}</div>
-            <b>{p.label}</b>
-          </div>
-        ))}
-      </div>
+      <p className="sbn-res-says">{story.level_name}</p>
+      <ul className="sbn-res-stats" aria-label="Your results">
+        <li><b>{stats.steps} of {stats.steps}</b><small>Steps</small></li>
+        <li><b>{stats.firstTry} of {stats.steps}</b><small>First try</small></li>
+        <li><b>{clock(stats.seconds)}</b><small>Time</small></li>
+      </ul>
       <div className="sbn-res-btns">
-        <button type="button" className="sbn-btn indigo" onClick={onWatch} data-autofocus><Play size={22} /> Watch my story</button>
-        <button type="button" className="sbn-btn light" onClick={onOther}><Grid size={22} /> Pick another story</button>
-        <button type="button" className="sbn-btn light" onClick={onExit}><Home size={22} /> All games</button>
+        <button type="button" className="sbn-btn indigo" onClick={onWatch} data-autofocus><Play size={20} /> Watch my story</button>
+        <button type="button" className="sbn-btn light" onClick={onOther}><Grid size={20} /> Pick another story</button>
+        <button type="button" className="sbn-btn light" onClick={onExit}><Home size={20} /> All games</button>
       </div>
       {preview && <p className="sbn-foot">Preview mode: this score was not saved</p>}
-      <span className="sbn-sr">{story.level_name}</span>
     </PwModal>
   )
 }
@@ -223,18 +236,17 @@ export function WatchScreen({ story, panels, onClose }) {
   }, [i, paused, last])
   const p = panels[i]
   return (
-    <PwModal onClose={onClose} width={900} label="Watch my story" className={`sbn-watch${paused ? ' paused' : ''}`}>
-      <h2 className="sbn-res-title" style={{ fontSize: 34 }}>{story.level_name}</h2>
-      <div className="sbn-watch-scene">{p.scene}<span className="sbn-scene-pill">Step {i + 1} of {panels.length} · {p.label}</span></div>
+    <PwModal onClose={onClose} width={560} label="Watch my story" className={`sbn-watch${paused ? ' paused' : ''}`}>
+      <button type="button" className="sbn-watch-x" onClick={onClose} aria-label="Close"><I size={20}><path d="M6 6l12 12M18 6L6 18" /></I></button>
+      <div className="sbn-watch-head"><strong>{story.level_name}</strong><span>{i + 1} / {panels.length}</span></div>
+      <div className="sbn-watch-scene">{p.scene}</div>
       <p className="sbn-watch-line">{p.line}</p>
       <div className="sbn-watch-ctl">
-        <button type="button" className="sbn-btn light" onClick={() => setI((n) => Math.max(0, n - 1))} disabled={i === 0}><ArrowLeft size={22} /> Back</button>
-        <button type="button" className="sbn-btn indigo" onClick={() => setPaused((v) => !v)} data-autofocus>{paused ? <><Play size={22} /> Play</> : <><Pause size={22} /> Pause</>}</button>
-        <button type="button" className="sbn-btn light" onClick={() => setI((n) => Math.min(last, n + 1))} disabled={i === last}>Next <ArrowRight size={22} /></button>
+        <button type="button" className="sbn-wbtn" onClick={() => setI((n) => Math.max(0, n - 1))} disabled={i === 0} aria-label="Back"><ArrowLeft size={22} /><span>Back</span></button>
+        <button type="button" className="sbn-wbtn main" onClick={() => setPaused((v) => !v)} data-autofocus aria-label={paused ? 'Play' : 'Pause'}>{paused ? <Play size={22} /> : <Pause size={22} />}<span>{paused ? 'Play' : 'Pause'}</span></button>
+        <button type="button" className="sbn-wbtn" onClick={() => setI((n) => Math.min(last, n + 1))} disabled={i === last} aria-label="Next"><span>Next</span><ArrowRight size={22} /></button>
       </div>
-      <button type="button" className="sbn-btn green wide" onClick={onClose}>Done</button>
     </PwModal>
-  )
-}
+  )}
 
 export { pickedChoices }

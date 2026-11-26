@@ -66,6 +66,8 @@ export default function GameBuilderPage({ user, onLogout }) {
   const [sessionGone, setSessionGone] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [publishInfo, setPublishInfo] = useState(null)
+  const [confirm, setConfirm] = useState(null) // 'draft' | 'publish': the "are you sure?" modal
+  const [done, setDone] = useState(null) // { kind: 'draft' | 'publish' }: the success modal
 
   const docRef = useRef(null)
   const savedDocRef = useRef(null)
@@ -288,11 +290,12 @@ export default function GameBuilderPage({ user, onLogout }) {
     navigate(BACK_PATH)
   }
 
-  const saveDraft = async () => {
+  const saveDraft = async ({ modal = false } = {}) => {
     setBusy('draft')
     const ok = await save('draft')
     setBusy('')
-    if (ok) flash('Draft saved')
+    if (modal) setConfirm(null)
+    if (ok) { if (modal) setDone({ kind: 'draft' }); else flash('Draft saved') }
   }
 
   const publish = async () => {
@@ -301,13 +304,15 @@ export default function GameBuilderPage({ user, onLogout }) {
       if (dirtyRef.current || !idRef.current) { if (!(await save('draft'))) return }
       await publishGame(idRef.current)
       setGame((g) => ({ ...g, status: 'published' }))
-      flash('Published — it now appears in the Activity Library and to therapists')
+      setConfirm(null)
+      setDone({ kind: 'publish' })
       loadGame(idRef.current).then((b) => setVersions(b.versions)).catch(() => {})
     } catch (err) {
+      setConfirm(null)
       if (err.data?.checklist) setPublishInfo(err.data.checklist)
       handleSaveError(err)
       if (!err.data?.checklist) flash(err.message)
-    } finally { setBusy('') }
+    } finally { setBusy(''); setConfirm(null) }
   }
   const unpublish = async () => {
     if (!window.confirm('Unpublish this game? Patients and therapists will no longer see it. Past results and badges are kept.')) return
@@ -359,6 +364,12 @@ export default function GameBuilderPage({ user, onLogout }) {
   const result = useMemo(() => (doc ? checklist(doc, { testPlayed: game.testPlayed }) : null), [doc, game.testPlayed])
   const legacy = game.legacy
   const published = game.status === 'published'
+  useEffect(() => {
+    if (!confirm && !done) return undefined
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) { setConfirm(null); setDone(null) } }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [confirm, done, busy])
   const statusText = saveState.status === 'saving' ? 'Saving…' : saveState.status === 'dirty' ? 'Unsaved changes' : saveState.status === 'error' ? (conflict ? 'Changed elsewhere' : 'Couldn’t save — retrying') : `All changes saved · ${ago(saveState.at)}`
 
   // ── Screens that replace the builder ──────────────────────────────────
@@ -406,10 +417,10 @@ export default function GameBuilderPage({ user, onLogout }) {
         </div>
         <button type="button" onClick={() => setTab('game')} style={barBtn(false)}>⚙ Game settings</button>
         <button type="button" onClick={() => setTesting(true)} disabled={legacy || !doc.levels.some((l) => l.elements.length)} style={{ ...barBtn(false, legacy || !doc.levels.some((l) => l.elements.length)), background: '#e4f2ec', borderColor: '#bfe3d3' }}>▶ Test play</button>
-        <button type="button" onClick={saveDraft} disabled={busy === 'draft'} style={barBtn(false, busy === 'draft')}>{busy === 'draft' ? 'Saving…' : 'Save draft'}</button>
+        <button type="button" onClick={() => setConfirm('draft')} disabled={busy === 'draft'} style={barBtn(false, busy === 'draft')}>{busy === 'draft' ? 'Saving…' : 'Save draft'}</button>
         {published
           ? <button type="button" onClick={unpublish} disabled={!!busy} style={barBtn(false, !!busy)}>Unpublish</button>
-          : <button type="button" onClick={publish} disabled={!!busy || (!legacy && !result.ready)} title={!legacy && !result.ready ? 'Finish the checklist on the right first' : undefined} style={barBtn(true, !!busy || (!legacy && !result.ready))}>{busy === 'publish' ? 'Publishing…' : 'Publish'}</button>}
+          : <button type="button" onClick={() => setConfirm('publish')} disabled={!!busy || (!legacy && !result.ready)} title={!legacy && !result.ready ? 'Finish the checklist on the right first' : undefined} style={barBtn(true, !!busy || (!legacy && !result.ready))}>{busy === 'publish' ? 'Publishing…' : 'Publish'}</button>}
       </header>
 
       {conflict && <div role="alert" style={{ background: '#FEF2F2', color: '#991B1B', padding: '8px 16px', fontSize: 13.5, fontWeight: 700 }}>This game was changed somewhere else, so autosave is paused. <button type="button" onClick={() => window.location.reload()} style={{ ...barBtn(false), minHeight: 34, marginLeft: 10 }}>Reload the latest</button></div>}
@@ -460,6 +471,46 @@ export default function GameBuilderPage({ user, onLogout }) {
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <GamePlayer doc={doc} device={doc.settings.device} onFinish={onTestFinished} onExit={() => setTesting(false)} finishLabel="Close test" />
+          </div>
+        </div>
+      )}
+
+
+      {confirm && (
+        <div onClick={() => { if (!busy) setConfirm(null) }} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(20,30,26,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="gb-confirm-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: 24, width: 'min(420px, 100%)', boxShadow: '0 24px 60px rgba(0,0,0,.28)' }}>
+            <h3 id="gb-confirm-title" style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#1f3d36' }}>{confirm === 'publish' ? 'Publish this game?' : 'Save this draft?'}</h3>
+            <p style={{ margin: '8px 0 0', fontSize: 14.5, fontWeight: 700, color: '#234C40', overflowWrap: 'anywhere' }}>{doc.meta.name || 'Untitled game'}</p>
+            <p style={{ margin: '6px 0 18px', fontSize: 14, lineHeight: 1.5, color: '#5D7770' }}>
+              {confirm === 'publish'
+                ? 'It will appear in the Activity Library and be available to therapists and patients. You can unpublish it later.'
+                : 'Your changes are saved as a draft. Therapists and patients will not see it until you publish.'}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" onClick={() => setConfirm(null)} disabled={!!busy} style={barBtn(false, !!busy)}>Cancel</button>
+              <button type="button" autoFocus onClick={() => (confirm === 'publish' ? publish() : saveDraft({ modal: true }))} disabled={!!busy} style={barBtn(true, !!busy)}>
+                {busy ? (confirm === 'publish' ? 'Publishing…' : 'Saving…') : confirm === 'publish' ? 'Yes, publish' : 'Yes, save draft'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {done && (
+        <div onClick={() => setDone(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(20,30,26,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="gb-done-title" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, padding: '28px 24px 22px', width: 'min(400px, 100%)', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.28)' }}>
+            <div aria-hidden="true" style={{ width: 64, height: 64, margin: '0 auto 12px', borderRadius: '50%', background: '#D9F2E3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3 id="gb-done-title" style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#1f3d36' }}>{done.kind === 'publish' ? 'Game published!' : 'Draft saved'}</h3>
+            <p style={{ margin: '8px 0 0', fontSize: 14.5, fontWeight: 700, color: '#234C40', overflowWrap: 'anywhere' }}>{doc.meta.name || 'Untitled game'}</p>
+            <p style={{ margin: '6px 0 18px', fontSize: 14, lineHeight: 1.5, color: '#5D7770' }}>
+              {done.kind === 'publish' ? 'It now appears in the Activity Library and to therapists.' : 'Your changes are saved. It stays a draft until you publish it.'}
+            </p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <button type="button" autoFocus onClick={() => setDone(null)} style={{ ...barBtn(true, false), width: '100%', minHeight: 46 }}>Keep editing</button>
+              <button type="button" onClick={() => { setDone(null); goBack() }} style={{ ...barBtn(false, false), width: '100%', minHeight: 46 }}>Back to games</button>
+            </div>
           </div>
         </div>
       )}

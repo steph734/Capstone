@@ -28,6 +28,9 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
   const [stepsRight, setStepsRight] = useState(0) // steps told with no wrong tap so far (the star pill)
   const [seconds, setSeconds] = useState(0)
   const [progress, setProgress] = useState({})
+  const [placed, setPlaced] = useState([]) // order check: step indexes tapped so far, in order
+  const [flash, setFlash] = useState(null) // the card that was not next (soft orange for a moment)
+  const orderWrongSent = useRef(false)
   const finishedRef = useRef(false)
   const startedAt = useRef(Date.now())
   const wrongRun = useRef(0) // wrong picks in a row
@@ -49,6 +52,18 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
   }, [stories, state.storyIndex])
   const items = story?.items || []
   const item = items[state.stepIndex]
+  // The closing "what happened first?" step asks for the WHOLE story in order: every told step, shuffled once per story.
+  const orderIdx = useMemo(() => items.map((_, i) => i).filter((i) => !items[i].is_order_check), [items])
+  const isOrder = Boolean(item?.is_order_check) && orderIdx.length >= 2
+  const deck = useMemo(() => {
+    const a = [...orderIdx]
+    for (let tries = 0; tries < 8; tries += 1) {
+      for (let i = a.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
+      if (a.some((v, i) => v !== orderIdx[i])) break
+    }
+    return a
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIdx.join(','), state.storyIndex])
 
   useEffect(() => {
     let cancelled = false
@@ -82,6 +97,7 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
     setAnnounce(`Step ${state.stepIndex + 1} of ${items.length}`)
     stepHadWrong.current = false
     wrongRun.current = 0
+    setPlaced([]); setFlash(null); orderWrongSent.current = false
     narrate()
     return () => { stopPaoVoice(); pao.setListening(false) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,6 +183,48 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
     dispatch({ type: 'tap', item, choiceKey: choice.choice_key })
   }
 
+  // Tapping the story in order. The reducer still decides the step (same picks, same wrong taps, same stars): a wrong
+  // order records one wrong tap, and finishing the sequence records the step's correct pick(s).
+  const handleOrderTap = (idx) => {
+    if (!isOrder || state.stepDone || flash != null || placed.includes(idx)) return
+    const expected = orderIdx[placed.length]
+    if (idx === expected) {
+      const next = [...placed, idx]
+      setPlaced(next)
+      wrongRun.current = 0
+      if (next.length >= orderIdx.length) {
+        const count = pickCountOf(item)
+        ;(item.choices || []).filter((c) => c.is_correct).slice(0, count).forEach((c) => dispatch({ type: 'tap', item, choiceKey: c.choice_key }))
+        if (!stepHadWrong.current) { cleanRun.current += 1; firstTrySteps.current += 1; setStepsRight(firstTrySteps.current) } else cleanRun.current = 0
+        const key = !stepHadWrong.current && cleanRun.current % STREAK_EVERY === 0 ? 'streak' : 'correct'
+        const text = 'Yes! You put the whole story in order!'
+        pao.fx(key, { n: cleanRun.current }, text)
+        speakPao(text, SPEECH)
+        remember(state.stepIndex + 1)
+        setAnnounce('Nice! The whole story is in order')
+      } else {
+        const text = `Yes! ${items[idx].label}. What happened next?`
+        pao.fx('correct', {}, text)
+        speakPao(text, SPEECH)
+        setAnnounce(`Nice! ${items[idx].label} is number ${next.length}`)
+      }
+      return
+    }
+    stepHadWrong.current = true
+    wrongRun.current += 1
+    setFlash(idx)
+    setTimeout(() => setFlash(null), 900)
+    if (!orderWrongSent.current) {
+      const wrongChoice = (item.choices || []).find((c) => !c.is_correct)
+      if (wrongChoice) dispatch({ type: 'tap', item, choiceKey: wrongChoice.choice_key })
+      orderWrongSent.current = true
+    }
+    const text = 'Hmm, that did not come next. Try another one!'
+    pao.fx(wrongRun.current >= ENCOURAGE_AFTER && wrongRun.current % ENCOURAGE_AFTER === 0 ? 'encourage' : 'tryAgain', {}, text)
+    speakPao(text, SPEECH)
+    setAnnounce('Not this one. Pick again')
+  }
+
   const goNext = () => { stopPaoVoice(); dispatch({ type: 'next', stepCount: items.length }) }
   const leaveStep = () => { stopPaoVoice(); dispatch({ type: 'picker' }) }
 
@@ -206,6 +264,7 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
             story={story} item={item} stepIndex={state.stepIndex} state={state} stars={stepsRight} preview={preview}
             paoView={pao.view} paoLine={pao.line} paoHeight={paoH}
             scene={<SceneFor story={story} item={item} index={state.stepIndex} label={`${item.label}: ${item.text}`} restartKey={state.stepDone ? 'solved' : 'play'} paused={watching} />}
+            order={isOrder ? { cards: deck.map((i) => ({ idx: i, label: items[i].label, scene: <SceneFor story={story} item={items[i]} index={i} label={items[i].label} /> })), placed, flash, onTap: handleOrderTap } : null}
             onTap={handleTap} onNext={goNext} onRead={narrate} onBack={leaveStep}
           />
         )}
@@ -213,7 +272,7 @@ export default function StoryBuilder({ onExit, preview = false, patientName = 'f
 
       {state.phase === 'done' && story && !watching && (
         <ResultsScreen
-          story={story} panels={panels} preview={preview} stars={result.stars}
+          story={story} preview={preview} stars={result.stars}
           stats={{ steps: items.length, firstTry: firstTrySteps.current, seconds, line: pao.lineFor('finished', { name: first }) }}
           onWatch={() => { stopPaoVoice(); setWatching(true) }} onOther={() => dispatch({ type: 'picker' })} onExit={onExit}
         />

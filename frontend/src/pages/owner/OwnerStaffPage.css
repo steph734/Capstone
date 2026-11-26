@@ -270,6 +270,27 @@
   transform: translateY(-1px);
 }
 
+/* Add Staff: dark green, bold white uppercase text, slightly rounded (same look as the Select Plan button) */
+.os-add-btn.os-cta-btn {
+  justify-content: center;
+  padding: 14px 28px;
+  min-height: 48px;
+  background: #2c4a3e;
+  border: 2px solid #2c4a3e;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.os-add-btn.os-cta-btn:hover {
+  background: #3d5a50;
+  border-color: #3d5a50;
+  box-shadow: 0 4px 12px rgba(44, 74, 62, 0.3);
+}
+.os-add-btn.os-cta-btn:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 3px; }
+
+
 /* ── Header date range ────────────────────────────────────── */
 .os-daterange {
   display: inline-flex;

@@ -2611,10 +2611,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
         <div className="admin-table-card os-staff-table-card">
           <div className="os-table-card-head">
             <h3>Employees</h3>
-            <button className="os-add-btn" onClick={() => setShowAdd(true)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+            <button className="os-add-btn os-cta-btn" onClick={() => setShowAdd(true)}>
               Add Staff
             </button>
           </div>
@@ -2624,9 +2621,6 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                 <tr>
                   <th>Employee ID</th>
                   <th>Full Name</th>
-                  <th>Email</th>
-                  <th>Specialty</th>
-                  <th>Branch</th>
                   <th>Status</th>
                   <th>Caseload</th>
                   <th>Actions</th>
@@ -2634,7 +2628,7 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
               </thead>
               <tbody>
                 {pageRows.length === 0 ? (
-                  <tr><td colSpan={8}><p className="os-empty">No staff match your search.</p></td></tr>
+                  <tr><td colSpan={5}><p className="os-empty">No staff match your search.</p></td></tr>
                 ) : pageRows.map((s) => {
                   return (
                     <tr key={s.id}>
@@ -2648,9 +2642,6 @@ export default function OwnerStaffPage({ user, onLogout, betaTier }) {
                           <div className="os-table-name">{s.name}{s.archived && <span className="os-archived-pill">Archived</span>}</div>
                         </div>
                       </td>
-                      <td data-label="Email">{s.email || '—'}</td>
-                      <td data-label="Specialty"><SpecialtyBadge specialty={s.specialty} /></td>
-                      <td data-label="Branch"><span className="os-branch-badge">{s.branch}</span></td>
                       <td data-label="Status">
                         {s.archived ? (
                           <span className="os-pill os-pill-grey">Archived</span>

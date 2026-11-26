@@ -168,6 +168,7 @@ import adminPlanItem from './_lib/routes/admin-plan-item.js'
 import adminPlanArchive from './_lib/routes/admin-plan-archive.js'
 import plansPublic from './_lib/routes/plans-public.js'
 import * as meSub from './_lib/routes/me-subscription.js'
+import meProfile from './_lib/routes/me-profile.js'
 import { requireFeature } from './_lib/entitlements.js'
 import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
 import adminPlanSubscribers from './_lib/routes/admin-plan-subscribers.js'
@@ -475,6 +476,7 @@ app.all('/api/owner/reports/summary', ownerReportsSummary)
 app.all('/api/owner/reports/:module/export', ownerReportsExport)
 app.get('/api/me/entitlements', meSub.entitlementsRoute) // the clinic's plan for ANY role, resolved on the server
 app.get('/api/me/subscription', meSub.subscriptionRoute)
+app.all('/api/me/profile', meProfile) // the signed-in person's own profile (name, photo, ...)
 app.post('/api/owner/subscription/confirm', meSub.confirmRoute)
 app.post('/api/owner/subscription/trial', meSub.trialRoute)
 app.post('/api/owner/subscription/cancel', meSub.cancelRoute)

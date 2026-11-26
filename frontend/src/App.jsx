@@ -14,6 +14,7 @@ import { getResetPassword } from './utils/passwordResets'
 import { TEMP_USERS, getEffectiveUsers } from './utils/accounts'
 import { sha256Hex } from './utils/hash'
 import { getSessionToken, setSessionToken } from './utils/session'
+import { loadMyProfile } from './utils/myProfile'
 import IdleGate from './components/idle/IdleGate'
 import SessionExpiredPage from './pages/SessionExpiredPage'
 import { clearLastActivity } from './session/sessionBus'
@@ -409,6 +410,22 @@ function App() {
       return next
     })
   }
+
+  // A patient's saved name and photo (from the server) are applied to the signed-in user as soon as the app knows who
+  // they are, so every page and sidebar shows them after a reload or a fresh login, not only the profile page.
+  useEffect(() => {
+    if (!isAuthenticated || currentUser?.role !== 'Patient' || !currentUser?.email) return undefined
+    let cancelled = false
+    loadMyProfile(currentUser.email).then((saved) => {
+      if (cancelled || !saved) return
+      const patch = {}
+      if (saved.name && saved.name !== currentUser.name) patch.name = saved.name
+      if (saved.avatar && saved.avatar !== currentUser.avatar) patch.avatar = saved.avatar
+      if (Object.keys(patch).length) handleUpdateUser(patch)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser?.email, currentUser?.role])
 
   return (
     <StreamProvider user={currentUser}>

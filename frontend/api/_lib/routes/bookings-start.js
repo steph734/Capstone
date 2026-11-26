@@ -11,7 +11,7 @@
 import { ObjectId } from 'mongodb'
 import { getDb } from '../mongo.js'
 import { tooManyRequests } from '../rateLimit.js'
-import { createBookingRecords, activeSlotFilter, acquireSlotLock, releaseSlotLock, markAvailability, expireStaleHolds, slotKey, parseSlot, str, asObjectId } from '../bookingCore.js'
+import { createBookingRecords, activeSlotFilter, acquireSlotLock, releaseSlotLock, releaseHold, markAvailability, expireStaleHolds, slotKey, parseSlot, str, asObjectId } from '../bookingCore.js'
 import { ensureIndexes, newToken, PAYMENT_MESSAGES } from '../paymentAttempts.js'
 import { HOLD_MS, ONLINE_AMOUNT_PESOS, CURRENCY } from '../pricing.js'
 
@@ -29,6 +29,7 @@ export default async function handler(req, res) {
   if (!KEY_RE.test(idempotencyKey)) return res.status(400).json({ error: 'Missing booking key.' })
   if (!str(patient.firstName) || !str(patient.lastName)) return res.status(400).json({ error: 'Patient first and last name are required.' })
   if (!str(patient.birthdate) || !str(patient.address)) return res.status(400).json({ error: 'Patient birthdate and address are required.' })
+  if (Number.isNaN(new Date(patient.birthdate).getTime())) return res.status(400).json({ error: 'Please enter a valid birthdate.' })
   if (!asObjectId(therapist.id)) return res.status(400).json({ error: 'Please choose a therapist.' })
   if (!str(session.timeSlot)) return res.status(400).json({ error: 'Please choose a time slot.' })
   if (await tooManyRequests(res, `booking-start:${req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip'}`, { max: 20, windowMs: 15 * 60 * 1000 })) return
@@ -47,6 +48,13 @@ export default async function handler(req, res) {
 
     // 1. Is the slot free? (a paid/held booking blocks it; an expired hold does not)
     const probe = createProbe(body)
+    // The same account retrying the same slot (page refresh, closed the payment window) must not be blocked by its OWN
+    // unpaid hold: give that hold back first. Other people's holds and paid bookings still block the slot.
+    const me = asObjectId(body.bookedBy?.id)
+    if (me) {
+      const own = await db.collection('appointments').find({ ...activeSlotFilter(probe.employeeId, probe.sessionDate, probe.start, now), booked_by: me, payment_state: 'awaiting_payment' }).toArray()
+      for (const old of own) await releaseHold(db, old, 'expired').catch((e) => console.error('release own hold failed:', e.message))
+    }
     const taken = () => db.collection('appointments').findOne(activeSlotFilter(probe.employeeId, probe.sessionDate, probe.start, now))
     if (await taken()) return res.status(409).json({ error: PAYMENT_MESSAGES.slot_taken, code: 'SLOT_NO_LONGER_AVAILABLE' })
 
@@ -84,7 +92,8 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     if (err.code === 'PATIENT_ARCHIVED') return res.status(409).json({ error: err.message, code: err.code })
-    console.error('bookings/start error:', err)
+    console.error('bookings/start error:', err?.code, err?.message, JSON.stringify(err?.errInfo?.details || null))
+    if (err?.code === 121) return res.status(400).json({ error: 'Some of the booking details are not valid. Please check the form and try again.', code: 'INVALID_DETAILS' })
     return res.status(500).json({ error: 'We could not start your booking. Please try again.' })
   }
 }

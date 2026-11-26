@@ -55,6 +55,35 @@ function useHeaderSlot(enabled) {
   return slot
 }
 
+// True while a full-screen modal / overlay is open, so the pills can step aside instead of floating on top of it.
+const MODAL_SELECTOR = '[role="dialog"], [aria-modal="true"], [class*="modal"], [class*="overlay"], [class*="backdrop"]'
+function isModalOpen() {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  for (const el of document.querySelectorAll(MODAL_SELECTOR)) {
+    if (el.closest('[data-sync-slot], [data-sync-float]')) continue
+    const cs = window.getComputedStyle(el)
+    if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue
+    const r = el.getBoundingClientRect()
+    if (r.width >= vw * 0.9 && r.height >= vh * 0.9) return true
+  }
+  return false
+}
+function useModalOpen() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    let frame = 0
+    const check = () => { frame = 0; setOpen(isModalOpen()) }
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(check) }
+    check()
+    const observer = new MutationObserver(schedule)
+    observer.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('resize', schedule)
+    return () => { observer.disconnect(); window.removeEventListener('resize', schedule); if (frame) cancelAnimationFrame(frame) }
+  }, [])
+  return open
+}
+
 // Small status pill for the page header: Online / Offline / "N changes pending" / Sync error.
 // When something needs the therapist's attention (a SOAP conflict, a refused change)
 // the pill shows "Review" and opens the dialog below.
@@ -64,6 +93,7 @@ export default function SyncStatus({ floating = false }) {
   const attention = s.conflicts + s.rejected
   const inlineExists = useSyncExternalStore(subscribeInline, hasInlinePill)
   const headerSlot = useHeaderSlot(floating && !inlineExists)
+  const modalOpen = useModalOpen()
   useEffect(() => {
     if (floating) return undefined
     inlineCount += 1; notifyInline()
@@ -118,10 +148,14 @@ export default function SyncStatus({ floating = false }) {
     </span>
   )
   // Normal case: inside the page's own header, next to the profile badge.
-  if (headerSlot) return createPortal(<>{body}{savedNote}</>, headerSlot)
+  if (headerSlot) {
+    headerSlot.style.display = modalOpen ? 'none' : 'inline-flex' // hidden while a modal is open
+    return createPortal(<>{body}{savedNote}</>, headerSlot)
+  }
+  if (modalOpen) return null
   // Page without a header (games, chat ...): top-right corner of the screen.
   return (
-    <div style={{ position: 'fixed', right: 16, top: 12, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>
+    <div data-sync-float="" style={{ position: 'fixed', right: 16, top: 12, zIndex: 9000, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)' }}>
       {body}
       {savedNote}
     </div>

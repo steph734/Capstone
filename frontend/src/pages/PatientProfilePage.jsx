@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PatientSidebar from '../components/PatientSidebar'
 import { logActivity } from '../utils/auditLog'
+import { loadMyProfile, saveMyProfile, photoToAvatar, readLocalProfile } from '../utils/myProfile'
 import './therapist/TherapistProfilePage.css'
 import './PageWithSidebar.css'
 import './admin/AdminPages.css'
-
-const STORAGE_KEY = 'patient_profile'
 
 const DEFAULT_PROFILE = {
   name: 'Alvrin',
@@ -18,7 +17,7 @@ const DEFAULT_PROFILE = {
   school: 'Makati Science High School',
   therapist: 'Dr. Sarah Reyes',
   joined: 'September 1, 2025',
-  bio: 'Alvrin is a 14-year-old patient undergoing occupational therapy for anxiety management. He has shown remarkable progress with breathing exercises and mindfulness activities over the past months.',
+  bio: '',
   avatar: 'https://i.pravatar.cc/150?img=33',
 }
 
@@ -29,12 +28,12 @@ const AVATAR_OPTIONS = [
   'https://i.pravatar.cc/150?img=8',
 ]
 
-function loadProfile(user) {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) return { ...DEFAULT_PROFILE, ...JSON.parse(saved) }
-  } catch {}
-  return { ...DEFAULT_PROFILE, name: user?.name || DEFAULT_PROFILE.name }
+// This account's own details: what it saved before (this browser's copy of it), otherwise what the account itself
+// says (name, email, photo). Never another account's profile.
+function baseProfile(user) {
+  const own = readLocalProfile(user?.email) || {}
+  const photo = user?.avatar && user.avatar !== '/therapy-pro-logo.png' ? user.avatar : ''
+  return { ...DEFAULT_PROFILE, name: user?.name || DEFAULT_PROFILE.name, email: user?.email || DEFAULT_PROFILE.email, ...(photo ? { avatar: photo } : {}), ...own }
 }
 
 function EditIcon() {
@@ -63,29 +62,43 @@ function Field({ icon, label, value, editing, field, draft, onChange }) {
 
 export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateUser }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [profile, setProfile] = useState(() => loadProfile(user))
+  const [profile, setProfile] = useState(() => baseProfile(user))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
-  const [toast, setToast] = useState(false)
+  const [toast, setToast] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const fileRef = useRef(null)
 
-  useEffect(() => { if (editing) setDraft(profile) }, [editing])
+  useEffect(() => { if (editing) { setDraft(profile); setSaveError('') } }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep the login email in sync with the saved profile email (covers profiles
-  // saved before this sync existed).
+  // The saved profile comes from the server, so it is the same after a reload, a logout and on another device.
   useEffect(() => {
-    if (profile.email && user?.email && profile.email !== user.email) {
-      onUpdateUser?.({ email: profile.email })
-    }
+    let cancelled = false
+    loadMyProfile(user?.email).then((saved) => { if (!cancelled && saved && !editing) setProfile({ ...baseProfile(user), ...saved }) })
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.email])
 
-  const handleSave = () => {
-    setProfile(draft)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
-    onUpdateUser?.({ name: draft.name, email: draft.email, avatar: draft.avatar })
+  const handleSave = async () => {
+    if (!String(draft.name || '').trim()) { setSaveError('Please enter your name.'); return }
+    setSaving(true); setSaveError('')
+    let saved
+    try {
+      saved = await saveMyProfile(user?.email, { ...draft, name: draft.name.trim() })
+    } catch (err) {
+      setSaving(false)
+      setSaveError(err.fields ? Object.values(err.fields)[0] : err.message || 'Could not save your profile. Please try again.')
+      return
+    }
+    setSaving(false)
+    const next = { ...draft, ...saved }
+    setProfile(next)
+    // The sidebar and every other page read the signed-in user, so the new name and photo show up everywhere at once.
+    onUpdateUser?.({ name: next.name, avatar: next.avatar })
     setEditing(false)
-    setToast(true)
-    setTimeout(() => setToast(false), 2800)
+    setToast('Profile saved successfully!')
+    setTimeout(() => setToast(''), 2800)
     logActivity({
       role: 'Patient',
       user: user?.name || draft.name,
@@ -103,6 +116,12 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
     const idx = AVATAR_OPTIONS.indexOf(draft.avatar)
     set('avatar', AVATAR_OPTIONS[(idx + 1) % AVATAR_OPTIONS.length])
   }
+  const pickPhoto = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try { set('avatar', await photoToAvatar(file)); setSaveError('') } catch (err) { setSaveError(err.message) }
+  }
 
   const iconProps = { editing, draft, onChange: set }
 
@@ -115,8 +134,6 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
         onClose={() => setSidebarOpen(false)}
         betaTier={betaTier}
         profilePath="/patient/profile"
-        profileName={profile.name}
-        profileAvatar={profile.avatar}
       />
 
       <main className="page-content admin-page-content">
@@ -138,8 +155,8 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
               <div className="trp-header-actions">
                 {editing ? (
                   <>
-                    <button className="trp-cancel-btn" onClick={() => setEditing(false)}>Cancel</button>
-                    <button className="trp-save-btn" onClick={handleSave}><SaveIcon /> Save Changes</button>
+                    <button className="trp-cancel-btn" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+                    <button className="trp-save-btn" onClick={handleSave} disabled={saving}><SaveIcon /> {saving ? 'Saving…' : 'Save Changes'}</button>
                   </>
                 ) : (
                   <button className="trp-edit-btn" onClick={() => setEditing(true)}><EditIcon /> Edit Profile</button>
@@ -151,7 +168,9 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
             <div className="trp-hero">
               <div className="trp-avatar-wrap">
                 <img className="trp-avatar" src={editing ? draft.avatar : profile.avatar} alt={profile.name} />
-                {editing && <button className="trp-avatar-edit-btn" onClick={cycleAvatar}><CameraIcon /></button>}
+                {editing && <button className="trp-avatar-edit-btn" onClick={() => fileRef.current?.click()} aria-label="Upload a photo" title="Upload a photo"><CameraIcon /></button>}
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={pickPhoto} style={{ display: 'none' }} />
+                {editing && <button type="button" onClick={cycleAvatar} style={{ marginTop: 8, background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', fontSize: 12, cursor: 'pointer' }}>Use a sample photo</button>}
               </div>
               <div className="trp-hero-body">
                 {editing
@@ -212,7 +231,7 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
                       <span className="trp-field-lbl">About Me</span>
                       {editing
                         ? <textarea className="trp-bio-field" value={draft.bio} onChange={e => set('bio', e.target.value)} rows={5} />
-                        : <p className="trp-bio-text">{profile.bio}</p>}
+                        : <p className="trp-bio-text">{profile.bio || 'Add a short note about yourself.'}</p>}
                     </div>
                   </div>
                 </div>
@@ -223,7 +242,8 @@ export default function PatientProfilePage({ user, onLogout, betaTier, onUpdateU
         </div>
       </main>
 
-      {toast && <div className="trp-toast">Profile saved successfully!</div>}
+      {saveError && editing && <div className="trp-toast" role="alert" style={{ background: '#b4233c' }}>{saveError}</div>}
+      {toast && <div className="trp-toast">{toast}</div>}
     </div>
   )
 }

@@ -36,19 +36,24 @@
 .trp-save-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 20px;
-  border: none;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  min-height: 46px;
+  border: 2px solid #2c4a3e;
   border-radius: 10px;
-  background: #22a05a;
+  background: #2c4a3e;
   color: #fff;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
 }
-.trp-save-btn:hover { background: #1a8a4a; }
+.trp-save-btn:hover { background: #3d5a50; border-color: #3d5a50; box-shadow: 0 4px 12px rgba(44, 74, 62, 0.3); }
+.trp-save-btn:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 3px; }
 
 .trp-cancel-btn {
   padding: 10px 18px;

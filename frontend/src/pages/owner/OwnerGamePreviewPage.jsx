@@ -9,7 +9,7 @@ export default function OwnerGamePreviewPage() {
   const { gameKey } = useParams()
   return (
     <>
-      {!['alphabet', 'picture-word', 'echo', 'spot-difference'].includes(gameKey) && <div role="status" style={{ position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 10000, pointerEvents: 'none', background: '#234C40', color: '#fff', borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 800, fontFamily: "'Segoe UI',system-ui,sans-serif", boxShadow: '0 2px 10px rgba(0,0,0,.2)' }}>
+      {!['alphabet', 'picture-word', 'echo', 'spot-difference', 'story'].includes(gameKey) && <div role="status" style={{ position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 10000, pointerEvents: 'none', background: '#234C40', color: '#fff', borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 800, fontFamily: "'Segoe UI',system-ui,sans-serif", boxShadow: '0 2px 10px rgba(0,0,0,.2)' }}>
         Preview mode · scores aren't saved
       </div>}
       <GamifiedFullPage backPath="/owner/gamified-activities/library" previewGameId={gameKey} />

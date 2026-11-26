@@ -1,31 +1,45 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { speakPao, stopPaoVoice } from '../../utils/paoVoice'
 import { useGameSession } from '../../hooks/useGameSession'
-import StoryStartModal from './StoryStartModal'
-import StoryPicker from './StoryPicker'
-import StoryStep from './StoryStep'
-import StoryRecap from './StoryRecap'
+import { PwSky } from '../picture-word-game/pwUi'
+import usePwStage from '../picture-word-game/usePwStage'
+import { PAO_PROP_CSS } from '../../games/pictureWord/PaoProps'
+import { STREAK_EVERY, ENCOURAGE_AFTER } from '../../games/storyBuilder/paoReactions'
+import { useStoryPao } from './StoryPao'
+import { PickerScreen, ResultsScreen, SceneFor, StepScreen, WatchScreen } from './StoryScreens'
+import { storyKeyOf } from './storyKeys'
 import { storyReducer, initialState, pickCountOf, buildRecapPanels, buildFinishResult } from './storyReducer'
-import './story-builder.css'
+import '../picture-word-game/pictureWord.css'
+import './storyBuilder.css'
 
-// Story Builder: every story, step, choice and recap line comes from the
-// game's `levels` in MongoDB, so a new story is a database change only.
+// Story Builder: every story, step, choice and recap line comes from the game's `levels` in MongoDB, so a new story
+// is a database change only. This file draws, speaks and reacts; the rules live in storyReducer.js (unchanged).
 const GAME_NAME = 'Story Builder'
 const SPEECH = { rate: 0.8, pitch: 1.15 }
-const BASE_DELAY_MS = 2600
 
 const sortBy = (list, key) => [...(list || [])].sort((a, b) => (a[key] ?? 0) - (b[key] ?? 0))
 
-// Long lines get a little more time before the next step.
-const nextStepDelay = (text = '') => BASE_DELAY_MS + Math.max(0, text.length - 60) * 30
-
-export default function StoryBuilder({ onExit }) {
+export default function StoryBuilder({ onExit, preview = false, patientName = 'friend', patientEmail = null, patientId = 'alvrin' }) {
   const [game, setGame] = useState(null)
   const [error, setError] = useState('')
   const [state, dispatch] = useReducer(storyReducer, initialState)
-  const [bubble, setBubble] = useState(null) // { key, text, tone } from the last tap
+  const [watching, setWatching] = useState(false)
+  const [announce, setAnnounce] = useState('')
+  const [stepsRight, setStepsRight] = useState(0) // steps told with no wrong tap so far (the star pill)
+  const [seconds, setSeconds] = useState(0)
+  const [progress, setProgress] = useState({})
   const finishedRef = useRef(false)
+  const startedAt = useRef(Date.now())
+  const wrongRun = useRef(0) // wrong picks in a row
+  const stepHadWrong = useRef(false)
+  const cleanRun = useRef(0) // steps in a row with no wrong tap
+  const firstTrySteps = useRef(0)
   const gameSession = useGameSession({ gameName: GAME_NAME })
+  const stage = usePwStage()
+
+  const progressKey = `storyBuilder:progress:${patientEmail || patientId}`
+  const first = String(patientName).split(' ')[0]
+  const pao = useStoryPao({ name: first })
 
   const stories = useMemo(() => sortBy(game?.levels, 'level_order'), [game])
   // Steps are sorted once here, so every index (picks, recap, finish) lines up.
@@ -35,7 +49,6 @@ export default function StoryBuilder({ onExit }) {
   }, [stories, state.storyIndex])
   const items = story?.items || []
   const item = items[state.stepIndex]
-  const stepKey = `${state.storyIndex}:${state.stepIndex}`
 
   useEffect(() => {
     let cancelled = false
@@ -50,31 +63,66 @@ export default function StoryBuilder({ onExit }) {
     return () => { cancelled = true }
   }, [])
 
-  // Stop speech when leaving the screen or moving on to another step.
+  // The picker is the first screen (no separate start card).
+  useEffect(() => { if (game && state.phase === 'start') dispatch({ type: 'picker' }) }, [game, state.phase])
+
+  useEffect(() => { try { setProgress(JSON.parse(localStorage.getItem(progressKey) || '{}')) } catch { /* ignore */ } }, [progressKey])
   useEffect(() => () => stopPaoVoice(), [])
 
-  // Read the story line and question as each step opens.
+  // Narration: the same words as before; Pao wears the headphones while it plays.
+  const narrate = () => {
+    if (!item) return
+    stopPaoVoice()
+    speakPao(`${item.text} ${item.question}`, { ...SPEECH, onStart: () => pao.setListening(true), onEnd: () => pao.setListening(false) })
+  }
   useEffect(() => {
     if (state.phase !== 'playing' || !item) return undefined
-    stopPaoVoice()
-    speakPao(`${item.text} ${item.question}`, SPEECH)
-    return () => stopPaoVoice()
+    pao.setListening(false)
+    pao.say(pao.lineFor('listening'))
+    setAnnounce(`Step ${state.stepIndex + 1} of ${items.length}`)
+    stepHadWrong.current = false
+    wrongRun.current = 0
+    narrate()
+    return () => { stopPaoVoice(); pao.setListening(false) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase, state.storyIndex, state.stepIndex])
 
-  // A correct step waits a moment so Pao can finish, then moves on.
+  // Time and progress are counted per story.
   useEffect(() => {
-    if (state.phase !== 'playing' || !state.stepDone) return undefined
-    const id = setTimeout(() => dispatch({ type: 'next', stepCount: items.length }), nextStepDelay(bubble?.text))
-    return () => clearTimeout(id)
+    if (state.phase === 'playing' && state.stepIndex === 0 && !state.stepDone) {
+      startedAt.current = Date.now()
+      wrongRun.current = 0; cleanRun.current = 0; firstTrySteps.current = 0
+      setStepsRight(0)
+      finishedRef.current = false
+      setWatching(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.stepDone, state.stepIndex, state.storyIndex])
+  }, [state.phase, state.storyIndex])
+
+  const remember = (steps) => {
+    if (preview || !story) return
+    const key = storyKeyOf(story) || story.story_key || story.level_name
+    try {
+      const next = { ...progress, [key]: Math.max(progress[key] || 0, steps) }
+      setProgress(next)
+      localStorage.setItem(progressKey, JSON.stringify(next))
+    } catch { /* storage blocked */ }
+  }
 
   // Report the finished story once; the reward sequence then shows on top.
   useEffect(() => {
     if (state.phase !== 'done' || finishedRef.current || !story) return
     finishedRef.current = true
-    gameSession.finish(buildFinishResult(story, state))
+    const secs = Math.round((Date.now() - startedAt.current) / 1000)
+    setSeconds(secs)
+    remember(items.length)
+    const result = buildFinishResult(story, state)
+    gameSession.finish({
+      ...result,
+      detail: { ...result.detail, ...(firstTrySteps.current ? { first_try_steps: firstTrySteps.current } : {}), ...(secs ? { duration_seconds: secs } : {}) },
+    })
+    const line = pao.fx('finished', { name: first })
+    speakPao(line, SPEECH)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase])
 
@@ -86,7 +134,7 @@ export default function StoryBuilder({ onExit }) {
     if (picked.includes(choice.choice_key) || missed.includes(choice.choice_key)) return
 
     let text
-    let tone
+    let finishesStep = false
     if (choice.is_correct) {
       const count = pickCountOf(item)
       const remaining = count - (picked.length + 1)
@@ -97,88 +145,81 @@ export default function StoryBuilder({ onExit }) {
       } else {
         text = choice.feedback || `Yes! ${choice.label}!`
       }
-      tone = 'good'
+      finishesStep = remaining <= 0
+      wrongRun.current = 0
+      let key = 'correct'
+      if (finishesStep) {
+        if (!stepHadWrong.current) { cleanRun.current += 1; firstTrySteps.current += 1; setStepsRight(firstTrySteps.current) } else cleanRun.current = 0
+        if (!stepHadWrong.current && cleanRun.current % STREAK_EVERY === 0) key = 'streak'
+        remember(state.stepIndex + 1)
+      }
+      pao.fx(key, { answer: choice.label, n: cleanRun.current }, text)
+      setAnnounce(`Nice! ${choice.label} is right`)
     } else {
       text = choice.feedback || 'Try another one!'
-      tone = 'gentle'
+      stepHadWrong.current = true
+      wrongRun.current += 1
+      pao.fx(wrongRun.current >= ENCOURAGE_AFTER && wrongRun.current % ENCOURAGE_AFTER === 0 ? 'encourage' : 'tryAgain', {}, text)
+      setAnnounce('Not this one. Pick again')
     }
 
-    setBubble({ key: stepKey, text, tone })
     speakPao(text, SPEECH)
     dispatch({ type: 'tap', item, choiceKey: choice.choice_key })
   }
 
-  const readStep = () => item && speakPao(`${item.text} ${item.question}`, SPEECH)
-
-  const readAll = () => {
-    const panels = buildRecapPanels(story, state)
-    speakPao(panels.map((p) => p.line).join(' '), SPEECH)
-  }
-
-  const leaveStep = () => {
-    stopPaoVoice()
-    setBubble(null)
-    dispatch({ type: 'picker' })
-  }
+  const goNext = () => { stopPaoVoice(); dispatch({ type: 'next', stepCount: items.length }) }
+  const leaveStep = () => { stopPaoVoice(); dispatch({ type: 'picker' }) }
 
   if (error) {
     return (
-      <div className="sb-root" style={{ display: 'grid', placeItems: 'center' }}>
-        <div style={{ textAlign: 'center', padding: 24 }}>
+      <div className="sbn-root" style={{ display: 'grid', placeItems: 'center' }}>
+        <PwSky />
+        <div style={{ position: 'relative', textAlign: 'center', padding: 24 }}>
           <p style={{ fontSize: 20, fontWeight: 700 }}>{error}</p>
-          <button type="button" className="sb-btn" onClick={onExit}>Back to games</button>
+          <button type="button" className="sbn-btn indigo" style={{ padding: '0 28px' }} onClick={onExit}>Back to games</button>
         </div>
       </div>
     )
   }
+  if (!game) return <div className="sbn-root" aria-busy="true"><PwSky /></div>
 
-  if (!game) return <div className="sb-root" aria-busy="true" />
-
-  // Pao's bubble: the last tap's line for this step, otherwise the question.
-  const shownBubble = bubble?.key === stepKey ? bubble : { text: item?.question || '', tone: 'hint' }
+  // One recap panel per told step, each with its animated scene (or the step's own picture).
+  const panels = state.phase === 'done' && story
+    ? (() => {
+        const idx = items.map((_, i) => i).filter((i) => !items[i].is_order_check)
+        return buildRecapPanels(story, state).map((p, n) => ({ ...p, scene: <SceneFor story={story} item={items[idx[n]]} index={idx[n]} label={`${p.label}: ${p.line}`} /> }))
+      })()
+    : []
+  const result = state.phase === 'done' && story ? buildFinishResult(story, state) : null
+  const paoH = stage.narrow ? 150 : 220
 
   return (
-    <div className="sb-root">
-      <div className="sb-cloud" aria-hidden="true" style={{ top: '9%', left: '6%' }} />
-      <div className="sb-cloud" aria-hidden="true" style={{ top: '16%', right: '10%', transform: 'scale(.8)' }} />
-      <div className="sb-hill sb-hill--a" aria-hidden="true" />
-      <div className="sb-hill sb-hill--b" aria-hidden="true" />
+    <div className="sbn-root">
+      <style>{PAO_PROP_CSS}</style>
+      <PwSky />
+      <div className={`sbn-stage${stage.narrow ? ' narrow' : ''}`} style={stage.style}>
+        {state.phase === 'picker' && (
+          <PickerScreen stories={stories} progress={progress} preview={preview} patientName={first} onPick={(i) => dispatch({ type: 'start', storyIndex: i })} onBack={onExit} />
+        )}
+        {(state.phase === 'playing' || state.phase === 'done') && story && item && (
+          <StepScreen
+            story={story} item={item} stepIndex={state.stepIndex} state={state} stars={stepsRight} preview={preview}
+            paoView={pao.view} paoLine={pao.line} paoHeight={paoH}
+            scene={<SceneFor story={story} item={item} index={state.stepIndex} label={`${item.label}: ${item.text}`} restartKey={state.stepDone ? 'solved' : 'play'} paused={watching} />}
+            onTap={handleTap} onNext={goNext} onRead={narrate} onBack={leaveStep}
+          />
+        )}
+      </div>
 
-      {state.phase === 'start' && (
-        <StoryStartModal game={game} onStart={() => dispatch({ type: 'picker' })} onCancel={onExit} />
-      )}
-
-      {state.phase === 'picker' && (
-        <StoryPicker
-          stories={stories}
-          onPick={(i) => dispatch({ type: 'start', storyIndex: i })}
-          onClose={() => dispatch({ type: 'home' })}
+      {state.phase === 'done' && story && !watching && (
+        <ResultsScreen
+          story={story} panels={panels} preview={preview} stars={result.stars}
+          stats={{ steps: items.length, firstTry: firstTrySteps.current, seconds, line: pao.lineFor('finished', { name: first }) }}
+          onWatch={() => { stopPaoVoice(); setWatching(true) }} onOther={() => dispatch({ type: 'picker' })} onExit={onExit}
         />
       )}
-
-      {state.phase === 'playing' && story && item && (
-        <StoryStep
-          story={story}
-          item={item}
-          stepIndex={state.stepIndex}
-          state={state}
-          bubble={shownBubble}
-          onTap={handleTap}
-          onRead={readStep}
-          onBack={leaveStep}
-        />
-      )}
-
-      {state.phase === 'done' && story && (
-        <StoryRecap
-          story={story}
-          panels={buildRecapPanels(story, state)}
-          game={game}
-          onReadAll={readAll}
-          onPlayAgain={() => dispatch({ type: 'start', storyIndex: state.storyIndex })}
-          onOtherStories={() => dispatch({ type: 'picker' })}
-        />
-      )}
+      {state.phase === 'done' && story && watching && <WatchScreen story={story} panels={panels} onClose={() => setWatching(false)} />}
+      <div className="sbn-sr" aria-live="polite">{announce}</div>
     </div>
   )
 }

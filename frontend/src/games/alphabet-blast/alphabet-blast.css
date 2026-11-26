@@ -202,3 +202,26 @@
   .ab-intro h2, .ab-result h2 { font-size: 28px; }
   .ab-result-hero { flex-direction: column; gap: 8px; }
 }
+
+/* compact intro modal (web + mobile) */
+.ab-card.ab-intro { width: min(92vw, 500px); padding: 60px 22px 20px; margin-top: 46px; border-radius: 26px; }
+.ab-intro-pao { top: -62px; transform: translateX(-50%) scale(.62); }
+.ab-intro .ab-kicker { font-size: 11px; }
+.ab-intro h2 { font-size: 30px; margin: 0 0 4px; }
+.ab-intro .ab-goal { font-size: 14px; margin: 0 auto 12px; max-width: 400px; }
+.ab-intro .ab-steps { gap: 8px; margin-bottom: 12px; }
+.ab-intro .ab-step { padding: 10px 6px; gap: 4px; border-radius: 16px; }
+.ab-intro .ab-step-icon { width: 36px; height: 36px; border-radius: 11px; }
+.ab-intro .ab-step-icon svg { width: 18px; height: 18px; }
+.ab-intro .ab-step b { font-size: 13px; }
+.ab-intro .ab-step small { font-size: 11.5px; }
+.ab-intro .ab-diff { margin-bottom: 12px; gap: 6px; }
+.ab-intro .ab-diff button { min-height: 40px; padding: 0 18px; font-size: 14px; }
+.ab-intro .ab-big.wide { min-height: 50px; font-size: 18px; }
+@media (max-width: 640px) {
+  .ab-card.ab-intro { width: min(92vw, 380px); padding: 56px 16px 16px; }
+  .ab-intro h2 { font-size: 26px; }
+  .ab-intro .ab-steps { grid-template-columns: 1fr; gap: 6px; }
+  .ab-intro .ab-step { display: grid; grid-template-columns: 36px 1fr; column-gap: 10px; row-gap: 0; align-items: center; justify-items: start; text-align: left; padding: 8px 10px; }
+  .ab-intro .ab-step-icon { grid-row: 1 / span 2; }
+}

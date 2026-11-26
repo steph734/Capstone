@@ -85,6 +85,14 @@
 
 /* under 900px wide: picture A above picture B, progress under both, Pao 150px with the bubble above her */
 .sd-stage.narrow { position: relative; transform: none !important; width: 100%; height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 124px 12px 230px; box-sizing: border-box; }
+/* stacked column: children keep their natural height (flex shrink squashed the pictures); the page scrolls */
+.sd-stage.narrow > * { flex-shrink: 0; }
+.sd-stage.narrow { padding-top: 160px; gap: 18px; }
+.sd-stage.narrow .sd-pic-wrap { margin-top: 12px; }
+.sd-stage.narrow .sd-pic-wrap + .sd-pic-wrap { margin-top: 18px; }
+.sd-stage.narrow .sd-title { white-space: nowrap; overflow: hidden; }
+.sd-stage.narrow .sd-headline { font-size: clamp(20px, 6vw, 26px); text-align: center; }
+.sd-stage.narrow .sd-bottom { justify-content: center; }
 .sd-stage.narrow .sd-back { left: 10px; top: 10px; height: 46px; padding: 0 14px; }
 .sd-stage.narrow .sd-stars { right: 10px; top: 10px; height: 46px; min-width: 0; font-size: 20px; padding: 0 14px; }
 .sd-stage.narrow .sd-title { top: 62px; height: 46px; padding: 0 14px; gap: 10px; max-width: calc(100% - 16px); }

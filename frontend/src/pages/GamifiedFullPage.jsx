@@ -779,7 +779,7 @@ function GamifiedFullPageInner({ backPath = '/dashboard', patientId = 'alvrin', 
   }
 
   if (phase === 'story-select') {
-    return <StoryBuilder onExit={backToGames}/>
+    return <StoryBuilder patientName={playerName} patientEmail={patientEmail} patientId={patientId} preview={Boolean(previewGameId)} onExit={backToGames}/>
   }
 
   if (previewGameId) {

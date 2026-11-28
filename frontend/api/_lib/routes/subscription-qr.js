@@ -18,6 +18,7 @@ import { loadPlansAndFeatures, planName, serializePlan } from '../plans.js'
 import { getEntitlements, writeRecord, CLINIC_ID } from '../entitlements.js'
 import { MAX_RECEIPT_BYTES, validateReference } from '../paymentProofRules.js'
 import { prepareReceipt } from '../receiptFile.js'
+import { syncQrPayment } from '../subscriptionLedger.js'
 
 const COLLECTION = 'subscription_qr_payments'
 const METHODS = ['gcash', 'paymaya']
@@ -91,9 +92,15 @@ export const ownerSubmitRoute = route('subscription qr submit', 'Owner', async (
     owner_name: [ctx.user.first_name, ctx.user.last_name].filter(Boolean).join(' ') || ctx.user.name || ctx.user.email || 'Owner',
     plan_key: slug.toUpperCase(), plan_name: planName(plan), billing_period: period, method, amount,
     reference_digits: ref.digits, reference_display: ref.display,
-    receipt: receipt.buffer, receipt_type: receipt.contentType, status: 'pending', submitted_at: new Date(),
+    receipt_type: receipt.contentType, status: 'pending', submitted_at: new Date(),
   }
   const { insertedId } = await col.insertOne(doc)
+  try {
+    await syncQrPayment(ctx.db, { ...doc, _id: insertedId }, receipt) // payment_attempts, payment_receipts, payment_audit
+  } catch (err) {
+    await col.deleteOne({ _id: insertedId }) // without its receipt the payment cannot be checked: let the Owner send it again
+    throw err
+  }
   await auditAdmin(ctx, 'clinic_plan_qr_submitted', `Sent a QR payment for the ${doc.plan_name} plan.`, { plan_key: slug, amount }).catch(() => {})
   return res.status(201).json({ payment: view({ ...doc, _id: insertedId }) })
 })
@@ -107,10 +114,12 @@ const byId = (id) => (/^[a-f0-9]{24}$/i.test(id) ? { _id: new ObjectId(id) } : n
 
 export const adminReceiptRoute = route('subscription qr receipt', 'Super Admin', async (ctx, req, res) => {
   const q = byId(req.params.id)
-  const p = q && await ctx.db.collection(COLLECTION).findOne(q, { projection: { receipt: 1, receipt_type: 1 } })
-  if (!p?.receipt) return fail(res, 404, 'NOT_FOUND', 'Receipt not found.')
-  res.setHeader('Content-Type', p.receipt_type)
-  return res.send(Buffer.from(p.receipt.buffer || p.receipt))
+  const p = q && await ctx.db.collection(COLLECTION).findOne(q, { projection: { receipt: 1, receipt_type: 1, receipt_id: 1 } })
+  const stored = p?.receipt_id ? await ctx.db.collection('payment_receipts').findOne({ _id: p.receipt_id }) : null
+  const data = stored?.data || p?.receipt // payments sent before receipts moved to payment_receipts
+  if (!data) return fail(res, 404, 'NOT_FOUND', 'Receipt not found.')
+  res.setHeader('Content-Type', stored?.content_type || p.receipt_type)
+  return res.send(Buffer.from(data.buffer || data))
 })
 
 function periodEnd(from, period) {
@@ -154,6 +163,7 @@ export const adminDecideRoute = route('subscription qr decide', 'Super Admin', a
       throw err
     }
   }
-  await auditAdmin(ctx, `clinic_plan_qr_${action}d`, `${action === 'approve' ? 'Approved' : 'Rejected'} a QR payment for the ${p.plan_name} plan.`, { payment_id: String(p._id), amount: p.amount }).catch(() => {})
+  await syncQrPayment(ctx.db, await col.findOne(q)).catch((err) => console.error('subscription ledger failed:', err.message))
+  await auditAdmin(ctx, action === 'approve' ? 'clinic_plan_qr_approved' : 'clinic_plan_qr_rejected', `${action === 'approve' ? 'Approved' : 'Rejected'} a QR payment for the ${p.plan_name} plan.`, { payment_id: String(p._id), amount: p.amount }).catch(() => {})
   return res.json({ payment: view(p), current: action === 'approve' ? await getEntitlements(ctx.db, ctx.user) : undefined })
 })

@@ -144,7 +144,7 @@ export default function AdminSubscriptionPage({ user, onLogout }) {
           )}
         </section>
 
-        <QrPaymentsPanel onDone={(msg) => { flash(msg); load() }} />
+        <QrPaymentsPanel onDone={load} />
 
         <section className="pcx-grid" aria-label="Plans">
           {!data ? [0, 1, 2].map((i) => <div key={i} className="pcx-card"><Skel h={48} w={48} r={14} /><Skel h={28} w="50%" /><Skel h={90} r={12} /><Skel h={120} r={12} /></div>)

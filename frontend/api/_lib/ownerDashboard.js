@@ -51,11 +51,11 @@ export async function buildOwnerDashboard(db) {
       { $group: { _id: '$_id.d', n: { $sum: 1 } } },
     ]).toArray(),
     db.collection('payments').find(
-      { status: { $in: PAID }, payment_date: { $gte: sixMonthsAgo } }, { projection: { amount: 1, payment_date: 1 } }
+      { status: { $in: PAID }, payment_for: { $ne: 'subscription' }, payment_date: { $gte: sixMonthsAgo } }, { projection: { amount: 1, payment_date: 1 } }
     ).toArray(),
-    db.collection('payments').find({ status: 'pending' }, { projection: { amount: 1 } }).toArray(),
+    db.collection('payments').find({ status: 'pending', payment_for: { $ne: 'subscription' } }, { projection: { amount: 1 } }).toArray(),
     db.collection('leave_request').countDocuments({ status: 'pending', is_archived: { $ne: true } }),
-    db.collection('payments').find({ status: { $in: PAID } }, { projection: { amount: 1, method: 1, payment_date: 1, payment_for: 1 } }).sort({ payment_date: -1 }).limit(4).toArray(),
+    db.collection('payments').find({ status: { $in: PAID }, payment_for: { $ne: 'subscription' } }, { projection: { amount: 1, method: 1, payment_date: 1, payment_for: 1 } }).sort({ payment_date: -1 }).limit(4).toArray(),
     db.collection('attendance').find({ type: 'time_in', is_archived: { $ne: true } }, { projection: { employee_name: 1, scanned_at: 1 } }).sort({ scanned_at: -1 }).limit(4).toArray(),
   ])
 

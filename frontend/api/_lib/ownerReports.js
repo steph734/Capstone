@@ -43,7 +43,7 @@ const rate = (num, den) => (den ? Math.round((num / den) * 100) : null)
 async function paymentsByDay(db, range, statuses) {
   const { start, end } = rangeBounds(range.from, range.to)
   const rows = await db.collection('payments').aggregate([
-    { $match: { status: { $in: statuses }, payment_date: { $gte: start, $lt: end } } },
+    { $match: { status: { $in: statuses }, payment_for: { $ne: 'subscription' }, payment_date: { $gte: start, $lt: end } } },
     { $group: { _id: dayOf('$payment_date'), value: { $sum: centavos } } },
   ]).toArray()
   return rows.map((r) => ({ day: r._id, value: r.value }))
@@ -52,7 +52,7 @@ async function paymentsByDay(db, range, statuses) {
 async function outstandingAtEnd(db, range) {
   const { end } = rangeBounds(range.from, range.to)
   const [r] = await db.collection('payments').aggregate([
-    { $match: { status: { $in: PENDING }, payment_date: { $lt: end } } },
+    { $match: { status: { $in: PENDING }, payment_for: { $ne: 'subscription' }, payment_date: { $lt: end } } },
     { $group: { _id: null, value: { $sum: centavos } } },
   ]).toArray()
   return r?.value || 0

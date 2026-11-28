@@ -243,3 +243,27 @@
 .pcx-sm-actions { display: flex; gap: 14px; }
 .pcx-sm-actions .br-btn { flex: 1; justify-content: center; min-height: 52px; font-size: 17px; }
 @media (max-width: 560px) { .pcx-sm { padding: 24px 20px; } .pcx-sm-actions { flex-direction: column-reverse; } }
+
+/* QR plan payments: receipt check, confirmation and success dialogs */
+.pcx-qr-view { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 720px) { .pcx-qr-view { grid-template-columns: 1fr; } }
+.pcx-qr-receipt { display: block; border: 1px solid #e3ece8; border-radius: 12px; background: #f6f9f8; padding: 8px; }
+.pcx-qr-receipt img { display: block; width: 100%; max-height: 55vh; object-fit: contain; }
+.pcx-qr-details { margin: 0 0 12px; padding: 2px 14px; border: 1px solid #e3ece8; border-radius: 12px; font-size: 14px; }
+.pcx-qr-details > div { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; }
+.pcx-qr-details > div + div { border-top: 1px solid #eef3f1; }
+.pcx-qr-details dt { color: #6b7c75; flex-shrink: 0; }
+.pcx-qr-details dd { margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; text-transform: none; }
+.pcx-qr-check, .pcx-qr-reasons label { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pcx-qr-check input, .pcx-qr-reasons input { appearance: auto; -webkit-appearance: auto; width: 18px; height: 18px; min-height: 0; margin: 0; flex-shrink: 0; accent-color: #2c4a3e; }
+.pcx-qr-reasons { margin: 0; padding: 0; border: 0; }
+.pcx-qr-reasons legend { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: #6b7c75; }
+.pcx-qr-reasons textarea { box-sizing: border-box; width: 100%; margin-top: 4px; padding: 10px 12px; border: 1px solid #cfdcd7; border-radius: 10px; font: inherit; font-size: 14px; resize: vertical; }
+.br-btn.pcx-qr-danger { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
+.br-btn.pcx-qr-danger.solid { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.br-btn.pcx-qr-danger:disabled { opacity: 0.55; cursor: not-allowed; }
+.pcx-qr-success { text-align: center; }
+.pcx-qr-success span { display: inline-flex; width: 68px; height: 68px; border-radius: 50%; align-items: center; justify-content: center; }
+.pcx-qr-success span.ok { background: #e3f4e8; color: #1f7a45; }
+.pcx-qr-success span.no { background: #fde8e8; color: #b91c1c; }
+.pcx-qr-success p { margin: 12px 0 0; font-size: 15px; line-height: 1.5; }

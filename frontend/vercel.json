@@ -10,7 +10,7 @@
       "destination": "/api"
     },
     {
-      "source": "/((?!api/|games/).*)",
+      "source": "/((?!api/|games/|assets/).*)",
       "destination": "/index.html"
     }
   ],

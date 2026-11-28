@@ -12,6 +12,7 @@ import { getStripeClient } from '../stripeClient.js'
 import { loadPlansAndFeatures, planName, num } from '../plans.js'
 import { getEntitlements, recordFromStripe, writeRecord, CLINIC_ID } from '../entitlements.js'
 import { listVisiblePlans } from './plans-public.js'
+import { recordCardPayment } from '../subscriptionLedger.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const fail = (res, status, code, error) => res.status(status).json({ error, code })
@@ -54,6 +55,12 @@ export const confirmRoute = route('owner subscription confirm', 'POST', ['Owner'
   if (!['active', 'trialing'].includes(s.status)) return fail(res, 409, 'PAYMENT_NOT_COMPLETE', 'The payment has not completed yet. Try again in a moment.')
   const record = recordFromStripe(s, { plan_key: pending.plan_key, owner_id: ctx.user._id, billing_period: pending.billing_period })
   await writeRecord(ctx.db, record)
+  if (s.status === 'active') {
+    await recordCardPayment(ctx.db, {
+      subscriptionId: id, planKey: record.plan_key, billingPeriod: record.billing_period, owner: ctx.user,
+      amount: (record.price_snapshot || 0) / 100,
+    }).catch((err) => console.error('subscription ledger failed:', err.message))
+  }
   await ctx.db.collection('clinic_settings').updateOne({ _id: CLINIC_ID }, { $unset: { pending_subscription: '' } })
   await auditAdmin(ctx, 'clinic_plan_activated', `The clinic subscribed to the ${String(pending.plan_key).toUpperCase()} plan.`, { plan_key: pending.plan_key, subscription_id: id }).catch(() => {})
   return res.json({ ok: true, current: await getEntitlements(ctx.db, ctx.user) })

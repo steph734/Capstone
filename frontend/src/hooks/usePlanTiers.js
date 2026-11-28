@@ -23,15 +23,25 @@ export function tierFromPlan(p) {
   }
 }
 
-// { tiers, current, clinicName }: tiers is null until loaded (callers keep their built-in tiers), `current` is the clinic's
+// { tiers, current, clinicName, loading }: while `loading` is true and there are no tiers yet, pages show a placeholder, never
+// their built-in prices (those can differ from the database). The last loaded plans are cached for the next visit.
+// `current` is the clinic's
 // entitlements (plan_key such as 'GOLD'). Refetches on focus and after any payment/downgrade (invalidateEntitlements).
+const CACHE_KEY = 'tp_plan_tiers_v1'
+const readCache = () => { try { const t = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return Array.isArray(t) && t.length ? t : null } catch { return null } }
+const writeCache = (t) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(t)) } catch { /* private mode */ } }
+
 export default function usePlanTiers() {
-  const [data, setData] = useState({ tiers: null, current: null, clinicName: '' })
+  const [data, setData] = useState(() => ({ tiers: readCache(), current: null, clinicName: '', loading: Boolean(getSessionToken()) }))
   const load = useCallback(() => {
     if (!getSessionToken()) return Promise.resolve()
     return authFetch('/api/me/subscription')
-      .then((d) => setData({ tiers: Array.isArray(d.plans) ? d.plans.map(tierFromPlan) : null, current: d.current || null, clinicName: d.clinic_name || '' }))
-      .catch(() => { /* keep what we have */ })
+      .then((d) => {
+        const tiers = Array.isArray(d.plans) ? d.plans.map(tierFromPlan) : null
+        if (tiers) writeCache(tiers)
+        setData({ tiers, current: d.current || null, clinicName: d.clinic_name || '', loading: false })
+      })
+      .catch(() => setData((old) => ({ ...old, loading: false }))) // keep what we have
   }, [])
   useEffect(() => {
     load()

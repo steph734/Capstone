@@ -138,7 +138,7 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
 
   // Plans come from the database (Super Admin > Subscription). Hidden plans are not offered, but the plan this Owner is
   // already on is always included so it still shows as their current plan.
-  const { tiers: apiTiers } = usePlanTiers()
+  const { tiers: apiTiers, loading: plansLoading } = usePlanTiers()
 
   // Re-evaluate the trial clock each minute so the "ending soon" notice appears
   // and the plan lapses without needing a page reload.
@@ -564,7 +564,8 @@ export default function OwnerSubscriptionPage({ user, onLogout, betaTier, active
           <h2 className="section-title">Subscription Tiers</h2>
 
           <div className="tiers-grid">
-            {subscriptionTiers.map((tier) => (
+            {!apiTiers && <p role="status">{plansLoading ? 'Loading plans…' : 'Could not load the plans. Check your connection and refresh the page.'}</p>}
+            {apiTiers && subscriptionTiers.map((tier) => (
               <div
                 key={tier.id}
                 className={`tier-card tier-${tier.color} ${tier.current ? 'current-tier' : ''}`}

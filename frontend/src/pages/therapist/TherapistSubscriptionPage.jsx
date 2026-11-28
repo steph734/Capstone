@@ -40,7 +40,7 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
   const trialEndMs = planTrialEnds ? new Date(planTrialEnds).getTime() : null
   const isTrialing = Boolean(trialEndMs) && trialEndMs > Date.now()
   const isTrialExpired = Boolean(trialEndMs) && !isTrialing
-  const { tiers: apiTiers, current } = usePlanTiers() // Live plans from the database + the clinic's plan, both from the server
+  const { tiers: apiTiers, current, loading: plansLoading } = usePlanTiers() // Live plans from the database + the clinic's plan, both from the server
   const activeTierId = current ? current.plan_key.toLowerCase() : 'free'
 
   const subscriptionTiersRaw = [
@@ -153,7 +153,8 @@ export default function TherapistSubscriptionPage({ user, onLogout, betaTier, ac
             <h2 className="section-title">Subscription Tiers</h2>
 
             <div className="tiers-grid">
-              {subscriptionTiers.map((tier) => (
+              {!apiTiers && <p role="status">{plansLoading ? 'Loading plans…' : 'Could not load the plans. Check your connection and refresh the page.'}</p>}
+              {apiTiers && subscriptionTiers.map((tier) => (
                 <div
                   key={tier.id}
                   className={`tier-card tier-${tier.color} ${tier.current ? 'current-tier' : ''}`}

@@ -41,7 +41,7 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
   }
 
   // The Owner pays for the plan, so a patient sees the clinic's current tier (from the server), not always Free.
-  const { tiers: apiTiers, current, clinicName } = usePlanTiers() // plans + the clinic's plan, from the server
+  const { tiers: apiTiers, current, clinicName, loading: plansLoading } = usePlanTiers() // plans + the clinic's plan, from the server
   const activeTierId = current ? current.plan_key.toLowerCase() : 'free'
   const currentRank = current ? current.tier_rank : null
 
@@ -161,7 +161,8 @@ export default function SubscriptionPage({ user, onLogout, betaTier }) {
             {clinicName && <p className="section-subtitle" style={{ margin: '-6px 0 14px', color: '#6b7c75' }}>Your plan comes from {clinicName}. Your clinic&apos;s Owner manages it.</p>}
             
             <div className="tiers-grid">
-              {subscriptionTiers.map((tier) => (
+              {!apiTiers && <p role="status">{plansLoading ? 'Loading plans…' : 'Could not load the plans. Check your connection and refresh the page.'}</p>}
+              {apiTiers && subscriptionTiers.map((tier) => (
                 <div 
                   key={tier.id} 
                   className={`tier-card tier-${tier.color} ${tier.current ? 'current-tier' : ''}`}

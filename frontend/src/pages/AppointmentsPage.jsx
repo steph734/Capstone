@@ -6,6 +6,7 @@ import { AVAILABILITY_SLOTS } from '../components/AvailabilityModal'
 import { SESSION_MODES } from '../data/sessionModes'
 import { manilaDateKey } from '../utils/manilaTime'
 import './AppointmentsPage.css'
+import GuardianBookings from '../components/GuardianBookings'
 
 /* ── Icons ── */
 function BellIcon() {
@@ -272,6 +273,8 @@ export default function AppointmentsPage({ user, onLogout, betaTier }) {
           <div className="appt-hero">
             <img src="/therapy-hero.png" alt="Therapy session illustration" className="hero-img" />
           </div>
+
+          {user?.role === 'Patient' && <GuardianBookings />}
 
           <div className="appt-card">
             {/* ── Session Overview Legend ── */}

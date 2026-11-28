@@ -9,8 +9,6 @@
 import { ObjectId } from 'mongodb'
 import { requireSession } from '../session.js'
 import { employeeFor, audit } from '../noteAccess.js'
-import { reviewQr } from '../paymentAttempts.js'
-import { notifyPatient } from '../paymentNotifications.js'
 import { REJECT_REASONS } from '../paymentProofRules.js'
 import { registrationProofRows, decideRegistrationPayment, PatientError } from '../therapistPatients.js'
 
@@ -57,23 +55,8 @@ export async function decidePayment(req, res, { id, decision, reason }) {
     if (e instanceof PatientError) return res.status(e.status).json({ error: e.message, code: e.code })
     throw e
   }
-  const attempt = await db.collection('payment_attempts').findOne({ _id: new ObjectId(String(id)) })
-  const appointment = attempt ? await db.collection('appointments').findOne({ _id: attempt.appointment_id }) : null
-  if (!attempt || !appointment || String(appointment.employee_id) !== String(employee._id)) {
-    await audit(db, { user, action: 'denied', ip, meta: { attempted: 'verify payment' } }).catch(() => {})
-    return res.status(403).json({ error: 'Only the therapist who received this booking can verify its payment.', code: 'NOT_ALLOWED' })
-  }
-  if (attempt.status === 'succeeded') return res.status(409).json({ error: 'This payment was already verified.', code: 'PAYMENT_ALREADY_VERIFIED' })
-
-  const approve = decision === 'approve'
-  const out = await reviewQr(db, attempt._id, approve, { reason, by: user.email })
-  if (!out.ok) return res.status(409).json({ error: out.error, code: 'ALREADY_SUBMITTED' })
-  await audit(db, { user, action: approve ? 'payment_verified' : 'payment_rejected', patientId: appointment.patient_id, ip, meta: { attempt: String(attempt._id) } }).catch(() => {})
-
-  // Tell the patient. A failure here never changes the decision.
-  const fresh = await db.collection('appointments').findOne({ _id: appointment._id })
-  await notifyPatient(db, approve ? 'verified' : 'rejected', fresh || appointment, { reason }).catch((e) => console.error('payment decision notice failed:', e.message))
-  return res.status(200).json({ ok: true, paymentStatus: approve ? 'verified' : 'rejected', appointmentId: String(appointment._id) })
+  await audit(db, { user, action: 'denied', ip, meta: { attempted: 'verify payment' } }).catch(() => {})
+  return res.status(403).json({ error: 'The clinic Owner checks booking payments now.', code: 'NOT_ALLOWED' })
 }
 
 export default async function handler(req, res) {
@@ -84,14 +67,7 @@ export default async function handler(req, res) {
       const ctx = await therapistContext(req, res)
       if (!ctx) return
       const { db, employee } = ctx
-      const now = new Date()
-      const appointments = await db.collection('appointments').find({ employee_id: employee._id, payment_state: 'pending_verification' }).sort({ updated_at: -1 }).limit(50).toArray()
-      const payments = []
-      for (const a of appointments) {
-        const attempt = (await db.collection('payment_attempts').find({ appointment_id: a._id, status: 'pending_verification' }).sort({ created_at: -1 }).limit(1).toArray())[0]
-        if (attempt) payments.push(proofRow(a, attempt, now))
-      }
-      payments.push(...await registrationProofRows(db, employee))
+      const payments = await registrationProofRows(db, employee) // booking payments are the Owner's to check
       res.setHeader('Cache-Control', 'no-store')
       return res.status(200).json({ payments, reasons: REJECT_REASONS })
     }

@@ -8,7 +8,7 @@ import { checkReceiptFile } from '../../utils/receiptImage'
 //
 // Controlled by the checkout modal: { reference, file } live there so they survive the confirmation modal, a failed submit,
 // and going back. `controls` hands the modal two functions to move focus to a field ("Edit" / "Change" on the confirm modal).
-export default function PaymentProofStep({ method, reference, onReference, file, onFile, holdBanner, rejectedReason, error, controls, verifier = 'your therapist' }) {
+export default function PaymentProofStep({ method, reference, onReference, file, onFile, holdBanner, rejectedReason, error, controls, verifier = 'the clinic' }) {
   const rule = REFERENCE_RULES[method] || REFERENCE_RULES.gcash
   const [touched, setTouched] = useState(false)
   const [fileError, setFileError] = useState('')

@@ -193,7 +193,7 @@ export default function PendingVerification({ attempt, isMaya, fallbackSession, 
           <div role="status" className="mt-3 flex items-start gap-2 rounded-lg px-3 py-3 text-sm" style={{ background: MINT, color: DARK }}>
             <span className="mt-0.5 shrink-0" style={{ color: GREEN }}><Check s={16} /></span>
             <span className="min-w-0 flex-1">
-              <strong>Thanks, we got your details.</strong> The therapist will check your {providerName} payment{attempt?.reference ? ` (ref. ${formatReference(attempt.reference)})` : ''}{attempt?.hasScreenshot ? ' and your screenshot' : ''}.
+              <strong>Thanks, we got your details.</strong> The clinic will check your {providerName} payment{attempt?.reference ? ` (ref. ${formatReference(attempt.reference)})` : ''}{attempt?.hasScreenshot ? ' and your screenshot' : ''}.
               <button type="button" onClick={() => setEditing(true)} className="ml-2 font-bold underline" style={{ color: GREEN }}>Add or change</button>
             </span>
           </div>

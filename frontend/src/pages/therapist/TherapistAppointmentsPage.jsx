@@ -60,7 +60,7 @@ export default function TherapistAppointmentsPage({ user, onLogout, betaTier }) 
   const [sum, loadSum] = useLoad(() => apptApi.summary(), [])
   const [cal, loadCal] = useLoad(() => apptApi.calendar(month), [month])
   const [day, loadDay] = useLoad(() => apptApi.day(selected), [selected])
-  const [reqs, loadReqs] = useLoad(() => apptApi.requests(2), [])
+  const [reqs, loadReqs] = useLoad(() => apptApi.requests(), [])
   const [list, loadList] = useLoad(() => apptApi.list({ tab, status: status === 'All' ? '' : status, q, from, to, page, pageSize: PAGE_SIZE }), [tab, status, q, from, to, page])
 
   const refreshAll = useCallback(() => { loadSum(); loadCal(); loadDay(); loadReqs(); loadList() }, [loadSum, loadCal, loadDay, loadReqs, loadList])

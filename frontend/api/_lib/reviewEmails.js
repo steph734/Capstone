@@ -110,21 +110,21 @@ export function buildProcessingEmail(v) {
     return `<tr><td style="padding:6px 10px 6px 0;vertical-align:top;width:26px;">${mark}</td><td style="padding:6px 0;"><div style="font-size:14px;font-weight:700;color:${state === 'todo' ? '#8aa095' : '#1e3a31'};">${esc(title)}</div><div style="font-size:12px;color:#6b7c75;">${esc(sub)}</div></td></tr>`
   }
   const body = `
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">Your appointment is being processed. ${esc(v.therapist || 'Your therapist')} will check your payment and accept your appointment. We'll email you again as soon as that happens.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">Your appointment is being processed. The clinic will check your payment, then ${esc(v.therapist || 'your therapist')} will accept your appointment. We'll email you again as soon as that happens.</p>
         <table style="width:100%;border-collapse:collapse;margin:0 0 16px;">
           ${step('done', 'Payment recorded', v.paidAt)}
-          ${step('now', 'Therapist is reviewing', 'Usually within 24 hours')}
+          ${step('now', 'Payment under review', 'Usually within 24 hours')}
           ${step('todo', 'Appointment accepted', "You'll get a confirmation email")}
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:14px;">${rows([...details(v), ['Payment', v.payment]])}</table>
-        <div style="margin:20px 0 0;border:1px solid #f3d284;background:#fff8e6;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:#7a4a06;">Your time slot is held for you until <strong>${esc(v.holdEnd)}</strong>. If your therapist needs a new receipt, we'll let you know.</div>`
+        <div style="margin:20px 0 0;border:1px solid #f3d284;background:#fff8e6;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:#7a4a06;">Your time slot is held for you until <strong>${esc(v.holdEnd)}</strong>. If we need a new receipt, we'll let you know.</div>`
   const html = shell({ heading: 'We got your payment', greeting: hello(v), body, button: { label: 'View my appointment', href: `${appBase()}/appointments` }, footer: 'You are receiving this because you booked an appointment on TherapyPro. This is not yet a confirmation.' })
   const text = [
     hello(v), '', 'We got your payment.', '',
-    `Your appointment is being processed. ${v.therapist || 'Your therapist'} will check your payment and accept your appointment. We'll email you again as soon as that happens.`, '',
-    `[done] Payment recorded: ${v.paidAt}`, '[now]  Therapist is reviewing: usually within 24 hours', "[next] Appointment accepted: you'll get a confirmation email", '',
+    `Your appointment is being processed. The clinic will check your payment, then ${v.therapist || 'your therapist'} will accept your appointment. We'll email you again as soon as that happens.`, '',
+    `[done] Payment recorded: ${v.paidAt}`, '[now]  Payment under review: usually within 24 hours', "[next] Appointment accepted: you'll get a confirmation email", '',
     ...detailsText(v), `Payment: ${v.payment}`, '',
-    `Your time slot is held for you until ${v.holdEnd}. If your therapist needs a new receipt, we'll let you know.`, '',
+    `Your time slot is held for you until ${v.holdEnd}. If we need a new receipt, we'll let you know.`, '',
     `View my appointment: ${appBase()}/appointments`, '', 'You are receiving this because you booked an appointment on TherapyPro. This is not yet a confirmation.',
   ].join('\n')
   return { subject, html, text }

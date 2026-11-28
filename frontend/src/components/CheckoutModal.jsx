@@ -29,8 +29,8 @@ import useDialogA11y from './payments/useDialogA11y'
 //   QR     select_method -> confirm -> proof -> (confirm dialog) -> sending -> recorded
 //                  "Pay"       "Confirm payment"   "Reference & receipt"      (the server stored the proof)
 //
-// Nothing here decides that a payment worked. Cards: the SERVER asks Stripe. QR (GCash / Maya): the booked therapist
-// verifies it by hand. "recorded" only means "your proof was stored and sent to the therapist", never "paid".
+// Nothing here decides that a payment worked. Cards: the SERVER asks Stripe. QR (GCash / Maya): the clinic Owner
+// verifies it by hand. "recorded" only means "your proof was stored and sent to the clinic", never "paid".
 // See src/utils/bookingPayments.js and api/_lib/routes/bookings-*.js, payments-item.js.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -212,7 +212,7 @@ function CheckoutBody({
   const methodLabel = result?.methodLabel && phase !== 'select_method' && phase !== 'confirm' ? result.methodLabel : isQr ? `${qrP.label} QR` : pm?.label || 'Card'
   const providerName = isQr || methodRef.current !== 'card' ? (methodRef.current === 'paymaya' ? 'Maya' : 'GCash') : 'Stripe'
   const cardAvailable = Boolean(stripe && elements)
-  const therapistName = (therapistLabel || '').split(' · ')[0] || 'your therapist'
+  const therapistName = 'the clinic' // who the payment proof goes to (the Owner checks it, then the therapist accepts)
   const amountPesos = total / 100
   const qrMethod = isQr ? qrP.apiMethod : methodRef.current // gcash | paymaya (for the proof rules)
   const modeLabel = (lineItems?.[0]?.name || '').match(/\(([^)]+)\)/)?.[1] || ''

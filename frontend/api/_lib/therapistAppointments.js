@@ -47,7 +47,7 @@ export async function summary(db, employee) {
     col.countDocuments({ ...mine(employee), is_archived: true }),
     listRequests(db, employee),
   ])
-  return { today: todayCount, scheduled, needsResponse: reqs.requests.length, completed, archived }
+  return { today: todayCount, scheduled, needsResponse: reqs.requests.filter((r) => r.phase === 'awaiting_therapist').length, completed, archived }
 }
 
 // ── 2. calendar dots for one month ──
@@ -108,7 +108,10 @@ export async function day(db, employee, date) {
 export async function requests(db, employee, limit) {
   const all = (await listRequests(db, employee)).requests.slice().sort((a, b) => new Date(a.requestedAt) - new Date(b.requestedAt))
   const n = Number(limit)
-  return { total: all.length, items: Number.isFinite(n) && n > 0 ? all.slice(0, n) : all }
+  const ready = all.filter((r) => r.phase === 'awaiting_therapist')
+  const waiting = all.filter((r) => r.phase === 'waiting_owner')
+  const ordered = [...ready, ...waiting]
+  return { total: ready.length, waitingOwner: waiting.length, items: Number.isFinite(n) && n > 0 ? ordered.slice(0, n) : ordered }
 }
 
 // ── 5. the "All appointments" list: upcoming first (soonest first), then the past (newest first) ──

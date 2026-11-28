@@ -4,8 +4,7 @@
 //   - is rate limited per user, and leaves an audit entry (who decided what, when; no payment data).
 //
 //   GET  /api/therapist/requests                         the requests to review + recently handled
-//   POST /api/appointments/:id/payment/verify            { checks: { amountSeen: true, referenceMatches: true } }
-//   POST /api/appointments/:id/payment/reject            { reason, note?, nextAction: "request_new_proof" | "decline_request" }
+//   (checking the payment moved to the Owner: /api/booking-flow)
 //   POST /api/appointments/:id/accept
 //   POST /api/appointments/:id/decline                   { reason, message? }
 //   GET  /api/appointments/:id/emails                    emails sent for this appointment
@@ -17,7 +16,7 @@ import { ObjectId } from 'mongodb'
 import { requireSession } from '../session.js'
 import { employeeFor, audit } from '../noteAccess.js'
 import { tooManyRequests } from '../rateLimit.js'
-import { ReviewError, loadOwned, verifyPayment, rejectPayment, acceptAppointment, declineAppointment, listEmails, resendEmail, listRequests } from '../requestReview.js'
+import { ReviewError, loadOwned, acceptAppointment, declineAppointment, recordTherapistResponse, listEmails, resendEmail, listRequests } from '../requestReview.js'
 
 function guarded(method, fn, { needsId = true } = {}) {
   return async function handler(req, res) {
@@ -53,33 +52,22 @@ export const requests = guarded('GET', async ({ res, db, employee }) => {
   return res.status(200).json(await listRequests(db, employee))
 }, { needsId: false })
 
+// Checking a payment moved to the Owner (/api/booking-flow): a therapist is always refused here.
 export const payment = (req, res) => {
-  const action = req.params.action
-  if (action === 'verify') {
-    return guarded('POST', async ({ req: r, res: s, db, user, appt, log }) => {
-      const out = await verifyPayment(db, appt, { checks: r.body?.checks, by: user.email })
-      if (!out.already) await log('payment_verified')
-      return s.status(200).json({ ok: true, ...out })
-    })(req, res)
-  }
-  if (action === 'reject') {
-    return guarded('POST', async ({ req: r, res: s, db, user, appt, log }) => {
-      const out = await rejectPayment(db, appt, r.body || {}, { by: user.email })
-      await log(out.nextAction === 'decline_request' ? 'payment_rejected_declined' : 'payment_rejected_new_proof')
-      return s.status(200).json({ ok: true, nextAction: out.nextAction, status: out.status, email: { id: String(out.email.id), status: out.email.status }, warning: out.warning })
-    })(req, res)
-  }
-  return res.status(404).json({ error: 'Not found.' })
+  if (!['verify', 'reject'].includes(req.params.action)) return res.status(404).json({ error: 'Not found.' })
+  return guarded('POST', async ({ res: s }) => s.status(403).json({ error: 'The clinic Owner checks booking payments now.', code: 'NOT_ALLOWED' }))(req, res)
 }
 
 export const accept = guarded('POST', async ({ res, db, user, appt, log }) => {
   const out = await acceptAppointment(db, appt, { by: user.email })
+  await recordTherapistResponse(db, appt, user, 'accept')
   await log('appointment_accepted')
   return res.status(200).json({ ok: true, status: out.status, email: { id: String(out.email.id), status: out.email.status }, warning: out.warning })
 })
 
 export const decline = guarded('POST', async ({ req, res, db, user, appt, log }) => {
   const out = await declineAppointment(db, appt, req.body || {}, { by: user.email })
+  await recordTherapistResponse(db, appt, user, 'decline', req.body?.message)
   await log('appointment_declined')
   return res.status(200).json({ ok: true, status: out.status, email: { id: String(out.email.id), status: out.email.status }, warning: out.warning })
 })

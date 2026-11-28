@@ -518,3 +518,12 @@
   .oa-service-badge,
   .oa-branch-badge { padding: 4px 9px; font-size: 11px; }
 }
+
+/* approval flow */
+.oa-kpi-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.oa-kpi-card.orange::before { background: #e0701b; }
+.oa-kpi-card.orange.hot { border-color: #f5c58c; box-shadow: 0 0 0 3px rgba(224, 112, 27, 0.18); }
+.oa-pill-orange { background: #fff0dc; color: #9a4a06; }
+@media (max-width: 1199px) { .oa-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .oa-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.oa-table-card .admin-table-scroll { overflow-x: auto; }

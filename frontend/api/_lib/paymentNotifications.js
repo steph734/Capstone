@@ -14,13 +14,21 @@ export const sessionWhen = (a) => {
 export const clinicTime = (date) => (date ? new Date(date).toLocaleString('en-US', { timeZone: CLINIC_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
 
 export const TEMPLATES = {
+  ownerNewProof: ({ patient, when, changed }) => ({
+    title: changed ? 'Payment details updated' : 'New payment to verify',
+    body: `${changed ? 'Updated payment details' : 'New payment'} received from ${patient || 'a patient'} for ${when}. Please verify.`,
+  }),
+  patientSlotReleased: ({ when }) => ({
+    title: 'Your booking was cancelled',
+    body: `We did not receive a new receipt in time, so the slot on ${when} was released. You are welcome to book again.`,
+  }),
   therapistNewProof: ({ patient, when, changed }) => ({
     title: changed ? 'Payment details updated' : 'New payment to verify',
     body: `${changed ? 'Updated payment details' : 'New payment'} received from ${patient || 'a patient'} for ${when}. Please verify.`,
   }),
-  patientProofReceived: ({ therapist }) => ({
+  patientProofReceived: () => ({
     title: 'We received your payment details',
-    body: `We received your payment details. ${therapist || 'Your therapist'} will verify them soon.`,
+    body: 'We received your payment details. The clinic will check them soon.',
   }),
   patientVerified: ({ when }) => ({
     title: 'Your appointment is confirmed',
@@ -64,12 +72,24 @@ async function deliver(db, { email, name, phone, tpl, link, channels = ['inApp',
   return out
 }
 
-// The booked therapist (their login email is the employee email) hears that proof arrived.
-export async function notifyTherapistProof(db, appointment, { changed = false } = {}) {
+// In-app notice to the booked therapist (their login email is the employee email).
+export async function notifyTherapist(db, appointment, tpl) {
   const emp = appointment.employee_id ? await db.collection('employees').findOne({ _id: appointment.employee_id }) : null
-  const tpl = TEMPLATES.therapistNewProof({ patient: appointment.patient_name, when: sessionWhen(appointment), changed })
   return deliver(db, { email: emp?.email, name: emp?.first_name || undefined, tpl, link: '/therapist/appointments', channels: ['inApp'] })
 }
+
+// In-app notice to every Owner. Without a title it is the "payment to verify" message.
+export async function notifyOwners(db, appointment, { changed = false, title, body } = {}) {
+  const tpl = title ? { title, body } : TEMPLATES.ownerNewProof({ patient: appointment.patient_name, when: sessionWhen(appointment), changed })
+  let delivered = false
+  try {
+    const owners = await db.collection('users').find({ role: 'Owner', is_archived: { $ne: true } }, { projection: { email: 1 } }).toArray()
+    for (const o of owners) delivered = (await inApp(db, o.email, tpl, '/owner/appointments')) || delivered
+  } catch (err) { console.error('owner notice failed:', err.message) }
+  return { inApp: delivered }
+}
+
+export const notifyGuardianInApp = (db, appointment, tpl) => deliver(db, { email: appointment.contact_email, tpl, link: '/appointments', channels: ['inApp'] })
 
 // kind: proofReceived | verified | rejected | holdReminder
 export async function notifyPatient(db, kind, appointment, vars = {}) {
@@ -77,6 +97,7 @@ export async function notifyPatient(db, kind, appointment, vars = {}) {
     proofReceived: () => TEMPLATES.patientProofReceived({ therapist: appointment.therapist_name }),
     verified: () => TEMPLATES.patientVerified({ when: sessionWhen(appointment) }),
     rejected: () => TEMPLATES.patientRejected({ reason: vars.reason, holdEnd: clinicTime(appointment.hold_expires_at) }),
+    slotReleased: () => TEMPLATES.patientSlotReleased({ when: sessionWhen(appointment) }),
     holdReminder: () => TEMPLATES.patientHoldReminder({ when: sessionWhen(appointment), holdEnd: clinicTime(appointment.hold_expires_at) }),
   }[kind]?.()
   if (!tpl) return { inApp: false, email: false, sms: false }

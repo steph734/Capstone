@@ -27,6 +27,7 @@ import therapistPayments from './_lib/routes/therapist-payments.js'
 import therapistPatients, { registrationReceiptRoute } from './_lib/routes/therapist-patients.js'
 import therapistAppointments from './_lib/routes/therapist-appointments.js'
 import * as review from './_lib/routes/appointments-review.js'
+import bookingFlow from './_lib/routes/booking-flow.js'
 import stripeWebhook from './_lib/routes/stripe-webhook.js'
 
 import createPaymentIntent from './_lib/routes/create-payment-intent.js'
@@ -227,6 +228,7 @@ app.all('/api/bookings/:id/:action', bookingsItem)
 app.all('/api/payments/awaiting-verification', paymentsAwaiting)
 app.all('/api/payments/:id/:action', paymentsItem)
 app.all('/api/payments/:id', paymentsItem)
+app.all('/api/booking-flow', bookingFlow) // Owner payment check -> therapist accept (?action=)
 app.all('/api/therapist/requests', review.requests)
 app.all('/api/appointments/:id/payment/:action', review.payment)
 app.all('/api/appointments/:id/accept', review.accept)

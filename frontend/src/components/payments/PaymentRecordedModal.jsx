@@ -20,8 +20,8 @@ export default function PaymentRecordedModal({ view, onDone, onChangeProof }) {
   const held = hoursLeft(b.holdExpiresAt)
   const items = [
     { state: 'done', title: 'Payment recorded', sub: `${stamp(view.proofSubmittedAt)}${view.referenceLast4 ? ` · Ref ending ${view.referenceLast4}` : ''}` },
-    { state: 'now', title: 'Therapist is reviewing', sub: `${therapist} is checking your payment` },
-    { state: 'todo', title: 'Appointment accepted', sub: "We'll email you once it's accepted or declined" },
+    { state: 'now', title: 'Payment under review', sub: 'The clinic is checking your payment' },
+    { state: 'todo', title: 'Therapist accepts', sub: `${therapist} is asked once your payment is confirmed` },
   ]
 
   return (
@@ -33,7 +33,7 @@ export default function PaymentRecordedModal({ view, onDone, onChangeProof }) {
       >
         {!hidePao && <img src={MEDAL_POSE} alt="" onError={() => setHidePao(true)} className="pointer-events-none absolute -top-[100px] left-1/2 h-[135px] w-auto -translate-x-1/2 select-none sm:-top-[110px] sm:h-[150px]" />}
         <h2 id="prm-title" className="m-0 text-center text-xl font-bold text-[#111827]">Appointment being processed</h2>
-        <p id="prm-desc" className="m-0 mt-1 text-center text-[13px] text-slate-500">Your payment is recorded. We&apos;re waiting for {therapist} to accept your appointment.</p>
+        <p id="prm-desc" className="m-0 mt-1 text-center text-[13px] text-slate-500">Your payment is recorded. The clinic checks it first, then {therapist} accepts your appointment.</p>
 
         <ul className="m-0 mt-4 list-none space-y-2.5 p-0">
           {items.map((it) => (
@@ -56,7 +56,7 @@ export default function PaymentRecordedModal({ view, onDone, onChangeProof }) {
             <Mail size={16} className="mt-0.5 shrink-0 text-[#2F5FD0]" aria-hidden="true" />
             <span className="block text-left">
               <span className="block text-[13px] font-bold text-[#2F5FD0]">We sent you an email</span>
-              <span className="block text-xs text-[#4A6BB8]">It says your appointment is being processed and waiting for the therapist.</span>
+              <span className="block text-xs text-[#4A6BB8]">It says your appointment is being processed.</span>
             </span>
           </div>
         )}

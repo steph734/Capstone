@@ -1,5 +1,6 @@
 import { getMongo } from '../mongo.js'
-import { realBookingsOnly } from '../bookingCore.js'
+import { realBookingsOnly, expireStaleHolds } from '../bookingCore.js'
+import { stageOf } from '../bookingFlowRules.js'
 import { requireSession } from '../session.js'
 
 // GET /api/owner/appointments -> every (non-archived) record in the `appointments`
@@ -16,8 +17,9 @@ export default async function handler(req, res) {
     if (!ctx) return
     const { db } = ctx
 
+    await expireStaleHolds(db).catch((e) => console.error('expireStaleHolds failed:', e.message))
     const [appts, employees, branches] = await Promise.all([
-      db.collection('appointments').find({ is_archived: { $ne: true }, ...realBookingsOnly }).sort({ session_date: -1, start_time: -1 }).toArray(),
+      db.collection('appointments').find({ is_archived: { $ne: true }, $or: [realBookingsOnly, { payment_state: 'pending_verification' }, { status: 'Pending', 'payment.status': 'rejected' }] }).sort({ session_date: -1, start_time: -1 }).toArray(),
       db.collection('employees').find({}, { projection: { branch_id: 1, first_name: 1, last_name: 1 } }).toArray(),
       db.collection('branchs').find({}, { projection: { branch_name: 1 } }).toArray(),
     ])
@@ -38,6 +40,7 @@ export default async function handler(req, res) {
         date: a.session_date || null,
         time: a.time_slot_label || [a.start_time, a.end_time].filter(Boolean).join(' - '),
         status: a.status || 'Pending',
+        stage: stageOf({ ...a, status: a.status || 'Pending' }),
         bookedOn: a.created_at || null,
         mode: a.session_mode || '',
         condition: a.condition || '',

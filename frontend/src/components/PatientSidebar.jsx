@@ -148,6 +148,8 @@ const ROLE_PROFILE_PATHS = {
   'Super Admin': '/admin/profile',
   Admin: '/admin/profile',
 }
+import useFlowBadge from '../hooks/useFlowBadge'
+
 const DEFAULT_PROFILE_PATH = '/patient/profile'
 
 export default function PatientSidebar({
@@ -170,6 +172,9 @@ export default function PatientSidebar({
   const RANK = { free: 0, silver: 1, gold: 2 }
   const effectiveTier = (RANK[clinic.tier] || 0) >= (RANK[betaTier] || 0) ? clinic.tier : betaTier
   const resolvedMenuItems = (menuItems ?? getPatientMenuItems(effectiveTier)).filter((it) => !(user?.role === 'Patient' && it.id === 'gamified-activities' && clinic.gamified === false)).map((it) => (it.id === 'gamified-activities' && homePractice.count > 0 ? { ...it, badge: homePractice.count } : it))
+  // Owner: payments to verify. Therapist: requests waiting for their answer.
+  const flowCount = useFlowBadge(user?.role)
+  const menu = flowCount > 0 ? resolvedMenuItems.map((it) => (it.id === 'appointments' ? { ...it, badge: flowCount } : it)) : resolvedMenuItems
   const unreadCount = useUnreadCount()
   const emailUnreadCount = useEmailUnreadCount(user?.email)
   const navigate = useNavigate()
@@ -230,7 +235,7 @@ export default function PatientSidebar({
 
         {/* Main Navigation */}
         <nav className="sidebar-nav">
-          {resolvedMenuItems.map(item => {
+          {menu.map(item => {
             const itemActive = location.pathname === item.path
             const hasChildren = Array.isArray(item.children) && item.children.length > 0
             const sectionActive =
@@ -263,7 +268,7 @@ export default function PatientSidebar({
                   {item.id === 'email' && emailUnreadCount > 0 && (
                     <span className="nav-unread-badge">{emailUnreadCount > 99 ? '99+' : emailUnreadCount}</span>
                   )}
-                  {item.badge > 0 && <span className="nav-unread-badge" aria-label={`${item.badge} unread`}>{item.badge > 99 ? '99+' : item.badge}</span>}
+                  {item.badge > 0 && <span className="nav-unread-badge" aria-label={`${item.badge} ${item.id === 'appointments' ? 'waiting' : 'unread'}`}>{item.badge > 99 ? '99+' : item.badge}</span>}
                   {item.trial && <span className="nav-trial-tag">Trial</span>}
                   {hasChildren && (
                     <span className={`nav-chevron ${isExpanded ? 'open' : ''}`}>

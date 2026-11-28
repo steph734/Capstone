@@ -7,6 +7,7 @@ import mongoose from 'mongoose'
 import crypto from 'crypto'
 
 import { NOT_A_REAL_BOOKING } from './pricing.js'
+import { notifyPatient } from './paymentNotifications.js'
 
 const { ObjectId } = mongoose.Types
 
@@ -233,10 +234,12 @@ export async function markAvailability(db, appointment, booked) {
 // Gives a held slot back (payment failed, timed out, was cancelled, or was rejected).
 export async function releaseHold(db, appointment, reason = 'expired') {
   const now = new Date()
-  await db.collection('appointments').updateOne(
+  const rejected = appointment.payment?.status === 'rejected' // the Owner asked for a new receipt and none came in time
+  const r = await db.collection('appointments').updateOne(
     { _id: appointment._id, payment_state: { $in: ['awaiting_payment', 'pending_verification'] } },
-    { $set: { status: 'Cancelled', cancelled_reason: 'Payment was not completed', payment_state: reason, hold_expires_at: null, updated_at: now } },
+    { $set: { status: 'Cancelled', cancelled_reason: rejected ? 'No new receipt was received within 24 hours' : 'Payment was not completed', payment_state: reason, hold_expires_at: null, updated_at: now } },
   )
+  if (rejected && r.modifiedCount) await notifyPatient(db, 'slotReleased', appointment).catch((e) => console.error('slot release notice failed:', e.message))
   if (appointment.employee_id) await releaseSlotLock(db, slotKey(appointment.employee_id, appointment.session_date, appointment.start_time), appointment._id)
   await markAvailability(db, appointment, false)
 }

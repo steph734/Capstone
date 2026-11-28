@@ -24,7 +24,7 @@ const same = (a, b) => (a instanceof Date || b instanceof Date ? new Date(a).get
 function matches(doc, q) {
   return Object.entries(q).every(([k, v]) => {
     if (k === '$or') return v.some((sub) => matches(doc, sub))
-    const val = doc[k]
+    const val = k.split('.').reduce((o, p) => o?.[p], doc)
     if (v && typeof v === 'object' && !(v instanceof Date) && !(v instanceof ObjectId) && !Array.isArray(v)) {
       return Object.entries(v).every(([op, arg]) => {
         if (op === '$in') return arg.some((x) => same(x, val))
@@ -39,12 +39,23 @@ function matches(doc, q) {
     return same(val, v)
   })
 }
+function apply(doc, u) {
+  for (const [path, value] of Object.entries(u.$set || {})) {
+    const keys = path.split('.'); let o = doc
+    for (const k of keys.slice(0, -1)) o = o[k] ??= {}
+    o[keys.at(-1)] = value
+  }
+  for (const path of Object.keys(u.$unset || {})) {
+    const keys = path.split('.'); const o = keys.slice(0, -1).reduce((x, k) => x?.[k], doc)
+    if (o) delete o[keys.at(-1)]
+  }
+}
 const col = (name) => ({
   findOne: async (q) => store[name].find((d) => matches(d, q)) || null,
   find: (q) => { let rows = store[name].filter((d) => matches(d, q)); const c = { sort: () => c, limit: (n) => { rows = rows.slice(0, n); return c }, toArray: async () => rows }; return c },
   insertOne: async (d) => { const doc = { _id: new ObjectId(), ...d }; store[name].push(doc); return { insertedId: doc._id } },
   createIndex: async () => {},
-  updateMany: async (q, u) => { store[name].filter((d) => matches(d, q)).forEach((d) => Object.assign(d, u.$set)); return {} },
+  updateMany: async (q, u) => { store[name].filter((d) => matches(d, q)).forEach((d) => apply(d, u)); return {} },
   updateOne: async (q, u, opts) => {
     let doc = store[name].find((d) => matches(d, q))
     if (!doc) {
@@ -52,8 +63,8 @@ const col = (name) => ({
       if (q._id !== undefined && store[name].some((d) => String(d._id) === String(q._id))) throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 })
       doc = { _id: q._id ?? new ObjectId() }; store[name].push(doc)
     }
-    Object.assign(doc, u.$set || {})
-    return { matchedCount: 1 }
+    apply(doc, u)
+    return { matchedCount: 1, modifiedCount: 1 }
   },
   findOneAndUpdate: async (q, u, opts) => {
     const doc = store[name].find((d) => matches(d, q))
@@ -554,13 +565,13 @@ describe('notifications never change the result', () => {
   it('a failing text or email is swallowed, and the in-app notice is still created', async () => {
     mocks.semaphore.mockRejectedValue(new Error('SMS provider down'))
     mocks.brevo.mockRejectedValue(new Error('email provider down'))
-    const { notifyPatient, notifyTherapistProof } = await import('./paymentNotifications.js')
+    const { notifyPatient, notifyOwners } = await import('./paymentNotifications.js')
     const appt = await makeHold()
-    store.employees = [{ _id: therapistId, email: 'th@example.com' }]
+    store.users = [{ _id: new ObjectId(), email: 'owner@example.com', role: 'Owner' }]
     const out = await notifyPatient(db, 'proofReceived', appt)
     expect(out).toMatchObject({ inApp: true, email: false, sms: false })
-    expect((await notifyTherapistProof(db, appt)).inApp).toBe(true)
-    expect(store.notifications.map((n) => n.recipient_email)).toEqual(expect.arrayContaining(['g@example.com', 'th@example.com']))
+    expect((await notifyOwners(db, appt)).inApp).toBe(true)
+    expect(store.notifications.map((n) => n.recipient_email)).toEqual(expect.arrayContaining(['g@example.com', 'owner@example.com']))
   })
   it('messages never contain a full reference number', async () => {
     const { TEMPLATES } = await import('./paymentNotifications.js')
@@ -603,14 +614,16 @@ describe('POST /api/payments/:id/proof and GET /api/payments/:id/receipt', () =>
     method: 'POST', body: f, headers: { ...(key ? { 'Idempotency-Key': key } : {}), ...(tok ? { 'x-booking-token': tok } : {}) },
   })
 
-  it('stores the proof, tells the therapist, and answers with the summary for the success modal', async () => {
+  it('stores the proof, tells the Owner, and answers with the summary for the success modal', async () => {
     const { attempt } = await setup()
+    store.users = [{ _id: new ObjectId(), email: 'owner@example.com', role: 'Owner' }]
     const res = await post(attempt, form('5456 656 574 544', jpegBytes()))
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body).toMatchObject({ paymentStatus: 'proof_submitted', referenceLast4: '4544', hasReceipt: true, receivedByTherapist: true, amount: 300 })
     expect(JSON.stringify(body)).not.toContain('access_token_hash')
-    expect(store.notifications.some((n) => n.recipient_email === 'th@example.com' && /New payment received from Eli/.test(n.body))).toBe(true)
+    expect(store.notifications.some((n) => n.recipient_email === 'owner@example.com' && /New payment received from Eli/.test(n.body))).toBe(true)
+    expect(store.notifications.some((n) => n.recipient_email === 'th@example.com')).toBe(false)
     expect(store.payments || []).toHaveLength(0) // recorded, not paid
   })
 
@@ -843,19 +856,18 @@ describe('request review', () => {
   })
 
   describe('the list the page shows', () => {
-    it('puts each request in the right phase', async () => {
+    it('shows an unchecked payment as waiting for the Owner, without proof details, and hides a rejected one', async () => {
       const { appt } = await withProof()
       let list = await rr.listRequests(db, me)
-      expect(list.requests).toHaveLength(1)
-      expect(list.requests[0]).toMatchObject({ phase: 'check_payment', timeLabel: '10:00 AM – 11:00 AM'.slice(0, 0) + list.requests[0].timeLabel, payment: { state: 'proof_submitted', referenceLast4: '4544' } })
+      expect(list.requests[0]).toMatchObject({ phase: 'waiting_owner', payment: null })
       await rr.rejectPayment(db, fresh(appt), { reason: 'amount_wrong', nextAction: 'request_new_proof' }, fast)
       list = await rr.listRequests(db, me)
-      expect(list.requests[0]).toMatchObject({ phase: 'waiting_proof', payment: { state: 'rejected', rejectReason: 'amount_wrong' } })
+      expect(list.requests).toHaveLength(0)
     })
-    it('a verified request is ready to decide, then moves to "recently handled" with its email status', async () => {
+    it('a verified request is ready to answer, then moves to "recently handled" with its email status', async () => {
       const { appt } = await verified()
       let list = await rr.listRequests(db, me)
-      expect(list.requests[0]).toMatchObject({ phase: 'decide', payment: { state: 'verified' } })
+      expect(list.requests[0]).toMatchObject({ phase: 'awaiting_therapist', payment: { state: 'verified' } })
       await rr.acceptAppointment(db, appt, { by: BY })
       list = await rr.listRequests(db, me)
       expect(list.requests).toHaveLength(0)
@@ -960,16 +972,16 @@ describe('"being processed" email', () => {
     const { buildProcessingEmail } = await import('./reviewEmails.js')
     const e = buildProcessingEmail(view)
     expect(e.subject).toBe('Your appointment on Nov 17 is being processed')
-    expect(e.html).toContain('Therapist is reviewing'); expect(e.html).toContain('View my appointment'); expect(e.html).toContain('border:1px solid #f3d284')
+    expect(e.html).toContain('Payment under review'); expect(e.html).toContain('View my appointment'); expect(e.html).toContain('border:1px solid #f3d284')
     expect(e.text).toMatchInlineSnapshot(`
       "Hello Rene,
 
       We got your payment.
 
-      Your appointment is being processed. Edward Briones will check your payment and accept your appointment. We'll email you again as soon as that happens.
+      Your appointment is being processed. The clinic will check your payment, then Edward Briones will accept your appointment. We'll email you again as soon as that happens.
 
       [done] Payment recorded: Nov 16, 6:24 PM
-      [now]  Therapist is reviewing: usually within 24 hours
+      [now]  Payment under review: usually within 24 hours
       [next] Appointment accepted: you'll get a confirmation email
 
       Patient: Miguel Tayao
@@ -979,7 +991,7 @@ describe('"being processed" email', () => {
       Session · Clinic: Cognitive · Main Clinic
       Payment: ₱300.00 · GCash QR · Ref ending 4544
 
-      Your time slot is held for you until Nov 19, 6:24 PM. If your therapist needs a new receipt, we'll let you know.
+      Your time slot is held for you until Nov 19, 6:24 PM. If we need a new receipt, we'll let you know.
 
       View my appointment: https://therapypro.app/appointments
 
@@ -1038,5 +1050,111 @@ describe('proof route: the email', () => {
     expect(await res.json()).toMatchObject({ paymentStatus: 'proof_submitted', emailQueued: false })
     expect(store.appointment_emails.find((e) => e.type === 'processing')).toMatchObject({ status: 'failed' })
     expect(store.payment_attempts[0]).toMatchObject({ status: 'pending_verification', email_status: 'failed' })
+  })
+})
+
+/* ───────────────────────── Owner checks the payment first, then the therapist answers ───────────────────────── */
+describe('booking approval flow', () => {
+  const owner = { _id: new ObjectId(), email: 'owner@example.com', role: 'Owner' }
+  const therapist = { _id: therapistId, email: 'th@example.com' }
+  const therapistUser = { _id: new ObjectId(), email: 'th@example.com', role: 'Therapist' }
+  const fresh = (a) => store.appointments.find((x) => String(x._id) === String(a._id))
+  const notices = (email) => (store.notifications || []).filter((n) => n.recipient_email === email)
+  async function sent() {
+    const appt = await makeHold()
+    const attempt = await newAttempt(appt, 'gcash')
+    const { submitProof } = await import('./paymentProof.js')
+    await submitProof(db, attempt, appt, { reference: REF, file: jpegBytes(), key: 'flow-key-00000000001' })
+    store.employees = [{ _id: therapistId, email: 'th@example.com' }]
+    store.users = [owner]
+    return fresh(appt)
+  }
+  let flow, rules
+  beforeEach(async () => { flow = await import('./bookingFlow.js'); rules = await import('./bookingFlowRules.js') })
+
+  it('maps old and new records to a stage', () => {
+    expect(rules.stageOf({ status: 'Pending', payment_state: 'pending_verification' })).toBe('awaiting_payment_check')
+    expect(rules.stageOf({ status: 'Pending', payment_state: 'paid' })).toBe('awaiting_therapist')
+    expect(rules.stageOf({ status: 'Pending' })).toBe('awaiting_therapist')
+    expect(rules.stageOf({ status: 'Confirmed', payment_state: 'paid' })).toBe('confirmed')
+    expect(rules.stageOf({ status: 'Cancelled', decision: 'declined' })).toBe('declined')
+    expect(rules.stageOf({ status: 'Completed' })).toBe('completed')
+  })
+
+  it('the therapist cannot answer before the Owner verifies; verifying twice notifies once and keeps the time', async () => {
+    const appt = await sent()
+    await expect(flow.therapistRespond(db, therapist, therapistUser, String(appt._id), { action: 'accept' })).rejects.toMatchObject({ code: 'NOT_READY' })
+    expect((await flow.ownerVerify(db, owner, String(appt._id))).already).toBe(false)
+    const at = fresh(appt).payment.verifiedAt
+    expect((await flow.ownerVerify(db, owner, String(appt._id))).already).toBe(true)
+    expect(fresh(appt).payment.verifiedAt).toBe(at)
+    expect(rules.stageOf(fresh(appt))).toBe('awaiting_therapist')
+    expect(fresh(appt).status).toBe('Pending')
+    expect(notices('th@example.com')).toHaveLength(1)
+  })
+
+  it('accept confirms once', async () => {
+    const appt = await sent()
+    await flow.ownerVerify(db, owner, String(appt._id))
+    expect((await flow.therapistRespond(db, therapist, therapistUser, String(appt._id), { action: 'accept' })).stage).toBe('confirmed')
+    expect((await flow.therapistRespond(db, therapist, therapistUser, String(appt._id), { action: 'accept' })).already).toBe(true)
+    expect(fresh(appt)).toMatchObject({ status: 'Confirmed', therapistResponse: { action: 'accepted' } })
+    expect(notices('g@example.com').filter((n) => /confirmed/i.test(n.title))).toHaveLength(1)
+  })
+
+  it('decline marks the payment for refund and tells the Owner', async () => {
+    const appt = await sent()
+    await flow.ownerVerify(db, owner, String(appt._id))
+    await flow.therapistRespond(db, therapist, therapistUser, String(appt._id), { action: 'decline', reason: 'Away that day' })
+    expect(rules.stageOf(fresh(appt))).toBe('declined')
+    expect(fresh(appt).payment.status).toBe('refund_due')
+    expect(notices('owner@example.com').some((n) => /declined/i.test(n.title))).toBe(true)
+  })
+
+  it('another therapist is refused', async () => {
+    const appt = await sent()
+    await expect(flow.therapistRespond(db, { _id: new ObjectId() }, therapistUser, String(appt._id), { action: 'accept' })).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('a taken slot gives 409 SLOT_TAKEN and the request stays in the queue', async () => {
+    const appt = await sent()
+    store.appointments.push({ ...appt, _id: new ObjectId(), payment_state: 'paid', status: 'Confirmed' })
+    await expect(flow.ownerVerify(db, owner, String(appt._id))).rejects.toMatchObject({ status: 409, code: 'SLOT_TAKEN' })
+    expect(rules.stageOf(fresh(appt))).toBe('awaiting_payment_check')
+  })
+
+  it('reject holds the slot 24 hours, hides it from the therapist, and a new receipt returns it to the Owner', async () => {
+    const appt = await sent()
+    await expect(flow.ownerReject(db, owner, String(appt._id), { reason: 'other' })).rejects.toMatchObject({ code: 'MESSAGE_REQUIRED_FOR_OTHER' })
+    const now = new Date()
+    await flow.ownerReject(db, owner, String(appt._id), { reason: 'receipt_unclear' }, now)
+    expect(fresh(appt).payment).toMatchObject({ status: 'rejected', rejectedReason: 'receipt_unclear' })
+    expect(fresh(appt).payment.slotHoldUntil.getTime()).toBe(now.getTime() + 24 * 3600 * 1000)
+    expect(rules.stageOf(fresh(appt))).toBe('payment_rejected')
+    expect((await (await import('./requestReview.js')).listRequests(db, therapist)).requests).toHaveLength(0)
+    const guardian = { _id: new ObjectId(), email: 'g@example.com', role: 'Patient' }
+    await expect(flow.guardianResubmit(db, { _id: new ObjectId(), email: 'x@example.com' }, String(appt._id), { reference: REF, file: jpegBytes(), key: 'flow-key-00000000002' })).rejects.toMatchObject({ status: 403 })
+    await flow.guardianResubmit(db, guardian, String(appt._id), { reference: REF, file: jpegBytes(), key: 'flow-key-00000000002' })
+    expect(rules.stageOf(fresh(appt))).toBe('awaiting_payment_check')
+    expect(fresh(appt).payment.status).toBe('pending_check')
+    expect(fresh(appt).payment.rejectedMessage).toBeUndefined()
+  })
+
+  it('no new receipt within 24 hours releases the slot and cancels with a message', async () => {
+    const appt = await sent()
+    await flow.ownerReject(db, owner, String(appt._id), { reason: 'amount_less' })
+    await core.expireStaleHolds(db, new Date(Date.now() + 25 * 3600 * 1000))
+    expect(fresh(appt)).toMatchObject({ status: 'Cancelled', cancelled_reason: 'No new receipt was received within 24 hours' })
+    expect(notices('g@example.com').some((n) => /cancelled/i.test(n.title))).toBe(true)
+  })
+
+  it('the API refuses each role the other roles\' actions', async () => {
+    const { default: express } = await import('express')
+    const { default: handler } = await import('./routes/booking-flow.js')
+    const app = express(); app.use(express.json()); app.all('/api/booking-flow', handler)
+    const server = await new Promise((r) => { const x = app.listen(0, () => r(x)) })
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/booking-flow?action=nope`)
+    expect(res.status).toBe(404)
+    server.close()
   })
 })

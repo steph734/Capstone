@@ -3,8 +3,15 @@ import OwnerPageShell from './OwnerPageShell'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import { authFetch } from '../../utils/session'
 import './OwnerAppointmentsPage.css'
+import { PaymentQueuePanel, VerifyPaymentModal } from './PaymentCheck'
+import { flowApi } from '../../utils/bookingFlowApi'
+import { STAGE_LABELS } from '../../../api/_lib/bookingFlowRules'
 
 const STATUSES = ['Confirmed', 'Pending', 'Completed', 'Cancelled', 'No Show']
+// The pill shows where the booking is in the approval flow (always as text, never colour alone).
+const STAGE_PILL = { awaiting_payment_check: 'oa-pill-orange', payment_rejected: 'oa-pill-orange', awaiting_therapist: 'oa-pill-yellow', confirmed: 'oa-pill-green', completed: 'oa-pill-gray', declined: 'oa-pill-red', cancelled: 'oa-pill-red', no_show: 'oa-pill-red' }
+const stageLabel = (a) => STAGE_LABELS[a.stage] || a.status
+const stagePill = (a) => STAGE_PILL[a.stage] || STATUS_PILL[a.status] || 'oa-pill-gray'
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' }) : '—')
 const initials = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
@@ -75,7 +82,7 @@ function ViewModal({ appt, onClose }) {
           <Avatar appt={appt} className="oa-profile-avatar" />
           <h2 className="oa-profile-name">{appt.patient}</h2>
           <p className="oa-profile-meta">{appt.service}</p>
-          <span className={`oa-pill ${STATUS_PILL[appt.status] || 'oa-pill-gray'}`}>{appt.status}</span>
+          <span className={`oa-pill ${stagePill(appt)}`}>{stageLabel(appt)}</span>
         </div>
 
         <div className="oa-profile-body">
@@ -103,7 +110,7 @@ function ViewModal({ appt, onClose }) {
             </div>
             <div className="oa-detail-row">
               <span className="oa-detail-lbl">Status</span>
-              <span className="oa-detail-val">{appt.status}</span>
+              <span className="oa-detail-val">{stageLabel(appt)}</span>
             </div>
           </div>
 
@@ -137,6 +144,22 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [viewing, setViewing] = useState(null)
+  const [queue, setQueue] = useState([])
+  const [reviewId, setReviewId] = useState(null)
+  const [toast, setToast] = useState('')
+  useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
+  const loadQueue = () => flowApi.ownerQueue().then((d) => setQueue(d.items)).catch((e) => console.error('payment queue:', e.message))
+  useEffect(() => {
+    loadQueue()
+    const id = setInterval(loadQueue, 60000)
+    window.addEventListener('focus', loadQueue)
+    return () => { clearInterval(id); window.removeEventListener('focus', loadQueue) }
+  }, [])
+  const reviewed = (id, left) => { // take it off the list at once, then read the real state again
+    if (id) setQueue((q) => q.filter((r) => r.id !== id))
+    if (!left) setReviewId(null)
+    loadQueue(); load(true)
+  }
 
   const applyPreset = (p) => {
     setDatePreset(p)
@@ -158,15 +181,15 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
     }
   }
 
-  const load = () => {
-    setLoading(true)
+  const load = (quiet) => {
+    if (quiet !== true) setLoading(true)
     setError('')
     authFetch('/api/owner/appointments')
       .then((d) => { setAppointments(d.appointments); setBranchNames(d.branches) })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }
-  useEffect(load, [])
+  useEffect(() => { load() }, [])
   const BRANCHES = useMemo(() => branchNames, [branchNames])
 
   const filtered = appointments.filter((a) => {
@@ -182,7 +205,8 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
   const counts = {
     total: appointments.length,
     confirmed: appointments.filter((a) => a.status === 'Confirmed').length,
-    pending: appointments.filter((a) => a.status === 'Pending').length,
+    toVerify: queue.length,
+    waiting: appointments.filter((a) => a.stage === 'awaiting_therapist').length,
     cancelled: appointments.filter((a) => a.status === 'Cancelled').length,
   }
 
@@ -191,7 +215,7 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
       user={user}
       onLogout={onLogout}
       title="Appointments"
-      subtitle="Monitor bookings and session flow across all branches"
+      subtitle="Monitor bookings and verify payments across all branches"
       icon="🗓️"
       menuItems={getOwnerMenuItems(betaTier)}
     >
@@ -202,6 +226,11 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
           <div className="oa-kpi-value">{counts.total}</div>
           <div className="oa-kpi-label">Total Appointments</div>
         </div>
+        <div className={`oa-kpi-card orange${counts.toVerify > 0 ? ' hot' : ''}`}>
+          <div className="oa-kpi-icon"><ClockIcon /></div>
+          <div className="oa-kpi-value">{counts.toVerify}</div>
+          <div className="oa-kpi-label">Payments to verify</div>
+        </div>
         <div className="oa-kpi-card green">
           <div className="oa-kpi-icon"><CheckCircleIcon /></div>
           <div className="oa-kpi-value">{counts.confirmed}</div>
@@ -209,8 +238,8 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
         </div>
         <div className="oa-kpi-card amber">
           <div className="oa-kpi-icon"><ClockIcon /></div>
-          <div className="oa-kpi-value">{counts.pending}</div>
-          <div className="oa-kpi-label">Pending</div>
+          <div className="oa-kpi-value">{counts.waiting}</div>
+          <div className="oa-kpi-label">Waiting for therapist</div>
         </div>
         <div className="oa-kpi-card red">
           <div className="oa-kpi-icon"><XCircleIcon /></div>
@@ -218,6 +247,8 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
           <div className="oa-kpi-label">Cancelled</div>
         </div>
       </div>
+
+      <PaymentQueuePanel items={queue} onReview={setReviewId} />
 
       {/* Toolbar */}
       <div className="oa-toolbar">
@@ -303,7 +334,7 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
                       <span className="oa-time">{a.time}</span>
                     </div>
                   </td>
-                  <td data-label="Status"><span className={`oa-pill ${STATUS_PILL[a.status] || 'oa-pill-gray'}`}>{a.status}</span></td>
+                  <td data-label="Status"><span className={`oa-pill ${stagePill(a)}`}>{stageLabel(a)}</span></td>
                   <td className="oa-cell-actions" data-label="Actions">
                     <div className="oa-table-actions">
                       <button className="oa-icon-btn oa-icon-view" onClick={() => setViewing(a)} title="View" aria-label={`View ${a.patient}'s appointment`}>
@@ -319,6 +350,8 @@ export default function OwnerAppointmentsPage({ user, onLogout, betaTier }) {
       </section>
 
       {viewing && <ViewModal appt={viewing} onClose={() => setViewing(null)} />}
+      {reviewId && queue.length > 0 && <VerifyPaymentModal items={queue} initialId={reviewId} onClose={() => setReviewId(null)} onDone={reviewed} showToast={setToast} />}
+      {toast && <div className="pcq-toast" role="status" aria-live="polite">{toast}</div>}
     </OwnerPageShell>
   )
 }

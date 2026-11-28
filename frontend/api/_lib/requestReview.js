@@ -69,7 +69,7 @@ async function declineCore(db, appt, { reason, message, by, now }) {
   const set = {
     status: 'Cancelled', cancelled_reason: 'Declined by therapist', decision: 'declined', decline_reason: reason, decline_message: message || null,
     declined_at: now, declined_by: by, decided_at: now, review_state: null, hold_expires_at: null, updated_at: now,
-    ...(verified ? {} : { payment_state: 'failed' }),
+    ...(verified ? { 'payment.status': 'refund_due' } : { payment_state: 'failed' }),
   }
   const r = await db.collection('appointments').updateOne({ _id: appt._id, status: 'Pending' }, { $set: set })
   if (!r.matchedCount) throw new ReviewError(409, 'ALREADY_DECIDED', 'This request was already decided.')
@@ -83,7 +83,7 @@ export async function declineAppointment(db, appt, input, { by, now = new Date()
   const v = validateDecline(input)
   if (!v.ok) throw new ReviewError(422, v.code, v.message)
   // The payment must have been checked first (an online payment still waiting for a decision cannot be declined from here).
-  if (appt.payment_state === 'pending_verification') throw new ReviewError(409, 'PAYMENT_NOT_VERIFIED', 'Check the payment first.')
+  if (['pending_verification', 'awaiting_payment'].includes(appt.payment_state)) throw new ReviewError(409, 'PAYMENT_NOT_VERIFIED', 'The payment has not been verified yet.')
   const { paymentSent } = await declineCore(db, appt, { ...v.value, by, now })
   const email = await sendTracked(db, { appointmentId: appt._id, type: 'decline', to: appt.contact_email, toName: appt.guardian_name, email: buildDeclineEmail(emailView(appt, { ...v.value, paymentSent })), sender, backoffMs })
   return { status: 'Cancelled', email, warning: warnOf(email) }
@@ -127,7 +127,7 @@ export async function acceptAppointment(db, appt, { by, now = new Date() } = {})
   if (!r.matchedCount) {
     const cur = await db.collection('appointments').findOne({ _id: appt._id })
     if (cur && cur.status !== 'Pending') throw new ReviewError(409, 'ALREADY_DECIDED', 'This request was already decided.')
-    throw new ReviewError(409, 'PAYMENT_NOT_VERIFIED', 'Check the payment first.')
+    throw new ReviewError(409, 'PAYMENT_NOT_VERIFIED', 'The payment has not been verified yet.')
   }
   // The EXISTING confirmation email (same function the old Accept button used).
   const rec = { appointment_id: appt._id, type: 'accept', to: appt.contact_email || '', subject: `TherapyPro: Appointment accepted — ${dateLong(appt.session_date)}`, html: '', text: `${appt.therapist_name || 'Your therapist'} accepted ${appt.patient_name}'s appointment on ${dateLong(appt.session_date)}, ${timeRange(appt)}.`, status: 'queued', attempts: 0, error: null, created_at: now, sent_at: null }
@@ -137,6 +137,12 @@ export async function acceptAppointment(db, appt, { by, now = new Date() } = {})
     sender: () => sendAppointmentStatusEmail({ email: appt.contact_email, guardianName: appt.guardian_name, patient: appt.patient_name, therapist: appt.therapist_name, therapistRole: appt.therapist_role, dateStr: dateLong(appt.session_date), timeStr: timeRange(appt), accepted: true }),
   })
   return { status: 'Confirmed', email, warning: warnOf(email) }
+}
+
+// Who answered and how. Written once: a repeat never changes the time.
+export async function recordTherapistResponse(db, appt, user, action, reason = '', now = new Date()) {
+  const why = cleanText(reason, 500)
+  await db.collection('appointments').updateOne({ _id: appt._id, therapistResponse: null }, { $set: { therapistResponse: { by: user._id, at: now, action: action === 'accept' ? 'accepted' : 'declined', ...(why ? { reason: why } : {}) } } })
 }
 
 /* ───────── emails ───────── */
@@ -157,28 +163,26 @@ const METHOD_LABEL = { gcash: 'GCash QR', paymaya: 'Maya QR' }
 
 export async function listRequests(db, employee, now = new Date()) {
   const appts = await db.collection('appointments').find({
-    employee_id: employee._id, status: 'Pending', is_archived: { $ne: true },
-    $or: [{ payment_state: { $nin: ['awaiting_payment', 'expired', 'failed', 'cancelled'] } }, { review_state: 'needs_proof' }],
+    employee_id: employee._id, status: 'Pending', is_archived: { $ne: true }, review_state: { $ne: 'needs_proof' },
+    payment_state: { $nin: ['awaiting_payment', 'expired', 'failed', 'cancelled'] }, // a rejected payment is not shown to the therapist
   }).toArray()
   const requests = []
   for (const a of appts) {
-    const attempt = a.payment_method === 'Cash' || a.payment_method === 'cash' ? null : await latestAttempt(db, a._id)
+    const waiting = a.payment_state === 'pending_verification' // the Owner has not checked it yet: status only, no proof details
+    const attempt = waiting || String(a.payment_method || '').toLowerCase() === 'cash' ? null : (await db.collection('payment_attempts').find({ appointment_id: a._id, status: 'succeeded' }).sort({ created_at: -1 }).limit(1).toArray())[0] || null
     let payment = null
     if (attempt) {
-      const state = attempt.status === 'succeeded' ? 'verified' : attempt.status === 'rejected' ? 'rejected' : 'proof_submitted'
+      const owner = a.payment?.verifiedBy ? await db.collection('users').findOne({ _id: a.payment.verifiedBy }, { projection: { first_name: 1, last_name: 1 } }) : null
       payment = {
-        attemptId: String(attempt._id), state, method: attempt.method, methodLabel: METHOD_LABEL[attempt.method] || 'QR', amount: attempt.amount,
-        referenceDisplay: attempt.reference_display || attempt.provider_ref || null, referenceLast4: attempt.reference_last4 || null,
-        submittedAt: attempt.proof_submitted_at || attempt.qr_submitted_at || null, holdExpiresAt: a.hold_expires_at || null,
-        holdText: holdText(a.hold_expires_at), holdExpired: Boolean(a.hold_expires_at && new Date(a.hold_expires_at) <= now),
-        receiptUrl: attempt.receipt_id ? `/api/payments/${attempt._id}/receipt` : null,
-        rejectReason: attempt.reject_reason || null, rejectNote: attempt.reject_note || null, rejectedAt: attempt.rejected_at || null, verifiedAt: attempt.verified_at || null,
-        referenceReused: Boolean(attempt.reference_reuse_flag),
+        state: 'verified', methodLabel: METHOD_LABEL[attempt.method] || (attempt.method === 'card' ? 'Card' : 'Online'), amount: attempt.amount,
+        referenceDisplay: attempt.reference_display || (attempt.method === 'card' ? null : attempt.provider_ref) || null,
+        verifiedAt: a.payment?.verifiedAt || attempt.verified_at || attempt.paid_at || null,
+        verifiedBy: a.payment?.verifiedBy ? [owner?.first_name, owner?.last_name].filter(Boolean).join(' ') || 'Owner' : null,
       }
     }
-    const phase = !payment ? 'decide' : payment.state === 'proof_submitted' ? 'check_payment' : payment.state === 'rejected' ? 'waiting_proof' : 'decide'
     requests.push({
-      id: String(a._id), phase, patientName: a.patient_name, guardianName: a.guardian_name || '', condition: a.condition || '',
+      id: String(a._id), phase: waiting ? 'waiting_owner' : 'awaiting_therapist', patientName: a.patient_name, guardianName: a.guardian_name || '', condition: a.condition || '',
+      date: new Date(a.session_date).toISOString().slice(0, 10), start: a.start_time,
       dateLong: dateLong(a.session_date), dateTab: dateTab(a.session_date), whenLabel: `${dateTab(a.session_date)}, ${new Date(a.session_date).getUTCFullYear()} · ${timeRange(a)}`, dateShort: dateShort(a.session_date), timeLabel: timeRange(a), timeStart: fmt12(a.start_time),
       sessionType: a.session_type || a.session_mode || '', clinic: CLINIC, amount: payment?.amount ?? a.total_due ?? null, requestedAt: a.created_at, payment,
     })

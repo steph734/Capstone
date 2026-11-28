@@ -20,7 +20,7 @@ import { loadAttempt, tokenOf } from '../bookingAccess.js'
 import { refreshCardAttempt, attemptView, submitQr, friendlyFailure, markFailed, tokenMatches, PAYMENT_MESSAGES } from '../paymentAttempts.js'
 import { releaseHold } from '../bookingCore.js'
 import { confirmSent, submitProof, loadReceipt, PROOF_MESSAGES } from '../paymentProof.js'
-import { notifyPatient, notifyTherapistProof } from '../paymentNotifications.js'
+import { notifyPatient, notifyOwners } from '../paymentNotifications.js'
 import { buildProcessingEmail, sendTracked } from '../reviewEmails.js'
 import { emailView, holdText } from '../requestReview.js'
 import { MAX_RECEIPT_BYTES } from '../paymentProofRules.js'
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       let emailQueued = false
       if (!out.replay) {
         // Best effort: a failed notice never undoes the stored proof.
-        const t = await notifyTherapistProof(db, appointment, { changed: out.changed }).catch((e) => { console.error('therapist notice failed:', e.message); return { inApp: false } })
+        const t = await notifyOwners(db, appointment, { changed: out.changed }) // the Owner checks the payment first
         receivedByTherapist = Boolean(t.inApp)
         if (!out.changed) {
           await notifyPatient(db, 'proofReceived', appointment).catch((e) => console.error('patient notice failed:', e.message))
@@ -133,10 +133,14 @@ async function receipt(req, res) {
   let allowed = false
   if (tokenOf(req)) allowed = tokenMatches(tokenOf(req), appointment.access_token_hash)
   if (!allowed) {
-    const ctx = await requireSession(req, res, { roles: ['Therapist'], auditDenied: true })
+    const ctx = await requireSession(req, res, { roles: ['Owner', 'Therapist'], auditDenied: true })
     if (!ctx) return
-    const employee = await employeeFor(ctx.db, ctx.user)
-    allowed = Boolean(employee && String(employee._id) === String(appointment.employee_id))
+    if (ctx.user.role === 'Owner') allowed = true // the Owner checks payments
+    else {
+      // The therapist sees nothing but the status until the Owner has confirmed the payment.
+      const employee = await employeeFor(ctx.db, ctx.user)
+      allowed = Boolean(employee && String(employee._id) === String(appointment.employee_id) && !['pending_verification', 'awaiting_payment'].includes(appointment.payment_state))
+    }
   }
   if (!allowed) return res.status(403).json({ error: PROOF_MESSAGES.NOT_ALLOWED, code: 'NOT_ALLOWED' })
 

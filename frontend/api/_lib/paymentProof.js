@@ -96,7 +96,11 @@ export async function submitProof(db, attempt, appointment, { reference, file, k
   }
   await db.collection('payment_attempts').updateOne({ _id: attempt._id }, { $set: patch })
   const until = new Date(now.getTime() + PAYMENT_HOLD_MS) // the therapist gets a full hold period to check it
-  await db.collection('appointments').updateOne({ _id: appointment._id }, { $set: { payment_state: 'pending_verification', hold_expires_at: until, updated_at: now } })
+  const fixing = appointment.payment?.status === 'rejected' // a new receipt after the Owner sent it back
+  await db.collection('appointments').updateOne({ _id: appointment._id }, {
+    $set: { payment_state: 'pending_verification', hold_expires_at: until, updated_at: now, ...(fixing ? { 'payment.status': 'pending_check', review_state: null } : {}) },
+    ...(fixing ? { $unset: { 'payment.rejectedReason': '', 'payment.rejectedMessage': '', 'payment.rejectedAt': '', 'payment.slotHoldUntil': '' } } : {}),
+  })
   if (appointment.employee_id) await extendSlotLock(db, slotKey(appointment.employee_id, appointment.session_date, appointment.start_time), appointment._id, PAYMENT_HOLD_MS, now)
   await audit(db, attempt, changed ? 'proof_changed' : 'proof_submitted', 'patient', { last4: ref.last4, bytes: receipt.buffer.length })
   return { attempt: { ...attempt, ...patch }, replay: false, changed }

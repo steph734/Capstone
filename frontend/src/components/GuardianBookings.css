@@ -1,0 +1,20 @@
+.gb { background: #fff; border: 1px solid #e3ede9; border-radius: 16px; padding: 16px 18px; color: #1d3a30; }
+.gb h2 { margin: 0 0 6px; font-size: 18px; font-weight: 800; }
+.gb ul { list-style: none; margin: 0; padding: 0; }
+.gb li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #eef3f1; }
+.gb-main { flex: 1 1 240px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gb-main strong { font-size: 14px; }
+.gb-main span { font-size: 13px; color: #6b7c75; }
+.gb-main p { margin: 4px 0 0; font-size: 13.5px; }
+.gb-main em { font-style: normal; font-size: 12.5px; font-weight: 700; color: #9a4a06; }
+.gb-pill { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #eef3f1; color: #4b6359; }
+.gb-pill.ok { background: #e3f4e8; color: #12704a; }
+.gb-pill.warn { background: #fff0dc; color: #9a4a06; }
+.gb-pill.wait { background: #e6edfc; color: #2f55b0; }
+.gb-pill.off { background: #fde8e8; color: #a32020; }
+.gb-btn { min-height: 44px; padding: 0 18px; border: 2px solid #254a3f; border-radius: 12px; background: #254a3f; color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+.gb-btn.light { background: #fff; color: #254a3f; }
+.gb-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.gb-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 40, 32, 0.5); }
+.gb-modal { box-sizing: border-box; width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border-radius: 20px; background: #fff; color: #1e293b; outline: none; }
+.gb-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }

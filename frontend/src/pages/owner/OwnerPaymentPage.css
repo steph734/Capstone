@@ -446,6 +446,12 @@
   box-shadow: 0 6px 16px rgba(44, 74, 62, 0.4);
 }
 
+.submit-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .submit-button:active {
   transform: translateY(0);
 }

@@ -8,7 +8,7 @@ import { checkReceiptFile } from '../../utils/receiptImage'
 //
 // Controlled by the checkout modal: { reference, file } live there so they survive the confirmation modal, a failed submit,
 // and going back. `controls` hands the modal two functions to move focus to a field ("Edit" / "Change" on the confirm modal).
-export default function PaymentProofStep({ method, reference, onReference, file, onFile, holdBanner, rejectedReason, error, controls }) {
+export default function PaymentProofStep({ method, reference, onReference, file, onFile, holdBanner, rejectedReason, error, controls, verifier = 'your therapist' }) {
   const rule = REFERENCE_RULES[method] || REFERENCE_RULES.gcash
   const [touched, setTouched] = useState(false)
   const [fileError, setFileError] = useState('')
@@ -58,7 +58,7 @@ export default function PaymentProofStep({ method, reference, onReference, file,
         <h2 tabIndex={-1} data-step-heading className="text-2xl font-bold text-slate-800 outline-none">Add your payment proof</h2>
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">Required</span>
       </div>
-      <p className="mt-1 text-sm text-slate-500">Enter the reference number and upload your receipt so your therapist can verify the payment.</p>
+      <p className="mt-1 text-sm text-slate-500">Enter the reference number and upload your receipt so {verifier} can verify the payment.</p>
 
       {rejectedReason !== undefined && rejectedReason !== null && (
         <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-800">

@@ -1,12 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
-import StripeSubscribeForm from '../../components/StripeSubscribeForm'
+import SubscriptionCheckoutModal from '../../components/SubscriptionCheckoutModal'
 import { authFetch } from '../../utils/session'
 import { invalidateEntitlements } from '../../hooks/useEntitlements'
 import './OwnerPaymentPage.css'
-
-const STRIPE_BILLING_PERIODS = new Set(['monthly', 'yearly'])
 
 // Dialling code prefilled into the phone field when a country/region is picked.
 const COUNTRY_DIAL_CODES = {
@@ -85,6 +83,19 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
   // isn't silent: null | { status: 'sending' | 'sent' | 'error', to, error }
   const [receiptResult, setReceiptResult] = useState(null)
 
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [qrPayment, setQrPayment] = useState(null) // the clinic's latest GCash / Maya payment
+
+  useEffect(() => {
+    let cancelled = false
+    authFetch('/api/owner/subscription/qr').then((d) => {
+      if (cancelled) return
+      setQrPayment(d.payment)
+      if (d.payment?.status === 'approved') invalidateEntitlements()
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const currentUser = user || { 
     name: 'Owner', 
     role: 'Owner', 
@@ -144,7 +155,8 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
     })
   }
 
-  const stripeReady = STRIPE_BILLING_PERIODS.has(billingPeriod)
+  const billingEmail = paymentData.email || currentUser.email
+  const billingName = paymentData.fullName || currentUser.name
 
   const handleSubscribeSuccess = async ({ subscriptionId } = {}) => {
     setPaymentStatus('success')
@@ -154,6 +166,27 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
       try { await authFetch('/api/owner/subscription/confirm', { method: 'POST', body: { subscription_id: subscriptionId } }); break } catch { await new Promise((r) => setTimeout(r, 1500)) }
     }
     invalidateEntitlements()
+  }
+
+  // Card paid: record the plan for the clinic, then email the receipt (a mail failure never undoes the payment).
+  const handleCardPaid = async ({ subscriptionId, paymentIntent }) => {
+    await handleSubscribeSuccess({ subscriptionId })
+    setReceiptResult({ status: 'sending', to: billingEmail })
+    fetch('/api/send-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: billingEmail, name: billingName, paymentIntentId: paymentIntent.id, tierId: tier.id }),
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        setReceiptResult(r.ok ? { status: 'sent', to: billingEmail } : { status: 'error', to: billingEmail, error: body.error || `HTTP ${r.status}` })
+      })
+      .catch((e) => setReceiptResult({ status: 'error', to: billingEmail, error: e.message }))
+  }
+
+  const closeCheckout = (paid) => {
+    setCheckoutOpen(false)
+    if (paid) handleGoBack()
   }
 
   const handleGoBack = () => {
@@ -347,23 +380,26 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                     </label>
                   </div>
 
-                  <h3 className="section-title">Card details</h3>
-                  {stripeReady ? (
-                    <StripeSubscribeForm
-                      tierId={tier.id}
-                      billingPeriod={billingPeriod}
-                      submitLabel={`Subscribe — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
-                      billingEmail={paymentData.email || currentUser.email}
-                      billingName={paymentData.fullName || currentUser.name}
-                      billingPhone={paymentData.phone}
-                      onSuccess={handleSubscribeSuccess}
-                      onReceiptResult={setReceiptResult}
-                    />
-                  ) : (
-                    <p className="field-description">
-                      This billing period isn't set up yet — please choose Monthly or Yearly to subscribe right now.
+                  {qrPayment?.status === 'pending' && (
+                    <p className="field-description" role="status">
+                      Your {qrPayment.method === 'paymaya' ? 'Maya' : 'GCash'} payment of ₱{qrPayment.amount} for the {qrPayment.planName} plan
+                      (ref {qrPayment.referenceDisplay}) is waiting to be verified. Your plan starts once it is approved.
                     </p>
                   )}
+                  {qrPayment?.status === 'rejected' && (
+                    <p className="field-description" role="alert" style={{ color: '#b91c1c' }}>
+                      Your last QR payment was not accepted{qrPayment.reason ? `: ${qrPayment.reason}` : '.'} Check your receipt and try again.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="submit-button"
+                    style={{ width: '100%' }}
+                    onClick={() => setCheckoutOpen(true)}
+                    disabled={qrPayment?.status === 'pending'}
+                  >
+                    {qrPayment?.status === 'pending' ? 'Waiting for verification' : `Continue to payment — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
+                  </button>
               </div>
             </div>
 
@@ -388,8 +424,8 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
               <div className="renewal-info">
                 <InfoIcon />
                 <span>
-                  Charged and auto-renewed by Stripe every {isMonthly ? 'month' : 'year'} at
-                  {' '}₱{price}.00 — no additional tax is added.
+                  Card payments are auto-renewed by Stripe every {isMonthly ? 'month' : 'year'}. GCash / Maya QR
+                  pays for one {isMonthly ? 'month' : 'year'}. ₱{price}.00, no additional tax is added.
                 </span>
               </div>
             </div>
@@ -397,7 +433,20 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
         </div>
       </div>
 
-      {paymentStatus === 'success' && (
+      {checkoutOpen && (
+        <SubscriptionCheckoutModal
+          planName={tier.name.split(': ')[1] || tier.name}
+          planId={tier.id}
+          period={billingPeriod}
+          amount={price}
+          billing={{ name: billingName, email: billingEmail, phone: paymentData.phone }}
+          onCardPaid={handleCardPaid}
+          onQrSent={setQrPayment}
+          onClose={closeCheckout}
+        />
+      )}
+
+      {paymentStatus === 'success' && !checkoutOpen && (
         <div
           className="payment-success-overlay"
           role="dialog"

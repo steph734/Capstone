@@ -168,6 +168,7 @@ import adminPlanItem from './_lib/routes/admin-plan-item.js'
 import adminPlanArchive from './_lib/routes/admin-plan-archive.js'
 import plansPublic from './_lib/routes/plans-public.js'
 import * as meSub from './_lib/routes/me-subscription.js'
+import * as subQr from './_lib/routes/subscription-qr.js'
 import meProfile from './_lib/routes/me-profile.js'
 import { requireFeature } from './_lib/entitlements.js'
 import adminPlanFeatures from './_lib/routes/admin-plan-features.js'
@@ -480,6 +481,11 @@ app.all('/api/me/profile', meProfile) // the signed-in person's own profile (nam
 app.post('/api/owner/subscription/confirm', meSub.confirmRoute)
 app.post('/api/owner/subscription/trial', meSub.trialRoute)
 app.post('/api/owner/subscription/cancel', meSub.cancelRoute)
+app.get('/api/owner/subscription/qr', subQr.ownerGetRoute) // paying the plan by GCash / Maya QR
+app.post('/api/owner/subscription/qr', subQr.ownerSubmitRoute)
+app.get('/api/admin/subscription-payments', subQr.adminListRoute)
+app.get('/api/admin/subscription-payments/:id/receipt', subQr.adminReceiptRoute)
+app.post('/api/admin/subscription-payments/:id/:action', subQr.adminDecideRoute)
 app.get('/api/plans', plansPublic) // Owner-facing: Live (and the caller's Beta) plans only
 app.all('/api/admin/plans/subscribers', adminPlanSubscribers)
 app.all('/api/admin/plans/:id/archive', adminPlanArchive)

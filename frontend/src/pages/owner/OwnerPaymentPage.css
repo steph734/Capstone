@@ -577,3 +577,21 @@
     margin-left: 320px;
   }
 }
+/* QR payment waiting for / given approval */
+.qr-status { box-sizing: border-box; width: 100%; max-width: 520px; margin: 24px auto; padding: 28px 24px; background: #fff; border-radius: 16px; box-shadow: 0 4px 18px rgba(44, 74, 62, 0.08); text-align: center; color: #2c4a3e; }
+.qr-status-icon { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.qr-status-icon.wait { background: #fff4d6; color: #92400e; }
+.qr-status-icon.wait svg { width: 32px; height: 32px; }
+.qr-status-icon.ok { background: #e3f4e8; color: #1f7a45; }
+.qr-status h2 { margin: 0 0 6px; font-size: 24px; }
+.qr-status p { margin: 0; font-size: 14px; line-height: 1.5; color: #5c7268; }
+.qr-status dl { margin: 18px 0 14px; padding: 4px 16px; border: 1px solid #e3ece8; border-radius: 12px; font-size: 14px; }
+.qr-status dl > div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.qr-status dl > div + div { border-top: 1px solid #eef3f1; }
+.qr-status dt { color: #6b7c75; }
+.qr-status dd { margin: 0; font-weight: 700; text-align: right; }
+.qr-status .qr-status-note { font-size: 12.5px; }
+.qr-status-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+.qr-status-btn { flex: 1 1 180px; min-height: 46px; padding: 0 20px; border: 2px solid #2c4a3e; border-radius: 10px; background: #2c4a3e; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.qr-status-btn.light { background: #fff; color: #2c4a3e; }
+.qr-status-btn:disabled { opacity: 0.55; cursor: not-allowed; }

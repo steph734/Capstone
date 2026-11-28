@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getOwnerMenuItems } from './ownerSidebarConfig'
 import PatientSidebar from '../../components/PatientSidebar'
 import SubscriptionCheckoutModal from '../../components/SubscriptionCheckoutModal'
@@ -86,15 +86,33 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [qrPayment, setQrPayment] = useState(null) // the clinic's latest GCash / Maya payment
 
-  useEffect(() => {
-    let cancelled = false
-    authFetch('/api/owner/subscription/qr').then((d) => {
-      if (cancelled) return
-      setQrPayment(d.payment)
-      if (d.payment?.status === 'approved') invalidateEntitlements()
-    }).catch(() => {})
-    return () => { cancelled = true }
+  const [checking, setChecking] = useState(false)
+  const sawPending = useRef(false) // so "approved" is announced only for a payment we were waiting on
+  const isPending = qrPayment?.status === 'pending'
+
+  const refreshQr = useCallback(async () => {
+    try {
+      const { payment } = await authFetch('/api/owner/subscription/qr')
+      setQrPayment(payment)
+      if (payment?.status === 'approved') invalidateEntitlements()
+    } catch { /* offline: keep showing what we have */ }
   }, [])
+  useEffect(() => { refreshQr() }, [refreshQr])
+  // While waiting, ask again every 20 seconds and whenever the Owner comes back to the tab.
+  useEffect(() => {
+    if (!isPending) return undefined
+    sawPending.current = true
+    const id = setInterval(refreshQr, 20000)
+    window.addEventListener('focus', refreshQr)
+    return () => { clearInterval(id); window.removeEventListener('focus', refreshQr) }
+  }, [isPending, refreshQr])
+
+  const checkNow = async () => {
+    setChecking(true)
+    await refreshQr()
+    setChecking(false)
+  }
+  const showStatus = isPending || (qrPayment?.status === 'approved' && sawPending.current)
 
   const currentUser = user || { 
     name: 'Owner', 
@@ -224,6 +242,31 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
             <h1 className="payment-title">{tier.name.split(': ')[1]} plan</h1>
           </div>
 
+          {showStatus && (
+            <section className="qr-status" role="status" aria-live="polite">
+              <div className={`qr-status-icon ${isPending ? 'wait' : 'ok'}`}>{isPending ? <InfoIcon /> : <CheckIcon />}</div>
+              <h2>{isPending ? 'Waiting for verification' : 'Payment approved'}</h2>
+              <p>
+                {isPending
+                  ? 'We received your payment details. Your plan starts as soon as the payment is approved.'
+                  : `Your ${qrPayment.planName} plan is now active.`}
+              </p>
+              <dl>
+                <div><dt>Plan</dt><dd>{qrPayment.planName} · {qrPayment.period === 'yearly' ? 'Yearly' : 'Monthly'}</dd></div>
+                <div><dt>Amount</dt><dd>₱{Number(qrPayment.amount).toFixed(2)}</dd></div>
+                <div><dt>Paid with</dt><dd>{qrPayment.method === 'paymaya' ? 'Maya' : 'GCash'} QR</dd></div>
+                <div><dt>Reference no.</dt><dd>{qrPayment.referenceDisplay}</dd></div>
+                <div><dt>Sent</dt><dd>{new Date(qrPayment.submittedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</dd></div>
+              </dl>
+              {isPending && <p className="qr-status-note">This page checks for an update automatically. You can safely leave it.</p>}
+              <div className="qr-status-actions">
+                {isPending && <button type="button" className="qr-status-btn light" onClick={checkNow} disabled={checking}>{checking ? 'Checking…' : 'Check now'}</button>}
+                <button type="button" className="qr-status-btn" onClick={handleGoBack}>Back to subscription</button>
+              </div>
+            </section>
+          )}
+
+          {!showStatus && (
           <div className="payment-content">
             {/* Left Column - Form */}
             <div className="payment-form-column">
@@ -380,12 +423,6 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                     </label>
                   </div>
 
-                  {qrPayment?.status === 'pending' && (
-                    <p className="field-description" role="status">
-                      Your {qrPayment.method === 'paymaya' ? 'Maya' : 'GCash'} payment of ₱{qrPayment.amount} for the {qrPayment.planName} plan
-                      (ref {qrPayment.referenceDisplay}) is waiting to be verified. Your plan starts once it is approved.
-                    </p>
-                  )}
                   {qrPayment?.status === 'rejected' && (
                     <p className="field-description" role="alert" style={{ color: '#b91c1c' }}>
                       Your last QR payment was not accepted{qrPayment.reason ? `: ${qrPayment.reason}` : '.'} Check your receipt and try again.
@@ -396,9 +433,8 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
                     className="submit-button"
                     style={{ width: '100%' }}
                     onClick={() => setCheckoutOpen(true)}
-                    disabled={qrPayment?.status === 'pending'}
                   >
-                    {qrPayment?.status === 'pending' ? 'Waiting for verification' : `Continue to payment — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
+                    {`Continue to payment — ₱${price}.00/${isMonthly ? 'month' : 'year'}`}
                   </button>
               </div>
             </div>
@@ -430,6 +466,7 @@ export default function OwnerPaymentPage({ user, onLogout, selectedTier, onBack,
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 
